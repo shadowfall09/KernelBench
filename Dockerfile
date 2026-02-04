@@ -30,5 +30,6 @@ COPY entrypoint.sh /app/KernelBench/entrypoint.sh
 RUN chmod +x /app/KernelBench/entrypoint.sh
 
 ENV PATH="/app/KernelBench/.venv/bin:$PATH"
+ENV CLAUDE_CODE_USE_BEDROCK=1
 
 ENTRYPOINT ["/app/KernelBench/entrypoint.sh"]

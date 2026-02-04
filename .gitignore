@@ -14,3 +14,4 @@ cache/*
 _build_cache/
 uv.lock
 CLAUDE.md
+runs_output/
