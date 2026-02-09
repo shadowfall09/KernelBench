@@ -1,13 +1,18 @@
-docker build -t kb-claude:v1 .
+# docker build -t kb-claude:v1 .
 
-# 确保本地有输出目录
-mkdir -p $(pwd)/runs_output
+LEVEL=${1:-1}
+PROBLEM=${2:-6}
+DEVICE=${3:-2}
 
-# 运行 Level 1, Problem 5
+mkdir -p runs_output
+mkdir -p $(pwd)/runs_output/${LEVEL}_${PROBLEM}
+
 docker run --rm -it \
-    --gpus '"device=2"' \
-    -e AWS_BEARER_TOKEN_BEDROCK="token" \
-    -e KB_LEVEL=1 \
-    -e KB_PROBLEM=5 \
-    -v $(pwd)/runs_output:/app/KernelBench/runs/claude_code \
+    --gpus "\"device=${DEVICE}\"" \
+    --cap-add=SYS_ADMIN \
+    --security-opt seccomp=unconfined \
+    -e AWS_BEARER_TOKEN_BEDROCK="${AWS_BEARER_TOKEN_BEDROCK:-}" \
+    -e KB_LEVEL=$LEVEL \
+    -e KB_PROBLEM=$PROBLEM \
+    -v $(pwd)/runs_output/${LEVEL}_${PROBLEM}:/app/KernelBench/runs/claude_code \
     kb-claude:v1
