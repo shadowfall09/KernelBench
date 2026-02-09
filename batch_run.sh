@@ -10,7 +10,7 @@ START=1
 END=10
 RUN_NAME="run_$(date +%Y%m%d_%H%M%S)"
 CUDA_VISIBLE_DEVICES="0,1,2,3"
-AWS_TOKEN="token"
+AWS_PROFILE="bedrock"
 DOCKER_IMAGE="kb-claude:v1"
 TIMEOUT=300
 HARDWARE="RTX_A6000"
@@ -39,8 +39,8 @@ while [[ $# -gt 0 ]]; do
             CUDA_VISIBLE_DEVICES="$2"
             shift 2
             ;;
-        --token)
-            AWS_TOKEN="$2"
+        --profile)
+            AWS_PROFILE="$2"
             shift 2
             ;;
         --timeout)
@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --end END            Ending problem number (default: 10)"
             echo "  --run-name NAME      Run name (default: run_YYYYMMDD_HHMMSS)"
             echo "  --gpus DEVICES       CUDA device list, comma-separated (default: 0,1,2,3)"
-            echo "  --token TOKEN        AWS Bearer Token (default: token)"
+            echo "  --profile PROFILE    AWS Profile (default: bedrock)"
             echo "  --timeout SECONDS    Evaluation timeout (default: 300)"
             echo "  --hardware HW        Hardware name (default: RTX_A6000)"
             echo "  --baseline BASELINE  Baseline name (default: baseline_time_torch)"
@@ -134,9 +134,10 @@ run_problem() {
         --gpus "device=${gpu}" \
         --cap-add=SYS_ADMIN \
         --security-opt seccomp=unconfined \
-        -e AWS_BEARER_TOKEN_BEDROCK="$AWS_TOKEN" \
+        -e AWS_PROFILE="$AWS_PROFILE" \
         -e KB_LEVEL=$LEVEL \
         -e KB_PROBLEM=$problem \
+        -v "$HOME/.aws:/root/.aws:ro" \
         -v "${problem_output_dir}:/app/KernelBench/runs/claude_code" \
         $DOCKER_IMAGE >> "$log_file" 2>&1
     
