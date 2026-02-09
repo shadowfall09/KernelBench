@@ -2,7 +2,8 @@
 
 # usage: ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3"
 
-set -e
+# 注意：不要在主流程开启 set -e，否则子进程报错可能导致主进程退出
+# set -e 
 
 # default parameters
 LEVEL=1
@@ -19,62 +20,17 @@ BASELINE="baseline_time_torch"
 # parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --level)
-            LEVEL="$2"
-            shift 2
-            ;;
-        --start)
-            START="$2"
-            shift 2
-            ;;
-        --end)
-            END="$2"
-            shift 2
-            ;;
-        --run-name)
-            RUN_NAME="$2"
-            shift 2
-            ;;
-        --gpus)
-            CUDA_VISIBLE_DEVICES="$2"
-            shift 2
-            ;;
-        --profile)
-            AWS_PROFILE="$2"
-            shift 2
-            ;;
-        --timeout)
-            TIMEOUT="$2"
-            shift 2
-            ;;
-        --hardware)
-            HARDWARE="$2"
-            shift 2
-            ;;
-        --baseline)
-            BASELINE="$2"
-            shift 2
-            ;;
-        --help)
-            echo "Usage: $0 [options]"
-            echo "Options:"
-            echo "  --level LEVEL        KernelBench level (default: 1)"
-            echo "  --start START        Starting problem number (default: 1)"
-            echo "  --end END            Ending problem number (default: 10)"
-            echo "  --run-name NAME      Run name (default: run_YYYYMMDD_HHMMSS)"
-            echo "  --gpus DEVICES       CUDA device list, comma-separated (default: 0,1,2,3)"
-            echo "  --profile PROFILE    AWS Profile (default: bedrock)"
-            echo "  --timeout SECONDS    Evaluation timeout (default: 300)"
-            echo "  --hardware HW        Hardware name (default: RTX_A6000)"
-            echo "  --baseline BASELINE  Baseline name (default: baseline_time_torch)"
-            echo "  --help               Show this help message"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Use --help to see available options"
-            exit 1
-            ;;
+        --level) LEVEL="$2"; shift 2 ;;
+        --start) START="$2"; shift 2 ;;
+        --end) END="$2"; shift 2 ;;
+        --run-name) RUN_NAME="$2"; shift 2 ;;
+        --gpus) CUDA_VISIBLE_DEVICES="$2"; shift 2 ;;
+        --profile) AWS_PROFILE="$2"; shift 2 ;;
+        --timeout) TIMEOUT="$2"; shift 2 ;;
+        --hardware) HARDWARE="$2"; shift 2 ;;
+        --baseline) BASELINE="$2"; shift 2 ;;
+        --help) echo "Usage: ..."; exit 0 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
@@ -83,53 +39,49 @@ IFS=',' read -ra GPU_ARRAY <<< "$CUDA_VISIBLE_DEVICES"
 NUM_GPUS=${#GPU_ARRAY[@]}
 
 echo "========================================="
-echo "KernelBench batch run script"
+echo "KernelBench PARALLEL batch run script (FIFO)"
 echo "========================================="
 echo "Level: $LEVEL"
 echo "Problem range: $START - $END"
 echo "Run name: $RUN_NAME"
 echo "Available GPUs: ${GPU_ARRAY[@]} (Total $NUM_GPUS)"
-echo "Docker image: $DOCKER_IMAGE"
 echo "========================================="
 
-# Create temporary output directory
+# Directories
 TEMP_OUTPUT_DIR="$(pwd)/runs_output_temp_${RUN_NAME}"
-mkdir -p "$TEMP_OUTPUT_DIR"
-
-# Create final output directory
 FINAL_OUTPUT_DIR="/home/yichengtao/KernelBench/runs/${RUN_NAME}"
-mkdir -p "$FINAL_OUTPUT_DIR"
+LOG_DIR="$(pwd)/logs_${RUN_NAME}"
+mkdir -p "$TEMP_OUTPUT_DIR" "$FINAL_OUTPUT_DIR" "$LOG_DIR"
 
-# Build Docker image
+# Build Docker image (ONCE, blocking)
 echo "Building Docker image..."
-docker build -t $DOCKER_IMAGE .
+docker build -t $DOCKER_IMAGE . || exit 1
 
-# Create task queue
-PROBLEMS=()
-for ((i=START; i<=END; i++)); do
-    PROBLEMS+=($i)
+# ==============================================================================
+#  CONCURRENCY CONTROL: NAMED PIPE (FIFO)
+# ==============================================================================
+FIFO_FILE="/tmp/$$.fifo"
+mkfifo "$FIFO_FILE"
+exec 6<>"$FIFO_FILE"  # Link file descriptor 6 to the FIFO
+rm "$FIFO_FILE"       # Remove file entry, FD remains open
+
+# 1. Initialize tokens: Push each GPU ID into the pipe
+for gpu in "${GPU_ARRAY[@]}"; do
+    echo "$gpu" >&6
 done
 
-# Create log directory
-LOG_DIR="$(pwd)/logs_${RUN_NAME}"
-mkdir -p "$LOG_DIR"
-
-# Background job arrays
-declare -A RUNNING_JOBS
-declare -A JOB_PROBLEMS
-
-# Function: Run a single problem
-run_problem() {
+# Function needs to be exported or defined before use
+run_task() {
     local problem=$1
     local gpu=$2
     local log_file="$LOG_DIR/problem_${problem}_gpu_${gpu}.log"
-    
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Problem $problem on GPU $gpu" | tee -a "$log_file"
-    
-    # Create a separate output directory for each problem
     local problem_output_dir="${TEMP_OUTPUT_DIR}/${LEVEL}_${problem}"
+    
     mkdir -p "$problem_output_dir"
     
+    echo "[$(date '+%H:%M:%S')] Starting P${problem} on GPU ${gpu}..."
+    
+    # Run Docker
     docker run --rm \
         --gpus "device=${gpu}" \
         --cap-add=SYS_ADMIN \
@@ -139,97 +91,65 @@ run_problem() {
         -e KB_PROBLEM=$problem \
         -v "$HOME/.aws:/root/.aws:ro" \
         -v "${problem_output_dir}:/app/KernelBench/runs/claude_code" \
-        $DOCKER_IMAGE >> "$log_file" 2>&1
-    
+        $DOCKER_IMAGE > "$log_file" 2>&1
+        
     local exit_code=$?
-    
+
     if [ $exit_code -eq 0 ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU $gpu completed Problem $problem ✓" | tee -a "$log_file"
-        # Copy only Python files to final directory
-        if [ -d "$problem_output_dir" ]; then
-            cp "$problem_output_dir"/*.py "$FINAL_OUTPUT_DIR/" 2>/dev/null || true
-        fi
+        echo "[$(date '+%H:%M:%S')] P${problem} DONE (GPU ${gpu}) ✓"
+        cp "$problem_output_dir"/*.py "$FINAL_OUTPUT_DIR/" 2>/dev/null || true
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU $gpu failed Problem $problem (Exit code: $exit_code) ✗" | tee -a "$log_file"
+        echo "[$(date '+%H:%M:%S')] P${problem} FAILED (GPU ${gpu}) ✗"
     fi
-    
-    return $exit_code
 }
 
-# Main loop: Assign tasks to GPUs
-problem_index=0
-total_problems=${#PROBLEMS[@]}
-completed=0
-failed=0
-
+# ==============================================================================
+#  MAIN LOOP
+# ==============================================================================
 echo ""
-echo "Starting task allocation..."
-echo ""
+echo "Starting parallel execution across $NUM_GPUS GPUs..."
 
-while [ $problem_index -lt $total_problems ] || [ ${#RUNNING_JOBS[@]} -gt 0 ]; do
-    # Check completed tasks
-    for gpu in "${!RUNNING_JOBS[@]}"; do
-        pid=${RUNNING_JOBS[$gpu]}
-        if ! kill -0 $pid 2>/dev/null; then
-            # Task completed
-            wait $pid
-            exit_code=$?
-            problem=${JOB_PROBLEMS[$gpu]}
-            
-            if [ $exit_code -eq 0 ]; then
-                ((completed++))
-            else
-                ((failed++))
-            fi
-            
-            unset RUNNING_JOBS[$gpu]
-            unset JOB_PROBLEMS[$gpu]
-            
-            echo "Progress: $((completed + failed))/$total_problems (Success: $completed, Failed: $failed)"
-        fi
-    done
+for ((problem=START; problem<=END; problem++)); do
+    # 2. Acquire a token (GPU)
+    # This command BLOCKS until a line (a GPU ID) is available to read
+    read -u 6 gpu_token
     
-    # Assign new tasks to idle GPUs
-    for gpu in "${GPU_ARRAY[@]}"; do
-        if [ $problem_index -lt $total_problems ] && [ -z "${RUNNING_JOBS[$gpu]}" ]; then
-            problem=${PROBLEMS[$problem_index]}
-            run_problem $problem $gpu &
-            pid=$!
-            RUNNING_JOBS[$gpu]=$pid
-            JOB_PROBLEMS[$gpu]=$problem
-            ((problem_index++))
-        fi
-    done
+    # 3. Launch background job
+    {
+        # Execute the task
+        run_task "$problem" "$gpu_token"
+        
+        # 4. Return the token
+        # ALWAYS execute this, even if run_task fails, so the GPU isn't lost forever
+        echo "$gpu_token" >&6
+    } & 
     
-    # Short sleep to avoid high CPU usage
-    sleep 2
+    # Don't sleep too long, just enough to prevent race conditions on log creation
+    sleep 0.5
 done
+
+# Wait for all background jobs to finish
+wait
+
+# Close FD
+exec 6>&-
 
 echo ""
 echo "========================================="
 echo "All tasks completed!"
-echo "Success: $completed"
-echo "Failed: $failed"
-echo "Total: $total_problems"
 echo "========================================="
 
-# Clean up temporary directory
-echo "Cleaning up temporary files..."
+# Clean up
 rm -rf "$TEMP_OUTPUT_DIR"
+echo "Results saved to: $FINAL_OUTPUT_DIR"
 
-echo ""
-echo "Generated files have been saved to: $FINAL_OUTPUT_DIR"
-echo ""
-
-# Run evaluation
-echo "========================================="
-echo "Starting evaluation..."
-echo "========================================="
+# ==============================================================================
+#  EVALUATION STAGE
+# ==============================================================================
 
 cd /home/yichengtao/KernelBench
 
-echo ""
-echo "Step 1: Evaluate from generations..."
+echo "Step 1: Evaluate..."
 uv run python scripts/eval_from_generations.py \
     run_name="${RUN_NAME}" \
     dataset_src=local \
@@ -237,18 +157,9 @@ uv run python scripts/eval_from_generations.py \
     num_gpu_devices=$NUM_GPUS \
     timeout=$TIMEOUT
 
-echo ""
-echo "Step 2: Benchmark analysis..."
+echo "Step 2: Analysis..."
 uv run python scripts/benchmark_eval_analysis.py \
     run_name="${RUN_NAME}" \
     level=$LEVEL \
     hardware=$HARDWARE \
     baseline=$BASELINE
-
-echo ""
-echo "========================================="
-echo "Batch processing completed!"
-echo "Run name: $RUN_NAME"
-echo "Log directory: $LOG_DIR"
-echo "Results directory: $FINAL_OUTPUT_DIR"
-echo "========================================="
