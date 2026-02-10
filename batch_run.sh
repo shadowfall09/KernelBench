@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# usage: ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3"
+# Usage: 
+#   Overwrite mode (default): ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3"
+#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3" --resume
 
 # 注意：不要在主流程开启 set -e，否则子进程报错可能导致主进程退出
 # set -e 
@@ -16,6 +18,7 @@ DOCKER_IMAGE="kb-claude:v1"
 TIMEOUT=300
 HARDWARE="RTX_A6000"
 BASELINE="baseline_time_torch"
+RESUME_MODE=false  # false=覆盖模式, true=继续运行模式
 
 # parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -29,7 +32,23 @@ while [[ $# -gt 0 ]]; do
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --hardware) HARDWARE="$2"; shift 2 ;;
         --baseline) BASELINE="$2"; shift 2 ;;
-        --help) echo "Usage: ..."; exit 0 ;;
+        --resume) RESUME_MODE=true; shift 1 ;;
+        --help)
+            echo "Usage: $0 [options]"
+            echo "Options:"
+            echo "  --level LEVEL        KernelBench level (default: 1)"
+            echo "  --start START        Starting problem number (default: 1)"
+            echo "  --end END            Ending problem number (default: 10)"
+            echo "  --run-name NAME      Run name (default: run_YYYYMMDD_HHMMSS)"
+            echo "  --gpus DEVICES       CUDA device list, comma-separated (default: 0,1,2,3)"
+            echo "  --profile PROFILE    AWS Profile (default: bedrock)"
+            echo "  --timeout SECONDS    Evaluation timeout (default: 300)"
+            echo "  --hardware HW        Hardware name (default: RTX_A6000)"
+            echo "  --baseline BASELINE  Baseline name (default: baseline_time_torch)"
+            echo "  --resume             Resume mode: skip already completed problems"
+            echo "  --help               Show this help message"
+            exit 0
+            ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -45,6 +64,7 @@ echo "Level: $LEVEL"
 echo "Problem range: $START - $END"
 echo "Run name: $RUN_NAME"
 echo "Available GPUs: ${GPU_ARRAY[@]} (Total $NUM_GPUS)"
+echo "Mode: $([ "$RESUME_MODE" = true ] && echo 'Resume (skip completed)' || echo 'Overwrite (run all)')"
 echo "========================================="
 
 # Directories
@@ -69,6 +89,15 @@ rm "$FIFO_FILE"       # Remove file entry, FD remains open
 for gpu in "${GPU_ARRAY[@]}"; do
     echo "$gpu" >&6
 done
+
+# Check if a problem is already completed
+is_problem_completed() {
+    local problem=$1
+    local output_file="$FINAL_OUTPUT_DIR/${LEVEL}_${problem}.py"
+    
+    # Check if output file exists and is not empty
+    [ -f "$output_file" ] && [ -s "$output_file" ]
+}
 
 # Function needs to be exported or defined before use
 run_task() {
@@ -109,7 +138,17 @@ run_task() {
 echo ""
 echo "Starting parallel execution across $NUM_GPUS GPUs..."
 
+# Count skipped tasks
+skipped=0
+
 for ((problem=START; problem<=END; problem++)); do
+    # Check if in resume mode and problem is completed
+    if [ "$RESUME_MODE" = true ] && is_problem_completed "$problem"; then
+        echo "[$(date '+%H:%M:%S')] P${problem} already completed, skipping..."
+        ((skipped++))
+        continue
+    fi
+    
     # 2. Acquire a token (GPU)
     # This command BLOCKS until a line (a GPU ID) is available to read
     read -u 6 gpu_token
@@ -137,6 +176,10 @@ exec 6>&-
 echo ""
 echo "========================================="
 echo "All tasks completed!"
+if [ "$RESUME_MODE" = true ] && [ $skipped -gt 0 ]; then
+    echo "Skipped (already done): $skipped"
+    echo "Executed: $((END - START + 1 - skipped))"
+fi
 echo "========================================="
 
 # Clean up
