@@ -2,7 +2,7 @@ FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install dependencies
+# 1. Install system dependencies
 RUN apt-get update && apt-get install -y \
     software-properties-common ca-certificates \
     && add-apt-repository ppa:ubuntu-toolchain-r/test -y \
@@ -30,7 +30,7 @@ RUN git clone https://github.com/shadowfall09/KernelBench.git
 # 5. Configure environment
 WORKDIR /app/KernelBench
 
-# 设置 C++ 编译器环境变量 (z3-solver 需要)
+# Set C++ compiler environment variables (required by z3-solver)
 ENV CC=gcc-13
 ENV CXX=g++-13
 ENV CXXFLAGS="-std=c++20"
@@ -38,14 +38,26 @@ ENV CXXFLAGS="-std=c++20"
 RUN uv venv
 RUN . .venv/bin/activate && uv sync --extra gpu
 
-# 6. Prepare directories and scripts
-RUN mkdir -p runs/claude_code
-COPY entrypoint.sh /app/KernelBench/entrypoint.sh
-RUN chmod +x /app/KernelBench/entrypoint.sh
+# 6. Prepare directories
+RUN mkdir -p runs/claude_code cache
 
+# 7. Set environment variables
 ENV PATH="/app/KernelBench/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/KernelBench/src:$PYTHONPATH"
+
+# Claude/Bedrock configuration (for generation tasks)
 ENV CLAUDE_CODE_USE_BEDROCK=1
 ENV ANTHROPIC_MODEL='global.anthropic.claude-opus-4-6-v1'
 ENV ANTHROPIC_SMALL_FAST_MODEL='us.anthropic.claude-haiku-4-5-20251001-v1:0'
 
-ENTRYPOINT ["/app/KernelBench/entrypoint.sh"]
+# Copy entrypoint script (used for generation)
+COPY entrypoint.sh /app/KernelBench/entrypoint.sh
+RUN chmod +x /app/KernelBench/entrypoint.sh
+
+# Default working directory
+WORKDIR /app/KernelBench
+
+# No ENTRYPOINT - allows flexible use for both generation and evaluation
+# For generation: docker run ... /app/KernelBench/entrypoint.sh
+# For evaluation: docker run ... bash -c "uv run python scripts/eval_from_generations.py ..."
+CMD ["/bin/bash"]

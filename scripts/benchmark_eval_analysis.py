@@ -148,8 +148,8 @@ def analyze_greedy_eval(run_name, hardware, baseline, level,
     print(f"Functionally correct: {correct_count}")
 
     print(f"\nSuccess rates:")
-    print(f"Compilation rate: {compiled_count/total_count*100:.1f}%")
-    print(f"Correctness rate: {correct_count/total_count*100:.1f}%")
+    print(f"Compilation rate: {compiled_count/total_eval*100:.1f}%")
+    print(f"Correctness rate: {correct_count/total_eval*100:.1f}%")
 
     import numpy as np
 
@@ -164,6 +164,7 @@ def analyze_greedy_eval(run_name, hardware, baseline, level,
     is_correct_list = []
     baseline_speed_list = []
     actual_speed_list = []
+    problem_info_list = []  # For detailed output
 
     # Sort problem IDs to ensure consistent order
     sorted_pids = sorted(dataset.get_problem_ids())
@@ -185,16 +186,44 @@ def analyze_greedy_eval(run_name, hardware, baseline, level,
             
         baseline_entry = baseline_results[f"level{level}"][problem_name]
         
+        # Check if baseline_entry is valid
+        if baseline_entry is None or not isinstance(baseline_entry, dict) or "mean" not in baseline_entry:
+            print(f"Warning: Invalid baseline entry for problem {problem_name}")
+            continue
+        
         is_correct_list.append(eval_entry["correctness"])
         actual_speed_list.append(eval_entry["runtime"])
         baseline_speed_list.append(baseline_entry["mean"])
+        
+        # Store problem info for detailed output
+        problem_info_list.append({
+            "pid": pid,
+            "name": problem_name,
+            "correct": eval_entry["correctness"],
+            "baseline": baseline_entry["mean"],
+            "actual": eval_entry["runtime"]
+        })
 
     is_correct = np.array(is_correct_list)
     baseline_speed = np.array(baseline_speed_list)
     actual_speed = np.array(actual_speed_list)
     n = len(is_correct)
 
-    print(f"Aligned {n} problems for analysis")
+    print(f"\nAligned {n} problems for analysis")
+    
+    # Print detailed comparison for first few problems
+    print("\n" + "="*80)
+    print("Detailed Runtime Comparison (first 10 problems):")
+    print("="*80)
+    print(f"{'PID':<5} {'Correct':<8} {'Baseline(ms)':<15} {'Actual(ms)':<15} {'Speedup':<10}")
+    print("-"*80)
+    for info in problem_info_list[:30]:
+        speedup = info["baseline"] / info["actual"] if info["actual"] > 0 else 0
+        status = "✓" if info["correct"] else "✗"
+        print(f"{info['pid']:<5} {status:<8} {info['baseline']:<15.3f} {info['actual']:<15.3f} {speedup:<10.2f}x")
+    if len(problem_info_list) > 30:
+        print(f"... ({len(problem_info_list) - 30} more problems)")
+    print("="*80)
 
     # Calculate the metrics
     gmsr_correct = geometric_mean_speed_ratio_correct_only(

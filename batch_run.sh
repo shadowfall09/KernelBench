@@ -2,7 +2,7 @@
 
 # Usage: 
 #   Overwrite mode (default): ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3"
-#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3" --resume
+#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 25 --run-name my_run --gpus "0,1,2,3,4,5,6,7" --resume
 
 # 注意：不要在主流程开启 set -e，否则子进程报错可能导致主进程退出
 # set -e 
@@ -93,10 +93,23 @@ done
 # Check if a problem is already completed
 is_problem_completed() {
     local problem=$1
-    local output_file="$FINAL_OUTPUT_DIR/${LEVEL}_${problem}.py"
+    local final_file="$FINAL_OUTPUT_DIR/level_${LEVEL}_problem_${problem}_sample_0_kernel.py"
+    local temp_file="$TEMP_OUTPUT_DIR/${LEVEL}_${problem}/level_${LEVEL}_problem_${problem}_sample_0_kernel.py"
     
-    # Check if output file exists and is not empty
-    [ -f "$output_file" ] && [ -s "$output_file" ]
+    # Check final directory first (preferred location)
+    if [ -f "$final_file" ] && [ -s "$final_file" ]; then
+        return 0
+    fi
+    
+    # Check temp directory (if previous run was interrupted)
+    if [ -f "$temp_file" ] && [ -s "$temp_file" ]; then
+        # Copy to final directory if found in temp
+        echo "  → Found in temp, copying to final directory..."
+        cp "$temp_file" "$FINAL_OUTPUT_DIR/" 2>/dev/null
+        return 0
+    fi
+    
+    return 1
 }
 
 # Function needs to be exported or defined before use
@@ -120,7 +133,8 @@ run_task() {
         -e KB_PROBLEM=$problem \
         -v "$HOME/.aws:/root/.aws:ro" \
         -v "${problem_output_dir}:/app/KernelBench/runs/claude_code" \
-        $DOCKER_IMAGE > "$log_file" 2>&1
+        $DOCKER_IMAGE \
+        /app/KernelBench/entrypoint.sh > "$log_file" 2>&1
         
     local exit_code=$?
 
@@ -187,22 +201,49 @@ rm -rf "$TEMP_OUTPUT_DIR"
 echo "Results saved to: $FINAL_OUTPUT_DIR"
 
 # ==============================================================================
-#  EVALUATION STAGE
+#  EVALUATION STAGE (in Docker container)
 # ==============================================================================
 
-cd /home/yichengtao/KernelBench
+echo ""
+echo "========================================="
+echo "Starting Evaluation Stage (in Docker)..."
+echo "========================================="
+
+# For evaluation, use CUDA_VISIBLE_DEVICES to control which GPUs are visible
+# This avoids Docker GPU allocation conflicts
+GPU_DEVICES=$(IFS=,; echo "${GPU_ARRAY[*]}")
 
 echo "Step 1: Evaluate..."
-uv run python scripts/eval_from_generations.py \
-    run_name="${RUN_NAME}" \
-    dataset_src=local \
-    level=$LEVEL \
-    num_gpu_devices=$NUM_GPUS \
-    timeout=$TIMEOUT
+docker run --rm \
+    --gpus all \
+    --cap-add=SYS_ADMIN \
+    --security-opt seccomp=unconfined \
+    -v "/home/yichengtao/KernelBench:/app/KernelBench" \
+    -w /app/KernelBench \
+    $DOCKER_IMAGE \
+    bash -c "uv run python scripts/eval_from_generations.py \
+        run_name='${RUN_NAME}' \
+        dataset_src=local \
+        level=${LEVEL} \
+        num_gpu_devices=${NUM_GPUS} \
+        timeout=${TIMEOUT} \
+        subset='(${START},${END})' \
+        gpu_arch=\"['Ampere']\""
 
+echo ""
 echo "Step 2: Analysis..."
-uv run python scripts/benchmark_eval_analysis.py \
-    run_name="${RUN_NAME}" \
-    level=$LEVEL \
-    hardware=$HARDWARE \
-    baseline=$BASELINE
+docker run --rm \
+    -v "/home/yichengtao/KernelBench:/app/KernelBench" \
+    -w /app/KernelBench \
+    $DOCKER_IMAGE \
+    bash -c "uv run python scripts/benchmark_eval_analysis.py \
+        run_name='${RUN_NAME}' \
+        level=${LEVEL} \
+        hardware=${HARDWARE} \
+        baseline=${BASELINE}"
+
+echo ""
+echo "========================================="
+echo "Evaluation and Analysis Complete!"
+echo "Results: /home/yichengtao/KernelBench/runs/${RUN_NAME}/"
+echo "========================================="
