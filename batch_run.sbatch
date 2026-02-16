@@ -14,7 +14,7 @@
 # Usage:
 #   sbatch batch_run.sbatch
 # Or with custom parameters:
-#   sbatch --export=ALL,LEVEL=1,START=1,END=100,RUN_NAME=my_run batch_run.sbatch
+#   sbatch --export=ALL,LEVEL=1,START=1,END=100,RUN_NAME=my_run,ENABLE_NCU=true batch_run.sbatch
 
 # Set defaults if not provided via --export
 LEVEL=${LEVEL:-1}
@@ -26,6 +26,7 @@ RESUME=${RESUME:-""}
 HARDWARE=${HARDWARE:-"RTX_A6000"}
 BASELINE=${BASELINE:-"baseline_time_torch"}
 TIMEOUT=${TIMEOUT:-300}
+ENABLE_NCU=${ENABLE_NCU:-true}
 
 echo "========================================="
 echo "SLURM Job Information"
@@ -41,6 +42,7 @@ echo "  Range: $START - $END"
 echo "  Run name: $RUN_NAME"
 echo "  GPUs: $GPUS"
 echo "  Resume: $RESUME"
+echo "  Enable NCU: $ENABLE_NCU"
 echo "========================================="
 
 # Create logs directory if not exists
@@ -52,6 +54,7 @@ cd /home/yichengtao/KernelBench || exit 1
 # Build command line arguments
 CMD_ARGS="--level $LEVEL --start $START --end $END --run-name $RUN_NAME --gpus $GPUS"
 CMD_ARGS="$CMD_ARGS --hardware $HARDWARE --baseline $BASELINE --timeout $TIMEOUT"
+CMD_ARGS="$CMD_ARGS --enable-ncu $ENABLE_NCU"
 
 if [ -n "$RESUME" ]; then
     CMD_ARGS="$CMD_ARGS --resume"

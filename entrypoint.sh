@@ -3,6 +3,7 @@
 
 KB_LEVEL=${KB_LEVEL:-1}
 KB_PROBLEM=${KB_PROBLEM:-5}
+KB_ENABLE_NCU=${KB_ENABLE_NCU:-true}
 
 echo "=========================================================="
 echo "🚀 Starting Claude Code Agent"
@@ -47,26 +48,24 @@ Results will be written to: KernelBench/runs/claude_code/eval_results.json
 Delete this file first if you need to evaluate again.
 
 Tips:
-- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel. 
-- You may use search to find optimization techniques for your specific problem.
-
-Optimization Goal:
-Iterate on the kernel until performance is maximized while maintaining correctness.
 EOF
 )
+
+if [ "$KB_ENABLE_NCU" = "true" ]; then
+    AGENT_PROMPT+=$'\n- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel.'
+fi
+
+AGENT_PROMPT+=$'\n- You may use search to find optimization techniques for your specific problem.'
+AGENT_PROMPT+=$'\n\nOptimization Goal:'
+AGENT_PROMPT+=$'\nIterate on the kernel until performance is maximized while maintaining correctness.'
 
 echo ""
 echo ">>> Sending prompt to Claude Code..."
 
-claude -p "$AGENT_PROMPT" --allowedTools "Read,Edit,Bash,WebFetch,WebSearch,Write,Glob,Grep,KillShell" --output-format stream-json --verbose --include-partial-messages | \
-  jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
-
-
-# uv run python scripts/eval_from_generations.py \
-#   run_name=example \
-#   dataset_src=local \
-#   level=1 \
-#   num_gpu_devices=1 \
-#   timeout=300 \
-#   subset="(1,1)" \
-#   gpu_arch="['Ampere']"
+if [ "$KB_ENABLE_NCU" = "true" ]; then
+    claude -p "$AGENT_PROMPT" --allowedTools "Read,Edit,Bash,WebFetch,WebSearch,Write,Glob,Grep,KillShell" --output-format stream-json --verbose --include-partial-messages | \
+      jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
+else
+    claude -p "$AGENT_PROMPT" --allowedTools "Read,Edit,Bash,WebFetch,WebSearch,Write,Glob,Grep,KillShell" --disallowedTools "Bash(ncu *)" --output-format stream-json --verbose --include-partial-messages | \
+      jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
+fi

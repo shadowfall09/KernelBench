@@ -2,10 +2,11 @@
 
 # Usage: 
 #   Overwrite mode (default): ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3"
-#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 25 --run-name my_run --gpus "0,1,2,3,4,5,6,7" --resume
+#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 25 --run-name sonnet_ncu_lv1 --gpus "0,1,2,3,4,5,6,7" --resume
 
-# 注意：不要在主流程开启 set -e，否则子进程报错可能导致主进程退出
-# set -e 
+
+# Get workspace directory (script location)
+WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # default parameters
 LEVEL=1
@@ -18,7 +19,8 @@ DOCKER_IMAGE="kb-claude:v1"
 TIMEOUT=300
 HARDWARE="RTX_A6000"
 BASELINE="baseline_time_torch"
-RESUME_MODE=false  # false=覆盖模式, true=继续运行模式
+RESUME_MODE=false  # false=Overwrite mode, true=Resume mode (skip completed problems)
+ENABLE_NCU=true    # true=enable NVIDIA Nsight Compute profiling, false=disable NCU (faster iteration, no profiling)
 
 # parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -33,6 +35,7 @@ while [[ $# -gt 0 ]]; do
         --hardware) HARDWARE="$2"; shift 2 ;;
         --baseline) BASELINE="$2"; shift 2 ;;
         --resume) RESUME_MODE=true; shift 1 ;;
+        --enable-ncu) ENABLE_NCU="$2"; shift 2 ;;
         --help)
             echo "Usage: $0 [options]"
             echo "Options:"
@@ -46,6 +49,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --hardware HW        Hardware name (default: RTX_A6000)"
             echo "  --baseline BASELINE  Baseline name (default: baseline_time_torch)"
             echo "  --resume             Resume mode: skip already completed problems"
+            echo "  --enable-ncu BOOL    Enable NCU profiling tool (default: true)"
             echo "  --help               Show this help message"
             exit 0
             ;;
@@ -68,10 +72,37 @@ echo "Mode: $([ "$RESUME_MODE" = true ] && echo 'Resume (skip completed)' || ech
 echo "========================================="
 
 # Directories
-TEMP_OUTPUT_DIR="$(pwd)/runs_output_temp_${RUN_NAME}"
-FINAL_OUTPUT_DIR="/home/yichengtao/KernelBench/runs/${RUN_NAME}"
-LOG_DIR="$(pwd)/logs_${RUN_NAME}"
+TEMP_OUTPUT_DIR="${WORKSPACE_DIR}/runs_output_temp_${RUN_NAME}"
+FINAL_OUTPUT_DIR="${WORKSPACE_DIR}/runs/${RUN_NAME}"
+LOG_DIR="${WORKSPACE_DIR}/logs_${RUN_NAME}"
 mkdir -p "$TEMP_OUTPUT_DIR" "$FINAL_OUTPUT_DIR" "$LOG_DIR"
+
+# Generate run configuration file
+RUN_START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+CONFIG_FILE="$FINAL_OUTPUT_DIR/run_config.json"
+cat > "$CONFIG_FILE" << EOF
+{
+  "run_name": "$RUN_NAME",
+  "start_time": "$RUN_START_TIME",
+  "level": $LEVEL,
+  "problem_range": {
+    "start": $START,
+    "end": $END
+  },
+  "gpus": "$CUDA_VISIBLE_DEVICES",
+  "num_gpus": $NUM_GPUS,
+  "timeout": $TIMEOUT,
+  "hardware": "$HARDWARE",
+  "baseline": "$BASELINE",
+  "resume_mode": $RESUME_MODE,
+  "enable_ncu": $ENABLE_NCU,
+  "docker_image": "$DOCKER_IMAGE",
+  "aws_profile": "$AWS_PROFILE",
+  "output_directory": "$FINAL_OUTPUT_DIR",
+  "log_directory": "$LOG_DIR"
+}
+EOF
+echo "Configuration saved to: $CONFIG_FILE"
 
 # Build Docker image (ONCE, blocking)
 echo "Building Docker image..."
@@ -131,6 +162,7 @@ run_task() {
         -e AWS_PROFILE="$AWS_PROFILE" \
         -e KB_LEVEL=$LEVEL \
         -e KB_PROBLEM=$problem \
+        -e KB_ENABLE_NCU="$ENABLE_NCU" \
         -v "$HOME/.aws:/root/.aws:ro" \
         -v "${problem_output_dir}:/app/KernelBench/runs/claude_code" \
         $DOCKER_IMAGE \
@@ -218,7 +250,7 @@ docker run --rm \
     --gpus all \
     --cap-add=SYS_ADMIN \
     --security-opt seccomp=unconfined \
-    -v "/home/yichengtao/KernelBench:/app/KernelBench" \
+    -v "${WORKSPACE_DIR}:/app/KernelBench" \
     -w /app/KernelBench \
     $DOCKER_IMAGE \
     bash -c "uv run python scripts/eval_from_generations.py \
@@ -233,7 +265,7 @@ docker run --rm \
 echo ""
 echo "Step 2: Analysis..."
 docker run --rm \
-    -v "/home/yichengtao/KernelBench:/app/KernelBench" \
+    -v "${WORKSPACE_DIR}:/app/KernelBench" \
     -w /app/KernelBench \
     $DOCKER_IMAGE \
     bash -c "uv run python scripts/benchmark_eval_analysis.py \
@@ -245,5 +277,5 @@ docker run --rm \
 echo ""
 echo "========================================="
 echo "Evaluation and Analysis Complete!"
-echo "Results: /home/yichengtao/KernelBench/runs/${RUN_NAME}/"
-echo "========================================="
+echo "Results: ${WORKSPACE_DIR}/runs/${RUN_NAME}/"
+echo "=========================================="
