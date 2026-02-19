@@ -47,9 +47,6 @@ ENV PYTHONPATH="/app/KernelBench/src"
 
 # Claude/Bedrock configuration (for generation tasks)
 ENV CLAUDE_CODE_USE_BEDROCK=1
-ENV ANTHROPIC_MODEL='global.anthropic.claude-sonnet-4-5-20250929-v1:0'
-# ENV ANTHROPIC_MODEL='global.anthropic.claude-opus-4-6-v1'
-ENV ANTHROPIC_SMALL_FAST_MODEL='us.anthropic.claude-haiku-4-5-20251001-v1:0'
 
 # Copy entrypoint script (used for generation)
 COPY entrypoint.sh /app/KernelBench/entrypoint.sh

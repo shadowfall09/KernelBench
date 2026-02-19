@@ -2,7 +2,7 @@
 
 # Usage: 
 #   Overwrite mode (default): ./batch_run.sh --level 1 --start 1 --end 10 --run-name my_run --gpus "0,1,2,3"
-#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 25 --run-name sonnet_ncu_lv1 --gpus "0,1,2,3,4,5,6,7" --resume
+#   Resume mode:              ./batch_run.sh --level 1 --start 1 --end 25 --run-name opus_ncu_lv1 --gpus "0,1,2,3,4,5,6,7" --model opus --resume
 
 
 # Get workspace directory (script location)
@@ -21,6 +21,8 @@ HARDWARE="RTX_A6000"
 BASELINE="baseline_time_torch"
 RESUME_MODE=false  # false=Overwrite mode, true=Resume mode (skip completed problems)
 ENABLE_NCU=true    # true=enable NVIDIA Nsight Compute profiling, false=disable NCU (faster iteration, no profiling)
+MODEL_NAME="sonnet"  # sonnet or opus
+ANTHROPIC_SMALL_FAST_MODEL="us.anthropic.claude-haiku-4-5-20251001-v1:0"  # Small fast model
 
 # parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -36,6 +38,8 @@ while [[ $# -gt 0 ]]; do
         --baseline) BASELINE="$2"; shift 2 ;;
         --resume) RESUME_MODE=true; shift 1 ;;
         --enable-ncu) ENABLE_NCU="$2"; shift 2 ;;
+        --model) MODEL_NAME="$2"; shift 2 ;;
+        --small-model) ANTHROPIC_SMALL_FAST_MODEL="$2"; shift 2 ;;
         --help)
             echo "Usage: $0 [options]"
             echo "Options:"
@@ -50,12 +54,28 @@ while [[ $# -gt 0 ]]; do
             echo "  --baseline BASELINE  Baseline name (default: baseline_time_torch)"
             echo "  --resume             Resume mode: skip already completed problems"
             echo "  --enable-ncu BOOL    Enable NCU profiling tool (default: true)"
+            echo "  --model MODEL        Model: 'sonnet' or 'opus' (default: sonnet)"
+            echo "  --small-model MODEL  Small fast model (default: claude-haiku-4-5)"
             echo "  --help               Show this help message"
             exit 0
             ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+# Map MODEL_NAME to full ANTHROPIC_MODEL string
+case "$MODEL_NAME" in
+    sonnet)
+        ANTHROPIC_MODEL="global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        ;;
+    opus)
+        ANTHROPIC_MODEL="global.anthropic.claude-opus-4-6-v1"
+        ;;
+    *)
+        echo "Error: Invalid model name '$MODEL_NAME'. Must be 'sonnet' or 'opus'"
+        exit 1
+        ;;
+esac
 
 # Convert CUDA_VISIBLE_DEVICES to array
 IFS=',' read -ra GPU_ARRAY <<< "$CUDA_VISIBLE_DEVICES"
@@ -67,6 +87,7 @@ echo "========================================="
 echo "Level: $LEVEL"
 echo "Problem range: $START - $END"
 echo "Run name: $RUN_NAME"
+echo "Model: $MODEL_NAME ($ANTHROPIC_MODEL)"
 echo "Available GPUs: ${GPU_ARRAY[@]} (Total $NUM_GPUS)"
 echo "Mode: $([ "$RESUME_MODE" = true ] && echo 'Resume (skip completed)' || echo 'Overwrite (run all)')"
 echo "========================================="
@@ -96,6 +117,9 @@ cat > "$CONFIG_FILE" << EOF
   "baseline": "$BASELINE",
   "resume_mode": $RESUME_MODE,
   "enable_ncu": $ENABLE_NCU,
+  "model_name": "$MODEL_NAME",
+  "anthropic_model": "$ANTHROPIC_MODEL",
+  "anthropic_small_fast_model": "$ANTHROPIC_SMALL_FAST_MODEL",
   "docker_image": "$DOCKER_IMAGE",
   "aws_profile": "$AWS_PROFILE",
   "output_directory": "$FINAL_OUTPUT_DIR",
@@ -163,6 +187,8 @@ run_task() {
         -e KB_LEVEL=$LEVEL \
         -e KB_PROBLEM=$problem \
         -e KB_ENABLE_NCU="$ENABLE_NCU" \
+        -e ANTHROPIC_MODEL="$ANTHROPIC_MODEL" \
+        -e ANTHROPIC_SMALL_FAST_MODEL="$ANTHROPIC_SMALL_FAST_MODEL" \
         -v "$HOME/.aws:/root/.aws:ro" \
         -v "${problem_output_dir}:/app/KernelBench/runs/claude_code" \
         $DOCKER_IMAGE \
