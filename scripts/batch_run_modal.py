@@ -11,8 +11,7 @@ Usage:
 
     # Full options
     uv run python scripts/batch_run_modal.py \
-        level=1 start=1 end=1 run_name=test_modal \
-        gpu=A10G num_parallel=1 \
+        level=1 start=1 end=2 run_name=test_modal gpu=A10G \
         resume=true enable_ncu=true
 
     # Resume interrupted run
@@ -67,6 +66,7 @@ def main(config: BatchRunConfig):
     print(f"Sandbox timeout: {config.sandbox_timeout}s")
     print(f"Mode: {'Resume (skip completed)' if config.resume else 'Overwrite (run all)'}")
     print(f"NCU: {'enabled' if config.enable_ncu else 'disabled'}")
+    print(f"Optimization rounds: {config.optimization_rounds}")
     print("=========================================")
 
     # Save run config
@@ -83,6 +83,7 @@ def main(config: BatchRunConfig):
             "baseline": config.baseline,
             "resume": config.resume,
             "enable_ncu": config.enable_ncu,
+            "optimization_rounds": config.optimization_rounds,
             "aws_profile": config.aws_profile,
             "platform": "modal",
         }, f, indent=4)
@@ -135,7 +136,8 @@ def main(config: BatchRunConfig):
                             })
                         pbar.update(1)
 
-        # Download kernel files from Volume
+        import time
+        time.sleep(20)  # Wait for any final writes to the volume to complete
         print("\nDownloading generated kernels from Modal Volume...")
         download_kernels_from_volume(
             output_volume, run_dir, config.level, config.start, config.end

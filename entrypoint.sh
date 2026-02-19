@@ -13,27 +13,22 @@ echo "=========================================================="
 
 
 AGENT_PROMPT=$(cat <<EOF
-You are an expert CUDA engineer, specialized in writing high-performance GPU kernels on NVIDIA RTX A6000 (Ampere architecture).
-Your task is to solve **Level $KB_LEVEL, Problem $KB_PROBLEM** in the KernelBench repository located in the current directory.
-You must write a CUDA kernel that is both correct and optimized for performance. If you are unable to optimize further in 5 rounds, provide a correct implementation.
+You are an expert CUDA engineer, specialized in writing high-performance GPU kernels.
+Your task is to solve **Level $KB_LEVEL, Problem $KB_PROBLEM** in the KernelBench repository.
+**Target GPU**: NVIDIA RTX A6000 (Architecture: Ampere)
+You must write a CUDA kernel that is both correct and optimized for performance. If you are unable to optimize further in 1 round, provide a correct implementation.
 Output your intermediate thoughts in real-time as you work through the problem.
 
-Rules:
-1. Do NOT run scripts/generate_samples.py.
-2. You may read its logic to understand the required output format and conventions.
-
 Implementation:
-- Reference implementations are in: KernelBench/KernelBench
-- Write your solution under: KernelBench/runs/claude_code
-- The 'example' folder under 'runs' already exists and contains an example kernel with no speedup.
-- Preserve the file naming pattern in 'claude_code'.
+- Reference PyTorch implementations are in: KernelBench/ and an example solution is in: runs/example
+- Write your solution under: runs/claude_code (mkdir if needed)
+- Preserve the file naming pattern (level_X_problem_Y_sample_0_kernel.py).
 - Write a correct and optimized CUDA implementation compatible with KernelBench.
 
 Evaluation Command:
-You MUST run the following command to verify your solution. 
+You can run the following command to verify your solution.
 Note: The parameter \`subset="($KB_PROBLEM,$KB_PROBLEM)"\` explicitly tells the script to ONLY test Problem $KB_PROBLEM.
 
-\`\`\`bash
 uv run python scripts/eval_from_generations.py \\
   run_name=claude_code \\
   dataset_src=local \\
@@ -42,12 +37,15 @@ uv run python scripts/eval_from_generations.py \\
   timeout=300 \\
   subset="($KB_PROBLEM,$KB_PROBLEM)" \\
   gpu_arch="['Ampere']"
-\`\`\`
 
-Results will be written to: KernelBench/runs/claude_code/eval_results.json
+Results will be written to: runs/claude_code/eval_results.json
 Delete this file first if you need to evaluate again.
 
 Tips:
+- The Python environment is located in \`.uv/.venv\`.
+- Do NOT run scripts/generate_samples.py. But you can read its logic to understand the required output format and conventions.
+- Consider Ampere-specific optimizations for NVIDIA RTX A6000 GPU.
+- You may use search to find optimization techniques for your specific problem.
 EOF
 )
 
@@ -55,7 +53,7 @@ if [ "$KB_ENABLE_NCU" = "true" ]; then
     AGENT_PROMPT+=$'\n- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel.'
 fi
 
-AGENT_PROMPT+=$'\n- You may use search to find optimization techniques for your specific problem.'
+AGENT_PROMPT+=$'\n'
 AGENT_PROMPT+=$'\n\nOptimization Goal:'
 AGENT_PROMPT+=$'\nIterate on the kernel until performance is maximized while maintaining correctness.'
 

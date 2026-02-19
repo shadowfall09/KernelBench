@@ -27,7 +27,7 @@ _eval_base = (
     modal.Image.from_registry(
         "nvidia/cuda:13.0.0-devel-ubuntu22.04", add_python="3.10"
     )
-    .apt_install("git", "gcc-10", "g++-10", "clang")
+    .apt_install("git", "gcc-10", "g++-10", "clang", "git")
     .uv_sync(uv_project_dir=REPO_TOP_DIR, extras=["gpu"])
     .env({"PYTHONPATH": "/root/src:/root"})
 )

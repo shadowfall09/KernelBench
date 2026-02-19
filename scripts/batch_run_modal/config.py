@@ -46,6 +46,8 @@ class BatchRunConfig(Config):
         self.resume = False
         # Enable NVIDIA Nsight Compute profiling
         self.enable_ncu = True
+        # Number of optimization rounds for the agent
+        self.optimization_rounds = 5
 
         # AWS profile name (used with `aws sso login --profile=xxx`)
         self.aws_profile = "bedrock"

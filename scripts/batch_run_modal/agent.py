@@ -25,15 +25,17 @@ def build_agent_prompt(
     problem_id: int,
     gpu_arch: str = "Ampere",
     enable_ncu: bool = True,
+    optimization_rounds: int = 1,
+    gpu_name: str = "A10G",
 ) -> str:
-    """Build the Claude Code agent prompt — same logic as entrypoint.sh."""
-    prompt = f"""You are an expert CUDA engineer, specialized in writing high-performance GPU kernels for a specific GPU.
-Your task is to solve **Level {level}, Problem {problem_id}** in the KernelBench repository located in the current directory.
-You must write a CUDA kernel that is both correct and optimized for performance. If you are unable to optimize further in limited (e.g. 5) rounds, provide a correct implementation.
+    prompt = f"""You are an expert CUDA engineer, specialized in writing high-performance GPU kernels.
+Your task is to solve **Level {level}, Problem {problem_id}** in the KernelBench repository.
+**Target GPU**: {gpu_name} (Architecture: {gpu_arch})
+You must write a CUDA kernel that is both correct and optimized for performance. If you are unable to optimize further in {optimization_rounds} round{'s' if optimization_rounds > 1 else ''}, provide a correct implementation.
 Output your intermediate thoughts in real-time as you work through the problem.
 
 Implementation:
-- Reference implementations are in: KernelBench/
+- Reference PyTorch implementations are in: KernelBench/ and an example solution is in: runs/example
 - Write your solution under: runs/claude_code (mkdir if needed)
 - Preserve the file naming pattern (level_X_problem_Y_sample_0_kernel.py).
 - Write a correct and optimized CUDA implementation compatible with KernelBench.
@@ -55,10 +57,12 @@ Results will be written to: runs/claude_code/eval_results.json
 Delete this file first if you need to evaluate again.
 
 Tips:
-- The Python environment you can use is located in `/.uv/.venv`.
+- The Python environment is located in `/.uv/.venv`.
 - Do NOT run scripts/generate_samples.py. But you can read its logic to understand the required output format and conventions.
-- Consider GPU architecture-specific optimizations, you may run `nvidia-smi` to check the GPU model and utilization.
+- Consider {gpu_arch}-specific optimizations for {gpu_name} GPU.
 - You may use search to find optimization techniques for your specific problem."""
+    
+    # prompt = "copy everything in runs/example to runs/claude_code"
 
     if enable_ncu:
         prompt += "\n- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel."
@@ -181,7 +185,9 @@ def run_single_problem_sandbox(
 
         # Build & write prompt
         gpu_arch = GPU_ARCH_MAPPING.get(config.gpu, "Ampere")
-        agent_prompt = build_agent_prompt(level, problem_id, gpu_arch, config.enable_ncu)
+        agent_prompt = build_agent_prompt(
+            level, problem_id, gpu_arch, config.enable_ncu, config.optimization_rounds, config.gpu
+        )
         with sb.open("/tmp/agent_prompt.txt", "w") as pf:
             pf.write(agent_prompt)
 
@@ -249,6 +255,13 @@ def run_single_problem_sandbox(
             ls_proc.wait()
             print(f"  [Debug] P{problem_id} file listing:\n{ls_out[:500]}")
 
+        # Commit volume from INSIDE the sandbox before terminating
+        # This ensures all writes are flushed to the volume
+        volume_name = f"kb-output-{config.run_name}"
+        commit_cmd = f"python -c 'import modal; modal.Volume.from_name(\"{volume_name}\").commit()'"
+        commit_proc = sb.exec("bash", "-c", commit_cmd)
+        commit_proc.wait()
+
         sb.terminate()
 
         elapsed = time.time() - start_time
@@ -290,6 +303,14 @@ def download_kernels_from_volume(
     """Download generated kernel files from Modal Volume to local disk."""
     os.makedirs(run_dir, exist_ok=True)
 
+    # Debug: list files in volume
+    print("  Listing files in volume root:")
+    try:
+        for entry in output_volume.listdir("/"):
+            print(f"    {entry}")
+    except Exception as e:
+        print(f"    Error listing volume: {e}")
+
     downloaded = 0
     for problem_id in range(start, end + 1):
         filename = f"level_{level}_problem_{problem_id}_sample_0_kernel.py"
@@ -299,8 +320,8 @@ def download_kernels_from_volume(
                 for data in output_volume.read_file(filename):
                     f.write(data)
             downloaded += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  Failed to download {filename}: {e}")
 
     print(f"Downloaded {downloaded} kernel files to {run_dir}")
     return downloaded
@@ -318,6 +339,15 @@ def download_logs_from_volume(
     logs_dir = os.path.join(run_dir, f"logs_{run_name}")
     os.makedirs(logs_dir, exist_ok=True)
 
+    # Debug: list files in logs directory
+    logs_volume_path = f"logs_{run_name}"
+    print(f"  Listing files in volume path: {logs_volume_path}")
+    try:
+        for entry in output_volume.listdir(logs_volume_path):
+            print(f"    {entry}")
+    except Exception as e:
+        print(f"    Error listing logs directory: {e}")
+
     downloaded = 0
     for problem_id in range(start, end + 1):
         # Download output log
@@ -328,19 +358,8 @@ def download_logs_from_volume(
                 for data in output_volume.read_file(output_filename):
                     f.write(data)
             downloaded += 1
-        except Exception:
-            pass
-
-        # Download stderr log
-        stderr_filename = f"logs_{run_name}/level_{level}_problem_{problem_id}_sample_0_stderr.txt"
-        try:
-            filepath = os.path.join(logs_dir, f"level_{level}_problem_{problem_id}_sample_0_stderr.txt")
-            with open(filepath, "wb") as f:
-                for data in output_volume.read_file(stderr_filename):
-                    f.write(data)
-            downloaded += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  Failed to download {output_filename}: {e}")
 
     print(f"Downloaded {downloaded} log files to {logs_dir}")
     return downloaded
