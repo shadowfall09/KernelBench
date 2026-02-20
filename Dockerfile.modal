@@ -1,0 +1,49 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Install system dependencies (no CUDA, no CUDA toolchain — compilation is offloaded to Modal cloud GPUs)
+RUN apt-get update && apt-get install -y \
+    software-properties-common ca-certificates \
+    curl wget git \
+    python3 python3-pip python3-venv \
+    vim less jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Install uv
+RUN pip3 install uv
+
+# 3. Install Claude CLI
+RUN curl -fsSL https://claude.ai/install.sh | bash
+#  Add Claude CLI to PATH
+ENV PATH="/root/.local/bin:/root/.anthropic/bin:$PATH"
+
+# 4. Clone repository
+WORKDIR /app
+RUN git clone https://github.com/shadowfall09/KernelBench.git
+
+# 5. Configure environment
+WORKDIR /app/KernelBench
+
+RUN uv venv
+# No --extra gpu: CUDA evaluation is offloaded to Modal cloud GPUs via eval_mode=modal
+RUN . .venv/bin/activate && uv sync
+
+# 6. Prepare directories
+RUN mkdir -p runs/claude_code cache
+
+# 7. Set environment variables
+ENV PATH="/app/KernelBench/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/KernelBench/src"
+
+# Claude/Bedrock configuration (for generation tasks)
+ENV CLAUDE_CODE_USE_BEDROCK=1
+
+# Copy entrypoint script (used for generation)
+COPY entrypoint_modal.sh /app/KernelBench/entrypoint_modal.sh
+RUN chmod +x /app/KernelBench/entrypoint_modal.sh
+
+# Default working directory
+WORKDIR /app/KernelBench
+
+CMD ["/bin/bash"]

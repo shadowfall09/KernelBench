@@ -182,23 +182,23 @@ def main(config: BatchRunConfig):
         subprocess.run(eval_cmd, check=True, cwd=REPO_TOP_DIR)
 
         # ===== Phase 3: Analysis =====
-        # print("\n[Phase 3] Running comparsion against baseline...")
-        # eval_results_path = os.path.join(run_dir, "eval_results.json")
-        # if not os.path.exists(eval_results_path):
-        #     print("\nSkipping analysis — eval_results.json not found.")
-        #     return
+        print("\n[Phase 3] Running comparsion against baseline...")
+        eval_results_path = os.path.join(run_dir, "eval_results.json")
+        if not os.path.exists(eval_results_path):
+            print("\nSkipping analysis — eval_results.json not found.")
+            return
         
-        # analysis_cmd = [
-        #     sys.executable,
-        #     os.path.join(REPO_TOP_DIR, "scripts", "benchmark_eval_analysis.py"),
-        #     f"run_name={config.run_name}",
-        #     f"level={config.level}",
-        #     f"hardware={config.gpu}",
-        #     f"baseline={config.baseline}",
-        # ]
+        analysis_cmd = [
+            sys.executable,
+            os.path.join(REPO_TOP_DIR, "scripts", "benchmark_eval_analysis.py"),
+            f"run_name={config.run_name}",
+            f"level={config.level}",
+            f"hardware={config.gpu}",
+            f"baseline={config.baseline}",
+        ]
 
-        # print(f"Running: {' '.join(analysis_cmd)}")
-        # subprocess.run(analysis_cmd, cwd=REPO_TOP_DIR)
+        print(f"Running: {' '.join(analysis_cmd)}")
+        subprocess.run(analysis_cmd, cwd=REPO_TOP_DIR)
 
     print("\n=========================================")
     print("All stages complete!")

@@ -4,10 +4,13 @@
 KB_LEVEL=${KB_LEVEL:-1}
 KB_PROBLEM=${KB_PROBLEM:-5}
 KB_ENABLE_NCU=${KB_ENABLE_NCU:-true}
+# Modal GPU type used for cloud evaluation (e.g. A10G, L40S, H100, A100)
+KB_MODAL_GPU=${KB_MODAL_GPU:-A10G}
 
 echo "=========================================================="
-echo "🚀 Starting Claude Code Agent"
+echo "🚀 Starting Claude Code Agent (Modal mode)"
 echo "🎯 Target: Level $KB_LEVEL, Problem $KB_PROBLEM"
+echo "☁️  Eval GPU: $KB_MODAL_GPU (via Modal)"
 echo "📂 Output: runs/claude_code"
 echo "=========================================================="
 
@@ -15,7 +18,7 @@ echo "=========================================================="
 AGENT_PROMPT=$(cat <<EOF
 You are an expert CUDA engineer, specialized in writing high-performance GPU kernels.
 Your task is to solve **Level $KB_LEVEL, Problem $KB_PROBLEM** in the KernelBench repository.
-**Target GPU**: NVIDIA RTX A6000 (Architecture: Ampere)
+**Target GPU**: $KB_MODAL_GPU
 You must write a CUDA kernel that is both correct and optimized for performance. If you are unable to optimize further in 5 rounds, provide a correct implementation.
 Output your intermediate thoughts in real-time as you work through the problem.
 
@@ -28,28 +31,28 @@ Implementation:
 Evaluation Command:
 You can run the following command to verify your solution.
 Note: The parameter \`subset="($KB_PROBLEM,$KB_PROBLEM)"\` explicitly tells the script to ONLY test Problem $KB_PROBLEM.
+Note: eval_mode=modal offloads GPU execution to Modal cloud — no local GPU required.
 
 uv run python scripts/eval_from_generations.py \\
   run_name=claude_code \\
   dataset_src=local \\
   level=$KB_LEVEL \\
-  num_gpu_devices=1 \\
   timeout=300 \\
   subset="($KB_PROBLEM,$KB_PROBLEM)" \\
-  gpu_arch="['Ampere']"
+  eval_mode=modal \\
+  gpu=$KB_MODAL_GPU
 
 Results will be written to: runs/claude_code/eval_results.json
 Delete this file first if you need to evaluate again.
 
 Tips:
 - Do NOT run scripts/generate_samples.py. But you can read its logic to understand the required output format and conventions.
-- Consider Ampere-specific optimizations for NVIDIA RTX A6000 GPU.
 - You may use search to find optimization techniques for your specific problem.
 EOF
 )
 
 if [ "$KB_ENABLE_NCU" = "true" ]; then
-    AGENT_PROMPT+=$'\n- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel.'
+    AGENT_PROMPT+=$'\n- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel (available via Modal eval).'
 fi
 
 AGENT_PROMPT+=$'\n'
