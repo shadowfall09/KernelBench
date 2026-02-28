@@ -123,7 +123,7 @@ def main(config: SandboxConfig):
 
         run_cmd(
             'claude via bash -c (with PTY)',
-            "bash", "-c", 'claude -p "你好" --allowedTools "Read,Edit,Bash,WebFetch,WebSearch,Write,Glob,Grep,KillShell" --output-format stream-json --verbose --include-partial-messages | jq -rj \'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text\'',
+            "bash", "-c", 'claude -p "写一个cuda程序，并使用ncu分析性能瓶颈，叙述你调用的分析命令和结果"  --allowedTools "Read,Edit,Bash,WebFetch,WebSearch,Write,Glob,Grep,KillShell" --output-format stream-json --verbose --include-partial-messages | jq -rj \'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text\'',
             pty=True,
             timeout=30
         )

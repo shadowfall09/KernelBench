@@ -53,9 +53,9 @@ class BatchRunConfig(Config):
         self.aws_profile = "bedrock"
 
         # Anthropic model config
-        # self.anthropic_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        self.anthropic_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
         # self.anthropic_model = "global.anthropic.claude-opus-4-6-v1"
-        self.anthropic_model = "global.anthropic.claude-sonnet-4-6"
+        # self.anthropic_model = "global.anthropic.claude-sonnet-4-6"
         self.anthropic_small_model = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
         # Whether to run evaluation + analysis after generation

@@ -62,7 +62,7 @@ Tips:
 - Consider {gpu_arch}-specific optimizations for {gpu_name} GPU.
 - You may use search to find optimization techniques for your specific problem."""
     
-    # prompt = "copy everything in runs/example to runs/claude_code"
+    prompt = "写一个cuda程序，并使用ncu分析性能瓶颈，叙述你调用的分析命令和结果" 
 
     if enable_ncu:
         prompt += "\n- You may use NVIDIA Nsight Compute (ncu) to profile and optimize your kernel."

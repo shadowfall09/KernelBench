@@ -11,7 +11,7 @@ Usage:
 
     # Full options
     uv run python scripts/batch_run_modal.py \
-        level=1 start=1 end=2 run_name=test_modal gpu=A10G \
+        level=1 start=2 end=2 run_name=test_modal gpu=A10G \
         resume=true enable_ncu=true
 
     # Resume interrupted run

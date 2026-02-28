@@ -9,8 +9,7 @@
 #   - eval_from_generations.py is called with eval_mode=modal
 #
 # Usage:
-#   Overwrite mode (default): ./batch_run_modal.sh --level 1 --start 30 --end 30 --run-name test_modal_local --parallel 4
-#   Resume mode:              ./batch_run_modal.sh --level 1 --start 1 --end 25 --run-name my_run --parallel 8 --resume
+#   Overwrite mode (default): ./batch_run_modal.sh --level 1 --start 1 --end 100 --run-name test_modal_local --parallel 10 --resume
 
 
 # Get workspace directory (script location)
@@ -214,56 +213,56 @@ run_task() {
 # ==============================================================================
 #  MAIN LOOP
 # ==============================================================================
-echo ""
-echo "Starting parallel execution with $NUM_PARALLEL concurrent containers..."
+# echo ""
+# echo "Starting parallel execution with $NUM_PARALLEL concurrent containers..."
 
-# Count skipped tasks
-skipped=0
+# # Count skipped tasks
+# skipped=0
 
-for ((problem=START; problem<=END; problem++)); do
-    # Check if in resume mode and problem is completed
-    if [ "$RESUME_MODE" = true ] && is_problem_completed "$problem"; then
-        echo "[$(date '+%H:%M:%S')] P${problem} already completed, skipping..."
-        ((skipped++))
-        continue
-    fi
+# for ((problem=START; problem<=END; problem++)); do
+#     # Check if in resume mode and problem is completed
+#     if [ "$RESUME_MODE" = true ] && is_problem_completed "$problem"; then
+#         echo "[$(date '+%H:%M:%S')] P${problem} already completed, skipping..."
+#         ((skipped++))
+#         continue
+#     fi
 
-    # 2. Acquire a token (parallel slot)
-    # This command BLOCKS until a slot becomes available
-    read -u 6 slot_token
+#     # 2. Acquire a token (parallel slot)
+#     # This command BLOCKS until a slot becomes available
+#     read -u 6 slot_token
 
-    # 3. Launch background job
-    {
-        # Execute the task
-        run_task "$problem" "$slot_token"
+#     # 3. Launch background job
+#     {
+#         # Execute the task
+#         run_task "$problem" "$slot_token"
 
-        # 4. Return the token
-        # ALWAYS execute this, even if run_task fails, so the slot isn't lost forever
-        echo "$slot_token" >&6
-    } &
+#         # 4. Return the token
+#         # ALWAYS execute this, even if run_task fails, so the slot isn't lost forever
+#         echo "$slot_token" >&6
+#     } &
 
-    # Small delay to prevent race conditions on log creation
-    sleep 0.5
-done
+#     # Small delay to prevent race conditions on log creation
+#     sleep 0.5
+# done
 
-# Wait for all background jobs to finish
-wait
+# # Wait for all background jobs to finish
+# wait
 
-# Close FD
-exec 6>&-
+# # Close FD
+# exec 6>&-
 
-echo ""
-echo "========================================="
-echo "All tasks completed!"
-if [ "$RESUME_MODE" = true ] && [ $skipped -gt 0 ]; then
-    echo "Skipped (already done): $skipped"
-    echo "Executed: $((END - START + 1 - skipped))"
-fi
-echo "========================================="
+# echo ""
+# echo "========================================="
+# echo "All tasks completed!"
+# if [ "$RESUME_MODE" = true ] && [ $skipped -gt 0 ]; then
+#     echo "Skipped (already done): $skipped"
+#     echo "Executed: $((END - START + 1 - skipped))"
+# fi
+# echo "========================================="
 
-# Clean up
-rm -rf "$TEMP_OUTPUT_DIR"
-echo "Results saved to: $FINAL_OUTPUT_DIR"
+# # Clean up
+# rm -rf "$TEMP_OUTPUT_DIR"
+# echo "Results saved to: $FINAL_OUTPUT_DIR"
 
 # ==============================================================================
 #  EVALUATION STAGE — runs locally (not in Docker), offloads GPU to Modal
@@ -274,15 +273,15 @@ echo "========================================="
 echo "Starting Evaluation Stage (local → Modal cloud)..."
 echo "========================================="
 
-echo "Step 1: Evaluate via Modal ($MODAL_GPU)..."
-uv run python scripts/eval_from_generations.py \
-    run_name="${RUN_NAME}" \
-    dataset_src=local \
-    level=${LEVEL} \
-    timeout=${TIMEOUT} \
-    subset="(${START},${END})" \
-    eval_mode=modal \
-    gpu="${MODAL_GPU}"
+# echo "Step 1: Evaluate via Modal ($MODAL_GPU)..."
+# uv run python scripts/eval_from_generations.py \
+#     run_name="${RUN_NAME}" \
+#     dataset_src=local \
+#     level=${LEVEL} \
+#     timeout=${TIMEOUT} \
+#     subset="(${START},${END})" \
+#     eval_mode=modal \
+#     gpu="${MODAL_GPU}"
 
 echo ""
 echo "Step 2: Analysis..."
