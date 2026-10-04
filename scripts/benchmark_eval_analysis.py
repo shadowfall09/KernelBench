@@ -1,16 +1,26 @@
-import json, os
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
 
-import pydra
-from pydra import Config, REQUIRED
-from kernelbench.dataset import construct_kernelbench_dataset
+import json, os, math
+from pathlib import Path
+from collections import defaultdict
 from tabulate import tabulate
+import numpy as np
+import pydra
+from pydra import REQUIRED, Config
+from src.dataset import construct_kernelbench_dataset
 
 """
 Benchmark Eval Analysis
 
-This script shows how to conduct analysis for model performance on KernelBench
+This script shows how to conduct analysis for model performance on KernelBench.
 
-Given generations and eval results, this script will compute the following:
+Supports multi-sample eval_results.json where keys are "{problem_id}_{sample_id}".
+Metrics are computed per sample across all problems, then reported as mean ± std.
+
 - Success rate (compiled and correctness)
 - Geometric mean of speedup for correct samples
 - Fast_p score for different speedup thresholds (we recommend and use this metric)
@@ -20,297 +30,332 @@ Usage:
 python3 scripts/benchmark_eval_analysis.py run_name=<run_name> level=<level> hardware=<hardware> baseline=<baseline>
 ```
 hardware + baseline should correspond to the results/timing/hardware/baseline.json file
-
-Optional path overrides (for external tools like leaderboards):
-```
-python3 scripts/benchmark_eval_analysis.py run_name=<run_name> level=<level> hardware=<hardware> baseline=<baseline> \
-    baseline_file=/path/to/baseline.json \
-    eval_results_dir=/path/to/runs \
-    output_file=/path/to/output.json
-```
-
 """
 
 
 class AnalysisConfig(Config):
     def __init__(self):
         self.run_name = REQUIRED  # name of the run to evaluate
-        self.level = REQUIRED  # level to evaluate
-
+        self.level = REQUIRED     # level to evaluate
         self.hardware = REQUIRED  # hardware to evaluate
         self.baseline = REQUIRED  # baseline to compare against
-
-        # Optional path overrides (defaults to standard KernelBench paths)
-        self.baseline_file = None      # Override: direct path to baseline JSON
-        self.eval_results_dir = None   # Override: path to runs directory
-        self.output_file = None        # Write JSON output to file
+        # When True: correctness from eval_results_hidden.json, runtime from eval_results.json
+        self.use_hidden_eval = False
+        self.start = None
+        self.end = None
+        self.runs_dir = "runs"
+        self.detail_limit = 30
 
     def __repr__(self):
         return f"AnalysisConfig({self.to_dict()})"
 
 
-def patch(eval_results, dataset):
+def build_baseline_lookup(baseline_results, level):
     """
-    Patch the eval results with the dataset
+    Build a mapping from integer problem_id -> baseline mean runtime.
+    Baseline keys look like "1_Square_matrix_multiplication_.py".
     """
-    for pid in dataset.get_problem_ids():
-        if str(pid) not in eval_results:
-            eval_results[str(pid)] = {
-                "sample_id": 0,
+    lookup = {}
+    for key, entry in baseline_results[f'level{level}'].items():
+        if (not isinstance(entry, dict) or not isinstance(entry.get("mean"), (int, float))
+                or not math.isfinite(entry["mean"]) or entry["mean"] <= 0):
+            continue  # skip problems that failed baseline (e.g. BF16 unsupported ops)
+        pid = int(key.split('_')[0])
+        lookup[pid] = entry["mean"]
+    return lookup
+
+
+def build_baseline_memory_lookup(baseline_results, level):
+    """
+    Build a mapping from integer problem_id -> baseline peak memory (bytes).
+    Returns an empty dict if no entries contain 'peak_memory' (old JSON files).
+    """
+    lookup = {}
+    for key, entry in baseline_results[f'level{level}'].items():
+        if not isinstance(entry, dict):
+            continue
+        if "peak_memory" in entry:
+            pid = int(key.split('_')[0])
+            lookup[pid] = entry["peak_memory"]
+    return lookup
+
+
+def parse_eval_results(eval_results):
+    """
+    Parse keys of the form "{problem_id}_{sample_id}" into a nested dict:
+      by_sample[sample_id][problem_id] = entry
+    Also returns the set of all problem_ids and sample_ids.
+    """
+    by_sample = defaultdict(dict)
+    problem_ids = set()
+    sample_ids = set()
+    for key, entry in eval_results.items():
+        pid, sid = key.rsplit('_', 1)
+        pid, sid = int(pid), int(sid)
+        by_sample[sid][pid] = entry
+        problem_ids.add(pid)
+        sample_ids.add(sid)
+    return by_sample, sorted(problem_ids), sorted(sample_ids)
+
+
+def patch_sample(sample_entries, all_problem_ids):
+    """
+    For a single sample, fill in missing problem_ids with failed entries.
+    """
+    for pid in all_problem_ids:
+        if pid not in sample_entries:
+            sample_entries[pid] = {
                 "compiled": False,
                 "correctness": False,
-                "metadata": {},
                 "runtime": -1.0,
-                "runtime_stats": {},
             }
+    return sample_entries
 
-    return eval_results
 
-
-def analyze_greedy_eval(run_name, hardware, baseline, level,
-                        baseline_file=None, eval_results_dir=None) -> dict:
+def compute_sample_metrics(sample_entries, all_problem_ids, baseline_lookup, p_values, baseline_memory_lookup=None):
     """
-    Analyze the greedy eval results for a run of a particular level.
-
-    Returns a dict with all computed metrics.
+    Given one sample's entries across all problems, compute scalar metrics.
+    Returns a dict of metric_name -> value.
     """
+    from src.score import geometric_mean_speed_ratio_correct_only, geometric_mean_speedup_all_problems, fastp, geometric_mean_memory_ratio, memory_efficient_p
 
+    n = len(all_problem_ids)
+    is_correct = np.array([sample_entries[pid]["correctness"] for pid in all_problem_ids])
+    compiled   = np.array([sample_entries[pid]["compiled"]    for pid in all_problem_ids])
+    baseline_speed = np.array([baseline_lookup[pid] for pid in all_problem_ids])
+    actual_speed   = np.array([sample_entries[pid]["runtime"] for pid in all_problem_ids], dtype=float)
+    timed_correct = is_correct & np.isfinite(actual_speed) & (actual_speed > 0)
+
+    metrics = {
+        "compiled_rate":    compiled.mean(),
+        "correctness_rate": is_correct.mean(),
+        "gmsr":             geometric_mean_speed_ratio_correct_only(timed_correct, baseline_speed, actual_speed, n),
+        "avg_speedup":      geometric_mean_speedup_all_problems(timed_correct, baseline_speed, actual_speed, n),
+    }
+    for p in p_values:
+        metrics[f"fast_p_{p}"] = fastp(timed_correct, baseline_speed, actual_speed, n, p)
+
+    if baseline_memory_lookup:
+        baseline_mem = np.array([baseline_memory_lookup.get(pid, -1.0) for pid in all_problem_ids])
+        kernel_mem   = np.array([sample_entries[pid].get("peak_memory", -1.0) for pid in all_problem_ids])
+        metrics["gmr"]               = geometric_mean_memory_ratio(is_correct, baseline_mem, kernel_mem, n)
+        metrics["memory_efficient_p"] = memory_efficient_p(is_correct, baseline_mem, kernel_mem, n, threshold=1.0)
+
+    return metrics
+
+
+def compute_best_of_n_metrics(by_sample, all_problem_ids, baseline_lookup, sample_ids, p_values):
+    """
+    Oracle best-of-N: for each problem, select the sample with the highest speedup
+    (baseline/actual) that is also correct. Problems with no correct sample count as failures.
+    Returns a dict of metric_name -> value.
+    """
+    from src.score import geometric_mean_speed_ratio_correct_only, geometric_mean_speedup_all_problems, fastp
+
+    n = len(all_problem_ids)
+    best_correct  = np.zeros(n, dtype=bool)
+    best_speedup  = np.zeros(n)   # baseline / actual for best correct sample (0 if none)
+    best_runtime  = np.full(n, -1.0)
+
+    for i, pid in enumerate(all_problem_ids):
+        baseline = baseline_lookup.get(pid, None)
+        if baseline is None:
+            continue
+        for sid in sample_ids:
+            entry = by_sample[sid].get(pid)
+            if entry is None:
+                continue
+            if entry.get("correctness") and entry.get("runtime", -1) > 0:
+                speedup = baseline / entry["runtime"]
+                if speedup > best_speedup[i]:
+                    best_speedup[i]  = speedup
+                    best_correct[i]  = True
+                    best_runtime[i]  = entry["runtime"]
+
+    baseline_arr = np.array([baseline_lookup.get(pid, 1.0) for pid in all_problem_ids])
+    actual_arr   = np.where(best_correct, best_runtime, -1.0)
+
+    metrics = {
+        "correctness_rate": best_correct.mean(),
+        "gmsr": geometric_mean_speed_ratio_correct_only(best_correct, baseline_arr, actual_arr, n),
+        "avg_speedup": geometric_mean_speedup_all_problems(best_correct, baseline_arr, actual_arr, n),
+    }
+    for p in p_values:
+        metrics[f"fast_p_{p}"] = fastp(best_correct, baseline_arr, actual_arr, n, p)
+    return metrics
+
+
+def merge_hidden_eval(standard_results: dict, hidden_results: dict) -> dict:
+    """
+    Merge hidden correctness with standard runtime.
+    For each key present in standard_results:
+      - correctness: from hidden_results (if key exists), else False
+      - runtime / compiled / runtime_stats / etc: from standard_results
+    Keys in hidden_results but not in standard_results are ignored (no runtime available).
+    """
+    merged = {}
+    for key, std_entry in standard_results.items():
+        merged[key] = dict(std_entry)  # copy runtime, compiled, etc.
+        if key in hidden_results:
+            merged[key]["correctness"] = hidden_results[key].get("correctness", False)
+        else:
+            # No hidden result → treat as failed (could not be evaluated)
+            merged[key]["correctness"] = False
+    return merged
+
+
+def analyze_multi_sample_eval(run_name, hardware, baseline, level, use_hidden_eval=False,
+                             problem_ids=None, runs_dir="runs", detail_limit=30):
     dataset = construct_kernelbench_dataset(level)
+    total_count = len(dataset)
 
-    # Resolve eval results path (use override if provided)
-    if eval_results_dir:
-        eval_file_path = os.path.join(eval_results_dir, run_name, "eval_results.json")
-        pass_at_k_file_path = os.path.join(eval_results_dir, run_name, "pass_at_k_results.json")
-    else:
-        eval_file_path = f"runs/{run_name}/eval_results.json"
-        pass_at_k_file_path = f"runs/{run_name}/pass_at_k_results.json"
+    eval_file_path = str(Path(runs_dir) / run_name / 'eval_results.json')
+    baseline_file_path = str(Path(__file__).resolve().parents[1] / 'results' / 'timing' / hardware / f'{baseline}.json')
+    assert os.path.exists(eval_file_path),     f"Eval file does not exist at {eval_file_path}"
+    assert os.path.exists(baseline_file_path), f"Baseline file does not exist at {baseline_file_path}"
 
-    assert os.path.exists(
-        eval_file_path
-    ), f"Eval file does not exist at {eval_file_path}"
-
-    has_pass_at_k_results = os.path.exists(pass_at_k_file_path)
-
-    # Resolve baseline path (use override if provided)
-    if baseline_file:
-        baseline_file_path = baseline_file
-    else:
-        baseline_file_path = f"results/timing/{hardware}/{baseline}.json"
-
-    assert os.path.exists(
-        baseline_file_path
-    ), f"Baseline file does not exist at {baseline_file_path}"
-
-    with open(eval_file_path, "r") as f:
+    with open(eval_file_path, 'r') as f:
         eval_results = json.load(f)
-
-    # Load pass@k results if available
-    pass_at_k_results = None
-    if has_pass_at_k_results:
-        with open(pass_at_k_file_path, "r") as f:
-            pass_at_k_results = json.load(f)
-
-    with open(baseline_file_path, "r") as f:
+    with open(baseline_file_path, 'r') as f:
         baseline_results = json.load(f)
 
-    # Initialize counters
-    total_count = len(dataset)
-    total_eval = len(eval_results)
-    compiled_count = 0
-    correct_count = 0
+    if use_hidden_eval:
+        hidden_file_path = str(Path(runs_dir) / run_name / 'eval_results_hidden.json')
+        assert os.path.exists(hidden_file_path), \
+            f"Hidden eval file not found at {hidden_file_path}. Run eval with use_hidden_tests=True first."
+        with open(hidden_file_path, 'r') as f:
+            hidden_results = json.load(f)
+        eval_results = merge_hidden_eval(eval_results, hidden_results)
+        print(f"[Hidden eval] Using correctness from {hidden_file_path}, runtime from {eval_file_path}")
 
-    # todo: for now we only consider sample_id = 0 though we should change this later
+    baseline_lookup = build_baseline_lookup(baseline_results, level)
+    baseline_memory_lookup = build_baseline_memory_lookup(baseline_results, level)
+    if not baseline_memory_lookup:
+        print("[Info] No peak_memory in baseline JSON; memory metrics will be skipped.")
+    by_sample, evaluated_problem_ids, sample_ids = parse_eval_results(eval_results)
 
-    stripped_eval_results = {}
-    for key, result in eval_results.items():
-        entry = [r for r in result if r["sample_id"] == 0]
-        assert len(entry) <= 1, "Multiple entries for sample_id = 0"
-        if len(entry) == 1:
-            stripped_eval_results[key] = entry[0]
-    eval_results = stripped_eval_results
+    # Restrict to problems covered by the baseline (normally all, but allows partial baselines)
+    requested = list(range(1, total_count + 1)) if problem_ids is None else problem_ids
+    missing_baselines = sorted(set(requested) - baseline_lookup.keys())
+    if problem_ids is not None and missing_baselines:
+        raise ValueError(f"Missing valid baseline timings for selected problems: {missing_baselines}")
+    all_problem_ids = sorted(pid for pid in requested if pid in baseline_lookup)
+    if not all_problem_ids or not sample_ids:
+        raise ValueError("No baseline-aligned problems or evaluated samples to analyze")
 
-    # Patch the eval results
-    eval_results = patch(eval_results, dataset)
-
-    # Count results
-    for entry in eval_results.values():
-        if entry["compiled"] == True:
-            compiled_count += 1
-        if entry["correctness"] == True:
-            correct_count += 1
-
-    # Print results
-    print("-" * 128)
-    print(f"Eval Summary for {run_name}")
-    print("-" * 128)
-    print(f"Total test cases with Eval Results: {total_eval} out of {total_count}")
-    print(f"Successfully compiled: {compiled_count}")
-    print(f"Functionally correct: {correct_count}")
-
-    print(f"\nSuccess rates:")
-    print(f"Compilation rate: {compiled_count/total_eval*100:.1f}%")
-    print(f"Correctness rate: {correct_count/total_eval*100:.1f}%")
-
-    import numpy as np
-
-    # Calculate speedup metrics
-    from kernelbench.score import (
-        fastp,
-        geometric_mean_speed_ratio_correct_and_faster_only,
-        geometric_mean_speed_ratio_correct_only,
-    )
-
-    # Extract the speedup values
-    is_correct_list = []
-    baseline_speed_list = []
-    actual_speed_list = []
-    problem_info_list = []  # For detailed output
-
-    # Sort problem IDs to ensure consistent order
-    sorted_pids = sorted(dataset.get_problem_ids())
-
-    for pid in sorted_pids:
-        # Get eval result
-        if str(pid) not in eval_results:
-            print(f"Warning: Problem {pid} not found in eval results")
-            continue
-        eval_entry = eval_results[str(pid)]
-        
-        # Get baseline result
-        problem = dataset.get_problem_by_id(pid)
-        problem_name = problem.name
-        
-        if problem_name not in baseline_results[f"level{level}"]:
-            print(f"Warning: Problem {problem_name} not found in baseline results")
-            continue
-            
-        baseline_entry = baseline_results[f"level{level}"][problem_name]
-        
-        # Check if baseline_entry is valid
-        if baseline_entry is None or not isinstance(baseline_entry, dict) or "mean" not in baseline_entry:
-            print(f"Warning: Invalid baseline entry for problem {problem_name}")
-            continue
-        
-        is_correct_list.append(eval_entry["correctness"])
-        actual_speed_list.append(eval_entry["runtime"])
-        baseline_speed_list.append(baseline_entry["mean"])
-        
-        # Store problem info for detailed output
-        problem_info_list.append({
-            "pid": pid,
-            "name": problem_name,
-            "correct": eval_entry["correctness"],
-            "baseline": baseline_entry["mean"],
-            "actual": eval_entry["runtime"]
-        })
-
-    is_correct = np.array(is_correct_list)
-    baseline_speed = np.array(baseline_speed_list)
-    actual_speed = np.array(actual_speed_list)
-    n = len(is_correct)
-
-    print(f"\nAligned {n} problems for analysis")
-    
-    # Print detailed comparison for first few problems
-    print("\n" + "="*80)
-    print("Detailed Runtime Comparison (first 10 problems):")
-    print("="*80)
-    print(f"{'PID':<5} {'Correct':<8} {'Baseline(ms)':<15} {'Actual(ms)':<15} {'Speedup':<10}")
-    print("-"*80)
-    for info in problem_info_list[:30]:
-        speedup = info["baseline"] / info["actual"] if info["actual"] > 0 else 0
-        status = "✓" if info["correct"] else "✗"
-        print(f"{info['pid']:<5} {status:<8} {info['baseline']:<15.3f} {info['actual']:<15.3f} {speedup:<10.2f}x")
-    if len(problem_info_list) > 30:
-        print(f"... ({len(problem_info_list) - 30} more problems)")
-    print("="*80)
-
-    # Calculate the metrics
-    gmsr_correct = geometric_mean_speed_ratio_correct_only(
-        is_correct, baseline_speed, actual_speed, n
-    )
-
-    # list of speedup thresholds p
     p_values = [0.0, 0.5, 0.8, 1.0, 1.5, 2.0]
-    fast_p_results = [
-        [p, fastp(is_correct, baseline_speed, actual_speed, n, p)] for p in p_values
-    ]
 
-    # Print the results
-    print("\nSpeedup Metrics:")
-    print(f"Geometric mean of speedup for correct samples: {gmsr_correct:.4f}")
+    # Compute per-sample metrics
+    per_sample_metrics = []
+    for sid in sample_ids:
+        sample_entries = patch_sample(dict(by_sample[sid]), all_problem_ids)
+        m = compute_sample_metrics(sample_entries, all_problem_ids, baseline_lookup, p_values, baseline_memory_lookup)
+        per_sample_metrics.append(m)
 
-    # Print table
-    print("\nFast_p Results:")
-    print(
-        tabulate(
-            fast_p_results, headers=["Speedup Threshold (p)", "Fast_p Score"], tablefmt="grid"
-        )
-    )
+    n_samples = len(sample_ids)
 
-    # Display pass@k metrics if available
-    if pass_at_k_results:
-        print("\nPass@k Correctness Metrics:")
+    def mean_std(key):
+        vals = [m[key] for m in per_sample_metrics]
+        return np.mean(vals), np.std(vals)
 
-        # Print metadata
-        metadata = pass_at_k_results.get("metadata", {})
-        if metadata:
-            print("\nEvaluation Metadata:")
-            metadata_table = [[key, value] for key, value in metadata.items()]
-            print(
-                tabulate(metadata_table, headers=["Metric", "Value"], tablefmt="grid")
-            )
+    # Compute best@N oracle (needed for the top-line metric)
+    best_n = compute_best_of_n_metrics(by_sample, all_problem_ids, baseline_lookup, sample_ids, p_values)
 
-        # Print average pass@k metrics
-        averages = pass_at_k_results.get("averages", {})
-        if averages:
-            print("\nAverage Pass@k Metrics:")
-            avg_table = [[k, v] for k, v in averages.items()]
-            print(tabulate(avg_table, headers=["Metric", "Value"], tablefmt="grid"))
+    # ── Official KernelBench metric ──────────────────────────────────────────
+    # Average speedup = geomean over ALL problems of max(1, best_correct_speedup)
+    avg_sp_mean, avg_sp_std = mean_std("avg_speedup")
+    best_n_avg_sp = best_n["avg_speedup"]
 
-    # Build and return results dict
-    results = {
-        "run_name": run_name,
-        "level": level,
-        "hardware": hardware,
-        "total_count": total_count,
-        "total_eval": total_eval,
-        "compiled_count": compiled_count,
-        "correct_count": correct_count,
-        "compilation_rate": compiled_count / total_count if total_count > 0 else 0.0,
-        "correctness_rate": correct_count / total_count if total_count > 0 else 0.0,
-        "geo_mean_speedup": float(gmsr_correct),
-        "fast_p": {str(p): float(score) for p, score in fast_p_results},
-    }
+    mode_label = "hidden-gated" if use_hidden_eval else "standard"
+    print("=" * 128)
+    print(f"Eval Summary for {run_name}  (level={level}, {n_samples} sample(s) per problem, correctness={mode_label})")
+    print("=" * 128)
+    print(f"Total problems in dataset: {total_count}  |  Samples evaluated: {n_samples}")
+    print()
+    print("  *** OFFICIAL METRIC: Average Speedup (geomean over all problems, speedup >= 1) ***")
+    print(f"      Per-sample avg:  {avg_sp_mean:.4f} ± {avg_sp_std:.4f}")
+    print(f"      Best@{n_samples} oracle:  {best_n_avg_sp:.4f}")
+    print("=" * 128)
 
-    # Include pass@k if available
-    if pass_at_k_results:
-        results["pass_at_k"] = {
-            "metadata": pass_at_k_results.get("metadata", {}),
-            "averages": pass_at_k_results.get("averages", {})
-        }
+    comp_mean, comp_std   = mean_std("compiled_rate")
+    corr_mean, corr_std   = mean_std("correctness_rate")
+    gmsr_mean, gmsr_std   = mean_std("gmsr")
 
-    return results
+    print(f"\nSuccess rates (mean ± std across {n_samples} sample(s)):")
+    print(f"  Compilation rate:  {comp_mean*100:.1f}% ± {comp_std*100:.1f}%")
+    print(f"  Correctness rate:  {corr_mean*100:.1f}% ± {corr_std*100:.1f}%")
+
+    print(f"\nSpeedup metrics:")
+    print(f"  Geometric mean speedup (correct only): {gmsr_mean:.4f} ± {gmsr_std:.4f}")
+
+    detail_rows = []
+    for pid in all_problem_ids:
+        for sid in sample_ids:
+            entry = by_sample[sid].get(pid, {})
+            runtime = entry.get("runtime", -1)
+            valid = entry.get("correctness", False) and isinstance(runtime, (int, float)) and math.isfinite(runtime) and runtime > 0
+            detail_rows.append([pid, sid, bool(entry.get("correctness")), baseline_lookup[pid], runtime,
+                                baseline_lookup[pid] / runtime if valid else None,
+                                entry.get("peak_memory", -1)])
+    if detail_limit:
+        print(f"\nPer-problem comparison (first {detail_limit} entries; timings in ms):")
+        print(tabulate(detail_rows[:detail_limit], headers=["PID", "Sample", "Verified correct", "Baseline ms", "Kernel ms", "Speedup", "Peak bytes"], floatfmt=".4f"))
+
+    from kb_workflows.common import atomic_json, json_safe
+    report = {"run_name": run_name, "level": level, "hardware": hardware, "baseline": baseline,
+              "hidden_gated": use_hidden_eval, "problem_ids": all_problem_ids,
+              "per_sample": {str(sid): m for sid, m in zip(sample_ids, per_sample_metrics)},
+              "best_of_n": best_n, "details": detail_rows}
+    atomic_json(Path(runs_dir) / run_name / "analysis_summary.json", json_safe(report))
+
+    rows = []
+    for p in p_values:
+        fp_mean, fp_std = mean_std(f"fast_p_{p}")
+        rows.append([p, f"{fp_mean*100:.1f}% ± {fp_std*100:.1f}%"])
+
+    print("\nFast_p Results (mean ± std across samples):")
+    print(tabulate(rows, headers=["Speedup Threshold (p)", "Fast_p Score"], tablefmt="grid"))
+
+    if baseline_memory_lookup:
+        gmr_mean, gmr_std = mean_std("gmr")
+        mep_mean, mep_std = mean_std("memory_efficient_p")
+        print(f"\nMemory metrics:")
+        print(f"  Geometric mean memory ratio (kernel/baseline): {gmr_mean:.4f} ± {gmr_std:.4f}  [lower = better]")
+        print(f"  Memory efficient (ratio < 1.0): {mep_mean*100:.1f}% ± {mep_std*100:.1f}%")
+
+    if n_samples > 1:
+        bon_rows = []
+        for p in p_values:
+            fp_mean, fp_std = mean_std(f"fast_p_{p}")
+            bon_rows.append([p, f"{fp_mean*100:.1f}% ± {fp_std*100:.1f}%", f"{best_n[f'fast_p_{p}']*100:.1f}%"])
+        print(f"\nFast_p Results (mean ± std  vs  best@{n_samples} oracle):")
+        print(tabulate(bon_rows, headers=["Speedup Threshold (p)", "Fast_p (mean ± std)", f"Fast_p (best@{n_samples})"], tablefmt="grid"))
+
+        print(f"\nPer-sample breakdown:")
+        header = ["Sample"] + ["compiled%"] + ["correct%"] + [f"fast_p_{p}" for p in p_values]
+        sample_rows = []
+        for i, (sid, m) in enumerate(zip(sample_ids, per_sample_metrics)):
+            row = [sid, f"{m['compiled_rate']*100:.1f}%", f"{m['correctness_rate']*100:.1f}%"]
+            for p in p_values:
+                row.append(f"{m[f'fast_p_{p}']*100:.1f}%")
+            sample_rows.append(row)
+        print(tabulate(sample_rows, headers=header, tablefmt="grid"))
+
+        # Best-of-N oracle summary
+        print(f"\nBest-of-{n_samples} Oracle (per problem, best correct sample wins):")
+        print(f"  Correctness rate:  {best_n['correctness_rate']*100:.1f}%")
+        print(f"  Geometric mean speedup (correct only): {best_n['gmsr']:.4f}")
 
 
 @pydra.main(base=AnalysisConfig)
 def main(config: AnalysisConfig):
-    results = analyze_greedy_eval(
-        config.run_name,
-        config.hardware,
-        config.baseline,
-        config.level,
-        baseline_file=config.baseline_file,
-        eval_results_dir=config.eval_results_dir
-    )
-
-    # Write JSON output if requested
-    if config.output_file:
-        with open(config.output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        print(f"\nResults written to: {config.output_file}")
-
-    return results
+    problem_ids = None
+    if config.start is not None or config.end is not None:
+        size = len(construct_kernelbench_dataset(config.level))
+        problem_ids = list(range(config.start or 1, (config.end or size) + 1))
+    analyze_multi_sample_eval(config.run_name, config.hardware, config.baseline, config.level,
+                              use_hidden_eval=config.use_hidden_eval, problem_ids=problem_ids,
+                              runs_dir=config.runs_dir, detail_limit=config.detail_limit)
 
 
 if __name__ == "__main__":

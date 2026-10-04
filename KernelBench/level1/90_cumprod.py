@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
 import torch
 import torch.nn as nn
 
@@ -37,7 +43,7 @@ input_shape = (32768,)
 dim = 1
 
 def get_inputs():
-    return [torch.rand(batch_size, *input_shape)]
+    return [torch.randn(batch_size, *input_shape)]
 
 def get_init_inputs():
     return [dim]

@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
 # Copyright 2018 Antoine Miech All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -87,7 +93,7 @@ class Model(nn.Module):
 
 batch_size = 2048
 num_features = 100
-num_clusters = 32
+num_clusters = 16
 feature_size = 512
 ghost_clusters = 0
 

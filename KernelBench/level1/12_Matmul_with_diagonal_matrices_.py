@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
 import torch
 import torch.nn as nn
 
@@ -20,9 +26,7 @@ class Model(nn.Module):
         Returns:
             torch.Tensor: The result of the matrix multiplication. Shape: (N, M).
         """
-        # Logically equivalent to torch.diag(A) @ B 
-        # more efficient as no need to materialize a full N×N matrix
-        return A.unsqueeze(1) * B
+        return torch.diag(A) @ B
 
 M = 4096
 N = 4096

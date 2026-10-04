@@ -1,61 +1,29 @@
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+# The same source checkout powers CPU generation and GPU verification images.
+ARG CUDA_IMAGE=nvidia/cuda:13.0.0-devel-ubuntu22.04
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-# 1. Install system dependencies
-RUN apt-get update && apt-get install -y \
-    software-properties-common ca-certificates \
-    && add-apt-repository ppa:ubuntu-toolchain-r/test -y \
-    && apt-get update && apt-get install -y \
-    curl wget git \
-    python3 python3-pip python3-venv \
-    gcc-13 g++-13 cmake build-essential \
-    vim less jq \
-    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 \
-    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100 \
-    && rm -rf /var/lib/apt/lists/*
-
-# 2. Install uv
-RUN pip3 install uv
-
-# 3. Install Claude CLI
+FROM python:3.10-slim AS agent-remote
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git curl jq ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/KernelBench
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 RUN curl -fsSL https://claude.ai/install.sh | bash
-#  Add Claude CLI to PATH
-ENV PATH="/root/.local/bin:/root/.anthropic/bin:$PATH"
+COPY . .
+ENV PYTHONPATH=/app/KernelBench PYTHONUNBUFFERED=1
+ENV PATH=/root/.local/bin:$PATH
+CMD ["/bin/bash"]
 
-# 4. Clone repository
-WORKDIR /app
-RUN git clone https://github.com/shadowfall09/KernelBench.git
-
-# 5. Configure environment
+FROM ${CUDA_IMAGE} AS agent
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3-pip build-essential git curl jq ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/bin/python3.10 /usr/local/bin/python
 WORKDIR /app/KernelBench
-
-# Set C++ compiler environment variables (required by z3-solver)
-ENV CC=gcc-13
-ENV CXX=g++-13
-ENV CXXFLAGS="-std=c++20"
-
-RUN uv venv
-RUN . .venv/bin/activate && uv sync --extra gpu
-
-# 6. Prepare directories
-RUN mkdir -p runs/claude_code cache
-
-# 7. Set environment variables
-ENV PATH="/app/KernelBench/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/KernelBench/src"
-
-# Claude/Bedrock configuration (for generation tasks)
-ENV CLAUDE_CODE_USE_BEDROCK=1
-
-# Copy entrypoint script (used for generation)
-COPY entrypoint.sh /app/KernelBench/entrypoint.sh
-RUN chmod +x /app/KernelBench/entrypoint.sh
-
-# Default working directory
-WORKDIR /app/KernelBench
-
-# No ENTRYPOINT - allows flexible use for both generation and evaluation
-# For generation: docker run ... /app/KernelBench/entrypoint.sh
-# For evaluation: docker run ... bash -c "uv run python scripts/eval_from_generations.py ..."
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+RUN curl -fsSL https://claude.ai/install.sh | bash
+COPY . .
+ENV PYTHONPATH=/app/KernelBench PYTHONUNBUFFERED=1
+ENV PATH=/root/.local/bin:/usr/local/cuda/bin:$PATH
 CMD ["/bin/bash"]

@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
 import torch
 import torch.nn as nn
 
@@ -15,9 +21,9 @@ sequence_length = 512
 embedding_dimension = 1024
 
 def get_inputs():
-    Q = torch.rand(batch_size, num_heads, sequence_length, embedding_dimension)
-    K = torch.rand(batch_size, num_heads, sequence_length, embedding_dimension)
-    V = torch.rand(batch_size, num_heads, sequence_length, embedding_dimension)
+    Q = torch.rand(batch_size, num_heads, sequence_length, embedding_dimension, device='cuda', dtype=torch.float16)
+    K = torch.rand(batch_size, num_heads, sequence_length, embedding_dimension, device='cuda', dtype=torch.float16)
+    V = torch.rand(batch_size, num_heads, sequence_length, embedding_dimension, device='cuda', dtype=torch.float16)
     return [Q, K, V]
 
 def get_init_inputs():

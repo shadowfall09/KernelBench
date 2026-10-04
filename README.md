@@ -1,176 +1,214 @@
-# KernelBench: Can LLMs Write Efficient GPU Kernels? [ICML '25]
-A benchmark for evaluating LLMs' ability to generate efficient GPU kernels
+<!--
+Copyright (c) Meta Platforms, Inc. and affiliates.
+All rights reserved.
 
-[arXiv](https://arxiv.org/html/2502.10517v1) | [blog post](https://scalingintelligence.stanford.edu/blogs/kernelbench/) | [HuggingFace Dataset](https://huggingface.co/datasets/ScalingIntelligence/KernelBench) 
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
 
-<img src="./assets/figures/KernelBenchMascot.png" width="200">
+# KernelBench-Verified: Do LLM-Generated Kernels Actually Beat PyTorch?
 
-## Versions
-The latest stable version will be on `main` branch. We continue to update and improve the repo. 
-- [v0.1](https://github.com/ScalingIntelligence/KernelBench/tree/v0.1) - See [blog](https://scalingintelligence.stanford.edu/blogs/kernelbenchv01/)
-- [v0](https://github.com/ScalingIntelligence/KernelBench/tree/v0) - Original Release
+## Fork provenance
 
+This repository is maintained at [shadowfall09/KernelBench](https://github.com/shadowfall09/KernelBench).
+The current code is based on [Meta KernelBench-Verified](https://github.com/facebookresearch/kernel_bench_verified)
+at commit `3fdf6fec7372a4d0cb682635f00e7bdcbc55d50e`, with the batch workflows
+migrated from the previous KernelBench fork. The original research attribution
+and license are retained below. Earlier fork versions remain in Git history.
 
-The Huggingface [dataset](https://huggingface.co/datasets/ScalingIntelligence/KernelBench) is updated to v0.1.
+## Integrated batch workflows
 
-This repo provides core functionality for KernelBench and an easy-to-use set of scripts for evaluation. It is not intended to provide complex agentic scaffolds that solve this task; we recommend cloning and modifying this repo for your experiment, or using it as a git submodule.
-
-## 👋 Task Description
-We structure the problem for LLM to transpile operators described in PyTorch to CUDA kernels, at whatever level of granularity it desires to.
-![KernelBenchMascot](./assets/figures/KernelBenchWorkFlow.png)
-
-We construct KernelBench to have 4 Levels of categories:
-- **Level 1 🧱**:  Single-kernel operators (100 Problems)
-    The foundational building blocks of neural nets (Convolutions, Matrix multiplies, Layer normalization)
-- **Level 2 🔗**:  Simple fusion patterns (100 Problems)
-    A fused kernel would be faster than separated kernels (Conv + Bias + ReLU, Matmul + Scale + Sigmoid)
-- **Level 3 ⚛️**:  Full model architectures (50 Problems)
-    Optimize entire model architectures end-to-end (MobileNet, VGG, MiniGPT, Mamba) 
-- **Level 4 🤗**:  Level Hugging Face 
-    Optimize whole model architectures from HuggingFace
-
-We are actively extending KernelBench to other DSLs beyond `cuda` as well (see below).
-
-## ⚖️ Evaluation
-#### Methodology
-To evaluate model-generated kernels, we need to check if they:
-- **is correct ✅**: check against reference torch operators `n_correctness` times on randomized inputs.
-- **is performant ⏱️**: compare against reference torch operators `n_trial` times to measure speedup between runtimes.
-
-Check out `src/eval.py` for details on how we implement correctness check and timing and `EVAL.md` for notes on evaluation and benchmarking guidelines [WIP].
-
-We provide a convenient script `scripts/run_and_check.py` to evaluate one single sample source code against a reference source code, check correctness and compute speedup. You can use this to evaluate a kernel either locally or remotely by setting `eval_mode=local` or `eval_mode=modal`.
-
-#### Overall Benchmark Metric
-
-Since we need to capture **both** correctness and performance, we define a metric `fast_p`: fraction of tasks that are both correct and have a speedup greater than threshold `p`; speedup is computed as the ratio of PyTorch reference wall-clock time to generated kernel time.
-
-Some examples to illustrate this metric that filters based on speedups:
-* `fast_1` is the fraction of tasks that LM-generated kernels are both correct and **faster** than PyTorch baseline
-* `fast_2` is the fraction of tasks that LM-generated kernels are both correct and **at least 2x faster** than PyTorch baseline
-* `fast_0` is the fraction of tasks that LM-generated kernels are **correct**. (same as correctness rate)
-
-You can increase speedup threshold `p` to make the task more challenging.
-
-
-#### Compute Overall Benchmark Performance
-
-We provide a script `scripts/greedy_analysis.py` to compute the overall benchmark performance. 
-Since we need to capture **both** correctness and performance, we use a metric `fast_p`: fraction of tasks that are both correct and have a speedup greater than threshold `p`; speedup is computed as the ratio of PyTorch reference wall-clock time to generated kernel time.
-
-<!-- TODO: update to provide fast_p measurement script -->
-
-## 🔍 Directory Structure
-We organize the repo into the following structure:
-```
-KernelBench/
-├── assets/
-├── KernelBench/ # Benchmark dataset files
-├── src/kernelbench/ # KernelBench logic code
-│   ├── unit_tests/  
-│   ├── prompts/
-│   ├── ....
-├── scripts/ # helpful scripts to run the benchmark
-├── results/ # baseline times across hardware 
-├── runs/ # where your runs will be stored
-├── notebooks/ # example notebooks for analysis
-├── pyproject.toml # Project configuration and dependencies
-```
-
-## 🔧 Set up
-
-We have transitioned to using `pyproject.toml` and `uv` for dependency management. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you haven't already
+This checkout also includes the Docker/Slurm, Modal, local verification queue and
+baseline-analysis workflows migrated from `KernelBench-modified`. They share
+`scripts/run_batch.py`, default to Verified hidden correctness gating and preserve
+timing/memory outputs. See [Batch workflows](docs/BATCH_WORKFLOWS.md) for setup,
+backend choices, resume behavior and compatibility entrypoints.
 
 ```bash
-# Install base dependencies (works without a local GPU)
-uv sync
-
-# Install with GPU dependencies (for local GPU evaluation)
-uv sync --extra gpu
-
-# Run commands with uv (which invoke the right env)
-uv run python scripts/<script_name>.py ...
+python scripts/run_batch.py --generation docker --evaluation docker \
+  --level 1 --start 1 --end 10 --run-name my_run \
+  --hardware RTX_A6000 --gpu-arch Ampere --gpus 0 --resume
 ```
 
-You can still use `conda (python=3.10)` to create your environment and install dependencies with `requirements.txt`.
+**Extended evaluation framework for LLM-generated GPU kernels with realistic baselines and robust correctness validation.**
 
-We use `litellm` for API calls. Please set your keys by creating a `.env` following our `.env.example`.
+Yunxiang Zhang<sup>1</sup>, Ping Yu<sup>2</sup>, Jianyu Wang<sup>1</sup>, Max (Xiangjun) Fan<sup>1</sup>, Julian Reed<sup>3</sup>, Azalia Mirhoseini<sup>3</sup>, Will Su<sup>1</sup>
 
-Running and profiling kernels require a GPU.
-If you don't have a GPU available locally, you can set up [Modal](https://modal.com/) for cloud serverless GPU evaluation. Set up your modal token after creating an account by running `modal token new`. Then, use the `generate_and_eval_single_sample_modal.py` script.
+<sup>1</sup>Meta &nbsp;&nbsp; <sup>2</sup>FAIR at Meta SuperIntelligence Lab &nbsp;&nbsp; <sup>3</sup>Stanford University
 
-You can also try out our [tutorial notebook](https://bit.ly/kernelbench-neurips-colab) (also in notebooks/tutorial.ipynb) with Google Colab.
+[![Leaderboard](https://img.shields.io/badge/Leaderboard-Verified-blue)](https://scalingintelligence.stanford.edu/kernelbenchverifiedleaderboard/)
+[![Paper](https://img.shields.io/badge/Paper-PDF-red)](KernelBench_Verified_Report.pdf)
 
-## 🚀 Usage
-### Run on a single problem 
-It is easier to get started with a single problem. This will fetch the problem, generate a sample, and evaluate the sample. 
+---
+
+Recent large language models (LLMs) can generate custom CUDA kernels that appear to outperform PyTorch on benchmarks such as KernelBench. Building upon this foundational framework, we demonstrate that [...]
+
+We introduce **KernelBench-Verified**, an extended evaluation framework that incorporates:
+1. **TF32-enabled baseline** - Realistic performance measurement with Tensor Core acceleration
+2. **Four-distribution hidden test suite** - Robust correctness validation across varied inputs
+3. **Memory efficiency metrics** - Capturing the speed-memory tradeoff in kernel optimization
+
+Under verified evaluation with seven frontier LLMs, GPT-5.5 achieves **0.88×** geometric mean speedup, significantly lower than the 1.43× speedup observed under standard evaluation. No model consist [...]
+
+## Leaderboard
+
+![Memory–Speedup Tradeoff (per level)](docs/figures/mem_speedup_tradeoff.png)
+
+Each dot is one model. **X** = Correct Speedup (geomean of baseline / kernel runtime over correct problems only; higher = faster). **Y** = Memory Efficiency (geomean of baseline mem / kernel mem over correct problems only; higher = uses less GPU memory than baseline). The upper-right corner is best (fast *and* memory-efficient); dashed lines mark the 1× reference (no change vs baseline). See the full interactive [Verified Leaderboard](https://scalingintelligence.stanford.edu/kernelbenchverifiedleaderboard/).
+
+## Framework Components
+
+### TF32 Baseline Configuration
+
+Enable TF32 in PyTorch to match practitioner deployment:
+
+```python
+# Enable TF32 acceleration in PyTorch
+torch.set_float32_matmul_precision('high')
+# Equivalent: torch.backends.cuda.matmul.allow_tf32 = True
+```
+
+This routes all float32 matmul and convolution operations through Tensor Cores, providing the realistic baseline against which speedups should be measured.
+
+### Multi-Distribution Hidden Test Suite
+
+Each problem has a hidden test file at `hidden_tests/level{L}/{pid}_hidden.py` defining `get_hidden_inputs()` that returns four distributions. A kernel must pass **all four distributions** to be consi [...]
+
+| Distribution | Transform | Catches |
+|--------------|-----------|---------|
+| **D1** | Original (×1.0) | Baseline correctness |
+| **D2** | Scale ×3.0 | Overflow, precision issues |
+| **D3** | Scale ×0.01 | Underflow, epsilon issues |
+| **D4** | Negate ×(-1.0) | Sign shortcuts, identity tricks |
+
+### Input-Blind Generation
+
+For 4 problems susceptible to reward hacking, test inputs are automatically stripped from the generation prompt. See [docs/INPUT_BLIND_GENERATION.md](docs/INPUT_BLIND_GENERATION.md) for details.
+
+## Installation
 
 ```bash
-# for example, run level 2 problem 40 from huggingface and use google gemini 2.5 flash for generation
+# Clone the repository
+git clone https://github.com/facebookresearch/kernel_bench_verified.git
+cd kernel_bench_verified
 
-uv run python scripts/generate_and_eval_single_sample.py dataset_src=huggingface level=2 problem_id=40 server_type=google model_name=gemini/gemini-2.5-flash
+# Create conda environment
+conda create -n kernel-bench python=3.10
+conda activate kernel-bench
 
-# dataset_src could be "local" or "huggingface"
-# add .verbose_logging for more visbility
+# Install dependencies
+pip install -r requirements.txt
+
+# Set API keys (for OpenAI, Anthropic, etc.)
+export OPENAI_API_KEY="your-key-here"
+export ANTHROPIC_API_KEY="your-key-here"
+# ... other provider keys as needed
 ```
 
-**What you might need to modify**
-* **`gpu_arch`** - Depend on your GPU, you might need to adjust the `gpu_arch` argument to reflect your hardware.
-* **`precision`** - You can specify the precision of tensor by `precision=fp32`. Currently all of our reported results are `fp32` but we added support for `fp16` & `bf16`.
-*  **`backend`** - We are also supporting other GPU programming languages beyond `cuda`. Simply specify `backend=triton`. For now we support DSLs: `cuda`, `triton`, `cute`, `tilelang`, `thunderkittens`.
+## Usage
 
-
-Note on setting up ThunderKittens (TK) locally: to use `backend=thunderkittens`, you need to git clone the ThunderKittens repo and set the following environment variable to point to your local ThunderKittens directory, `export THUNDERKITTENS_ROOT=<PATH to ThunderKittens folder>`, and all ThunderKitten programs as shown in the [example](src/kernelbench/prompts/model_new_ex_add_thunderkittens.py), should contain `tk_root = os.environ.get("THUNDERKITTENS_ROOT", "/root/ThunderKittens")`, which enable the kernel to include the right TK primitives. In addition, we only support BF16 for TK right now.
-
-Check the config fields for comprehensive set of options. Note we provide the model with a one-shot example by default along with the minimum set of info; you can check out other prompt settings or construct your own in `src/prompt_constructor_toml.py`.
-
-### Run on all problems 
+### Full Evaluation Pipeline
 
 ```bash
-# 1. Generate responses and store kernels locally to runs/{run_name} directory
-uv run python scripts/generate_samples.py run_name=test_hf_level_1 dataset_src=huggingface level=1 num_workers=50 server_type=deepseek model_name=deepseek-chat temperature=0
+# 1. Generate kernels (5 samples per problem)
+python scripts/generate_samples.py \
+  run_name=gpt-5.5_level1_test \
+  dataset_src=local \
+  level=1 \
+  num_samples=5 \
+  server_type=openai \
+  model_name=gpt-5.5 \
+  max_tokens=32000 \
+  temperature=0.8 \
+  num_workers=4
 
-# 2. Evaluate on all generated kernels in runs/{run_name} directory
-uv run python scripts/eval_from_generations.py run_name=test_hf_level_1 dataset_src=local level=1 num_gpu_devices=8 timeout=300
+# 2. Standard evaluation (correctness + timing + memory)
+python scripts/eval_from_generations.py \
+  run_name=gpt-5.5_level1_test \
+  dataset_src=local \
+  level=1 \
+  num_samples=5 \
+  eval_mode=local \
+  gpu_arch="['Hopper']" \
+  num_gpu_devices=8 \
+  timeout=600 \
+  build_cache=True \
+  num_cpu_workers=1 \
+  precision=fp32 \
+  measure_performance=True
 
-# If you like to speedup evaluation, you can use parallelize compilation on CPUs before getting to evaluation on GPUs
-# add build_cache=True and num_cpu_workers=<num_cpu_workers> to the command
+# 3. Hidden evaluation (4-distribution correctness gating)
+python scripts/eval_from_generations.py \
+  run_name=gpt-5.5_level1_test \
+  dataset_src=local \
+  level=1 \
+  num_samples=5 \
+  eval_mode=local \
+  gpu_arch="['Hopper']" \
+  num_gpu_devices=8 \
+  timeout=600 \
+  build_cache=True \
+  num_cpu_workers=1 \
+  precision=fp32 \
+  use_hidden_tests=True \
+  measure_performance=False
+
+# 4. Generate leaderboard with verified metrics
+python scripts/generate_leaderboard.py \
+  --use_hidden_eval \
+  --baseline baseline_time_torch_tf32 \
+  --fp32_tolerance 1e-3 \
+  --out leaderboard.html
 ```
-### Analyze the eval results to compute Benchmark Performance
-We provide `scripts/benchmark_eval_analysis.py` to analyze the eval results to compute success rate, timing metric, and overall benchmark performance  `fast_p`. 
+
+### Key Flags
+
+- `--use_hidden_tests`: Enable 4-distribution hidden correctness testing (outputs `eval_results_hidden.json`)
+- `--use_hidden_eval`: Apply hidden eval gating in leaderboard (only kernels passing all 4 distributions count as correct)
+- `--baseline baseline_time_torch_tf32`: Use TF32-enabled PyTorch baseline (realistic performance)
+- `--fp32_tolerance 1e-3`: FP32 numerical tolerance for correctness checking
+
+### Generate Hidden Tests
 
 ```bash
-uv run python scripts/benchmark_eval_analysis.py run_name=test_hf_level_1 level=1 hardware=L40S_matx3 baseline=baseline_time_torch
+# Regenerate hidden tests for all Level 1 problems
+python scripts/generate_hidden_inputs.py --level 1
+
+# Regenerate for a single problem
+python scripts/generate_hidden_inputs.py --level 1 --pid 90
 ```
-If you are using a different hardware, you can generate the baseline time with `scripts/generate_baseline_time.py` script.
-We provide some reference baseline times a variety of NVIDIA GPUs across generations in `results/timing`, but we recommend you to generate your own baseline time for more accurate results (cluster power, software version, all affects timing result). See `results/timing/README.md` for more details.
 
-### Multi-Turn Framework & Integrations
-We have also releaed the test-time framework [Caesar](https://github.com/ScalingIntelligence/caesar) that are used in the multi-turn / iterative refinement experiments in our paper. You can use or modify this framework for high-throughput test-time scaling (both sequential and parallel) targeting KernelBench problems.
+### Adding New Problems to Input-Blind List
 
-You can also use KernelBench as a library for your projects, for example: `from kernelbench import timing`, `from kernelbench import eval as kb_eval`, or `from kernelbench.utils import set_gpu_arch`.
+1. Add `(level, pid)` to `STRIP_TEST_CONFIG_PIDS` in `src/prompt_constructor.py`
+2. Add shape annotations to the problem's `forward()` docstring in `KernelBench/level{L}/{problem}.py`
+3. Regenerate stripped prompts and re-evaluate
 
-## 🛣️ Upcoming Roadmap
-Check out our [roadmap](https://github.com/ScalingIntelligence/KernelBench/issues/74) for what we plan to add as features. We welcome community contirbutions in these directions. 
+## Output Files
 
-## 🔍 Known Usage
-Since release, we have gotten a lot of interest from researchers, research labs, and companies that use KernelBench to explore this direction. We have documented [known usage](https://docs.google.com/document/d/e/2PACX-1vTjS-UMH1HB5n_PENq2k-3YRfXIXkqKIKeNC2zcWMyLPdl4Jrwvdk4dNDVSsM8ybKrCxZB7GJq1slZF/pub) of KernelBench and related efforts towards automated kernel generations. If you are using KernelBench, we love to hear more about it!
-
-Disclaimer: KernelBench is designed as an open-source evaluation framework and toolkit. The KernelBench team does not review, validate, or endorse individual kernels or reported results. Users are responsible for independently verifying any results obtained using the framework. Please check out `EVAL.md` for more guidance on benchmarking and evaluating kernels.
-
-## 🪪 License
-MIT. Check `LICENSE.md` for more details.
-
+- `runs/{run_name}/eval_results.json` — Standard evaluation (correctness, runtime, memory)
+- `runs/{run_name}/eval_results_hidden.json` — Hidden evaluation (4-distribution gated correctness)
+- `leaderboard.html` — Interactive HTML leaderboard with verified metrics
 
 ## Citation
+
+If you use KernelBench-Verified in your research, please cite:
+
 ```bibtex
-@misc{ouyang2025kernelbenchllmswriteefficient,
-      title={KernelBench: Can LLMs Write Efficient GPU Kernels?}, 
-      author={Anne Ouyang and Simon Guo and Simran Arora and Alex L. Zhang and William Hu and Christopher Ré and Azalia Mirhoseini},
-      year={2025},
-      eprint={2502.10517},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2502.10517}, 
+@article{zhang2026kernelbenchverified,
+  title={KernelBench-Verified: Do LLM-Generated Kernels Actually Beat PyTorch?},
+  author={Zhang, Yunxiang and Yu, Ping and Wang, Jianyu and Fan, Max (Xiangjun) and Reed, Julian and Mirhoseini, Azalia and Su, Will},
+  journal={arXiv preprint},
+  year={2026}
 }
 ```
+
+## License
+
+This source code is licensed under the MIT License. See the LICENSE file for details.
+
+Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
+
+## Acknowledgments
+
+KernelBench-Verified builds upon the original [KernelBench](https://github.com/ScalingIntelligence/KernelBench) benchmark. We thank the KernelBench authors for their foundational work.
