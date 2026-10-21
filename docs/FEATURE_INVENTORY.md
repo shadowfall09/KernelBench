@@ -1,20 +1,25 @@
 # KernelBench Pro 功能改进清单（相比 KernelBench-Verified）
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流。
 
-当前已提交能力为第一至第六版的累计功能。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前已提交能力为第一至第七版的累计功能。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
 | 能力 | 当前配置 |
 | --- | --- |
 | Python | 3.12；验证依赖 Torch 2.12.0 |
-| 生成 | local / Docker / Modal / Harbor |
+| 生成后端 | local / Docker / Modal / Harbor |
+| GPU 目标 | TOML 配置与预设，显式 CLI 参数覆盖 |
+| 生成协议 | 原生 one-shot / mini-swe-agent feedback；Harbor external；会话 skill interactive |
+| 反馈预算 | 默认每样本最多 5 次候选、2400 秒，可配置 |
 | 正式验证 | local / Docker / Modal / HTTP 队列 |
 | Harbor 任务 | 同一 CLI 的 `export-harbor` 阶段 |
 | 结果与恢复 | 原生样本编号、文件格式、基线、计时、评分及指纹 |
 
 下面各版分别记录对应提交、功能变化和验证范围。
+
+第七版同时包含 GPU 配置、one-shot / mini-swe-agent 反馈循环和 coding-agent skill，见后文对应记录。
 
 ## 第一版：Verified + 批量工作流
 
@@ -275,6 +280,52 @@ git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel b
 | 文档 | [Harbor 接入](HARBOR.md)、README 和批量文档同步更新；历史 Python 3.10 测试记录仍保留其真实环境。 |
 
 验证：Python 3.12.12 / Torch 2.12.0 / 正式发布的 Harbor 0.24.0 下 **204 passed**，含 32 项 Harbor 回归；Ruff、依赖一致性、实际 Task 模型校验和 CLI 配置解析通过。两个 Docker 目标的构建定义检查通过。Harbor Docker CPU smoke 因宿主 NAT 网络错误未启动，没有产物或 reward，不算通过；Torch CUDA 13 构建报告当前宿主驱动过旧，真实 GPU 与 agent 端到端验证仍待兼容环境。
+
+## 第七版：GPU 配置与有界 Agent 工作流
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add configurable GPU targets and bounded mini-swe-agent workflows |
+| 提交定位 | `git log -1 --format='%H %s' --grep='^Add configurable GPU targets and bounded mini-swe-agent workflows$'` |
+| 基础提交 | `d2550fb60a36e2555635072a8eab6a1411392504` |
+| 记录日期 | 2026-10-21 |
+| 功能状态 | 已提交；270 项 CPU/模拟回归通过，真实 GPU 与付费模型端到端验证待完成 |
+
+本版把 GPU 文件配置、one-shot / mini-swe-agent 反馈循环和 coding-agent skill 纳入同一次提交。此前搁置的评测完整性整合及清理草稿仍保留在原 stash，没有恢复或纳入本版。
+
+### GPU 配置统一
+
+| 功能 | 相对第六版的变化 | 实现入口 |
+| --- | --- | --- |
+| 文件配置 | 新增 `--config FILE.toml`，`[gpu]` 管 GPU，`[run]` 管工作流；命令行显式覆盖文件，文件覆盖默认值；检查类型、未知字段及枚举值。 | `kb_workflows/config.py`、[GPU 配置](GPU_CONFIG.md) |
+| GPU 预设 | 型号到架构和云端类型的映射移出 Python，集中维护在随包分发的 TOML；提供 A6000 本地和 H100 Modal 示例。 | `kb_workflows/gpu_profiles.toml`、`configs/`、`pyproject.toml` |
+| 自定义目标 | `[gpu]` 可直接填写硬件标签、架构、设备和云端类型；编译目标接受架构名或计算能力，不再依赖旧的固定架构白名单。 | `kb_workflows/gpu.py`、`src/utils.py` |
+| 明确选择硬件 | 去掉默认 H100 和未知型号回退 Hopper；未知硬件需显式架构，实际 GPU 任务要求完整目标，Modal 要求云端类型。更换 CLI 目标时清除文件中旧的目标配置。 | `kb_workflows/config.py`、`kb_workflows/cli.py` |
+| 后端与子任务 | 同一解析结果传给现有生成、评测、基线、调度和恢复流程；子任务保存展开后的 JSON，不依赖宿主 TOML 路径；Harbor 省略空云端类型。 | `kb_workflows/harbor.py`、原生 `RunConfig` 及任务协议 |
+| 集群与恢复 | Slurm 使用 `KB_CONFIG`，只让显式环境变量覆盖文件；shell 入口尊重文件后端；GPU 解析模块和预设参与 evaluator digest，切换目标影响恢复指纹。 | `batch_run.sbatch`、`batch_run.sh`、`batch_run_modal.sh`、`kb_workflows/common.py` |
+
+GPU 配置阶段验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 下 **244 passed**，新增 40 项配置与边界回归；Ruff、脚本语法和 diff 检查通过。离线 wheel 构建成功，解包后在仓库外验证 GPU 预设可加载；配置预览不导入 Torch、Modal 或 Harbor，Harbor 任务通过实际 Task 模型校验。真实 GPU 与 agent 端到端验证仍受宿主驱动限制，未新增实机通过声明。
+
+范围：一个运行配置描述一种 GPU 类别，异构卡使用独立运行和基线；执行后端仍为 NVIDIA CUDA，不代表 AMD、Intel、MPS 或 CPU 性能评测已适配。
+
+### One-shot、mini-swe-agent 与 coding-agent skill
+
+与前述 GPU 配置统一改动一起提交。采用 mini-swe-agent 发布版 2.4.6，参考 TIRx 的固定评测契约、诊断与基准分离设计；没有迁入 TIRx 编译器、NumSim、Synccheck、Racecheck 或 KCoral。此前 stash 仍未恢复。
+
+| 功能 | 相对第六版的变化 | 实现入口 |
+| --- | --- | --- |
+| 真实 agent loop | 使用上游 DefaultAgent 的查询/反馈循环、线性消息历史、步数/费用检查与轨迹序列化；自有 Model/Environment 适配器提交源码，控制器负责执行反馈。 | `kb_workflows/agent_loop.py`、`kb_workflows/agent_models.py` |
+| One-shot | 一个样本只发起一次模型适配器调用，不给执行反馈；Claude Code 内置工具、MCP 和自定义加载关闭。多样本采样与单次生成分别记录。 | `configs/a6000-one-shot.toml`、`generation_mode` |
+| 有界反馈 | 默认每样本尝试最多 5 次候选、2400 秒；CLI/TOML 可调。控制器保留开发正确且平均耗时最低的候选，后续错误或超时不覆盖已完成最佳版本。 | `configs/a6000-feedback.toml`、`kb_workflows/generation.py` |
+| 开发与最终评测分离 | 开发任务明确关闭隐藏测试；冻结源码后原生流程重新做标准与多种子隐藏验证。新增独立 Torch profiler 诊断子任务，诊断时间不进入正式评分，也不冒充 NCU 硬件计数器。 | `kb_workflows/agent_loop.py`、`kb_workflows/profile_task.py`、`kb_workflows/evaluate_task.py` |
+| 资源与来源记录 | 记录调用、候选、开发/诊断次数、可观测 token 和估算费用；未知值不当作零。源码 hash 绑定生成回执；已完成失败可恢复而不自动重试，显式重复尝试累计历史成本并标为 repeated-attempts。 | `generation_budget.json`、`generation_attempts.json`、`phase_budget.json`、`kb_workflows/experiment.py` |
+| 模式比较 | 按模式、框架、预算、采样数、题集、硬件和精度分组，模型信息逐行记录；不跨不同实验组直接排名。生成后修改源码标为 unattributed。 | `python -m kb_workflows.experiment`、`paper_analysis.json` |
+| 模型与后端 | Claude Code / LiteLLM 模型入口共用 mini-swe-agent；local / Docker / Modal 生成接入同一循环；队列支持诊断任务。Harbor 保持外部 agent 模式，不冒充原生 one-shot 或受控轮数。 | `requirements.txt`、`kb_workflows/modal_backend.py`、`kb_workflows/queue_worker.py` |
+| Coding-agent skill | Claude Code 的 `/kernelbench-pro` 与 `.agents/skills` 共享 skill。当前会话可准备任务、提交标准开发检查、冻结最佳源码并执行最终评测，不递归启动 Claude CLI；模型调用不可观测时单列 interactive。 | [.claude/skills/kernelbench-pro/SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md)、`kb_workflows/agent_task.py` |
+
+验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下，**270 项完整 CPU/模拟回归通过**。覆盖真实 DefaultAgent、伪模型 CLI 的完整 worker/多样本/恢复路径、LiteLLM SDK 适配、未知费用、费用超限、保留正确候选、诊断反馈、标准/隐藏分离、重试成本、来源归属和嵌套子进程超时清理。Ruff、168 个包的依赖一致性及 skill 校验通过；离线 wheel 构建后，在仓库外核对适配模块、GPU 预设与轻量导入。测试没有调用付费模型，也没有执行真实 GPU 内核；当前宿主仍报告 NVIDIA 驱动不兼容 CUDA 13，实机端到端验证待兼容的已分配 GPU。
+
+运行说明与方案比较见 [Agent loops](AGENT_LOOPS.md)。费用限制是调用间的客户端估算上限，单次可超限；GPU 计费时间保持未知，不宣称完整 OS 沙箱或反作弊认证。
 
 ## 维护方式
 

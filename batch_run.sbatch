@@ -14,12 +14,20 @@ cd "$task_root"
 task_gpu_count="${SLURM_GPUS_ON_NODE:-1}"
 task_gpu_list="${GPUS:-$(seq -s, 0 "$((task_gpu_count - 1))") }"
 task_gpu_list="${task_gpu_list// /}"
-task_args=(--level "${LEVEL:-1}" --start "${START:-1}" --end "${END:-10}"
-           --run-name "${RUN_NAME:-slurm_${SLURM_JOB_ID}}" --gpus "$task_gpu_list"
-           --hardware "${HARDWARE:?Set HARDWARE to the verifier GPU label}"
-           --gpu-arch "${GPU_ARCH:-Ampere}" --timeout "${TIMEOUT:-300}"
-           --enable-ncu "${ENABLE_NCU:-true}" --resume "${RESUME:-false}")
-if [[ -n "${BASELINE:-}" ]]; then task_args+=(--baseline "$BASELINE"); fi
-if [[ -n "${AWS_PROFILE:-}" ]]; then task_args+=(--profile "$AWS_PROFILE"); fi
-"${KB_PYTHON:-python3}" scripts/run_batch.py --generation "${GENERATION:-docker}" \
-    --evaluation "${EVALUATION:-docker}" "${task_args[@]}"
+if [[ -n "${KB_CONFIG:-}" ]]; then
+    task_args=(--config "$KB_CONFIG")
+else
+    task_args=(--level 1 --start 1 --end 10 --run-name "slurm_${SLURM_JOB_ID}"
+               --gpus "$task_gpu_list" --generation docker --evaluation docker)
+fi
+# Only explicitly provided environment settings override a config file.
+for task_setting in LEVEL:level START:start END:end RUN_NAME:run-name GPUS:gpus \
+    HARDWARE:hardware GPU_ARCH:gpu-arch GPU_PROFILE:gpu-profile GPU:gpu TIMEOUT:timeout \
+    ENABLE_NCU:enable-ncu RESUME:resume BASELINE:baseline AWS_PROFILE:profile \
+    GENERATION:generation EVALUATION:evaluation; do
+    task_variable="${task_setting%%:*}"
+    if [[ -n "${!task_variable:-}" ]]; then
+        task_args+=("--${task_setting#*:}" "${!task_variable}")
+    fi
+done
+"${KB_PYTHON:-python3}" scripts/run_batch.py "${task_args[@]}"

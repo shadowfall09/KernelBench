@@ -2,6 +2,8 @@
 
 Harbor 是现有批量流程的生成后端，和 local、Docker、Modal 共用 `RunConfig`、题目范围、样本槽位、结果文件与恢复逻辑。Python 统一为 3.12，验证依赖保持 Torch 2.12.0。
 
+原生 one-shot / mini-swe-agent 反馈循环见 [Agent loops](AGENT_LOOPS.md)。Harbor agent 使用其自身的工具与内部策略，因此记录为 `external`，不声称遵守原生候选轮数限制或隐藏反馈隔离，也不能标成可控 one-shot。原生最终验证仍独立执行。
+
 ## 安装
 
 ```bash
@@ -18,13 +20,12 @@ python scripts/run_batch.py --help
 先为所选 Harbor agent 配置认证，再运行：
 
 ```bash
-python scripts/run_batch.py \
+python scripts/run_batch.py --config configs/a6000.toml \
   --generation harbor --evaluation local \
   --harbor-agent claude-code --harbor-environment docker \
   --model 'your-provider/your-model' \
   --level 1 --start 1 --end 10 --num-samples 2 \
-  --run-name harbor_run --hardware RTX_A6000 --gpu RTX_A6000 \
-  --gpu-arch Ampere --gpus 0 --parallel 1 --resume
+  --run-name harbor_run --parallel 1 --resume
 ```
 
 将 `--model` 换成你已配置的模型。Docker 需要 NVIDIA Container Toolkit；集群上先通过 Slurm 获取 GPU。各本地 GPU 上的 Harbor 任务串行执行，生成的 Compose 定义把 agent 和 verifier 绑定到所分配的同一设备。不同 GPU 可以并行。
@@ -43,14 +44,14 @@ Harbor 在生成任务内部也会执行 verifier，所以完整流程会额外�
 | `--agent-timeout` | 2400 秒 | agent 执行预算 |
 | `--timeout` | 300 秒 | 单个原生 GPU 验证/基线子任务预算 |
 
-Modal 示例使用 `--harbor-environment modal --gpu H100 --gpu-arch Hopper`，并配置 Harbor/Modal 运行时凭据；正式评测后端仍可独立选择。`--profile` 提供的 AWS profile 在宿主上解析为临时运行时凭据，不复制 profile 文件或把凭据写入导出任务。其他认证按所选 Harbor agent 的原生支持配置；`--small-model` 和原生 `--optimization-rounds` 不控制 Harbor agent 的内部策略。
+GPU 目标由同一个 `[gpu]` 配置决定，详见 [GPU 配置](GPU_CONFIG.md)。Modal 示例使用 `--harbor-environment modal --gpu-profile H100`，并配置 Harbor/Modal 运行时凭据；正式评测后端仍可独立选择。没有云端类型的预设不会默认选择 H100。`--profile` 提供的 AWS profile 在宿主上解析为临时运行时凭据，不复制 profile 文件或把凭据写入导出任务。其他认证按所选 Harbor agent 的原生支持配置；`--small-model` 和原生 `--optimization-rounds` 不控制 Harbor agent 的内部策略。
 
 ## 只导出 Harbor 任务
 
 ```bash
 python scripts/run_batch.py --stage export-harbor \
   --level 1 --start 1 --end 10 --num-samples 1 \
-  --run-name harbor_export --gpu H100 --gpu-arch Hopper
+  --run-name harbor_export --gpu-profile H100
 
 harbor run -p runs/harbor_export/harbor_tasks \
   -a claude-code -m 'your-provider/your-model' -e modal -k 1 -n 1

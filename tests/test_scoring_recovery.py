@@ -19,7 +19,7 @@ def run(tmp_path, monkeypatch):
     hidden = tmp_path / "hidden_tests/level1/1_hidden.py"
     hidden.parent.mkdir(parents=True)
     hidden.write_text("hidden source")
-    config = RunConfig(run_name="scoring", runs_dir=str(tmp_path / "runs"), hardware="test",
+    config = RunConfig(run_name="scoring", runs_dir=str(tmp_path / "runs"), hardware="test", gpu_arch="Ampere",
                        start=1, end=1, num_samples=3, baseline_suite=False).validate()
     monkeypatch.setattr(common, "ROOT", tmp_path)
     monkeypatch.setattr(engine, "ROOT", tmp_path)

@@ -1,0 +1,16 @@
+[gpu]
+profile = "RTX_A6000"
+devices = [0]
+
+[run]
+run_name = "a6000_one_shot"
+generation = "docker"
+evaluation = "docker"
+generation_mode = "one-shot"
+agent_backend = "claude-code"
+agent_timeout = 2400
+agent_profile = false
+level = 1
+start = 1
+end = 10
+num_samples = 1

@@ -1,0 +1,38 @@
+# GPU presets used by the batch CLI. These are configuration defaults, not a
+# claim that every listed GPU has passed end-to-end validation with our image.
+# Inline [gpu] settings in a run config can describe a new GPU without code edits.
+
+[profiles.A10G]
+architecture = "Ampere"
+modal_type = "A10G"
+
+[profiles.A100]
+architecture = "Ampere"
+modal_type = "A100"
+
+[profiles."A100-80GB"]
+architecture = "Ampere"
+modal_type = "A100-80GB"
+
+[profiles.RTX_A6000]
+architecture = "Ampere"
+
+[profiles.L40S]
+architecture = "Ada"
+modal_type = "L40S"
+
+[profiles.L4]
+architecture = "Ada"
+modal_type = "L4"
+
+[profiles.H100]
+architecture = "Hopper"
+modal_type = "H100"
+
+[profiles.H200]
+architecture = "Hopper"
+modal_type = "H200"
+
+[profiles.T4]
+architecture = "Turing"
+modal_type = "T4"

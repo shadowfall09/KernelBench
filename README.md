@@ -15,6 +15,8 @@ LICENSE file in the root directory of this source tree.
 
 - 统一运行基线、生成、评测和分析，支持按题目范围运行和多样本尝试。
 - 生成支持本地、Docker、Modal 和 Harbor；验证支持本地、Docker、Modal 和 HTTP 队列。
+- GPU 型号、架构、设备和云端类型统一使用 TOML 配置；支持型号预设及自定义目标。
+- 原生生成接入 mini-swe-agent：支持 one-shot 和有预算的反馈循环，开发反馈与最终隐藏评测分开。
 - 默认比较 eager、torch.compile default、max-autotune、CUDA Graph 四种基线。
 - 使用同步墙钟计时，逐次更换输入并校验输出，记录稳态耗时和冷启动成本。
 - 严格检查输出结构、shape、dtype、整数、bool 和非有限值；隐藏测试使用三个种子，29 道 Level 1 题另有数值压力测试。
@@ -36,6 +38,7 @@ python scripts/run_batch.py --help
 
 需要 Triton、CuTe、TileLang 等可选工具时，使用 `uv sync --extra dev --extra gpu`。
 本地验证需要 CUDA GPU 和兼容的编译工具链；本地生成还需要 Claude Code CLI 及运行时认证。
+也可配置 `agent_backend = "litellm"` 和显式供应商/模型，使用对应 API 认证。
 
 ## Harbor
 
@@ -46,13 +49,15 @@ Harbor 使用同一个批量入口和结果格式；安装 `uv sync --extra dev 
 ```bash
 # 预览配置与题目范围，不创建运行目录或调用模型。
 python scripts/run_batch.py --dry-run \
-  --level 1 --start 1 --end 10 --run-name my_run
+  --config configs/a6000.toml
 
-# 基线 → 生成 → 评测 → 分析；按实际设备修改硬件标签与架构。
-python scripts/run_batch.py --generation docker --evaluation docker \
-  --level 1 --start 1 --end 10 --run-name my_run \
-  --hardware RTX_A6000 --gpu-arch Ampere --gpus 0 --resume
+# 基线 → 生成 → 评测 → 分析；命令行可覆盖配置中的运行参数。
+python scripts/run_batch.py --config configs/a6000.toml --resume
 ```
+
+修改配置中的 `[gpu] profile` 和 `devices` 即可切换目标。自定义 GPU 可直接填写硬件标签和架构；不再默认选择 H100/Hopper。配置格式、覆盖优先级和云端示例见 [GPU 配置](docs/GPU_CONFIG.md)。
+
+一次生成使用 `configs/a6000-one-shot.toml`；反馈循环使用 `configs/a6000-feedback.toml`，默认每个样本最多 5 次候选、40 分钟，可配置。两种模式使用相同最终评测；完整协议、模型入口、预算及比较方式见 [Agent loops](docs/AGENT_LOOPS.md)。Claude Code 可在仓库中使用 `/kernelbench-pro`；Codex 的 `.agents/skills` 入口共享同一份 skill。
 
 在集群上通过 `srun` 或 `sbatch` 获取 GPU 后执行本地评测。Docker、Slurm、Modal、远端队列的完整配置见 [批量工作流](docs/BATCH_WORKFLOWS.md)。
 
@@ -66,6 +71,9 @@ python scripts/run_batch.py --generation docker --evaluation docker \
 | `paper_analysis.json` | 保留现有文件名的性能评分报告 |
 | `eval_results_scored.json` | 通过证据检查后的计分资格 |
 | `pass_at_k_results.json` | 正确性 pass@k |
+| `generation_budget.json` | 生成模式、声明预算、实际调用及费用/token 回执；未知值保留 null |
+| `generation_attempts.json` | 包含重试的样本尝试历史；重复运行不隐藏前次成本 |
+| `phase_budget.json` | 基线、生成、最终验证与分析各阶段的墙钟时间 |
 
 阶段统计中的正耗时不等于有效加速；性能结论以评分报告和对应测量证据为准。
 
@@ -79,6 +87,8 @@ python -m ruff check kb_workflows tests src/reliability.py src/validation.py
 | 文档 | 用途 |
 | --- | --- |
 | [功能清单](docs/FEATURE_INVENTORY.md) | 逐版变化、实现入口与验证状态 |
+| [GPU 配置](docs/GPU_CONFIG.md) | GPU 预设、自定义架构、设备选择与覆盖规则 |
+| [Agent loops](docs/AGENT_LOOPS.md) | one-shot、mini-swe-agent 循环、预算、交互 skill 与比较 |
 | [Harbor 接入](docs/HARBOR.md) | 统一生成后端、任务导出与 reward |
 | [批量工作流](docs/BATCH_WORKFLOWS.md) | 各后端、恢复、基线与评分配置 |
 | [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |

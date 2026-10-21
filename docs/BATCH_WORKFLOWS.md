@@ -4,6 +4,12 @@ Local, Docker, Modal and Harbor generation share one configuration and evaluator
 hidden tests from this checkout. Compatibility entrypoints remain available.
 See [NOTICE](../NOTICE.md) for code provenance.
 
+Native local/Docker/Modal generation uses mini-swe-agent 2.4.6. Choose
+`generation_mode = "one-shot"` or `"feedback"` in `[run]`; feedback defaults to
+five candidate submissions and 2400 seconds per sample. Development feedback is
+standard-only; hidden correctness runs after selection. See [Agent loops](AGENT_LOOPS.md)
+for model adapters, resource receipts, replay behavior and the Claude Code/Codex skill.
+
 ## Install
 
 Use Python 3.12:
@@ -28,12 +34,15 @@ or baked into cloud images.
 ## One entrypoint, independent generation and verification
 
 ```bash
-python scripts/run_batch.py \
-  --generation docker --evaluation docker \
-  --level 1 --start 1 --end 10 --run-name my_run \
-  --hardware RTX_A6000 --gpu-arch Ampere --gpus 0,1 \
-  --parallel 2 --profile bedrock --resume
+python scripts/run_batch.py --config configs/a6000.toml \
+  --run-name my_run --gpus 0,1 --profile bedrock --resume
 ```
+
+TOML `[gpu]` selects the target preset, architecture and local devices; `[run]`
+sets the workflow. Explicit CLI options override the file. Presets live in
+`kb_workflows/gpu_profiles.toml`; custom GPUs can be configured inline. Unknown
+hardware no longer falls back to Hopper, and there is no implicit H100 target.
+See [GPU configuration](GPU_CONFIG.md) for the schema and precedence rules.
 
 `--start` and `--end` are inclusive. The batch workflow supports levels 1–3. `--num-samples`
 controls independent agent attempts per problem. Every attempt has its own work
@@ -42,12 +51,20 @@ selected GPU. CPU generation for queue/Modal verification uses `--parallel`.
 
 | Option | Choices | Purpose |
 | --- | --- | --- |
-| `--generation` | `local`, `docker`, `modal` | Where Claude Code generates kernels |
+| `--config` | TOML path | Load `[gpu]` and `[run]` settings |
+| `--gpu-profile` | A preset name | Select one coherent GPU target, e.g. `RTX_A6000` |
+| `--generation-mode` | `one-shot`, `feedback`, `external` | Controlled native mode or external Harbor agent |
+| `--agent-backend` | `claude-code`, `litellm` | Single-response model adapter used by mini-swe-agent |
+| `--optimization-rounds` | Default `5` | Maximum candidates per feedback attempt |
+| `--agent-timeout` | Default `2400` | Generation wall seconds per sample attempt |
+| `--agent-cost-limit` | Default `0` | Optional estimated USD cap checked between model calls |
+| `--agent-profile` | Default `true` | Separate development profiler diagnostics |
+| `--generation` | `local`, `docker`, `modal`, `harbor` | Where the agent generates kernels |
 | `--evaluation` | `local`, `docker`, `modal`, `queue` | Where the final evaluator runs |
-| `--stage` | `all`, `generate`, `evaluate`, `analyze`, `baseline` | Run the complete pipeline or one phase |
+| `--stage` | `all`, `generate`, `evaluate`, `analyze`, `baseline`, `export-harbor` | Run the complete pipeline, one phase, or task export |
 | `--hardware` | A baseline directory label | Identify the actual verifier GPU; e.g. `RTX_A6000` |
-| `--gpu-arch` | `Ampere`, `Ada`, `Hopper`, etc. | CUDA compilation target |
-| `--gpu` | Modal GPU type; default `H100` | Cloud GPU selection |
+| `--gpu-arch` | Architecture name or compute capability | CUDA compilation target; overrides the config |
+| `--gpu` | Explicit cloud GPU type | Cloud GPU selection; no implicit default |
 | `--gpus` | Comma-separated indices | Local GPUs, relative to `CUDA_VISIBLE_DEVICES` |
 | `--precision` | `fp32`, `fp16`, `bf16` | Computation precision |
 | `--fp32-tolerance` | Default `1e-3` | FP32 correctness tolerance, consistent across backends |
@@ -61,8 +78,9 @@ creating files, building images, contacting Modal or calling a model.
 The `all` stage records missing baselines, generates kernels, evaluates them and
 analyzes the selected range. A baseline must exist for every selected problem;
 missing or failed baseline measurements cause an explicit analysis error.
-`--hardware` is required for `all`, `baseline` and `analyze` with local/queue GPUs.
-Modal defaults that label to `--gpu`.
+Select the actual verifier GPU through `[gpu]`, `--gpu-profile` or the legacy
+hardware/architecture flags. Presets populate the baseline label automatically.
+Custom GPUs require an explicit architecture; Modal also needs a cloud GPU type.
 
 ## Evaluation is the same on every backend
 
@@ -126,15 +144,17 @@ also removes its container on timeout.
 Submit from the checkout root, selecting your cluster's partition/account:
 
 ```bash
-sbatch --partition=taurus --account=yichengtao --gpus=2 \
-  --export=ALL,LEVEL=1,START=1,END=10,HARDWARE=RTX_A6000,GPU_ARCH=Ampere,RUN_NAME=slurm_test \
+sbatch --partition=taurus --account=yichengtao --gpus=1 \
+  --export=ALL,KB_CONFIG=configs/a6000.toml,RUN_NAME=slurm_test \
   batch_run.sbatch
 ```
 
 The script uses `SLURM_SUBMIT_DIR` instead of a hardcoded repository path and
 honors the allocated `CUDA_VISIBLE_DEVICES`. Set `KB_REPO_DIR` if submitting from
 another directory, and `KB_PYTHON` to select a Python environment. `GENERATION`
-and `EVALUATION` select the same backends as the unified CLI. The default is Docker.
+and `EVALUATION` select the same backends as the unified CLI. With `KB_CONFIG`,
+only explicitly supplied environment settings override the file. Without a config,
+the default is Docker; no default architecture is injected.
 
 ## Persistent local verification queue
 

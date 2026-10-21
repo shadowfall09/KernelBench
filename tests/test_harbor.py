@@ -175,6 +175,7 @@ def test_missing_harbor_cli_fails_before_baseline_or_generation(config, monkeypa
 @pytest.fixture
 def verifier(config, tmp_path, monkeypatch):
     config.generation = "local"
+    config.stage = "evaluate"
     config.evaluation = "local"
     config.resume = True
     spec = {"protocol": "kernelbench-pro-harbor-v1", "evaluator_sha256": evaluator_digest(),
@@ -252,7 +253,8 @@ def test_invalid_verification_writes_zero_instead_of_stale_reward(verifier, kind
 def test_native_cli_dispatches_export_without_model_or_gpu(config, monkeypatch):
     called = []
     monkeypatch.setattr(harbor, "export_tasks", lambda cfg: called.append(cfg) or Path("tasks"))
-    assert cli.main(["--stage", "export-harbor", "--start", "90", "--end", "90"]) == 0
+    assert cli.main(["--stage", "export-harbor", "--start", "90", "--end", "90",
+                     "--gpu-profile", "RTX_A6000"]) == 0
     assert called[0].start == called[0].end == 90
 
 

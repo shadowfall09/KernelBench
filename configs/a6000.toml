@@ -1,0 +1,14 @@
+# Start with: python scripts/run_batch.py --config configs/a6000.toml --dry-run
+# Indices are relative to CUDA_VISIBLE_DEVICES; request GPUs through Slurm first.
+[gpu]
+profile = "RTX_A6000"
+devices = [0]
+
+[run]
+run_name = "a6000_run"
+generation = "docker"
+evaluation = "docker"
+level = 1
+start = 1
+end = 10
+precision = "fp32"

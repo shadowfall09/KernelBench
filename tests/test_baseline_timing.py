@@ -137,7 +137,7 @@ def test_graph_replay_copies_inputs_and_keeps_previous_output(monkeypatch):
 
 
 def test_suite_uses_distinct_tasks_and_resumes_only_complete_receipts(tmp_path, monkeypatch):
-    config = RunConfig(run_name="suite", runs_dir=str(tmp_path), hardware="test", start=1, end=1,
+    config = RunConfig(run_name="suite", runs_dir=str(tmp_path), hardware="test", gpu_arch="Ampere", start=1, end=1,
                        baseline_suite=True, resume=True).validate()
     monkeypatch.setattr(engine, "ROOT", tmp_path)
     seen = []

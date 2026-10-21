@@ -71,6 +71,10 @@ def sandbox_secrets(config):
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_BASE_URL",
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_API_BASE",
+        "GEMINI_API_KEY",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_SESSION_TOKEN",
@@ -144,7 +148,8 @@ def run_modal_agent(directory, config, pid):
         process.wait()
     finally:
         # Download before termination; partial kernels/logs remain useful after agent failure.
-        for name in ("agent_result.json", "agent.log", "sandbox.log", f"runs/agent/{kernel_name(config.level, pid)}"):
+        for name in ("agent_result.json", "agent.log", "sandbox.log", "trajectory.json", "development_history.json",
+                     "best_candidate.json", f"runs/agent/{kernel_name(config.level, pid)}"):
             try:
                 with sandbox.open(f"/work/{name}", "r") as stream:
                     content = stream.read()

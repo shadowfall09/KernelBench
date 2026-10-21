@@ -224,7 +224,14 @@ def baseline(payload: dict):
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
-        result = baseline(payload) if payload.get("task") == "baseline" else evaluate(payload)
+        if payload.get("task") == "profile":
+            from .profile_task import profile
+
+            result = profile(payload)
+        elif payload.get("task", "evaluate") in {"evaluate", "baseline"}:
+            result = baseline(payload) if payload.get("task") == "baseline" else evaluate(payload)
+        else:
+            raise ValueError("Unknown evaluation task")
     except Exception as exc:
         result = failure(str(exc), error_name=type(exc).__name__)
     atomic_json(Path(sys.argv[2]), result)

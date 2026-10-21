@@ -1,0 +1,17 @@
+[gpu]
+profile = "RTX_A6000"
+devices = [0]
+
+[run]
+run_name = "a6000_feedback"
+generation = "docker"
+evaluation = "docker"
+generation_mode = "feedback"
+agent_backend = "claude-code"
+optimization_rounds = 5
+agent_timeout = 2400
+agent_profile = true
+level = 1
+start = 1
+end = 10
+num_samples = 1

@@ -24,3 +24,10 @@ Minimal Flash Attention；具体链接保留在该目录的说明中。
 [可靠性说明](docs/RELIABILITY.md)。
 
 上游论文 PDF、LaTeX 源稿、图表及旧实验报告不随本仓库分发。
+
+## Agent 工作流
+
+原生反馈循环依赖 MIT 许可的 [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent)，
+固定使用发布版 2.4.6 的 DefaultAgent；本仓库自行实现模型和评测环境适配器。
+诊断与正式基准分离参考 [MLC / TIRx Harness](https://mlc.ai/agentic-gpu-programming-for-mlsys/)，
+本次未迁入其编译器或检查器。相关方案核对及采用范围见 [Agent loops](docs/AGENT_LOOPS.md)。

@@ -100,6 +100,7 @@ def current_result(result, payload):
 
 def analyze_paper(config):
     from .engine import task_payload
+    from .experiment import existing_budget, protocol
 
     selected = select_problems(config.level, config.start, config.end)
     standard = read_json(config.run_dir / "eval_results.json", {})
@@ -196,6 +197,8 @@ def analyze_paper(config):
     by_layer = {layer: mean(mean(slots) for slots in values) for layer, values in groups.items()}
     report = {
         "kind": "failure_inclusive_measurement_scoring_v1", "problem_ids": list(selected),
+        "experiment": existing_budget(config).get("protocol", protocol(config)), "generation_budget": existing_budget(config),
+        "generation_receipts_available": bool(existing_budget(config)),
         "declared_samples": config.num_samples, "cold_calls": config.cold_calls, "hidden_gated": config.hidden_tests,
         "aggregation": "problem_mean_then_layer_macro; failures_and_missing_slots_zero; no_best_of_n",
         "bounded_gain_by_layer": by_layer, "bounded_gain_macro": mean(by_layer.values()),

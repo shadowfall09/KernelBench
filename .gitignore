@@ -44,7 +44,10 @@ backups/
 
 # Editor, test and temporary files
 .vscode/
-.claude/
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/kernelbench-pro/
 .idea/
 *.swp
 *.swo

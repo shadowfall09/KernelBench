@@ -126,8 +126,9 @@ cpus = 4
 memory_mb = {config.harbor_memory_mb}
 storage_mb = 40960
 gpus = 1
-gpu_types = [{json.dumps(config.gpu)}]
 """
+    if config.gpu:
+        resources += f"gpu_types = [{json.dumps(config.gpu)}]\n"
     (directory / "task.toml").write_text(f"""schema_version = "1.4"
 artifacts = ["/app/solution.py"]
 

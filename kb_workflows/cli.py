@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import time
 from contextlib import nullcontext
 
 from .common import ROOT, atomic_json, evaluator_digest, read_json, select_problems
@@ -31,6 +32,8 @@ def main(argv=None):
                 )
             )
             return 0
+        if config.stage != "analyze":
+            config.require_gpu_target()
         if config.stage == "export-harbor":
             from .harbor import export_tasks
 
@@ -38,6 +41,13 @@ def main(argv=None):
             return 0
         if config.generation == "harbor" and config.stage in {"all", "generate"} and not shutil.which(config.harbor_command):
             raise ValueError("Harbor executable not found; install the harbor extra or set --harbor-command")
+        if config.generation == "local" and config.stage in {"all", "generate"}:
+            import importlib.util
+
+            if importlib.util.find_spec("minisweagent") is None:
+                raise ValueError("mini-swe-agent is missing; install the project requirements")
+            if config.agent_backend == "claude-code" and not shutil.which("claude"):
+                raise ValueError("Claude Code CLI is missing; install it or select --agent-backend litellm")
         if config.stage in {"all", "analyze", "baseline"} and not config.hardware:
             raise ValueError("Specify --hardware for the actual verifier GPU to select/record its baseline")
         from .engine import analyze_run, evaluate_run, record_baseline
@@ -56,6 +66,17 @@ def main(argv=None):
         context = modal_session(config) if cloud and config.stage != "analyze" else nullcontext()
         config.run_dir.mkdir(parents=True, exist_ok=True)
         atomic_json(config.run_dir / "run_config.json", config.to_dict())
+        phases = {}
+
+        def phase(name, function):
+            started = time.monotonic()
+            try:
+                return function(config)
+            finally:
+                phases[name] = time.monotonic() - started
+                atomic_json(config.run_dir / "phase_budget.json", {"phase_wall_seconds": phases,
+                            "includes": "phase request wait, compilation and execution; excludes image build and environment startup",
+                            "gpu_execution_seconds": None, "cloud_billing_certified": False})
         generation_ok = True
         with context:
             baseline_path = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
@@ -69,13 +90,13 @@ def main(argv=None):
             )
             if config.stage == "baseline" or config.record_baseline or (config.stage == "all" and missing_baseline):
                 print("[baseline] Recording the requested problems on the verifier hardware", flush=True)
-                record_baseline(config)
+                phase("baseline", record_baseline)
             if config.stage in {"all", "generate"}:
-                generation_ok = generate_run(config)
+                generation_ok = phase("generation", generate_run)
             if config.stage in {"all", "evaluate"}:
-                evaluate_run(config)
+                phase("final_evaluation", evaluate_run)
             if config.stage in {"all", "analyze"}:
-                analyze_run(config)
+                phase("analysis", analyze_run)
         print(f"Results: {config.run_dir}", flush=True)
         return 0 if generation_ok else 1
     except (ValueError, OSError, RuntimeError) as exc:

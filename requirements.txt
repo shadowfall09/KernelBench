@@ -17,3 +17,5 @@ einops
 python-dotenv
 pydantic
 tabulate
+mini-swe-agent==2.4.6
+psutil>=5.9

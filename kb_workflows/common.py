@@ -9,17 +9,6 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GPU_ARCH = {
-    "A10G": "Ampere",
-    "A100": "Ampere",
-    "A100-80GB": "Ampere",
-    "RTX_A6000": "Ampere",
-    "L40S": "Ada",
-    "L4": "Ada",
-    "H100": "Hopper",
-    "H200": "Hopper",
-    "T4": "Turing",
-}
 
 
 def atomic_json(path: Path, value):
@@ -82,6 +71,9 @@ def evaluator_digest():
         "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
         "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
         "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
+        "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
+        "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
+        "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",
     ):
         digest.update(name.encode())
         digest.update((ROOT / name).read_bytes())
