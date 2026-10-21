@@ -16,14 +16,14 @@ PROTOCOL = "frozen_final_remeasurement_v1"
 
 def _options(config):
     return {name: getattr(config, name) for name in (
-        "level", "suite", "suite_role", "start", "end", "num_samples", "precision", "fp32_tolerance",
+        "level", "suite", "suite_role", "task_profile", "task_track", "task_memory_mb", "start", "end", "num_samples", "precision", "fp32_tolerance",
         "num_correct_trials", "num_perf_trials", "hidden_tests", "strict_validation", "evidence_level",
         "baseline", "baseline_suite", "baseline_portfolio", "cold_calls", "gpu_arch", "hardware",
         "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout")}
 
 
 def _slots(config):
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
     slots = {}
     for pid, reference in selected.items():
         for sid in range(config.num_samples):

@@ -37,7 +37,7 @@ def problem_paths(level: int, root: Path = ROOT):
     return dict(sorted(paths.items()))
 
 
-def select_problems(level: int, start: int = 1, end: int | None = None, problem_ids=None, root: Path = ROOT, *, suite="full", suite_role="scored"):
+def select_problems(level: int, start: int = 1, end: int | None = None, problem_ids=None, root: Path = ROOT, *, suite="full", suite_role="scored", track="all"):
     paths = problem_paths(level, root)
     end = max(paths) if end is None else end
     selected = list(problem_ids) if problem_ids is not None else list(range(start, end + 1))
@@ -49,7 +49,7 @@ def select_problems(level: int, start: int = 1, end: int | None = None, problem_
 
         if suite not in SUITES:
             raise ValueError(f"Unknown suite: {suite}")
-        rows = suite_rows(level, suite_role)
+        rows = suite_rows(level, suite_role, suite=suite, track=track)
         selected = [pid for pid in selected if pid in rows]
         for pid in selected:
             if (paths[pid].name != rows[pid]["reference"]
@@ -57,6 +57,8 @@ def select_problems(level: int, start: int = 1, end: int | None = None, problem_
                 raise ValueError(f"Suite reference snapshot mismatch for level {level} problem {pid}")
     elif suite_role != "scored":
         raise ValueError("--suite-role requires --suite kernelbench105")
+    elif track != "all":
+        raise ValueError("Track selection requires a parameterized suite")
     if not selected:
         raise ValueError("No problems remain in the requested suite, role and range")
     return {pid: paths[pid] for pid in sorted(set(selected))}
@@ -94,6 +96,8 @@ def evaluator_digest():
         "kb_workflows/contract_specs.py",
         "kb_workflows/paired_statistics.py", "kb_workflows/paired_task.py", "kb_workflows/final_verification.py",
         "kb_workflows/calibration.py", "kb_workflows/headroom.py", "kb_workflows/performance.py",
+        "kb_workflows/production.py", "kb_workflows/production_ops.py", "kb_workflows/production_specs.py",
+        "kb_workflows/suites/production41.json",
         "kb_workflows/baseline_rewrites.py", "kb_workflows/baseline_rewrites.json",
         "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
         "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",

@@ -11,6 +11,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
+from .production import task_input_policy
 
 
 def configure_tf32(torch, enabled):
@@ -32,6 +33,7 @@ def validate_sources(payload):
     return reference
 
 
+@task_input_policy
 def evaluate(payload: dict):
     import torch
 
@@ -131,6 +133,7 @@ def evaluate(payload: dict):
     )
 
 
+@task_input_policy
 def baseline(payload: dict):
     import torch
 
@@ -141,6 +144,7 @@ def baseline(payload: dict):
         get_tolerance_for_precision,
         get_torch_dtype_from_string,
         load_original_model_and_inputs,
+        move_model,
         set_seed,
     )
     from src.validation import clone_tensors, compare_outputs
@@ -172,7 +176,7 @@ def baseline(payload: dict):
         set_seed(42)
         args = [_process_input_tensor(x, device, dtype) for x in inputs()]
         set_seed(42)
-        oracle = Model(*init_inputs).to(device=device, dtype=dtype)
+        oracle = move_model(Model(*init_inputs), device, dtype)
         set_seed(42)
         expected = clone_tensors(oracle(*clone_tensors(args)))
         synchronize(device)
@@ -180,7 +184,7 @@ def baseline(payload: dict):
         set_seed(42)
         synchronize(device)
         started = CLOCK()
-        model = Model(*init_inputs).to(device=device, dtype=dtype)
+        model = move_model(Model(*init_inputs), device, dtype)
         backend = settings.get("compile_backend")
         mode = settings.get("compile_mode", "default")
         model, backend, mode = prepare_baseline(model, args, device, variant, backend=backend, mode=mode,

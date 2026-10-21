@@ -10,7 +10,7 @@
 
 当前支持 Level 1–3 范围、多样本，以及从研究包接入的 KernelBench-105 固定选集：105 道主集、5 道审查探针、140 道扩展题。三种角色独立运行。I/F/D 是研究者给出的暂定分类，不是算法最优性或可达性证书；原始输入尚未按论文的退化审计重新校准。用法和选择规则见[研究索引](../research/headroom/README.md)。
 
-还需要生产风格难题、逐题 dtype 与合法输入域契约、backward、隐藏形状、按显存缩放，以及在当前题目和真实反馈循环下重做区分度实验。历史 7 模型原始结果未在压缩包中提供；论文声称的精确排名一致性不能在本仓库独立重现。
+第十二版已新增独立Level 5的Production-41：12设计、6数值设计、12固定格式与11反向题；支持逐角色dtype、合法输入与隐藏形状、按设备容量的确定性显存计划。11个反向家族有FP64 gradcheck与有限差分回归，四轨分开评分；软件实现不等于GPU可达性或区分度实验已完成。旧题的完整输入校准及当前协议下的区分度分析仍需推进。历史 7 模型原始结果未在压缩包中提供；论文声称的精确排名一致性不能在本仓库独立重现。
 
 <a id="m2"></a>
 
@@ -19,6 +19,8 @@
 “原随机输入上接近参考”不足以证明程序实现了题意。输出格式、离散结果、非有限值、数值量级、状态和执行路径都可能让错误实现通过；更多反馈还会增加针对评测器优化的机会。
 
 当前实现严格的结构/shape/dtype 比较、整数与 bool 精确比较、NaN/Inf 对齐、输入副本和输出快照、RNG 配对、参考前后调用检查、源码命名空间和后端设置恢复。隐藏验证重新使用三个种子；29 道经过输入域核对的 L1 题增加零值、放大和离群压力。墙钟计时包含输出消费和设备同步，每个计时输出也要校验。
+
+新增生产题还使用相对RMS/逐元素预算，逐题拒绝全零候选；参考比较门不冒充独立FP64自资格。
 
 这些能力分别减少特定错误，不能合并成“完整反作弊通过”。第九版新增显式严格模式，覆盖17道L1的小规模附加实例：FP64契约、信号诊断、合法输入族、隐藏奇数尺寸/stride、模式状态与缓存检查。原尺寸自动校准、全题覆盖、自写内核来源证明和复杂状态映射仍待完成。研究包的审查记录保留为**源码审查结论**；1,574 份候选和反例没有在这里上 GPU 复测。原型中的统一扰动、跳过非有限参考、固定自写时间占比阈值均未直接纳入默认评测。
 
@@ -56,7 +58,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 
 ## 逐项归档
 
-下表覆盖第一至第七版的 **67 项**改动、第八版 **7 项**整合、第九版 **8 项**、第十版 **5 项**与第十一版 **5 项**设计落地。每项指定一个主要 motivation，必要时附关联动机。仓库清理、命名和兼容性属于 M5 的维护工作，不包装成新的研究贡献。V6/V7 编号在本轮追踪表中补齐；不改变历史提交内容。
+下表覆盖第一至第七版的 **67 项**改动、第八版 **7 项**整合、第九版 **8 项**、第十版 **5 项**、第十一版 **5 项**与第十二版 **6 项**设计落地。每项指定一个主要 motivation，必要时附关联动机。仓库清理、命名和兼容性属于 M5 的维护工作，不包装成新的研究贡献。V6/V7 编号在本轮追踪表中补齐；不改变历史提交内容。
 
 <!-- changes:start -->
 ### M1：题目与区分度的改动
@@ -66,6 +68,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V1-03 题目范围与多样本批量生成 | 统一题集与独立样本槽位，避免各家子集不明 | M4 | [generation.py](../kb_workflows/generation.py) |
 | V8-04 KernelBench-105 选集 | 接入105个scored、5个probe、140个extended的固定选集 | M3 | [kernelbench105.json](../kb_workflows/suites/kernelbench105.json) |
 | V8-05 全流程统一选题 | 生成、基线、隐藏验证、评分、预算与Harbor均使用同一子集 | M5 | [common.py](../kb_workflows/common.py) |
+| V12-01 Production-41参数化题集 | 独立Level 5增加12设计、6数值设计、12固定格式与11反向任务，保留旧250题及旧Level 4模型 | — | [production_specs.py](../kb_workflows/production_specs.py), [production41.json](../kb_workflows/suites/production41.json) |
+| V12-02 独立反向轨道与梯度参考 | 11个VJP参考支持外层no_grad下执行；FP64 gradcheck和方向有限差分核对梯度，轨道分别选题与评分 | M2 | [production_ops.py](../kb_workflows/production_ops.py), [test_production.py](../tests/test_production.py) |
+| V12-03 逐输入角色的dtype契约 | 保留FP32缩放、bool mask与离散索引，支持FP8存储/packed INT4及E2M1软件量化；有效精度写入任务而非统一强转 | M2 | [production.py](../kb_workflows/production.py), [eval.py](../src/eval.py) |
 
 ### M2：正确性与执行可信度的改动
 
@@ -87,6 +92,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V5-05 无效验证不能算通过 | 空测试、参考异常与零次检查不能冒充通过 | M3 | [eval.py](../src/eval.py) |
 | V6-11 验证与 reward | 单独 verifier 重新判断产物，异常奖励为零 | M5 | [harbor_verifier.py](../kb_workflows/harbor_verifier.py) |
 | V8-03 研究证据归档与重建 | 保留逐实现审查依据与来源摘要，不执行缺依赖的原型 | M1, M3 | [headroom_evidence.py](../scripts/headroom_evidence.py) |
+| V12-04 显存计划与合法隐藏实例 | 按声明包络及设备容量确定性缩放并保存计划，私有尺寸/stride/动态范围/分页/mask及归一化近常量遵守输入域 | M1, M5 | [production.py](../kb_workflows/production.py), [build_production_tasks.py](../scripts/build_production_tasks.py) |
+| V12-05 生产题数值预算与零答案门 | 所有41题使用相对RMS及逐元素比较，六个数值设计预算独立；逐题验证全零反例，参考比较与独立FP64自资格明确区分 | M1 | [validation.py](../src/validation.py), [production_specs.py](../kb_workflows/production_specs.py), [test_production.py](../tests/test_production.py) |
 | V9-01 FP64数值契约 | 在17道已审阅L1的附加实例上，参考与候选均须通过RMS及全元素FP64门 | — | [numerical.py](../kb_workflows/numerical.py) |
 | V9-02 参考信号诊断 | 记录输出量级、非有限值、常数与容差覆盖；至少一组合法实例有信息量 | — | [numerical.py](../kb_workflows/numerical.py) |
 | V9-03 合法输入族与隐藏形状 | 限定17题的耦合维度、符号、近常数、动态范围、边界、GELU辨别输入及最终非连续stride | M1 | [strict_validation.py](../kb_workflows/strict_validation.py) |
@@ -173,6 +180,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V8-02 统一论文与能力状态 | 已实现与研究目标使用同一套名称和预算，不将设计写成实验结果 | M1, M2, M3, M4 | [PAPER.md](../research/headroom/PAPER.md) |
 | V8-07 选集与参考版本证据 | 记录manifest摘要并检查参考快照，阻止静默任务漂移 | M3 | [suites.py](../kb_workflows/suites.py) |
 | V11-05 Verifier配置与精度设置恢复 | 可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计 | M2 | [harbor.py](../kb_workflows/harbor.py), [generation.py](../kb_workflows/generation.py), [validation.py](../src/validation.py) |
+| V12-06 生产题全流程与来源恢复 | 选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹 | M4 | [engine.py](../kb_workflows/engine.py), [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py) |
 | V9-06 逐项证据等级 | 实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级 | M2, M3 | [evidence.py](../kb_workflows/evidence.py) |
 | V10-05 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母 | M3, M4 | [final_verification.py](../kb_workflows/final_verification.py) |
 <!-- changes:end -->
@@ -184,12 +192,12 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 <!-- roadmap:start -->
 | 设计 | 状态 | Motivation | 已交付与剩余范围 |
 | --- | --- | --- | --- |
-| R-01 生产难题与反向轨道 | 待实现 | M1 | 约41道设计、数值设计、实现和backward题需参考程序、测试、基线与见证 |
-| R-02 多dtype任务族与显存缩放 | 待实现 | M1 | 现有运行精度选项不等于已审阅的逐题dtype契约或按显存自动实例化 |
+| R-01 生产难题与反向轨道 | 代码已实现 | M1 | 已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13 |
+| R-02 多dtype任务族与显存缩放 | 代码已实现 | M1 | 已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证 |
 | R-03 选集区分度重新验证 | 待实现 | M1 | 原7模型数据缺失；归档输出分别涉及104和105题，不能据此确认精确排名复现 |
-| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 已接入17道L1附加实例的FP64/RMS/全元素契约和参考自资格；原尺寸全面校准、其他题目和误差预算设计轨道待完成 |
+| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 17道旧题附加FP64参考自资格及新41题参考误差门已接入；6道数值设计有FP64算术参考与逐题预算，原250题原尺寸独立oracle校准与完整覆盖仍需实现 |
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成 |
-| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已为17道L1实现合法输入族、奇数尺寸与最终非连续stride；全题集、特殊值及参数化生产shape域待完成 |
+| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成 |
 | R-08 自写内核执行归因与库轨道 | 待实现 | M2 | Torch算子汇总不证明来源；20%和95%阈值未校准，不作为默认资格 |
 | R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成 |

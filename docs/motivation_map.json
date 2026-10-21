@@ -1070,28 +1070,123 @@
       "reason": "可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计"
     },
     {
+      "id": "V12-01",
+      "title": "Production-41参数化题集",
+      "primary": "M1",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/production_specs.py",
+        "kb_workflows/suites/production41.json"
+      ],
+      "reason": "独立Level 5增加12设计、6数值设计、12固定格式与11反向任务，保留旧250题及旧Level 4模型"
+    },
+    {
+      "id": "V12-02",
+      "title": "独立反向轨道与梯度参考",
+      "primary": "M1",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/production_ops.py",
+        "tests/test_production.py"
+      ],
+      "reason": "11个VJP参考支持外层no_grad下执行；FP64 gradcheck和方向有限差分核对梯度，轨道分别选题与评分"
+    },
+    {
+      "id": "V12-03",
+      "title": "逐输入角色的dtype契约",
+      "primary": "M1",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/production.py",
+        "src/eval.py"
+      ],
+      "reason": "保留FP32缩放、bool mask与离散索引，支持FP8存储/packed INT4及E2M1软件量化；有效精度写入任务而非统一强转"
+    },
+    {
+      "id": "V12-04",
+      "title": "显存计划与合法隐藏实例",
+      "primary": "M2",
+      "secondary": [
+        "M1",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/production.py",
+        "scripts/build_production_tasks.py"
+      ],
+      "reason": "按声明包络及设备容量确定性缩放并保存计划，私有尺寸/stride/动态范围/分页/mask及归一化近常量遵守输入域"
+    },
+    {
+      "id": "V12-05",
+      "title": "生产题数值预算与零答案门",
+      "primary": "M2",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/validation.py",
+        "kb_workflows/production_specs.py",
+        "tests/test_production.py"
+      ],
+      "reason": "所有41题使用相对RMS及逐元素比较，六个数值设计预算独立；逐题验证全零反例，参考比较与独立FP64自资格明确区分"
+    },
+    {
+      "id": "V12-06",
+      "title": "生产题全流程与来源恢复",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py",
+        "kb_workflows/generation.py",
+        "kb_workflows/harbor.py"
+      ],
+      "reason": "选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹"
+    },
+    {
       "id": "R-01",
       "title": "生产难题与反向轨道",
       "primary": "M1",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/production_specs.py",
+        "KernelBench/level5/1_online_attention.py",
+        "tests/test_production.py"
       ],
-      "reason": "约41道设计、数值设计、实现和backward题需参考程序、测试、基线与见证"
+      "reason": "已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13"
     },
     {
       "id": "R-02",
       "title": "多dtype任务族与显存缩放",
       "primary": "M1",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/production.py",
+        "src/eval.py",
+        "tests/test_production.py"
       ],
-      "reason": "现有运行精度选项不等于已审阅的逐题dtype契约或按显存自动实例化"
+      "reason": "已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证"
     },
     {
       "id": "R-03",
@@ -1113,10 +1208,11 @@
       "status": "in_progress",
       "source": "paper_design",
       "evidence": [
+        "kb_workflows/numerical.py",
         "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py"
+        "kb_workflows/production.py"
       ],
-      "reason": "已接入17道L1附加实例的FP64/RMS/全元素契约和参考自资格；原尺寸全面校准、其他题目和误差预算设计轨道待完成"
+      "reason": "17道旧题附加FP64参考自资格及新41题参考误差门已接入；6道数值设计有FP64算术参考与逐题预算，原250题原尺寸独立oracle校准与完整覆盖仍需实现"
     },
     {
       "id": "R-05",
@@ -1140,9 +1236,9 @@
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py"
+        "kb_workflows/production.py"
       ],
-      "reason": "已为17道L1实现合法输入族、奇数尺寸与最终非连续stride；全题集、特殊值及参数化生产shape域待完成"
+      "reason": "已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现"
     },
     {
       "id": "R-07",

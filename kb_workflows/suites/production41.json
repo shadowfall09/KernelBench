@@ -1,0 +1,420 @@
+{
+  "name": "production41",
+  "version": 1,
+  "selection_seed": null,
+  "problems": [
+    {
+      "level": 5,
+      "problem_id": 1,
+      "reference": "1_online_attention.py",
+      "reference_sha256": "d6e36f636904d976077f9bab6ba5c248898d283b3a9a4e2300ecfbe7e5a2106a",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "attention"
+    },
+    {
+      "level": 5,
+      "problem_id": 2,
+      "reference": "2_linear_cross_entropy.py",
+      "reference_sha256": "eddb52ca680c850eb3edfc2656d6cb7ca3c43b5cca64f0e8de5eac91ca1376ae",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "cross_entropy"
+    },
+    {
+      "level": 5,
+      "problem_id": 3,
+      "reference": "3_welford_normalization.py",
+      "reference_sha256": "1c087ed66f8659bb04f1c8c379d86c15adada004d32a98417ec5ea2d9cc48452",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "normalization"
+    },
+    {
+      "level": 5,
+      "problem_id": 4,
+      "reference": "4_partial_topk.py",
+      "reference_sha256": "de627ac86cb4f29b39bd0907644cdf72d0b1939aca829587702f17c48caecd0b",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "topk"
+    },
+    {
+      "level": 5,
+      "problem_id": 5,
+      "reference": "5_chunked_linear_attention.py",
+      "reference_sha256": "5b73744be67e9534548c802e3b4312e21292abcec500a4218e06d8ca5be0287e",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "attention_linear"
+    },
+    {
+      "level": 5,
+      "problem_id": 6,
+      "reference": "6_chunked_state_space.py",
+      "reference_sha256": "3a79278512239edae9ddce5fa3faebc2506f22d0a037b4f4c3f2a874657b9078",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "state_space"
+    },
+    {
+      "level": 5,
+      "problem_id": 7,
+      "reference": "7_persistent_recurrent.py",
+      "reference_sha256": "0966e31e02d3e6676af8b446fb4d7966a58374f9dfa8d3cd69d1db3d9a5fcc5e",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "recurrent"
+    },
+    {
+      "level": 5,
+      "problem_id": 8,
+      "reference": "8_fft_long_convolution.py",
+      "reference_sha256": "2772e964f34805b49b0f6ce94dcd9d61b6a82984fbb3ef2bc78a705e9bf1475e",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "convolution"
+    },
+    {
+      "level": 5,
+      "problem_id": 9,
+      "reference": "9_grouped_moe.py",
+      "reference_sha256": "1b99109227cf728659ac4faf990ac41582eadcf63273074f7edeb27f2a6ca18c",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "moe"
+    },
+    {
+      "level": 5,
+      "problem_id": 10,
+      "reference": "10_dequantization_gemm.py",
+      "reference_sha256": "3b439355bd592e76bfb89ab7e31b19fb5bece36a265ef3634a8232d398db7356",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "int4_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 11,
+      "reference": "11_paged_attention.py",
+      "reference_sha256": "bf479ed3c49db0c8dddfa6d07270b5a00b87ebbb88b3ecaa211fd954f6aede47",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "paged"
+    },
+    {
+      "level": 5,
+      "problem_id": 12,
+      "reference": "12_split_k_gemm.py",
+      "reference_sha256": "ae3afadb4561e40fac43fdcfa33f87a782441c7fc37e967448920206b6bc7f81",
+      "role": "scored",
+      "layer": "D",
+      "track": "design",
+      "family": "matmul"
+    },
+    {
+      "level": 5,
+      "problem_id": 13,
+      "reference": "13_accurate_gemm_emulation.py",
+      "reference_sha256": "2cbddd5ec78654e85933d97c90d477d200b0d451554526798d7df695e77f8052",
+      "role": "scored",
+      "layer": "D",
+      "track": "numerical",
+      "family": "matmul"
+    },
+    {
+      "level": 5,
+      "problem_id": 14,
+      "reference": "14_format_budget_gemm.py",
+      "reference_sha256": "295b413d24467425862e7212ff8e0e36f2339ecedffc75d21757781dac96cdb7",
+      "role": "scored",
+      "layer": "D",
+      "track": "numerical",
+      "family": "matmul"
+    },
+    {
+      "level": 5,
+      "problem_id": 15,
+      "reference": "15_format_budget_attention.py",
+      "reference_sha256": "104c6e70b095465f8004ec4f29e9b3ee6586a481e8a501d19fcfdd36559ed67b",
+      "role": "scored",
+      "layer": "D",
+      "track": "numerical",
+      "family": "attention"
+    },
+    {
+      "level": 5,
+      "problem_id": 16,
+      "reference": "16_format_budget_moe.py",
+      "reference_sha256": "37db1c451937737530669ec807f0ab0717904c58620f4eb3be701834fc38218e",
+      "role": "scored",
+      "layer": "D",
+      "track": "numerical",
+      "family": "moe"
+    },
+    {
+      "level": 5,
+      "problem_id": 17,
+      "reference": "17_block_fp4_quantization_gemm.py",
+      "reference_sha256": "07ef66c9e048fdabe7d727072ec4e065b6271212268dc5b1b2dac8297cc00a7c",
+      "role": "scored",
+      "layer": "D",
+      "track": "numerical",
+      "family": "fp4_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 18,
+      "reference": "18_token_fp8_quantization_attention.py",
+      "reference_sha256": "22ac469e848797bbabb8a76758ed1ff3941e0b3a7d94b81138ddacba2510b241",
+      "role": "scored",
+      "layer": "D",
+      "track": "numerical",
+      "family": "attention"
+    },
+    {
+      "level": 5,
+      "problem_id": 19,
+      "reference": "19_bf16_gemm.py",
+      "reference_sha256": "571b0dd1678efdfe5c7f62c9fa0453fbb9763f8c75efa92f92ad6ad4ed5dfd2d",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "fixed_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 20,
+      "reference": "20_fp16_gemm.py",
+      "reference_sha256": "6b920bacc9ec6075098d19847b46818422e8865db22f1db384522f3058f3d30a",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "fixed_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 21,
+      "reference": "21_fp8_scaled_gemm.py",
+      "reference_sha256": "d7e197669fce896e9ecf956117cfb3af279feae70bc58022116ff98f4f10a4f2",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "fp8_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 22,
+      "reference": "22_w4a16_gemm.py",
+      "reference_sha256": "84091212994f129e05f6601c3286f0c0717ddc72b53b0acc8d2703130d1e080e",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "int4_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 23,
+      "reference": "23_batched_grouped_gemm.py",
+      "reference_sha256": "a8823095e55a2e6885eb41db4b5752eddbee2005ac0c9f34923e03a106429ad4",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "grouped_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 24,
+      "reference": "24_paged_decode.py",
+      "reference_sha256": "bd794559f97f6e8e307d8a22e39b876b16a22c7fd6283f98b1e871248a4b6bb5",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "paged"
+    },
+    {
+      "level": 5,
+      "problem_id": 25,
+      "reference": "25_batched_topk.py",
+      "reference_sha256": "1bd1ac1619781fcbaa104f66c136899d3e9176f0cc3cb8b69e9b288b50f9643b",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "topk"
+    },
+    {
+      "level": 5,
+      "problem_id": 26,
+      "reference": "26_swiglu_projection.py",
+      "reference_sha256": "e2f40f7dc1e6b850a5b9454975d4fa9012e1c6ba26a737e19f18435ea9bb465b",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "swiglu"
+    },
+    {
+      "level": 5,
+      "problem_id": 27,
+      "reference": "27_residual_rmsnorm.py",
+      "reference_sha256": "59c9fe7d89141b9f92b0a3b97d911df4dd171045d0608d4afd2cf91be2d1fd91",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "rmsnorm"
+    },
+    {
+      "level": 5,
+      "problem_id": 28,
+      "reference": "28_rotary_embedding.py",
+      "reference_sha256": "5ce77d4d1df691ada4a30e16288153b04b085f5a551bc98b35fd6bbf0e62049a",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "rotary"
+    },
+    {
+      "level": 5,
+      "problem_id": 29,
+      "reference": "29_quantized_moe.py",
+      "reference_sha256": "a91b3eed2886f45554ff70c9280cd6adc9dd96f7d9c6fd86535e7aa97f4a9322",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "quantized_moe"
+    },
+    {
+      "level": 5,
+      "problem_id": 30,
+      "reference": "30_gqa_decode.py",
+      "reference_sha256": "ca25664059f68e04d255583f0fe35de5e923ff47a44603984dfecc0a2b559556",
+      "role": "scored",
+      "layer": "I",
+      "track": "implementation",
+      "family": "gqa"
+    },
+    {
+      "level": 5,
+      "problem_id": 31,
+      "reference": "31_online_attention_backward.py",
+      "reference_sha256": "f889dfb073643b0d99ca7de073147264a8030a6f60f8947d061d3478fb3aee9a",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "attention"
+    },
+    {
+      "level": 5,
+      "problem_id": 32,
+      "reference": "32_linear_cross_entropy_backward.py",
+      "reference_sha256": "9e309ae0b0473730f5e2d9dc33b1a4df239d2388235a68e2dbd512addbc37ec1",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "cross_entropy"
+    },
+    {
+      "level": 5,
+      "problem_id": 33,
+      "reference": "33_welford_normalization_backward.py",
+      "reference_sha256": "b6f9a9300ea98324808e60aad36513fbf8d25f33803db7c49427e78e211eb6ce",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "normalization"
+    },
+    {
+      "level": 5,
+      "problem_id": 34,
+      "reference": "34_chunked_linear_attention_backward.py",
+      "reference_sha256": "73a8c8fabeab44e67008601ae63db8801a0f9cb0448c81234ee4dc88890e254a",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "attention_linear"
+    },
+    {
+      "level": 5,
+      "problem_id": 35,
+      "reference": "35_chunked_state_space_backward.py",
+      "reference_sha256": "ed0ee4518a20fcb15ecb58129b653ec68583aebc885282eab76a7b1d03bec182",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "state_space"
+    },
+    {
+      "level": 5,
+      "problem_id": 36,
+      "reference": "36_persistent_recurrent_backward.py",
+      "reference_sha256": "947c36a1ed3a9ffcbbe1907358ce1607522d1f5eb0c5625abbaf77f8db00b5dd",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "recurrent"
+    },
+    {
+      "level": 5,
+      "problem_id": 37,
+      "reference": "37_fft_long_convolution_backward.py",
+      "reference_sha256": "8abb75d03d35063450b3c4521de41b45e76260a05608285ccb81f58ae739e569",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "convolution"
+    },
+    {
+      "level": 5,
+      "problem_id": 38,
+      "reference": "38_grouped_moe_backward.py",
+      "reference_sha256": "9e594f1d4e1f1837a0ba219bf8c1ed19c32d40fc76a876ecc3bf432509bbc802",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "moe"
+    },
+    {
+      "level": 5,
+      "problem_id": 39,
+      "reference": "39_dequantization_gemm_backward.py",
+      "reference_sha256": "15a43ef2d0766a27250fbfd9af6a07c83767d77cdf0aa5f57fb3356370effa64",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "int4_gemm"
+    },
+    {
+      "level": 5,
+      "problem_id": 40,
+      "reference": "40_paged_attention_backward.py",
+      "reference_sha256": "085a2473f80030625385202d8eec314c6b0889e23c92cbd1cd8ac255da8a4c59",
+      "role": "scored",
+      "layer": "D",
+      "track": "backward",
+      "family": "paged"
+    },
+    {
+      "level": 5,
+      "problem_id": 41,
+      "reference": "41_swiglu_projection_backward.py",
+      "reference_sha256": "e7df63918a8ad2bbae71d71197f56d6cc74de9058403c9da55e98864c74bcd55",
+      "role": "scored",
+      "layer": "I",
+      "track": "backward",
+      "family": "swiglu"
+    }
+  ],
+  "layer_certificates": false,
+  "reachability_results_collected": false,
+  "reference_source": "KernelBench Pro mathematical references; no imported candidate implementations"
+}

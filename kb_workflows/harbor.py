@@ -97,7 +97,7 @@ def write_task(directory, config, pid, sid=0, device=None):
     if device is not None:
         for target in (environment, tests):
             (target / "docker-compose.yaml").write_text(_compose(device))
-    child = replace(config, suite="full", suite_role="scored", start=pid, end=pid, num_samples=1, run_name="harbor",
+    child = replace(config, suite="production41" if config.level == 5 else "full", suite_role="scored", start=pid, end=pid, num_samples=1, run_name="harbor",
                     generation="local", evaluation="local", gpus="0", resume=False,
                     stage="evaluate", problem_specs="", hardware=config.hardware or config.gpu,
                     runs_dir="/logs/verifier/kernelbench-pro/runs", build_image=False,
@@ -184,7 +184,7 @@ def export_tasks(config):
         staged = Path(temporary) / "tasks"
         staged.mkdir()
         tasks = []
-        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
+        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
             for sid in range(config.num_samples):
                 name = task_name(config.level, pid, sid)
                 write_task(staged / name, config, pid, sid)

@@ -41,6 +41,14 @@ def settings(config, hidden=False):
 def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
     path = select_problems(config.level, problem_ids=[pid])[pid]
     options = settings(config, hidden)
+    if config.level == 5:
+        from .production import PROTOCOL
+        from .production_specs import task as production_task
+
+        spec = production_task(pid)
+        options["precision"] = spec["fixed_activation_dtype"] or config.precision
+        options["production"] = {"protocol": PROTOCOL, "task_sha256": fingerprint(spec),
+                                 "profile": config.task_profile, "memory_bytes": config.task_memory_mb * 1024**2}
     payload = {
         "task": task,
         "level": config.level,
@@ -104,7 +112,7 @@ def evaluate_tasks(config, payloads):
 
 
 def evaluate_run(config):
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
     config.run_dir.mkdir(parents=True, exist_ok=True)
     for hidden in [False, True] if config.hidden_tests else [False]:
         label = "hidden" if hidden else "standard"
@@ -150,7 +158,7 @@ def write_pass_at_k(config):
     n = config.num_samples
     ks = sorted({int(k) for k in config.pass_at_k.split(",") if int(k) <= n})
     problems = {}
-    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
         count = sum(
             bool(standard.get(f"{pid}_{sid}", {}).get("compiled"))
             and bool(standard.get(f"{pid}_{sid}", {}).get("correctness"))
@@ -183,7 +191,7 @@ def write_validation_summary(config, standard=None, hidden=None):
     counts = dict(declared_samples=0, compiled_samples=0, standard_correct_samples=0,
                   hidden_correct_samples=0, correct_samples=0, timed_correct_samples=0)
     rows = []
-    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             raw, secret = standard.get(key, {}), hidden.get(key, {})
@@ -219,7 +227,7 @@ def record_baseline(config):
     level = results.setdefault(f"level{config.level}", {})
     names = {}
     tasks = []
-    for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role).items():
+    for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track).items():
         payload = task_payload(config, pid, task="baseline")
         signature = fingerprint(payload)
         if config.resume and (level.get(path.name) or {}).get("metadata", {}).get("workflow_signature") == signature:
@@ -248,7 +256,7 @@ def analyze_run(config):
         analyze_multi_sample_eval(
             config.run_name, config.hardware, config.baseline, config.level,
             use_hidden_eval=config.hidden_tests,
-            problem_ids=list(select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)),
+            problem_ids=list(select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)),
             runs_dir=config.runs_dir, detail_limit=30,
         )
     except (ValueError, AssertionError) as exc:
@@ -263,7 +271,7 @@ def record_baseline_suite(config):
     results = read_json(target, {})
     level = results.setdefault(f"level{config.level}", {})
     tasks, names, signatures, variants = [], {}, {}, {}
-    for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role).items():
+    for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track).items():
         base = task_payload(config, pid, task="baseline")
         signature = fingerprint(base)
         previous = level.get(path.name, {})
@@ -325,7 +333,7 @@ def run_paired(config):
     target = config.run_dir / "paired_results.json"
     results = read_json(target, {}) if config.resume else {}
     tasks = []
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
     for pid in selected:
         for sid in range(config.num_samples):
             for repeat in range(config.final_repeats or 1):

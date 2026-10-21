@@ -26,6 +26,9 @@ class RunConfig:
     level: int = 1
     suite: str = "full"
     suite_role: str = "scored"
+    task_profile: str = "standard"
+    task_track: str = "all"
+    task_memory_mb: int = 512
     start: int = 1
     end: int | None = None
     run_name: str = ""
@@ -94,8 +97,18 @@ class RunConfig:
     def validate(self):
         self.run_name = safe_name(self.run_name or f"run_{datetime.now(timezone.utc):%Y%m%d_%H%M%S}")
         self.runs_dir = str(Path(self.runs_dir).expanduser().resolve())
-        if self.level not in (1, 2, 3) or self.start < 1 or (self.end is not None and self.end < self.start):
-            raise ValueError("KernelBench Pro batch workflows support levels 1–3; start/end must form a valid inclusive range")
+        if self.level not in (1, 2, 3, 5) or self.start < 1 or (self.end is not None and self.end < self.start):
+            raise ValueError("Levels must be 1–3 or 5; start/end must form a valid inclusive range")
+        if (self.level == 5) != (self.suite == "production41"):
+            raise ValueError("Level 5 requires --suite production41, which only contains level 5")
+        if self.suite == "production41" and self.suite_role != "scored":
+            raise ValueError("production41 contains only the scored role")
+        if self.task_profile not in {"small", "standard", "large"}:
+            raise ValueError("Unknown production task profile")
+        if self.task_track not in {"all", "design", "numerical", "implementation", "backward"}:
+            raise ValueError("Unknown production task track")
+        if self.suite != "production41" and self.task_track != "all":
+            raise ValueError("--task-track requires production41")
         for name in (
             "parallel",
             "num_samples",
@@ -108,6 +121,7 @@ class RunConfig:
             "queue_wait_timeout",
             "cold_calls",
             "harbor_memory_mb",
+            "task_memory_mb",
         ):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
@@ -243,6 +257,7 @@ def parser():
         "harbor_memory_mb",
         "paired_trials",
         "final_repeats",
+        "task_memory_mb",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
@@ -252,7 +267,9 @@ def parser():
         "score_mode": ("bounded_gain", "headroom"),
         "baseline_portfolio": ("standard", "extended"),
         "evidence_level": ("current", "L0", "L1", "L2"),
-        "suite": ("full", "kernelbench105"),
+        "suite": ("full", "kernelbench105", "production41"),
+        "task_profile": ("small", "standard", "large"),
+        "task_track": ("all", "design", "numerical", "implementation", "backward"),
         "suite_role": ("scored", "probe", "extended"),
         "stage": ("all", "generate", "evaluate", "analyze", "baseline", "export-harbor"),
         "generation": ("local", "docker", "modal", "harbor"),
@@ -270,6 +287,8 @@ def parser():
         "evidence_level",
         "suite",
         "suite_role",
+        "task_profile",
+        "task_track",
         "run_name",
         "runs_dir",
         "stage",

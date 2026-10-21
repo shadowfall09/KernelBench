@@ -15,11 +15,27 @@ from pydantic import BaseModel
 import numpy as np
 import random
 import json
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
+from contextvars import ContextVar
 from io import StringIO
 import sys
 
 from kb_workflows.measurement import CLOCK, input_signature, synchronized_times, timing_stats
+
+_PRESERVE_INPUT_DTYPES = ContextVar("preserve_declared_input_dtypes", default=False)
+
+
+@contextmanager
+def input_dtype_policy(*, preserve=False):
+    token = _PRESERVE_INPUT_DTYPES.set(preserve)
+    try:
+        yield
+    finally:
+        _PRESERVE_INPUT_DTYPES.reset(token)
+
+
+def move_model(model, device, precision):
+    return model.to(device=device) if _PRESERVE_INPUT_DTYPES.get() else model.to(device=device, dtype=precision)
 
 from . import utils
 from .reliability import HIDDEN_SEEDS, check_paired_calls, stress_cases, stress_enabled
@@ -127,7 +143,7 @@ def _process_input_tensor(input, device, precision=torch.float32):
         return input
 
     # cast to the desired precision dtype for activations
-    input_tensor = input.to(dtype=precision) if input.is_floating_point() else input
+    input_tensor = input.to(dtype=precision) if input.is_floating_point() and not _PRESERVE_INPUT_DTYPES.get() else input
 
     # Default for all other backends and float types
     return input_tensor.to(device=device)
@@ -414,8 +430,8 @@ def run_correctness_on_fixed_inputs(
     inputs = [_process_input_tensor(x, device, precision) for x in raw_inputs]
     with torch.no_grad():
         issue = check_paired_calls(
-            original_model_instance.to(device=device, dtype=precision),
-            new_model_instance.to(device=device, dtype=precision), inputs,
+            move_model(original_model_instance, device, precision),
+            move_model(new_model_instance, device, precision), inputs,
             seed=seed, tolerance=get_tolerance_for_precision(precision), device=device,
             set_seed=set_seed, metadata=metadata, label=config_label,
         )
@@ -513,8 +529,8 @@ def measure_hidden_speedup(
         config_label = f"config_{i + 1}"
         try:
             inputs = [_process_input_tensor(x, device, precision) for x in raw_inputs]
-            model = original_model_instance.to(device=device, dtype=precision)
-            model_new = new_model_instance.to(device=device, dtype=precision)
+            model = move_model(original_model_instance, device, precision)
+            model_new = move_model(new_model_instance, device, precision)
 
             # Time reference model
             ref_times = time_execution_with_cuda_event(
@@ -605,7 +621,7 @@ def eval_kernel_against_ref(
     metadata["hardware"] = torch.cuda.get_device_name(device=device)
     metadata["device"] = str(device)  # for debugging
 
-    original_model = original_model.to(device=device, dtype=precision)
+    original_model = move_model(original_model, device, precision)
     synchronize(device)
     candidate_setup_started = CLOCK()
 
@@ -642,8 +658,8 @@ def eval_kernel_against_ref(
             set_seed(seed_num)  # set seed for reproducible weights
             custom_model = ModelNew(*init_inputs)
             assert hasattr(custom_model, "forward")
-            original_model = original_model.to(device=device, dtype=precision)
-            custom_model = custom_model.to(device=device, dtype=precision)
+            original_model = move_model(original_model, device, precision)
+            custom_model = move_model(custom_model, device, precision)
             torch.cuda.synchronize(device=device)
         if verbose:
             print("[Eval] New Model with Custom CUDA Kernel Loaded")
@@ -732,7 +748,7 @@ def eval_kernel_against_ref(
                 set_seed(seed_num)
                 inputs = get_inputs()
                 inputs = [_process_input_tensor(x, device, precision) for x in inputs]
-                model_new = custom_model.to(device=device, dtype=precision)
+                model_new = move_model(custom_model, device, precision)
                 torch.cuda.synchronize(device=device)
 
                 timing_receipt = metadata["timing_receipt"] = {}
@@ -843,8 +859,8 @@ def run_and_check_correctness(
     generator = torch.Generator().manual_seed(seed)
     seeds = torch.randint(0, 2**32 - 1, (num_correct_trials,), generator=generator).tolist()
     with torch.no_grad():
-        model = original_model_instance.to(device=device, dtype=precision)
-        model_new = new_model_instance.to(device=device, dtype=precision)
+        model = move_model(original_model_instance, device, precision)
+        model_new = move_model(new_model_instance, device, precision)
         for trial, trial_seed in enumerate(seeds):
             set_seed(trial_seed)
             inputs = [_process_input_tensor(x, device, precision) for x in get_inputs_fn()]

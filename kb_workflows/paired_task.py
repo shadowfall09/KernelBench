@@ -9,6 +9,7 @@ from src.validation import clone_tensors, compare_outputs, preserve_backend_sett
 
 from .measurement import CLOCK, consume_output, synchronize
 from .paired_statistics import paired_summary
+from .production import task_input_policy
 from .strict_validation import environment_guard
 
 
@@ -70,6 +71,7 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
     return paired_summary(rows)
 
 
+@task_input_policy
 def evaluate_paired(payload):
     import torch
 
@@ -79,6 +81,7 @@ def evaluate_paired(payload):
         get_torch_dtype_from_string,
         load_custom_model,
         load_original_model_and_inputs,
+        move_model,
         set_seed,
     )
     from src.validation import clone_tensors
@@ -105,7 +108,7 @@ def evaluate_paired(payload):
     models = {}
     for name in ("R", "B", "oracle"):
         set_seed(seed)
-        models[name] = Model(*clone_tensors(initial)).to(device=device, dtype=dtype)
+        models[name] = move_model(Model(*clone_tensors(initial)), device, dtype)
     build = ROOT / "cache/workflow" / fingerprint(payload)
     build.mkdir(parents=True, exist_ok=True)
     os.environ["TORCH_EXTENSIONS_DIR"] = str(build)
@@ -118,7 +121,7 @@ def evaluate_paired(payload):
     with environment_guard(changes):
         Candidate = load_custom_model(payload["kernel_src"], {}, str(build))
         set_seed(seed)
-        models["C"] = Candidate(*clone_tensors(initial)).to(device=device, dtype=dtype)
+        models["C"] = move_model(Candidate(*clone_tensors(initial)), device, dtype)
     # Compilation scaffolding assigns this trusted setting before candidate import.
     if changes:
         raise ValueError(f"Candidate import changed process settings: {sorted(set(changes))}")

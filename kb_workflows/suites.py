@@ -7,11 +7,21 @@ import json
 from pathlib import Path
 
 MANIFEST = Path(__file__).with_name("suites") / "kernelbench105.json"
-SUITES = ("full", "kernelbench105")
+PRODUCTION_MANIFEST = Path(__file__).with_name("suites") / "production41.json"
+SUITES = ("full", "kernelbench105", "production41")
 ROLES = ("scored", "probe", "extended")
 
 
-def load_manifest():
+def load_manifest(suite="kernelbench105"):
+    if suite == "production41":
+        data = json.loads(PRODUCTION_MANIFEST.read_text())
+        rows = data["problems"]
+        if (len(rows) != 41 or {row["problem_id"] for row in rows} != set(range(1, 42))
+                or any(row["level"] != 5 or row["role"] != "scored" for row in rows)):
+            raise ValueError("Invalid production41 manifest")
+        return data
+    if suite != "kernelbench105":
+        raise ValueError("Unknown selection manifest")
     data = json.loads(MANIFEST.read_text())
     rows = data["problems"]
     identities = [(row["level"], row["problem_id"]) for row in rows]
@@ -23,16 +33,24 @@ def load_manifest():
     return data
 
 
-def suite_rows(level, role):
+def suite_rows(level, role, suite="kernelbench105", track="all"):
     if role not in ROLES:
         raise ValueError(f"Unknown suite role: {role}")
-    return {row["problem_id"]: row for row in load_manifest()["problems"]
-            if row["level"] == level and row["role"] == role}
+    return {row["problem_id"]: row for row in load_manifest(suite)["problems"]
+            if row["level"] == level and row["role"] == role and (track == "all" or row.get("track") == track)}
 
 
 def selection_receipt(config):
     if config.suite == "full":
         return {"name": "full", "role": "scored", "layer_certificates": False}
+    if config.suite == "production41":
+        return {"name": "production41", "role": config.suite_role, "layer_certificates": False,
+                "manifest_sha256": hashlib.sha256(PRODUCTION_MANIFEST.read_bytes()).hexdigest(),
+                "input_calibration": "role_domains_and_memory_plan_v1", "historical_ranking_reproduced": False,
+                "dtype_instances_scored_separately": True, "reachability_results_collected": False,
+                "profile": config.task_profile, "memory_budget_mb": config.task_memory_mb,
+                "track": config.task_track,
+                "purpose": "production_parameterized_families; design_labels_provisional"}
     return {"name": config.suite, "role": config.suite_role,
             "manifest_sha256": hashlib.sha256(MANIFEST.read_bytes()).hexdigest(),
             "seed": load_manifest()["selection_seed"], "layer_certificates": False,

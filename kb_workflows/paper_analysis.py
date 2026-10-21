@@ -106,7 +106,7 @@ def analyze_paper(config):
     from .engine import task_payload
     from .experiment import existing_budget, protocol
 
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
     standard = read_json(config.run_dir / "eval_results.json", {})
     hidden = read_json(config.run_dir / "eval_results_hidden.json", {}) if config.hidden_tests else standard
     baselines = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
@@ -114,9 +114,9 @@ def analyze_paper(config):
     specs = read_json(Path(config.problem_specs), {}) if config.problem_specs else {}
     specs = specs.get(f"level{config.level}", {})
     calibration = read_json(Path(config.device_calibration), {}) if config.device_calibration else {}
-    research_rows = suite_rows(config.level, config.suite_role) if config.suite != "full" else {}
+    research_rows = suite_rows(config.level, config.suite_role, suite=config.suite) if config.suite != "full" else {}
     digest = evaluator_digest()
-    groups, bounded_groups, rows, scored, certificate_coverage = {}, {}, [], {}, {}
+    groups, bounded_groups, track_groups, rows, scored, certificate_coverage = {}, {}, {}, [], {}, {}
     external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
                       for option in ("problem_specs", "device_calibration") if getattr(config, option)}
     auxiliary_files = {}
@@ -130,6 +130,7 @@ def analyze_paper(config):
         if layer not in {"I", "F", "D", "unclassified"}:
             raise ValueError(f"Unknown layer for {pid}: {layer}")
         baseline = baselines.get(path.name, {})
+        task_track = research_rows.get(pid, {}).get("track", "forward")
         bound_issue = None
         if config.score_mode == "headroom":
             from .headroom import certificate
@@ -147,7 +148,7 @@ def analyze_paper(config):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             raw, secret = standard.get(key, {}), hidden.get(key, {})
-            row = {"problem_id": pid, "sample_id": sid, "layer": layer, "layer_source": layer_source, "score": 0}
+            row = {"problem_id": pid, "sample_id": sid, "layer": layer, "track": task_track, "layer_source": layer_source, "score": 0}
             rows.append(row)
             slots.append(0)
             bounded_slots.append(0)
@@ -284,6 +285,7 @@ def analyze_paper(config):
             )
             scored[key] = entry
         groups.setdefault(layer, []).append(slots)
+        track_groups.setdefault(task_track, {}).setdefault(layer, []).append(slots)
         bounded_groups.setdefault(layer, []).append(bounded_slots)
     by_layer = {layer: mean(mean(slots) for slots in values) for layer, values in groups.items()}
     label_source = ("problem_specs_with_suite_fallback" if config.problem_specs and research_rows else
@@ -293,7 +295,12 @@ def analyze_paper(config):
     report = {
         "kind": "failure_inclusive_measurement_scoring_v1", "problem_ids": list(selected),
         "suite": selection_receipt(config), "leaderboard_eligible": config.suite_role == "scored" and
+            (config.suite != "production41" or config.task_track != "all") and
             (config.score_mode != "headroom" or all(item["valid"] for item in certificate_coverage.values())),
+        "track_comparison_policy": "separate_tracks; all_track_collection_macro_is_diagnostic",
+        "score_by_track": {track: {"by_layer": {layer: mean(mean(slots) for slots in values) for layer, values in layers.items()},
+                                  "macro": mean(mean(mean(slots) for slots in values) for values in layers.values())}
+                           for track, layers in track_groups.items()},
         "headroom_certificate_coverage": certificate_coverage,
         "layer_source": label_source,
         "headroom_score_implemented": True, "score_mode": config.score_mode,

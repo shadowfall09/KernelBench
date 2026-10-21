@@ -7,8 +7,10 @@ import tempfile
 from pathlib import Path
 
 from .common import ROOT, fingerprint
+from .production import task_input_policy
 
 
+@task_input_policy
 def profile(payload):
     import torch
 
@@ -17,6 +19,7 @@ def profile(payload):
         get_torch_dtype_from_string,
         load_custom_model,
         load_original_model_and_inputs,
+        move_model,
     )
     from src.utils import set_gpu_arch
     from src.validation import clone_tensors
@@ -38,7 +41,7 @@ def profile(payload):
     build = ROOT / "cache/workflow" / fingerprint(payload)
     build.mkdir(parents=True, exist_ok=True)
     ModelNew = load_custom_model(payload["kernel_src"], {}, str(build))
-    model = ModelNew(*initial).to(device=device, dtype=dtype)
+    model = move_model(ModelNew(*initial), device, dtype)
     with torch.no_grad():
         model(*clone_tensors(args))
         torch.cuda.synchronize(device)

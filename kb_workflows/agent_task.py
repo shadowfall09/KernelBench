@@ -93,7 +93,7 @@ def main(argv=None):
 
         config = parse_config(options)
         config.require_gpu_target()
-        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         if config.start != config.end or config.num_samples != 1 or list(selected) != [config.start]:
             raise ValueError("Interactive preparation requires --start N --end N --num-samples 1")
         if config.generation != "local" or config.evaluation not in {"local", "docker", "queue", "modal"}:

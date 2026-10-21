@@ -14,7 +14,7 @@ from .suites import selection_receipt
 def main(argv=None):
     try:
         config = parse_config(argv)
-        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         strict_coverage = None
         if config.strict_validation:
             from .contract_specs import coverage

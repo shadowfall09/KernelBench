@@ -24,6 +24,16 @@ work certificates and a `device_calibration` receipt. It uses steady-state gains
 the SOL target denominator and reports amortized bounded gain separately. Calibration is
 an explicit opt-in command, never an automatic phase. See [headroom scoring](HEADROOM_SCORING.md).
 
+## Production families
+
+Select `suite = "production41"`, `level = 5` and
+`task_track = "design" | "numerical" | "implementation" | "backward"`.
+The `all` selection collects all four tracks and reports them separately; its mixed macro
+is diagnostic. `task_profile = "small" | "standard" | "large"` and `task_memory_mb = 512`
+declare instantiation limits. Per-role storage preserves FP32 scales and discrete inputs;
+fixed-format tasks may override the requested activation family. See
+[production tasks](PRODUCTION_TASKS.md) for exact representations and limits.
+
 ## Install
 
 Use Python 3.12:

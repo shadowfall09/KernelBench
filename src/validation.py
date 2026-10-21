@@ -2,8 +2,20 @@
 
 import math
 from contextlib import contextmanager
+from contextvars import ContextVar
 
 import torch
+
+_OUTPUT_COMPARATOR = ContextVar("declared_output_comparison", default=None)
+
+
+@contextmanager
+def output_comparison_policy(comparator=None):
+    token = _OUTPUT_COMPARATOR.set(comparator)
+    try:
+        yield
+    finally:
+        _OUTPUT_COMPARATOR.reset(token)
 
 
 def compare_outputs(expected, actual, tolerance, path="output"):
@@ -20,11 +32,15 @@ def compare_outputs(expected, actual, tolerance, path="output"):
         if expected.is_complex():
             return compare_outputs(torch.view_as_real(expected), torch.view_as_real(actual), tolerance, path)
         if torch.isfinite(expected).all() and torch.isfinite(actual).all():
+            if comparator := _OUTPUT_COMPARATOR.get():
+                return comparator(expected, actual, path)
             return None if torch.allclose(expected, actual, atol=tolerance, rtol=tolerance) else f"{path}: finite values differ"
         for name, mask in (("NaN", torch.isnan), ("+Inf", torch.isposinf), ("-Inf", torch.isneginf)):
             if not torch.equal(mask(expected), mask(actual)):
                 return f"{path}: {name} locations differ"
         finite = torch.isfinite(expected)
+        if comparator := _OUTPUT_COMPARATOR.get():
+            return comparator(expected[finite], actual[finite], path)
         if not torch.allclose(expected[finite], actual[finite], atol=tolerance, rtol=tolerance):
             return f"{path}: finite values differ"
         return None

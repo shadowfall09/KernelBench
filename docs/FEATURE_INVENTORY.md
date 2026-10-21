@@ -429,6 +429,30 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 
 本版未运行GPU/Trainium校准、模型生成、训练或科研实验。设备收据与实验结果维持未采集；后续实现按同一范围推进。来源归因和实际硬件计数器采集仍未完成；A/E不会填造数值。之前stash保持不变。
 
+## 第十二版：生产题族、逐角色精度与反向轨道
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add production task families with role-aware inputs and backward tracks |
+| 日期 | 2026-10-21 |
+| 基础提交 | `d2594bd` |
+| 状态 | 已提交；CPU/模拟回归，不运行科研实验 |
+
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V12-01 | Production-41参数化题集 | 独立Level 5增加12设计、6数值设计、12固定格式与11反向任务，保留旧250题及旧Level 4模型 | `kb_workflows/production_specs.py` | [M1](MOTIVATION.md#m1) |
+| V12-02 | 独立反向轨道与梯度参考 | 11个VJP参考支持外层no_grad下执行；FP64 gradcheck和方向有限差分核对梯度，轨道分别选题与评分 | `kb_workflows/production_ops.py` | [M1](MOTIVATION.md#m1) |
+| V12-03 | 逐输入角色的dtype契约 | 保留FP32缩放、bool mask与离散索引，支持FP8存储/packed INT4及E2M1软件量化；有效精度写入任务而非统一强转 | `kb_workflows/production.py` | [M1](MOTIVATION.md#m1) |
+| V12-04 | 显存计划与合法隐藏实例 | 按声明包络及设备容量确定性缩放并保存计划，私有尺寸/stride/动态范围/分页/mask及归一化近常量遵守输入域 | `kb_workflows/production.py` | [M2](MOTIVATION.md#m2) |
+| V12-05 | 生产题数值预算与零答案门 | 所有41题使用相对RMS及逐元素比较，六个数值设计预算独立；逐题验证全零反例，参考比较与独立FP64自资格明确区分 | `src/validation.py` | [M2](MOTIVATION.md#m2) |
+| V12-06 | 生产题全流程与来源恢复 | 选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹 | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
+
+使用 `--suite production41 --level 5`，按 `--task-track design|numerical|implementation|backward` 选择独立轨道。`all`用于收集，混合分数只作诊断。small/standard/large与显存包络显式配置；角色格式、FP8及FP4的实现边界、隐藏实例和数值预算见[生产题说明](PRODUCTION_TASKS.md)。
+
+验证：Python 3.12.12 / Torch 2.12.0 下614项CPU/模拟回归通过，本版新增168项。覆盖全部41题的合法角色、支持dtype、隐藏奇数/stride/范围、全零反例、11个FP64 gradcheck与有限差分、10个独立Torch公式对照、pack/tie规则、显存缩放、原生失败分母及Harbor/轨道配置。生成文件一致性、Ruff、动机表、本地文档链接与离线wheel轻量导入检查通过。
+
+参考和原生/Harbor流程均已实现；GPU编译、计时、厂商最强baseline、原生FP4吞吐和可达性实验未运行，不能据此声称实机性能或完整L0资格。之前stash保持不变。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

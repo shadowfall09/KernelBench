@@ -30,7 +30,7 @@ def protocol(config):
 
 
 def write_budget_report(config, summary):
-    ids = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+    ids = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
     slots = [summary.get(f"{pid}_{sid}", {}) for pid in ids for sid in range(config.num_samples)]
     history = read_json(config.run_dir / "generation_attempts.json", {})
     attempts = history.get("slots", {})
@@ -79,7 +79,7 @@ def compare_runs(directories):
                     "suite": selection_receipt(config),
                     "layer_assignments": {str(row["problem_id"]): row.get("layer") for row in scoring.get("details", [])},
                     "hardware": config.hardware, "precision": config.precision, "baseline": config.baseline,
-                    "level": config.level, "problems": list(select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)),
+                    "level": config.level, "problems": list(select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)),
                     "hidden_tests": config.hidden_tests, "num_correct_trials": config.num_correct_trials,
                     "num_perf_trials": config.num_perf_trials, "cold_calls": config.cold_calls,
                     "fp32_tolerance": config.fp32_tolerance}
@@ -88,6 +88,7 @@ def compare_runs(directories):
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
         contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))
                         for option in ("problem_specs", "device_calibration") if getattr(config, option)})
+        contract.update(task_profile=config.task_profile, task_memory_mb=config.task_memory_mb)
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})
         entry["runs"].append({"run": directory.name, "declared_model": config.model, "observed_models": budget.get("observed_models"),
@@ -113,7 +114,7 @@ def existing_budget(config):
     if not report:
         return {}
     current = {}
-    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
         for sid in range(config.num_samples):
             path = config.run_dir / kernel_name(config.level, pid, sid)
             current[f"{pid}_{sid}"] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None

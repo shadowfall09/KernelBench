@@ -30,6 +30,11 @@ def input_blind_problems():
 
 def prompt_source(source, level, pid):
     # Follow the configured input-blind policy without importing its API-client dependencies.
+    if level == 5:
+        lines = source.splitlines(keepends=True)
+        return "\n".join("".join(lines[node.lineno - 1:node.end_lineno]) for node in ast.parse(source).body
+                         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                         or node.name not in {"get_inputs", "get_init_inputs"})
     if (level, pid) not in input_blind_problems():
         return source
     tree = ast.parse(source)
@@ -61,9 +66,17 @@ def agent_environment(config):
 
 def build_prompt(config, pid):
     filename = kernel_name(config.level, pid)
+    contract = ""
+    if config.level == 5:
+        from .production_specs import task
+
+        spec = task(pid)
+        contract = (f"\nTrack: {spec['track']}; activation family: {spec['fixed_activation_dtype'] or config.precision}. "
+                    "Input dtypes follow the public per-role contract; keep scale factors FP32 and indices/masks discrete. "
+                    "Packed FP4 references specify software E2M1 semantics, not mandatory native FP4 instructions.\n")
     return f"""Implement ModelNew for KernelBench Pro level {config.level}, problem {pid}.
 The public reference is supplied below; implement real CUDA/Triton kernels.
-Target hardware: {config.hardware or config.gpu}; architecture: {config.gpu_arch}; precision: {config.precision}.
+Target hardware: {config.hardware or config.gpu}; architecture: {config.gpu_arch}; requested precision family: {config.precision}.{contract}
 Return one complete Python source block. The controller writes it to runs/agent/{filename}.
 Keep the model's algorithm, input-dependent behavior, shapes and parameters correct.
 Some references intentionally omit the test harness. Implement from the supplied Model definition;
@@ -94,7 +107,7 @@ def prepare_job(config, pid, sid):
     (directory / "model.py").write_text(prompt_source(source, config.level, pid))
     job = config.to_dict()
     job.update(
-        suite="full",
+        suite="production41" if config.level == 5 else "full",
         suite_role="scored",
         start=pid,
         end=pid,
@@ -296,7 +309,7 @@ def generate_run(config):
     history_path = config.run_dir / "generation_attempts.json"
     history = read_json(history_path, {"slots": {}, "historical_attempts_unknown": bool(previous)})
     tasks = []
-    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             path = config.run_dir / kernel_name(config.level, pid, sid)
@@ -373,6 +386,6 @@ def generate_run(config):
     write_budget_report(config, summary)
     return all(
         summary.get(f"{pid}_{sid}", {}).get("status") == "success"
-        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         for sid in range(config.num_samples)
     )
