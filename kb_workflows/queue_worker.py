@@ -137,9 +137,9 @@ def validate_payload(payload):
             raise ValueError(f"Missing {key}")
     if not isinstance(payload["request_id"], str) or not payload["request_id"]:
         raise ValueError("request_id must be a nonempty string")
-    if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing"}:
+    if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing", "qualify_small"}:
         raise ValueError("Unknown task")
-    if payload.get("task", "evaluate") in {"evaluate", "profile", "paired_timing"} and not isinstance(payload.get("kernel_src"), str):
+    if payload.get("task", "evaluate") in {"evaluate", "profile", "paired_timing", "qualify_small"} and not isinstance(payload.get("kernel_src"), str):
         raise ValueError("kernel_src must be provided")
     if payload["eval_config"].get("timeout", 0) <= 0:
         raise ValueError("Evaluation timeout must be positive")

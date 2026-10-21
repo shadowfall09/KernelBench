@@ -10,11 +10,13 @@ from .common import fingerprint
 _FILE_HASHES = {}
 
 
-def checkpoint_digest(directory):
+def checkpoint_digest(directory, *, exclude=()):
     """Hash local weights/tokenizer assets; reuse bytes only when file metadata is unchanged."""
     directory = Path(directory).resolve()
     records = []
     for path in sorted(path for path in directory.rglob("*") if path.is_file()):
+        if str(path.relative_to(directory)) in exclude:
+            continue
         stat = path.stat()
         identity = (str(path.resolve()), stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
         if identity not in _FILE_HASHES:

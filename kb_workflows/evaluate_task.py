@@ -249,10 +249,41 @@ def baseline(payload: dict):
     )
 
 
+def qualify_small(payload):
+    """Reviewed auxiliary correctness before allocating the original performance workload."""
+    import torch
+
+    from src.utils import set_gpu_arch
+
+    from .evidence import accepted, from_result
+    from .measurement import device_fingerprint
+    from .strict_validation import evaluate_contract
+
+    source = validate_sources(payload)
+    configure_tf32(torch, False)
+    settings = payload["eval_config"]
+    if settings.get("gpu_arch"):
+        set_gpu_arch(settings["gpu_arch"].split(","))
+    build = ROOT / "cache/workflow" / fingerprint(payload)
+    build.mkdir(parents=True, exist_ok=True)
+    os.environ["TORCH_EXTENSIONS_DIR"] = str(build)
+    os.environ["TORCH_USE_CUDA_DSA"] = "1"
+    checks = evaluate_contract(payload, source, build)
+    result = {"compiled": True, "correctness": all(accepted(item) for item in checks.values()), "runtime": -1,
+              "metadata": {"reference_sha256": fingerprint({"source": source}),
+                           "kernel_sha256": fingerprint({"source": payload["kernel_src"]}),
+                           "device_fingerprint": device_fingerprint(torch.device("cuda:0")),
+                           "qualification_scope": "reviewed_auxiliary_cases; no_original_input_allocation_or_timing"}}
+    result["metadata"]["evidence_receipt"] = from_result(result, settings, additional=checks)
+    return result
+
+
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
-        if payload.get("task") == "paired_timing":
+        if payload.get("task") == "qualify_small":
+            result = qualify_small(payload)
+        elif payload.get("task") == "paired_timing":
             from .paired_task import evaluate_paired
 
             result = evaluate_paired(payload)

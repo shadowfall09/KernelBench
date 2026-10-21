@@ -44,6 +44,8 @@ agent_profile = true
 
 可选资源预留增加本地`local-transformers`精确总token计数、单请求LiteLLM输出限额和local/Docker开发worker占用额度；配置、失败处理、恢复限制和计分证据见[资源预算](RESOURCE_BUDGETS.md)。设备额度按父进程墙钟结算，尚未提供纯GPU busy时间硬限。不会自动下载或运行本地checkpoint。
 
+策略训练另提供固定版本TRL的one-shot/反馈GRPO入口，开发工具复用本节控制器，终局才进入完整奖励验证；计划、恢复和审计范围见[RL工作流](RL_WORKFLOW.md)。训练不自动启动，持出题不进入训练callback。
+
 ## 反馈与最终验证分开
 
 控制器只把经过现有 input-blind 策略处理的公开参考发给模型。反馈通道明确关闭隐藏测试，模型没有读取测试源码的 shell/file 工具。开发正确性和计时复用当前评测器，仍检查输出结构、dtype、非有限值、变化输入及逐次计时输出。

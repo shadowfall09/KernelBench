@@ -82,6 +82,29 @@ def test_failures_and_missing_slots_stay_in_denominator(run):
     assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
 
 
+def test_rl_public_hidden_gap_regrades_identical_saved_sources_without_execution(run, monkeypatch):
+    from dataclasses import replace
+
+    from kb_workflows import rl_audit, study_data
+
+    config, _, _, hidden, save = run
+    hidden["1_0"]["correctness"] = False
+    save()
+    monkeypatch.setattr(study_data, "ROOT", common.ROOT)
+    monkeypatch.setattr(study_data, "evaluator_digest", lambda: "current")
+    monkeypatch.setattr(study_data, "select_problems", engine.select_problems)
+    monkeypatch.setattr(engine, "evaluate_tasks", lambda *a, **k: pytest.fail("Audit launched an evaluator"))
+    public = replace(config, hidden_tests=False, run_name="public")
+    shutil.copytree(config.run_dir, public.run_dir)
+    atomic_json(public.run_dir / "run_config.json", public.to_dict())
+    result = rl_audit.public_hidden_gap(public.run_dir, config.run_dir, trials=100)
+    assert result["mean_public_minus_final"] == pytest.approx(1 / 3)
+    assert result["failures_retained"] and not result["experiments_started"]
+    (public.run_dir / kernel_name(1, 1)).write_text("different candidate")
+    with pytest.raises(ValueError, match="identical candidate"):
+        rl_audit.public_hidden_gap(public.run_dir, config.run_dir, trials=100)
+
+
 @pytest.mark.parametrize("damage", [None, "receipt", "history", "usage", "signature"])
 def test_resource_budget_proof_is_required_and_invalidates_both_score_gates(run, monkeypatch, damage):
     import hashlib

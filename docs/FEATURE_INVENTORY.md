@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第十四版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第十五版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -497,6 +497,31 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 配置、作用范围、未知用量处理与恢复规则见[资源预算](RESOURCE_BUDGETS.md)。R-18推进为部分实现；纯GPU busy时间硬限与远端可信取消仍待实现。不会把worker墙钟、模型token计数或客户端估算费用写成GPU账单。
 
 验证：Python 3.12.12 / Torch 2.12.0下681项CPU/模拟回归通过，本版新增37项；覆盖预留/返还/未知扣款、超额与不支持后端、最佳候选保留、模型资产变更、评分证据失效与预算网格。真实模型与设备实验均未运行，Ruff、动机表与文档链接检查通过。此前stash保持原样。
+
+## 第十五版：GRPO训练入口与奖励验证
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Integrate local GRPO with native terminal rewards and audit workflows |
+| 日期 | 2026-10-21 |
+| 基础提交 | `2ba12d6` |
+| 状态 | 软件实现与CPU/模拟回归；真实模型和训练实验未运行 |
+
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V15-01 | 冻结训练计划与持出划分 | 显式任务/源码/family划分、模型资产及实现指纹，公开参考沿用input-blind策略，默认不执行 | `kb_workflows/rl_plan.py` | [M4](MOTIVATION.md#m4) |
+| V15-02 | 原生GRPO与标准开发工具 | 固定TRL 1.8.0，one-shot/反馈环境及候选选择，离线加载；持出题不进入训练callback | `kb_workflows/rl_training.py` | [M4](MOTIVATION.md#m4) |
+| V15-03 | 分阶段小实例资格任务 | 新增qualify_small worker，在原尺寸分配与计时前运行审查契约；基线不合格时先停止模型加载 | `kb_workflows/evaluate_task.py` | [M2](MOTIVATION.md#m2) |
+| V15-04 | 同题交替终局奖励 | 共享repeat种子、同设备UUID、独立进程交替重测；严格资格分与弱raw-speedup消融分开，失败保留零分 | `kb_workflows/rl_rewards.py` | [M3](MOTIVATION.md#m3) |
+| V15-05 | 训练预算与checkpoint恢复 | 生成前预留group、中断仍扣额、checkpoint绑定文件/step/奖励历史，父进程墙钟监督包含清理 | `kb_workflows/rl_training.py` | [M5](MOTIVATION.md#m5) |
+| V15-06 | 奖励重评分与可靠性审计 | 预声明案例、重复重评、ICC/排序/攻击接受率及公共最终差；缺检查与基础设施故障不冒充防攻击通过 | `kb_workflows/rl_audit.py` | [M4](MOTIVATION.md#m4) |
+| V15-07 | 持出评测计划与CLI | 生成冻结checkpoint的原生持出任务/会话计划，提供计划、基线预检、训练、重评和离线审计命令 | `scripts/rl_workflow.py` | [M4](MOTIVATION.md#m4) |
+
+完整配置与限制见[RL工作流](RL_WORKFLOW.md)。默认只规划/预览；真实执行需要显式开关。本版不把TRL含工具观察的completion序列算成精确计费token，也不宣称纯GPU时间硬限、完整OS隔离或训练收益已经验证。
+
+验证：Python 3.12.12 / Torch 2.12.0下724项CPU/模拟回归通过，本版新增43项；实际原生评分处理模拟worker证据，覆盖坏候选分母、早停、交替种子、同设备检查、文件篡改、丢失账本、checkpoint恢复、TRL真实配置API、重评样本重排及持出权重冻结。未加载真实模型或运行训练；Ruff、动机表、文档链接和依赖检查通过。
+
+R-20推进为部分实现；候选算法证书加分和绑定训练来源的完整效果对照报告仍需完成。其余研究设计继续保留原状态，不以新增训练入口替代全部23项的验收。此前stash保持原样。
 
 ## 维护方式
 

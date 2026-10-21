@@ -103,6 +103,19 @@ def execute_plan(path, *, execute=False, runner=None, keep_going=False):
             fingerprint({key: value for key, value in plan.items() if key != "plan_sha256"})
             or plan.get("evaluator_sha256") != evaluator_digest() or plan.get("plan_implementation_sha256") != study_digest()):
         raise ValueError("Plan is malformed, changed, or stale; regenerate and review it")
+    if "checkpoints" in plan:
+        from .local_model import checkpoint_digest
+
+        identities = plan["checkpoints"]
+        if not isinstance(identities, dict) or not identities:
+            raise ValueError("Frozen local checkpoint identities are missing")
+        for identity in identities.values():
+            if (not isinstance(identity, dict) or not Path(identity.get("path", "")).is_dir()
+                    or checkpoint_digest(identity["path"]) != identity.get("sha256")):
+                raise ValueError("A frozen held-out checkpoint changed; regenerate the evaluation plan")
+        if any(job["config"].get("agent_backend") != "local-transformers" or job["config"].get("model") not in
+               {identity["path"] for identity in identities.values()} for job in plan["jobs"]):
+            raise ValueError("Held-out jobs do not match their frozen checkpoints")
     if not execute:
         return {"experiments_started": False, "job_count": len(plan["jobs"]), "plan_sha256": plan["plan_sha256"]}
     if runner is None:

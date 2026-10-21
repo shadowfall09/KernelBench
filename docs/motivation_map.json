@@ -1507,12 +1507,15 @@
       "title": "RL训练与奖励验证",
       "primary": "M4",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/rl_training.py",
+        "kb_workflows/rl_rewards.py",
+        "kb_workflows/rl_audit.py",
+        "docs/RL_WORKFLOW.md"
       ],
-      "reason": "Harbor reward接入不等于完成训练；需红队、排序稳定性与持出集实验"
+      "reason": "已实现本地TRL GRPO、原生标准工具与终局奖励、交替重测、生成前预算与恢复、红队/稳定性/公共最终差审计和持出计划；候选算法证书加分及绑定训练来源的完整效果对照报告仍待补全，真实训练与模型/设备实验按用户要求不运行"
     },
     {
       "id": "R-21",
@@ -1801,6 +1804,112 @@
         "kb_workflows/budget_curves.py"
       ],
       "reason": "研究计划和曲线增加总token、输出token和开发worker占用三种额度；按真实后端能力预检，保持其他预算分组，默认不执行"
+    },
+    {
+      "id": "V15-01",
+      "title": "冻结训练计划与持出划分",
+      "primary": "M4",
+      "secondary": [
+        "M1",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_plan.py"
+      ],
+      "reason": "显式任务、参考与隐藏源码哈希、审查family、初始模型及实现指纹固定计划；公开参考沿用input-blind策略，默认不执行"
+    },
+    {
+      "id": "V15-02",
+      "title": "原生GRPO与标准开发工具",
+      "primary": "M4",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_training.py"
+      ],
+      "reason": "固定TRL 1.8.0及DAPO损失变体，接入one-shot/反馈工具、原生最佳候选选择和离线模型；持出题不进入训练callback"
+    },
+    {
+      "id": "V15-03",
+      "title": "分阶段小实例资格任务",
+      "primary": "M2",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/evaluate_task.py",
+        "kb_workflows/rl_rewards.py"
+      ],
+      "reason": "qualify_small在原尺寸分配前运行审查契约；源码与小实例失败先停止昂贵阶段，基线过期则在模型加载前停止"
+    },
+    {
+      "id": "V15-04",
+      "title": "同题交替终局奖励",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_rewards.py"
+      ],
+      "reason": "同题共享repeat种子并交替启动独立标准/隐藏/配对计时任务，核对设备UUID；严格资格分与弱raw-speedup消融分开，失败槽位为零"
+    },
+    {
+      "id": "V15-05",
+      "title": "训练预算与checkpoint恢复",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_training.py"
+      ],
+      "reason": "生成前持久化预留group，中断仍扣额度；checkpoint绑定文件、step及奖励前缀；父进程监督总墙钟含清理，缺账本拒绝重置"
+    },
+    {
+      "id": "V15-06",
+      "title": "奖励重评分与可靠性审计",
+      "primary": "M4",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_evaluation.py",
+        "kb_workflows/rl_audit.py"
+      ],
+      "reason": "预声明源码案例与重复计划，重算ICC/奖励排序/攻击接受率和公共最终差；缺数据与基础设施故障不能冒充抵御攻击，统计依赖假设显式保留"
+    },
+    {
+      "id": "V15-07",
+      "title": "持出评测计划与CLI",
+      "primary": "M4",
+      "secondary": [
+        "M1",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_evaluation.py",
+        "kb_workflows/study_plan.py",
+        "scripts/rl_workflow.py"
+      ],
+      "reason": "持出checkpoint资产冻结并复用原生one-shot/反馈任务及独立会话；提供默认非执行CLI，模型改变在运行前拒绝"
     }
   ]
 }

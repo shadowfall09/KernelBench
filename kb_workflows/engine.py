@@ -57,7 +57,7 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         "ref_arch_src": path.read_text(),
         "eval_config": options,
     }
-    if task in {"evaluate", "profile", "paired_timing"}:
+    if task in {"evaluate", "profile", "paired_timing", "qualify_small"}:
         payload["kernel_src"] = (config.run_dir / kernel_name(config.level, pid, sid)).read_text()
     else:
         options.update(compile_backend=config.compile_backend, compile_mode=config.compile_mode)
