@@ -23,6 +23,9 @@ def settings(config, hidden=False):
         "evaluation_backend": config.evaluation,
         "use_hidden_tests": hidden,
         "measure_performance": not hidden,
+        "timing_method": "synchronized_wall",
+        "baseline_suite": config.baseline_suite,
+        "cold_calls": config.cold_calls,
         "evaluator_sha256": evaluator_digest(),
     }
 
@@ -156,6 +159,8 @@ def write_pass_at_k(config):
 def record_baseline(config):
     if not config.hardware:
         raise ValueError("Specify --hardware when recording a baseline (use the actual verifier GPU name)")
+    if config.baseline_suite:
+        return record_baseline_suite(config)
     target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
     results = read_json(target, {})
     level = results.setdefault(f"level{config.level}", {})
@@ -193,3 +198,38 @@ def analyze_run(config):
         runs_dir=config.runs_dir,
         detail_limit=30,
     )
+
+
+def record_baseline_suite(config):
+    from .baseline_variants import VARIANTS, select_baseline
+
+    target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
+    results = read_json(target, {})
+    level = results.setdefault(f"level{config.level}", {})
+    tasks, names, signatures, variants = [], {}, {}, {}
+    for pid, path in select_problems(config.level, config.start, config.end).items():
+        base = task_payload(config, pid, task="baseline")
+        signature = fingerprint(base)
+        previous = level.get(path.name, {})
+        if config.resume and previous.get("suite_complete") and previous.get("metadata", {}).get("workflow_signature") == signature:
+            continue
+        signatures[path.name] = signature
+        variants[path.name] = {}
+        for variant in VARIANTS:
+            payload = task_payload(config, pid, task="baseline")
+            payload["eval_config"]["baseline_variant"] = variant
+            payload["request_id"] = "kb-" + fingerprint(payload)
+            key = f"baseline-{pid}-{variant}"
+            names[key] = path.name, variant
+            tasks.append((key, payload))
+    for key, result in evaluate_tasks(config, tasks):
+        name, variant = names[key]
+        variants[name][variant] = result
+        chosen = select_baseline(variants[name], config.cold_calls)
+        chosen.setdefault("metadata", {})["workflow_signature"] = signatures[name]
+        chosen["suite_complete"] = len(variants[name]) == len(VARIANTS)
+        level[name] = chosen
+        atomic_json(target, results)
+        print(f"[baseline] {name}/{variant}: {result.get('mean', result.get('metadata'))}", flush=True)
+    atomic_json(target, results)
+    return target

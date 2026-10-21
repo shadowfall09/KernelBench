@@ -1,8 +1,8 @@
 # 相比 KernelBench-Verified 的功能改进清单
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录单独提交的正确性判断与输入隔离。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时。
 
-当前已提交能力为第一版与第二版的累计功能。其余本地评测增强暂缓，未纳入已提交清单。
+当前已提交能力为第一至第三版的累计功能。其余本地评测增强暂缓，未纳入已提交清单。
 
 ## 第一版：Verified + 批量工作流
 
@@ -130,6 +130,32 @@ python -m pytest -q tests/test_correctness_validation.py tests/test_workflows.py
 真实 CUDA 执行和项目固定 Torch 2.12.0 的运行验证仍待完成。本版没有加入根因探针、反作弊、墙钟计时、四变体基线或新计分流程；参考报错和空隐藏测试集的处理规则也未在本版修改。
 
 本节实现入口的相对链接会打开当前 checkout；查看本版准确源码时，使用上述命令取得提交哈希，再执行 `git show <hash>:src/eval.py` 或对应文件路径。
+
+## 第三版：基线与计时
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add validated baseline portfolio and synchronized wall timing |
+| 基础提交 | `d488df8` |
+| 本版提交 | 与本节首次加入同一提交；可用下方命令查询 |
+| 状态 | 已提交；CPU/模拟 CUDA 回归通过；真实 GPU 工具链待验证 |
+
+```bash
+git log -1 --format='%h %s' --grep='^Add validated baseline portfolio and synchronized wall timing$'
+```
+
+| 编号 | 功能 | 具体变化 | 实现入口 |
+| --- | --- | --- | --- |
+| V3-01 | 默认四变体基线 | eager、compile default、compile max-autotune、CUDA Graph 各自独立任务运行；验证初次及每次计时输出，保留失败变体，在正确变体中选最优。组合的 FP32 使用 IEEE；显式单基线仍可使用 TF32。 | `baseline_variants.py`、`evaluate_task.py`、`engine.py` |
+| V3-02 | 同步墙钟计时 | 调用前后同步，计入 Python 调度、调用、输出消费及 GPU 完成等待；输入准备和完整参考校验在计时外。Graph 的输入复制和输出克隆计入 replay 耗时。 | `measurement.py`、`src/eval.py` |
+| V3-03 | 变化输入与逐次输出验证 | 批量基线和候选每次重新调用可信输入生成器，记录新种子；保留输入副本，每次检查输出，失败不作为有效性能结果。固定生成器仍可能产生相同内容。 | `measurement.py`、`evaluate_task.py`、`src/eval.py` |
+| V3-04 | 冷成本与 K 次摊销 | 记录构建/初始化、首次调用和预热；按 `(cold + (K-1) × steady) / K` 报告平均成本，默认 K=10000，同时保留稳态最优与摊销最优基线。 | `measurement.py`、`baseline_variants.py`、`config.py` |
+| V3-05 | 原始样本和测量信息 | 保存毫秒样本、均值/标准差及正态近似 95% 均值区间；记录真实设备、软件版本、输入形状/stride/dtype 和源码指纹，供后续兼容性检查。 | `measurement.py`、`evaluate_task.py` |
+| V3-06 | 区分旧计时与新结果 | 新默认文件名为 `baseline_time_suite_fp32_wall`；`--no-baseline-suite` 可选单基线，编译单基线需同时指定该开关；基线组合未完整记录时重新执行。 | `config.py`、`cli.py`、`engine.py` |
+
+验证：Python 3.10 / Torch 2.9.0 下，**84 项测试通过**，含 20 项新增基线/计时回归及此前 64 项测试。新增测试为 [test_baseline_timing.py](../tests/test_baseline_timing.py)，包含真实 CPU 公式、模拟异步完成与 Graph replay、原评测入口的计时校验接入。Ruff、目标模块编译和 diff 检查通过。
+
+范围：本版记录摊销成本，不改变聚合评分；评分与恢复另列下一版。H1–H14、FP64 精度门、sanitizer、根因探针、独立最终重测继续暂缓。冷成本不清空编译缓存，未计进程启动和输入准备；不代表完整应用端到端成本。真实 CUDA、torch.compile、Graph 和 Torch 2.12.0 尚待部署验证。旧名 `time_execution_with_cuda_event` 保留为墙钟计时兼容入口；仅原生批量入口提供变化输入及逐次验证。
 
 ## 维护方式
 

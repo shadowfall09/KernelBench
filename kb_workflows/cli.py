@@ -55,6 +55,7 @@ def main(argv=None):
             missing_baseline = any(
                 not isinstance(baseline_data.get(path.name), dict)
                 or not (baseline_data[path.name].get("mean") or 0) > 0
+                or (config.baseline_suite and not baseline_data[path.name].get("suite_complete"))
                 for path in selected.values()
             )
             if config.stage == "baseline" or config.record_baseline or (config.stage == "all" and missing_baseline):

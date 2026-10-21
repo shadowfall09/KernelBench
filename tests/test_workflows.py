@@ -26,6 +26,7 @@ def config(tmp_path):
         generation="local",
         evaluation="queue",
         queue_poll_interval=0.01,
+        baseline_suite=False,
     ).validate()
 
 
@@ -38,8 +39,8 @@ def test_problem_range_and_cli_validation():
         with pytest.raises(ValueError):
             parse_config(arguments)
     assert parse_config(["--no-hidden-tests"]).hidden_tests is False
-    assert parse_config([]).baseline == "baseline_time_torch_tf32"
-    assert parse_config(["--precision", "bf16"]).baseline == "baseline_time_torch_bf16"
+    assert parse_config([]).baseline == "baseline_time_suite_fp32_wall"
+    assert parse_config(["--precision", "bf16"]).baseline == "baseline_time_suite_bf16_wall"
 
 
 def test_legacy_options_use_same_configuration():
@@ -263,24 +264,33 @@ def test_dry_run_does_not_create_files_or_load_cloud_sdk(tmp_path):
 
 def test_baseline_uses_tf32_and_records_compatible_memory_fields(config, monkeypatch):
     from contextlib import ExitStack
-    from unittest.mock import MagicMock
 
+    import torch
+
+    from kb_workflows import measurement
     from kb_workflows.evaluate_task import baseline
     from src import eval as native
 
-    model = MagicMock()
-    model.to.return_value = model
+    class Reference(torch.nn.Module):
+        def to(self, **kwargs):
+            return self
+
+        def forward(self):
+            return torch.ones(2)
+
+    model = Reference()
     payload = engine.task_payload(config, 1, task="baseline")
     with ExitStack() as stack:
         stack.enter_context(
             patch.object(native, "load_original_model_and_inputs", return_value=(lambda: model, lambda: [], lambda: []))
         )
-        stack.enter_context(patch.object(native, "time_execution_with_cuda_event", return_value=[1.0, 2.0]))
+        stack.enter_context(patch.object(measurement, "synchronized_times", return_value=[1.0, 2.0]))
         stack.enter_context(
             patch.object(native, "get_timing_stats", return_value={"mean": 1.5, "hardware": "test-gpu"})
         )
         stack.enter_context(patch.object(native, "get_memory_stats", return_value={"peak_bytes": 1024}))
         configure = stack.enter_context(patch("kb_workflows.evaluate_task.configure_tf32"))
+        stack.enter_context(patch.object(measurement, "synchronize"))
         result = baseline(payload)
     assert configure.call_args.args[1] is True
     assert result["tf32"] is True and result["peak_memory"] == 1024

@@ -76,7 +76,8 @@ def fingerprint(payload: dict):
 
 def evaluator_digest():
     digest = hashlib.sha256()
-    for name in ("src/eval.py", "src/utils.py", "kb_workflows/evaluate_task.py", "requirements.txt"):
+    for name in ("src/eval.py", "src/utils.py", "src/validation.py", "kb_workflows/evaluate_task.py",
+                 "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py", "requirements.txt"):
         digest.update((ROOT / name).read_bytes())
     return digest.hexdigest()
 

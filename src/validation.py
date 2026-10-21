@@ -1,6 +1,7 @@
 """Shared output comparison and tensor snapshots for correctness evaluation."""
 
 import math
+from contextlib import contextmanager
 
 import torch
 
@@ -67,3 +68,24 @@ def clone_tensors(value):
 def synchronize(device):
     if device is not None and torch.device(device).type == "cuda":
         torch.cuda.synchronize(device=device)
+
+
+@contextmanager
+def preserve_backend_settings():
+    """Restore shared backend flags after candidate import, construction or forward."""
+    cudnn = torch.backends.cudnn
+    attributes = [(cudnn, "benchmark"), (cudnn, "deterministic")]
+    if hasattr(torch.backends.cuda.matmul, "fp32_precision"):
+        attributes += [
+            (torch.backends, "fp32_precision"),
+            (torch.backends.cuda.matmul, "fp32_precision"),
+            (cudnn, "fp32_precision"),
+        ]
+    else:
+        attributes += [(torch.backends.cuda.matmul, "allow_tf32"), (cudnn, "allow_tf32")]
+    snapshot = [(obj, name, getattr(obj, name)) for obj, name in attributes]
+    try:
+        yield
+    finally:
+        for obj, name, value in snapshot:
+            setattr(obj, name, value)

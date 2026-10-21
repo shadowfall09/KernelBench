@@ -51,6 +51,8 @@ class RunConfig:
     record_baseline: bool = False
     compile_backend: str = ""
     compile_mode: str = "default"
+    baseline_suite: bool = True
+    cold_calls: int = 10000
     profile: str = ""
     model: str = ""
     small_model: str = ""
@@ -82,6 +84,7 @@ class RunConfig:
             "num_perf_trials",
             "queue_max_inflight",
             "queue_wait_timeout",
+            "cold_calls",
         ):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
@@ -89,18 +92,22 @@ class RunConfig:
             raise ValueError("Queue polling interval and HTTP timeout must be positive")
         if not math.isfinite(self.fp32_tolerance) or self.fp32_tolerance <= 0:
             raise ValueError("FP32 tolerance must be finite and positive")
+        if self.baseline_suite and self.compile_backend:
+            raise ValueError("Use --baseline-suite or --compile-backend, not both")
         devices = self.gpus.split(",")
         if any(not d.isdigit() for d in devices) or len(set(devices)) != len(devices):
             raise ValueError("--gpus must contain distinct numeric device IDs")
         self.gpu_arch = self.gpu_arch or GPU_ARCH.get(self.hardware, GPU_ARCH.get(self.gpu, "Hopper"))
         self.hardware = self.hardware or (self.gpu if self.evaluation == "modal" else "")
-        suffix = "tf32" if self.precision == "fp32" else self.precision
+        suffix = "tf32" if self.precision == "fp32" and not self.baseline_suite else self.precision
         prefix = (
             f"baseline_time_torch_compile_{self.compile_backend}_{self.compile_mode}"
             if self.compile_backend
             else "baseline_time_torch"
         )
-        self.baseline = self.baseline or f"{prefix}_{suffix}"
+        if self.baseline_suite:
+            prefix = "baseline_time_suite"
+        self.baseline = self.baseline or f"{prefix}_{suffix}_wall"
         safe_name(self.baseline)
         if self.hardware and Path(self.hardware).name != self.hardware:
             raise ValueError("Hardware must be a directory label, not a path")
@@ -138,6 +145,7 @@ def parser():
         "num_perf_trials",
         "queue_max_inflight",
         "queue_wait_timeout",
+        "cold_calls",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
@@ -179,7 +187,7 @@ def parser():
             default=getattr(RunConfig(), name),
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("resume", "enable_ncu", "hidden_tests", "record_baseline", "bedrock", "build_image", "dry_run"):
+    for name in ("resume", "enable_ncu", "hidden_tests", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=getattr(RunConfig(), name))
         p.add_argument(f"--no-{flag}", dest=name, action="store_false")

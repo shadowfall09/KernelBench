@@ -42,6 +42,8 @@ def evaluate(payload: dict):
     )
     from src.utils import set_gpu_arch
 
+    from .measurement import amortized, device_fingerprint
+
     settings = payload["eval_config"]
     hidden = settings.get("use_hidden_tests", False)
     path = get_hidden_test_path(payload["level"], payload["problem_id"]) if hidden else None
@@ -76,8 +78,15 @@ def evaluate(payload: dict):
         return failure("Evaluator returned no result (possible compilation lock failure)")
     runtime = result.runtime if isinstance(result.runtime, (int, float)) and math.isfinite(result.runtime) else -1.0
     result.metadata.update(
-        torch_version=torch.__version__, precision=settings["precision"], fp32_tolerance=settings["fp32_tolerance"]
+        torch_version=torch.__version__, precision=settings["precision"], fp32_tolerance=settings["fp32_tolerance"],
+        device_fingerprint=device_fingerprint(torch.device("cuda:0")),
+        reference_sha256=fingerprint({"source": reference}), timing_method="synchronized_wall",
+        kernel_sha256=fingerprint({"source": payload["kernel_src"]}),
     )
+    cold = result.metadata.get("cold_start_ms")
+    if runtime > 0 and isinstance(cold, (int, float)) and math.isfinite(cold) and cold > 0:
+        result.metadata.update(cold_calls=settings.get("cold_calls", 10000),
+                               amortized_runtime_ms=amortized(runtime, cold, settings.get("cold_calls", 10000)))
     return json_safe(
         {
             "compiled": result.compiled,
@@ -98,15 +107,29 @@ def baseline(payload: dict):
         _process_input_tensor,
         get_memory_stats,
         get_timing_stats,
+        get_tolerance_for_precision,
         get_torch_dtype_from_string,
         load_original_model_and_inputs,
         set_seed,
-        time_execution_with_cuda_event,
+    )
+    from src.validation import clone_tensors, compare_outputs
+
+    from .baseline_variants import cuda_graph_model
+    from .measurement import (
+        CLOCK,
+        amortized,
+        device_fingerprint,
+        fresh_seed,
+        input_signature,
+        synchronize,
+        synchronized_times,
     )
 
     reference = validate_sources(payload)
     settings = payload["eval_config"]
-    tf32 = settings["precision"] == "fp32"
+    os.environ["KB_FP32_TOL"] = str(settings["fp32_tolerance"])
+    variant = settings.get("baseline_variant", "eager")
+    tf32 = settings["precision"] == "fp32" and not settings.get("baseline_suite", False)
     configure_tf32(torch, tf32)
     device = torch.device("cuda:0")
     dtype = get_torch_dtype_from_string(settings["precision"])
@@ -115,32 +138,85 @@ def baseline(payload: dict):
     with torch.no_grad():
         init_inputs = [_process_input_tensor(x, device, dtype) for x in init()]
         set_seed(42)
-        model = Model(*init_inputs).to(device=device, dtype=dtype)
-        set_seed(42)
         args = [_process_input_tensor(x, device, dtype) for x in inputs()]
+        set_seed(42)
+        oracle = Model(*init_inputs).to(device=device, dtype=dtype)
+        set_seed(42)
+        expected = clone_tensors(oracle(*clone_tensors(args)))
+        synchronize(device)
+        configure_tf32(torch, tf32)
+        set_seed(42)
+        synchronize(device)
+        started = CLOCK()
+        model = Model(*init_inputs).to(device=device, dtype=dtype)
         backend = settings.get("compile_backend")
+        mode = settings.get("compile_mode", "default")
+        if variant.startswith("compile_"):
+            backend = "inductor"
+            mode = "max-autotune" if variant == "compile_max_autotune" else "default"
         if backend:
             options = {"backend": backend}
             if backend == "inductor":
-                options["mode"] = settings["compile_mode"]
+                options["mode"] = mode
             model = torch.compile(model, **options)
-        times = time_execution_with_cuda_event(
-            model, *args, num_trials=settings["num_perf_trials"], device=device, verbose=False
-        )
+        if variant == "cuda_graph":
+            model = cuda_graph_model(model, args, device)
+        synchronize(device)
+        setup_ms = (CLOCK() - started) * 1000
+        set_seed(42)
+        fresh = clone_tensors(args)
+        synchronize(device)
+        started = CLOCK()
+        actual = model(*fresh)
+        synchronize(device)
+        first_forward_ms = (CLOCK() - started) * 1000
+        issue = compare_outputs(expected, actual, get_tolerance_for_precision(dtype))
+        del expected, actual, fresh
+        if issue:
+            return failure(f"Baseline correctness failed: {issue}", baseline_variant=variant)
+        timing_receipt = {}
+
+        def input_factory(trial):
+            seed = fresh_seed()
+            timing_receipt.setdefault("input_seeds", []).append(seed)
+            set_seed(seed)
+            return [_process_input_tensor(x, device, dtype) for x in inputs()]
+
+        def verifier(fresh, output):
+            expected = clone_tensors(oracle(*fresh))
+            synchronize(device)
+            issue = compare_outputs(expected, output, get_tolerance_for_precision(dtype))
+            if issue:
+                raise RuntimeError(f"Baseline varied-input correctness failed: {issue}")
+
+        times = synchronized_times(model, args, device, num_trials=settings["num_perf_trials"],
+                                   input_factory=input_factory, verifier=verifier, receipt=timing_receipt)
         stats = get_timing_stats(times, device=device)
         memory = get_memory_stats(model, *args, device=device)
         stats.update(peak_memory=memory["peak_bytes"], memory_stats=memory)
+
     return json_safe(
         {
             **stats,
             "precision": settings["precision"],
             "tf32": tf32,
             "torch_version": torch.__version__,
-            "timing_method": "cuda_event",
+            "timing_method": "synchronized_wall",
             "time_unit": "ms",
             "compile_backend": backend,
-            "compile_mode": settings.get("compile_mode"),
+            "compile_mode": mode,
+            "baseline_variant": variant,
+            "baseline_correctness": True,
+            "device_fingerprint": device_fingerprint(device),
+            "input_signature": input_signature(args),
+            "cold_start_ms": setup_ms + first_forward_ms + timing_receipt.get("warmup_total_ms", 0),
+            "candidate_setup_ms": setup_ms,
+            "first_forward_ms": first_forward_ms,
             "reference_sha256": fingerprint({"source": payload["ref_arch_src"]}),
+            "timing_receipt": timing_receipt,
+            "cold_calls": settings.get("cold_calls", 10000),
+            "amortized_mean_ms": amortized(stats["mean"], setup_ms + first_forward_ms
+                                           + timing_receipt.get("warmup_total_ms", 0), settings.get("cold_calls", 10000)),
         }
     )
 

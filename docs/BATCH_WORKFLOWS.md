@@ -68,7 +68,7 @@ Modal defaults that label to `--gpu`.
 
 Every run defaults to two phases:
 
-1. Standard correctness, CUDA-event timing and peak GPU memory measurement.
+1. Standard correctness, synchronized wall timing and peak GPU memory measurement; every timed output is verified on freshly generated inputs.
 2. Hidden correctness using the repository's four input distributions; no repeated timing.
 
 Results use Verified's flat `"problem_id_sample_id"` keys, so its analysis and
@@ -76,12 +76,12 @@ leaderboard scripts can read them directly. Reported correctness is gated by the
 hidden result while runtime and memory come from the standard result. A missing
 hidden result counts as incorrect.
 
-Correctness runs use full FP32 arithmetic. FP32 baseline timing enables TF32 for
-matmul and cuDNN. FP16/BF16 baselines have separate names. New PyTorch precision
+Correctness runs use full FP32 arithmetic. Explicit single-baseline FP32 timing enables TF32 for
+matmul and cuDNN; the default portfolio uses IEEE FP32 for all variants. FP16/BF16 baselines have separate names. New PyTorch precision
 controls are used on supported versions; see the
 [PyTorch CUDA documentation](https://docs.pytorch.org/docs/2.12/notes/cuda.html#tensorfloat-32-tf32-on-ampere-and-later-devices).
 
-The default FP32 baseline is `baseline_time_torch_tf32`. Old measurements from the
+The default FP32 baseline is `baseline_time_suite_fp32_wall` (eager, compile default, compile max-autotune and CUDA Graph). Suite timing uses IEEE FP32; explicitly select `--no-baseline-suite` for a single TF32 baseline. Old measurements from the
 modified repository are not copied: they used different reference problems,
 precision settings and hardware. Record a baseline on the actual verifier GPU.
 
@@ -214,7 +214,7 @@ python scripts/generate_baseline_time.py --evaluation local \
 # Optional torch.compile baseline; receives a distinct default filename.
 python scripts/generate_baseline_time.py --evaluation local \
   --level 1 --start 1 --end 10 --hardware RTX_A6000 --gpu-arch Ampere \
-  --compile-backend inductor --compile-mode max-autotune
+  --no-baseline-suite --compile-backend inductor --compile-mode max-autotune
 
 python scripts/run_batch.py --stage analyze --level 1 --start 1 --end 10 \
   --run-name my_run --hardware RTX_A6000
@@ -266,3 +266,22 @@ Both Docker targets passed build-definition checks, and Modal image definitions
 were constructed with the installed SDK. A Slurm GPU smoke-test allocation was
 unavailable because the requested nodes were busy; no real GPU, model-generation
 or Modal execution is claimed by these checks.
+
+## Wall timing and startup costs
+
+Batch candidate and baseline timing synchronizes the device before and after each
+call and consumes its outputs. Input generation and full reference comparisons are
+outside the interval. Each timed call uses a new seed with the trusted input
+factory, and all warmup/timed outputs are verified. A fixed input factory may still
+produce identical contents. CUDA Graph input copies and stable output copies are
+included in replay time. This adds host/synchronization overhead to short kernels.
+
+Results retain raw samples and normal-approximation 95% mean intervals. The cold
+cost is observed setup, first forward and warmup, with existing compiler caches;
+it excludes process startup, input preparation and correctness validation overhead.
+`--cold-calls K` defaults to 10000 and reports `(cold + (K - 1) * steady) / K`.
+The portfolio retains steady and amortized winners; aggregate scoring is separate.
+New baseline filenames end in `_wall`; do not reuse CUDA-event baselines.
+
+The added regression suite passes on CPU and simulated CUDA scheduling. Real GPU,
+compile, CUDA Graph and the pinned Torch 2.12.0 toolchain still require validation.

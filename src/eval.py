@@ -19,6 +19,8 @@ from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import sys
 
+from kb_workflows.measurement import CLOCK, input_signature, synchronized_times, timing_stats
+
 from . import utils
 from .validation import clone_tensors, compare_outputs, synchronize
 
@@ -626,6 +628,10 @@ def eval_kernel_against_ref(
     metadata["hardware"] = torch.cuda.get_device_name(device=device)
     metadata["device"] = str(device)  # for debugging
 
+    original_model = original_model.to(device=device, dtype=precision)
+    synchronize(device)
+    candidate_setup_started = CLOCK()
+
     # this is where compilation happens
     try:
         os.environ["TORCH_USE_CUDA_DSA"] = "1"  # compile with device side assertion
@@ -675,6 +681,7 @@ def eval_kernel_against_ref(
             compiled=True, correctness=False, metadata=metadata
         )  # skip further steps
 
+    metadata["candidate_setup_ms"] = (CLOCK() - candidate_setup_started) * 1000
     kernel_exec_result = None
 
     # Check Correctness
@@ -751,13 +758,29 @@ def eval_kernel_against_ref(
                 model_new = custom_model.to(device=device, dtype=precision)
                 torch.cuda.synchronize(device=device)
 
-                elapsed_times = time_execution_with_cuda_event(
-                    model_new,
-                    *inputs,
-                    num_trials=num_perf_trials,
-                    verbose=verbose,
-                    device=device,
+                timing_receipt = metadata["timing_receipt"] = {}
+
+                def input_factory(trial):
+                    from kb_workflows.measurement import fresh_seed
+                    seed = fresh_seed()
+                    timing_receipt.setdefault("input_seeds", []).append(seed)
+                    set_seed(seed)
+                    return [_process_input_tensor(x, device, precision) for x in get_inputs()]
+
+                def verifier(fresh, actual):
+                    expected = clone_tensors(original_model(*fresh))
+                    synchronize(device)
+                    issue = compare_outputs(expected, actual, get_tolerance_for_precision(precision))
+                    if issue:
+                        raise RuntimeError(f"Timed output did not match varied input: {issue}")
+
+                elapsed_times = synchronized_times(
+                    model_new, inputs, device, num_trials=num_perf_trials,
+                    input_factory=input_factory, verifier=verifier, receipt=timing_receipt,
                 )
+                metadata["cold_start_ms"] = metadata.get("cold_start_ms", 0) + timing_receipt.get("warmup_total_ms", 0)
+                metadata.update(input_signature=input_signature(inputs), timing_method="synchronized_wall",
+                                output_consumed=True, fresh_timing_inputs=True)
                 runtime_stats = get_timing_stats(elapsed_times, device=device)
 
                 if verbose:
@@ -772,7 +795,10 @@ def eval_kernel_against_ref(
             if verbose:
                 print(f"[Eval] Error in Measuring Performance: {e}")
             kernel_exec_result.metadata["error_during_performance"] = e
+            kernel_exec_result.correctness = False
+            kernel_exec_result.runtime = -1.0
 
+    kernel_exec_result.metadata.update(metadata)
     graceful_eval_cleanup(context, device)
     return kernel_exec_result
 
@@ -803,61 +829,16 @@ def register_and_format_exception(
 
 
 def time_execution_with_cuda_event(
-    kernel_fn: callable,
-    *args,
-    num_warmup: int = 3,
-    num_trials: int = 10,
-    verbose: bool = True,
-    device: torch.device = None,
+    kernel_fn: callable, *args, num_warmup: int = 3, num_trials: int = 10,
+    verbose: bool = True, device: torch.device = None,
 ) -> list[float]:
+    """Compatibility name for synchronized wall milliseconds, including dispatch.
+
+    This legacy interface clones inputs; batch evaluation additionally supplies
+    fresh input contents and verifies every timed output.
     """
-    Time a CUDA kernel function over multiple trials using torch.cuda.Event
-
-    Args:
-        kernel_fn: Function to time
-        *args: Arguments to pass to kernel_fn
-        num_trials: Number of timing trials to run
-        verbose: Whether to print per-trial timing info
-        device: CUDA device to use, if None, use current device
-
-    Returns:
-        List of elapsed times in milliseconds
-    """
-    if device is None:
-        if verbose:
-            print(f"Using current device: {torch.cuda.current_device()}")
-        device = torch.cuda.current_device()
-
-    # Warm ups
-    for _ in range(num_warmup):
-        kernel_fn(*args)
-        torch.cuda.synchronize(device=device)
-
-    print(
-        f"[Profiling] Using device: {device} {torch.cuda.get_device_name(device)}, warm up {num_warmup}, trials {num_trials}"
-    )
-    elapsed_times = []
-
-    # Actual trials
-    for trial in range(num_trials):
-        # create event marker default is not interprocess
-        start_event = torch.cuda.Event(enable_timing=True)
-        end_event = torch.cuda.Event(enable_timing=True)
-
-        start_event.record()
-        kernel_fn(*args)
-        end_event.record()
-
-        # Synchronize to ensure the events have completed
-        torch.cuda.synchronize(device=device)
-
-        # Calculate the elapsed time in milliseconds
-        elapsed_time_ms = start_event.elapsed_time(end_event)
-        if verbose:
-            print(f"Trial {trial + 1}: {elapsed_time_ms:.3g} ms")
-        elapsed_times.append(elapsed_time_ms)
-
-    return elapsed_times
+    device = torch.cuda.current_device() if device is None else device
+    return synchronized_times(kernel_fn, args, device, num_warmup, num_trials)
 
 
 def run_and_check_correctness(
@@ -911,8 +892,14 @@ def run_and_check_correctness(
 
             try:
                 set_seed(trial_seed)
-                output_new = model_new(*clone_tensors(inputs))
+                fresh = clone_tensors(inputs)
                 synchronize(device)
+                first_call_started = CLOCK()
+                output_new = model_new(*fresh)
+                synchronize(device)
+                if trial == 0:
+                    metadata["first_forward_ms"] = (CLOCK() - first_call_started) * 1000
+                    metadata["cold_start_ms"] = metadata.get("candidate_setup_ms", 0) + metadata["first_forward_ms"]
                 issue = compare_outputs(output, output_new, get_tolerance_for_precision(precision))
                 if issue:
                     metadata["correctness_issue"] = issue
@@ -1040,13 +1027,7 @@ def get_timing_stats(elapsed_times: list[float], device: torch.device = None) ->
         all timing are in ms
     """
 
-    stats = {
-        "mean": float(f"{np.mean(elapsed_times):.3g}"),
-        "std": float(f"{np.std(elapsed_times):.3g}"),
-        "min": float(f"{np.min(elapsed_times):.3g}"),
-        "max": float(f"{np.max(elapsed_times):.3g}"),
-        "num_trials": len(elapsed_times),
-    }
+    stats = timing_stats(elapsed_times)
 
     if device:
         stats["hardware"] = torch.cuda.get_device_name(device=device)
