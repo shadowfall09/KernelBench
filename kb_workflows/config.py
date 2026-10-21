@@ -24,6 +24,8 @@ def boolean(value):
 @dataclass
 class RunConfig:
     level: int = 1
+    suite: str = "full"
+    suite_role: str = "scored"
     start: int = 1
     end: int | None = None
     run_name: str = ""
@@ -117,6 +119,12 @@ class RunConfig:
             self.generation_mode = "external"
         if self.generation_mode == "external" and self.generation != "harbor" and self.stage in {"all", "generate"}:
             raise ValueError("external generation mode is reserved for Harbor")
+        from .suites import ROLES, SUITES
+
+        if self.suite not in SUITES or self.suite_role not in ROLES:
+            raise ValueError("Invalid suite or suite role")
+        if self.suite == "full" and self.suite_role != "scored":
+            raise ValueError("--suite-role requires --suite kernelbench105")
         if self.problem_specs:
             self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
             if not Path(self.problem_specs).is_file():
@@ -211,6 +219,8 @@ def parser():
             aliases.append("--num-parallel")
         p.add_argument(*aliases, dest=name, type=int, default=argparse.SUPPRESS)
     choices = {
+        "suite": ("full", "kernelbench105"),
+        "suite_role": ("scored", "probe", "extended"),
         "stage": ("all", "generate", "evaluate", "analyze", "baseline", "export-harbor"),
         "generation": ("local", "docker", "modal", "harbor"),
         "evaluation": ("local", "docker", "modal", "queue"),
@@ -221,6 +231,8 @@ def parser():
         "agent_backend": ("claude-code", "litellm"),
     }
     for name in (
+        "suite",
+        "suite_role",
         "run_name",
         "runs_dir",
         "stage",

@@ -1,0 +1,151 @@
+level,pid,tier
+level2,1,F-pw
+level2,2,F-pw
+level2,3,F-red
+level2,4,F-pw
+level2,5,F-pw
+level2,6,F-red
+level2,7,F-pw
+level2,8,F-red
+level2,9,low:GEMM-dominated
+level2,10,F-red
+level2,11,F-red
+level2,12,low:GEMM-dominated
+level2,13,D
+level2,14,D
+level2,15,F-red
+level2,16,F-pw
+level2,17,F-red
+level2,18,D
+level2,19,F-red
+level2,20,F-pw
+level2,21,F-red
+level2,22,low:GEMM-dominated
+level2,23,INVALID(constant output)
+level2,24,F-red
+level2,25,F-red
+level2,26,F-pw
+level2,27,F-red
+level2,28,low:GEMM-dominated
+level2,29,low:GEMM-dominated
+level2,30,low:GEMM-dominated
+level2,31,F-pw
+level2,32,F-red
+level2,33,low:GEMM-dominated
+level2,34,F-red
+level2,35,F-red
+level2,36,F-red
+level2,37,F-red
+level2,38,F-red
+level2,39,low:GEMM-dominated
+level2,40,low:GEMM-dominated
+level2,41,low:GEMM-dominated
+level2,42,D
+level2,43,low:conv-light-tail
+level2,44,D
+level2,45,low:GEMM-dominated
+level2,46,F-red
+level2,47,F-pw
+level2,48,F-pw
+level2,49,F-red
+level2,50,F-red
+level2,51,D
+level2,52,F-red
+level2,53,low:GEMM-dominated
+level2,54,F-pw
+level2,55,low:GEMM-dominated
+level2,56,low:GEMM-dominated
+level2,57,F-pw
+level2,58,F-red
+level2,59,low:GEMM-dominated
+level2,60,F-red
+level2,61,F-red
+level2,62,low:GEMM-dominated
+level2,63,low:GEMM-dominated
+level2,64,low:GEMM-dominated
+level2,65,F-red
+level2,66,low:GEMM-dominated
+level2,67,F-red
+level2,68,low:GEMM-dominated
+level2,69,F-pw
+level2,70,low:GEMM-dominated
+level2,71,F-pw
+level2,72,F-red
+level2,73,F-red
+level2,74,F-red
+level2,75,low:GEMM-dominated
+level2,76,low:GEMM-dominated
+level2,77,low:conv-light-tail
+level2,78,F-red
+level2,79,F-red
+level2,80,INVALID(constant output)
+level2,81,low:GEMM-dominated
+level2,82,F-red
+level2,83,INVALID(constant output)
+level2,84,low:GEMM-dominated
+level2,85,F-red
+level2,86,low:GEMM-dominated
+level2,87,F-pw
+level2,88,low:GEMM-dominated
+level2,89,F-red
+level2,90,F-pw
+level2,91,F-red
+level2,92,F-red
+level2,93,F-pw
+level2,94,low:GEMM-dominated
+level2,95,low:GEMM-dominated
+level2,96,F-red
+level2,97,low:GEMM-dominated
+level2,98,D
+level2,99,low:GEMM-dominated
+level2,100,F-pw
+level3,1,low:GEMM-dominated
+level3,2,low:GEMM-dominated
+level3,3,low:GEMM-dominated
+level3,4,low:redundant CNN
+level3,5,low:redundant CNN
+level3,6,low:redundant CNN
+level3,7,low:redundant CNN
+level3,8,F
+level3,9,low:redundant CNN
+level3,10,low:redundant CNN
+level3,11,low:redundant CNN
+level3,12,low:redundant CNN
+level3,13,F
+level3,14,D
+level3,15,low:redundant CNN
+level3,16,low:redundant CNN
+level3,17,F
+level3,18,low:redundant CNN
+level3,19,F
+level3,20,F
+level3,21,F
+level3,22,F
+level3,23,low:redundant CNN
+level3,24,low:redundant CNN
+level3,25,F
+level3,26,low:redundant CNN
+level3,27,low:redundant CNN
+level3,28,uncertain:nn.TransformerEncoder
+level3,29,untraced(Swin)
+level3,30,untraced(Swin)
+level3,31,D
+level3,32,uncertain:nn.TransformerEncoder
+level3,33,low:GEMM-dominated
+level3,34,D
+level3,35,low:cuDNN RNN
+level3,36,low:cuDNN RNN
+level3,37,low:cuDNN RNN
+level3,38,low:cuDNN RNN
+level3,39,low:cuDNN RNN
+level3,40,low:cuDNN RNN
+level3,41,low:cuDNN RNN
+level3,42,low:cuDNN RNN
+level3,43,D
+level3,44,D
+level3,45,F
+level3,46,F
+level3,47,F
+level3,48,D
+level3,49,D
+level3,50,D

@@ -49,10 +49,21 @@ controls independent agent attempts per problem. Every attempt has its own work
 directory, logs and output file. Local GPU generation runs at most one agent per
 selected GPU. CPU generation for queue/Modal verification uses `--parallel`.
 
+The default suite is `full`. Explicit `--suite kernelbench105` intersects the range
+with the versioned research selection. `--suite-role scored` selects 105 tasks
+across the three levels; `probe` (5) and `extended` (140) are separate runs and
+are not marked main-leaderboard eligible. Baselines, agents, verification,
+analysis, budgets and Harbor export use the same selected IDs. Reports carry the
+manifest fingerprint; changed reference snapshots are rejected until reviewed.
+I/F/D labels are provisional, and importing the selection does not calibrate
+inputs or enable headroom scoring. See [research scope and examples](../research/headroom/README.md).
+
 | Option | Choices | Purpose |
 | --- | --- | --- |
 | `--config` | TOML path | Load `[gpu]` and `[run]` settings |
 | `--gpu-profile` | A preset name | Select one coherent GPU target, e.g. `RTX_A6000` |
+| `--suite` | `full`, `kernelbench105` | Select the task manifest before intersecting the range |
+| `--suite-role` | `scored`, `probe`, `extended` | Keep research roles in separate runs; `full` requires `scored` |
 | `--generation-mode` | `one-shot`, `feedback`, `external` | Controlled native mode or external Harbor agent |
 | `--agent-backend` | `claude-code`, `litellm` | Single-response model adapter used by mini-swe-agent |
 | `--optimization-rounds` | Default `5` | Maximum candidates per feedback attempt |

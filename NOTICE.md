@@ -25,6 +25,14 @@ Minimal Flash Attention；具体链接保留在该目录的说明中。
 
 上游论文 PDF、LaTeX 源稿、图表及旧实验报告不随本仓库分发。
 
+## 本项目研究材料
+
+`research/headroom/` 根据用户提供的 `headroom-bench-20261021.zip` 整合现行研究稿、
+固定任务选集和审查证据。原始文件及压缩包摘要见该目录的 `evidence/source_manifest.json`。
+论文与 motivation 按当前代码重写；标准化数据保留来源和未复测状态，
+不将源码审查结论冒充 GPU 实验。旧论文备份、内部笔记与缺依赖的原型没有迁入。
+这些项目研究材料与此前删除的上游宣传和旧报告不同。
+
 ## Agent 工作流
 
 原生反馈循环依赖 MIT 许可的 [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent)，

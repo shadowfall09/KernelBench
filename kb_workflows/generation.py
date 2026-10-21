@@ -94,6 +94,8 @@ def prepare_job(config, pid, sid):
     (directory / "model.py").write_text(prompt_source(source, config.level, pid))
     job = config.to_dict()
     job.update(
+        suite="full",
+        suite_role="scored",
         start=pid,
         end=pid,
         num_samples=1,
@@ -292,7 +294,7 @@ def generate_run(config):
     history_path = config.run_dir / "generation_attempts.json"
     history = read_json(history_path, {"slots": {}, "historical_attempts_unknown": bool(previous)})
     tasks = []
-    for pid in select_problems(config.level, config.start, config.end):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             path = config.run_dir / kernel_name(config.level, pid, sid)
@@ -369,6 +371,6 @@ def generate_run(config):
     write_budget_report(config, summary)
     return all(
         summary.get(f"{pid}_{sid}", {}).get("status") == "success"
-        for pid in select_problems(config.level, config.start, config.end)
+        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
         for sid in range(config.num_samples)
     )

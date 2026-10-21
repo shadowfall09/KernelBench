@@ -1,0 +1,2511 @@
+{
+  "name": "kernelbench105",
+  "version": 1,
+  "selection_seed": 20261002,
+  "source_archive_sha256": "4222a13cd2f19e0ecfbd017a7416125ac8cf4f49dbed95fa11108fe3a253dd85",
+  "reference_snapshot": "92c27f4c020a4860d5ca546b88a50b007f629e3f",
+  "labels": "provisional research taxonomy; no SOL or reachability certificate",
+  "input_calibration": "not_implemented",
+  "problems": [
+    {
+      "level": 1,
+      "problem_id": 1,
+      "reference": "1_Square_matrix_multiplication_.py",
+      "reference_sha256": "2d349d77a97fd1a6f29365553275729685ab1cfff57ca4458bb6a8c09b88e91d",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 2,
+      "reference": "2_Standard_matrix_multiplication_.py",
+      "reference_sha256": "bce22f4d7998a206e01997a59183bd8290b8d2e9993e19ec44d40fe019ff6965",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 3,
+      "reference": "3_Batched_matrix_multiplication.py",
+      "reference_sha256": "f785135fb4b6dcce703e086882993fddda81c107eef5dd425da53b1d26a1e04e",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/GEMM-batched",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 4,
+      "reference": "4_Matrix_vector_multiplication_.py",
+      "reference_sha256": "e2dae47c5eb114f64a2800006e1fe2dbf66c47536e9dae5e1404ebd5ddeda14b",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 5,
+      "reference": "5_Matrix_scalar_multiplication.py",
+      "reference_sha256": "cebe7f46e6399e4711743bcf1a89efceed348feaf481961b4ae1ff329d6a58c1",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 6,
+      "reference": "6_Matmul_with_large_K_dimension_.py",
+      "reference_sha256": "98dc90d168182da70323df08295acd6136dd946f74f801fda2cd22fe2ba473d2",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/GEMM-large-K",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 7,
+      "reference": "7_Matmul_with_small_K_dimension_.py",
+      "reference_sha256": "3aa3688513fc95456e6ed9f2de9a0c71773a33f16e42405d3bca4678d8c27024",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-small-K-huge-output",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 8,
+      "reference": "8_Matmul_with_irregular_shapes_.py",
+      "reference_sha256": "e5a83f3620f6cc123f7292399be80e8ae17969ee180d3540bbd35a3a4807150f",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/GEMM-irregular",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 9,
+      "reference": "9_Tall_skinny_matrix_multiplication_.py",
+      "reference_sha256": "183b5173c6b56a8ac1c20d606c075fba88e3b606208dfe129d0038aa7be52fc1",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/GEMM-small-K-huge-output",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 10,
+      "reference": "10_3D_tensor_matrix_multiplication.py",
+      "reference_sha256": "9feadc5bac2eb98fa95bd224f87bdffb390fe41632e58b6811a0ade4367233ab",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/GEMM-3D-tensor",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 11,
+      "reference": "11_4D_tensor_matrix_multiplication.py",
+      "reference_sha256": "09fc7f7f20b65c2a9e59251cb3abaa1cf59211f71ce80245ddd791fe537bd698",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 12,
+      "reference": "12_Matmul_with_diagonal_matrices_.py",
+      "reference_sha256": "62342e32e5d33f65deb299004b052473b5f78094cc897daa845cf09e1a6e0bec",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 1,
+      "problem_id": 13,
+      "reference": "13_Matmul_for_symmetric_matrices.py",
+      "reference_sha256": "8782872f96b406fc9d134201c1ae0cc840bd460a72a57b6891cb76be1a5f2864",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 14,
+      "reference": "14_Matmul_for_upper_triangular_matrices.py",
+      "reference_sha256": "070bdfbd6afcb82c1ddd8cd82c5a2fbb742089afc6aabfbc8d952e579068129d",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 1,
+      "problem_id": 15,
+      "reference": "15_Matmul_for_lower_triangular_matrices.py",
+      "reference_sha256": "069687881e034120fa1de076b1b9d9761c8fe45d5ac9a2972dbe1f8307c931c7",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 1,
+      "problem_id": 16,
+      "reference": "16_Matmul_with_transposed_A.py",
+      "reference_sha256": "e44b045efbae7379e912e8fa7770acb1b5e8b82eaef80d77b875630e27d05776",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 17,
+      "reference": "17_Matmul_with_transposed_B.py",
+      "reference_sha256": "a89773f8bd7f34b13fbcdba2c5670d0985cf38f767e272e9fe2ac7cb011d1b7c",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 18,
+      "reference": "18_Matmul_with_transposed_both.py",
+      "reference_sha256": "fc22bfbd08aa11fc82a1ec02c2469ad6f39a650404e5ae73d21f53bbede91701",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/GEMM-square-or-rect",
+      "reason": "cell size 7, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 19,
+      "reference": "19_ReLU.py",
+      "reference_sha256": "3f3571481e280fdd960ec50ca9cbda184948b86b283c62af3ea6eb971848d84c",
+      "role": "probe",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 20,
+      "reference": "20_LeakyReLU.py",
+      "reference_sha256": "324f633b00a15888a798203317d76bd14287d50804c9b3f75f62b9e9cbda9345",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 21,
+      "reference": "21_Sigmoid.py",
+      "reference_sha256": "2220654dea1baaa2be7805ae74fc072b3c0a715d3bd6eb13098077eaf1fbe90a",
+      "role": "probe",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 22,
+      "reference": "22_Tanh.py",
+      "reference_sha256": "d72fb7d9001f9d19b712ac2030187c7f9a123963ae00ef74db083268efd12c88",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 23,
+      "reference": "23_Softmax.py",
+      "reference_sha256": "4314753740f2f885486149f2449e04d463314dd0daa35a961e3b8b61bf334a8c",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-softmax",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 24,
+      "reference": "24_LogSoftmax.py",
+      "reference_sha256": "e22665b54ec00bf7510cdcde13dec2d645721976f3e12486ca2bddfc875b3a7e",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-softmax",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 25,
+      "reference": "25_Swish.py",
+      "reference_sha256": "455a745129977ab79abb2ca0cee1b3aad5fea82ccbf2eac975185237ae275b89",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-activation-chain",
+      "reason": "cell size 3, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 26,
+      "reference": "26_GELU_.py",
+      "reference_sha256": "5a63f7999287a10c0974b9beb591253b5b9c6d27d5d067583abad208dd322f6e",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 27,
+      "reference": "27_SELU_.py",
+      "reference_sha256": "c54c764742a5ec1994ac41f9e4becae6f4ada027b1b554e7a5b31af6513e0b16",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 28,
+      "reference": "28_HardSigmoid.py",
+      "reference_sha256": "e8077a6dfbf48823180676e7ad6d45c28a8b78e29d68e6daa32be339318873ea",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 29,
+      "reference": "29_Softplus.py",
+      "reference_sha256": "7481cd5fb1ddfd951c6fc859e2aae0e37bbd6a8620377b83f7c6535371609a9e",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 30,
+      "reference": "30_Softsign.py",
+      "reference_sha256": "d549a64f573785690f590740d9850aa4b7a4a7c579790b1a3fa7ae1ac529effd",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L1/F-activation-chain",
+      "reason": "cell size 3, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 31,
+      "reference": "31_ELU.py",
+      "reference_sha256": "69645350385f6c7133c48a6ed1e2f78e2124fd74a05ad11a76cb8976b933e03f",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 32,
+      "reference": "32_HardTanh.py",
+      "reference_sha256": "abe4bc7205002c762d007832256f6ac459f2c05a9643d084d43d98f78b7a88ac",
+      "role": "extended",
+      "layer": "unclassified",
+      "cell": "near-bound",
+      "reason": "near lower bound (pointwise)"
+    },
+    {
+      "level": 1,
+      "problem_id": 33,
+      "reference": "33_BatchNorm.py",
+      "reference_sha256": "d91ed9ef739197df1baacc064e3fdea486add500588f7228a94bbcbeedcd9cfc",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-normalization",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 34,
+      "reference": "34_InstanceNorm.py",
+      "reference_sha256": "0db2fb5746f2616f306c4e1383086ab7e2cc01cb460e3b4fed556805e5d1f89b",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-normalization",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 35,
+      "reference": "35_GroupNorm_.py",
+      "reference_sha256": "dae7ea880e78cf6af30f328cfbd3da72a115f8c5fa9443263d5db814232ba92b",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-normalization",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 36,
+      "reference": "36_RMSNorm_.py",
+      "reference_sha256": "5219d89deaa2522637880af7981c9078b9f8e0808bc9bc7101e905650cd4faf1",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L1/F-norm-multi-op",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 37,
+      "reference": "37_FrobeniusNorm_.py",
+      "reference_sha256": "87c0d8e9d80ada38d30140c842f7d17d566c86852f1c506b8306827b94ca47b9",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-norm-multi-op",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 38,
+      "reference": "38_L1Norm_.py",
+      "reference_sha256": "f6dc16b4edfc7a6700002794ccc3708caca2609eb2ef32126855ba8a09158204",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-norm-multi-op",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 39,
+      "reference": "39_L2Norm_.py",
+      "reference_sha256": "0b483cf3c5c4c963163e8b0e388452f20679c41ac4201e1e4bc436949b8c146f",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L1/F-norm-multi-op",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 40,
+      "reference": "40_LayerNorm.py",
+      "reference_sha256": "3186ba7f571f0b5a27d6a6fa8c44fdfa6e993c288ef4a004fbd1518aafbcf55e",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-normalization",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 41,
+      "reference": "41_Max_Pooling_1D.py",
+      "reference_sha256": "788e2222fd6968f224ce81dbcd8f7ad1d9d92104c6b1687bf3ef41d821c03341",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-max-pool",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 42,
+      "reference": "42_Max_Pooling_2D.py",
+      "reference_sha256": "4e2ee3d9952c29095079ece7fb12e62a21f209c6abce742a78894f1b7678fc8e",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-max-pool",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 43,
+      "reference": "43_Max_Pooling_3D.py",
+      "reference_sha256": "89d254eb6436700597bceba64d60a8fd1b095d868c0785c4d9b264eb07648560",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-max-pool",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 44,
+      "reference": "44_Average_Pooling_1D.py",
+      "reference_sha256": "0fe5629462900a05f368d863c9c28cfa7acbc44f27136014c6bc3b2a398b395c",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-avg-pool",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 45,
+      "reference": "45_Average_Pooling_2D.py",
+      "reference_sha256": "062bb9762938a827cefe172a5b450c304abe4047bcb251019c1c76579936378c",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-avg-pool",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 46,
+      "reference": "46_Average_Pooling_3D.py",
+      "reference_sha256": "3e3a1797d851cb37e001c14353ff3bf051e79ed574a7d2e5be80f44f262438ee",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-avg-pool",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 47,
+      "reference": "47_Sum_reduction_over_a_dimension.py",
+      "reference_sha256": "ee0a62cb65f320beb6388016e670195c2a7795f83527d76264eefec6b27ea158",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-value-reduction",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 48,
+      "reference": "48_Mean_reduction_over_a_dimension.py",
+      "reference_sha256": "653ab19c0481d741f13967747d5874b8573031f555eb663228d5d8b280497023",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-value-reduction",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 49,
+      "reference": "49_Max_reduction_over_a_dimension.py",
+      "reference_sha256": "3c7b0ca3422c0da3679e69bf4cc59e58da18df99666b1d6745655e50a7d31f78",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-value-reduction",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 50,
+      "reference": "50_conv_standard_2D__square_input__square_kernel.py",
+      "reference_sha256": "e8095fb3c67a391c106e198305eb2bf035a97166898a47a52869adfcc7925b8b",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_2d",
+      "reason": "cell size 6, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 51,
+      "reference": "51_Argmax_over_a_dimension.py",
+      "reference_sha256": "c1ce09c9f6168c5c9b759668d36afd6ef24433d07ec5af11a173b69490634f3d",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-arg-reduction",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 52,
+      "reference": "52_Argmin_over_a_dimension.py",
+      "reference_sha256": "a3b221e180f6d6f436ce42e292ee06b4e260df6a60d1b43b175b19f038a0ce27",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-arg-reduction",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 53,
+      "reference": "53_Min_reduction_over_a_dimension.py",
+      "reference_sha256": "293f21ff5e68d91ecc38c8308dbb43b9d8cf5abdcc3cff99d1a04631e5f342f6",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-value-reduction",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 54,
+      "reference": "54_conv_standard_3D__square_input__square_kernel.py",
+      "reference_sha256": "c262f76cf959b35c7aab20464e47ef92a312a5c3bb99c130841d6deece3130dd",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_3d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 55,
+      "reference": "55_conv_standard_2D__asymmetric_input__square_kernel.py",
+      "reference_sha256": "aee14a975627a05a2f83427a5aacc82936de0e90072fec871ffd8ea907510cbb",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_2d",
+      "reason": "cell size 6, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 56,
+      "reference": "56_conv_standard_2D__asymmetric_input__asymmetric_kernel.py",
+      "reference_sha256": "5225fa9be367b3306613f2859f56a0888ec94099ebe550a18bf73e1226230bda",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_standard_2d",
+      "reason": "cell size 6, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 57,
+      "reference": "57_conv_transposed_2D__square_input__square_kernel.py",
+      "reference_sha256": "4efddd03597fb3a0dff2b6d3b6246647bfcdfb412b7f8cafac8694e0fa37ba2b",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 58,
+      "reference": "58_conv_transposed_3D__asymmetric_input__asymmetric_kernel.py",
+      "reference_sha256": "ea59e34508a12639e637f696f71858ba8822570df1db7c1dd2c0d10108213694",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 59,
+      "reference": "59_conv_standard_3D__asymmetric_input__square_kernel.py",
+      "reference_sha256": "5ac98396901754f1f913dd917734f10baa340f99fb4367911ecca4004b4adaa8",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_3d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 60,
+      "reference": "60_conv_standard_3D__square_input__asymmetric_kernel.py",
+      "reference_sha256": "973abd15cea073b99ef905bad0b1a435d11d3c58bae2b1045928d93fc02475b7",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_standard_3d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 61,
+      "reference": "61_conv_transposed_3D__square_input__square_kernel.py",
+      "reference_sha256": "f7f8ccd26f8710f47e1f7500da202342a400920ee0c7a6d1467d7edabb94acea",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 62,
+      "reference": "62_conv_standard_2D__square_input__asymmetric_kernel.py",
+      "reference_sha256": "ff17e1771b64dc2c75180f712b380e964fb7cbe65f1d5134c1e7d66ade292efc",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_2d",
+      "reason": "cell size 6, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 63,
+      "reference": "63_conv_standard_2D__square_input__square_kernel.py",
+      "reference_sha256": "5ae80deafc5d8fd5d5e411cbc1e6e6ee023c792edfa008a5370499eb87db45dd",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_2d",
+      "reason": "cell size 6, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 64,
+      "reference": "64_conv_transposed_1D.py",
+      "reference_sha256": "4c83f819cc5b81945b5da0a2272b8f9bbbf01b405e3f3e0f2ba0b32997f4f631",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_1d",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 65,
+      "reference": "65_conv_transposed_2D__square_input__asymmetric_kernel.py",
+      "reference_sha256": "f5363206823b51cb8b059d63892b64422bc19945e81b47f8fe7dbe0e208ef904",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 66,
+      "reference": "66_conv_standard_3D__asymmetric_input__asymmetric_kernel.py",
+      "reference_sha256": "f716f33c97c180ebceb22745fea0f9698873564469b0198b7d12272caf61e087",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_3d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 67,
+      "reference": "67_conv_standard_1D.py",
+      "reference_sha256": "7a8e48ec22a52062af0e972c7bdd9a45e07681c4d0508ef9b10b7d982957cd8b",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_1d",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 68,
+      "reference": "68_conv_transposed_3D__square_input__asymmetric_kernel.py",
+      "reference_sha256": "3ef96c5ebd8e476040be78d213b156c096f314cf45d9d765279708abb53138cb",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 69,
+      "reference": "69_conv_transposed_2D__asymmetric_input__asymmetric_kernel.py",
+      "reference_sha256": "14d75d426a241346c69f07529603556ce461dec8325f23b6858072e403de17bb",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 70,
+      "reference": "70_conv_transposed_3D__asymmetric_input__square_kernel.py",
+      "reference_sha256": "e225fb16bd92aa821904ccc7b79fb78cda1af6c5b069dc4c421d83ca05e0c299",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 71,
+      "reference": "71_conv_transposed_2D__asymmetric_input__square_kernel.py",
+      "reference_sha256": "e853d51d8a2f8685c468e9c7a31a544ce82876e1b280b95772df144a2b02a809",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 72,
+      "reference": "72_conv_transposed_3D_asymmetric_input_asymmetric_kernel___strided_padded_grouped_.py",
+      "reference_sha256": "4abb4af5c7a68ced6bbede5d96937c0f0e38053b143643355ac5381554d50521",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 73,
+      "reference": "73_conv_transposed_3D_asymmetric_input_square_kernel__strided_padded__grouped.py",
+      "reference_sha256": "c9652bf021895c6b1fdfe4632aa24d62e993a201f122e8014d80ea8ed65e5e19",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 74,
+      "reference": "74_conv_transposed_1D_dilated.py",
+      "reference_sha256": "959a2e0100c4fa55ac5ce5814953a15728f8f81d035a8b345eea4a4aa1b5ad9f",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_transposed_1d",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 75,
+      "reference": "75_conv_transposed_2D_asymmetric_input_asymmetric_kernel_strided__grouped____padded____dilated__.py",
+      "reference_sha256": "29b7ceecf13fb2ea071ca22ed3805c974831d17cb70157d64ab5df5b6868999b",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 76,
+      "reference": "76_conv_standard_1D_dilated_strided__.py",
+      "reference_sha256": "14f573c50d1da58563f5b6c6d2f1a0490b74a100c7be790f40adb4565bfb9f26",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_standard_1d",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 77,
+      "reference": "77_conv_transposed_3D_square_input_square_kernel___padded____dilated____strided__.py",
+      "reference_sha256": "0103aece769b11a1507c42308e3e1f94bcb64d3fe7a3e21cf8bed246c317fa96",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_transposed_3d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 78,
+      "reference": "78_conv_transposed_2D_asymmetric_input_asymmetric_kernel___padded__.py",
+      "reference_sha256": "071cf6841f518ebe65d5d150b9f20804d39b79762b24612004710fd3e0fb0466",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 79,
+      "reference": "79_conv_transposed_1D_asymmetric_input_square_kernel___padded____strided____dilated__.py",
+      "reference_sha256": "6db00a9c6819b6c725d89580f47073b005f9b2a3ac4c1236ae54f19d998327d6",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_1d",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 80,
+      "reference": "80_conv_standard_2D_square_input_asymmetric_kernel___dilated____padded__.py",
+      "reference_sha256": "3a4df4097b281c35dfb470298446a707e22627cb79284cc37ec22cdf9b2dd716",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_standard_2d",
+      "reason": "cell size 6, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 81,
+      "reference": "81_conv_transposed_2D_asymmetric_input_square_kernel___dilated____padded____strided__.py",
+      "reference_sha256": "eeb221ea34d93233163ab269f22aa41dd65da4ee27b1e5be7ad8c52d88b14014",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_transposed_2d",
+      "reason": "cell size 7, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 82,
+      "reference": "82_conv_depthwise_2D_square_input_square_kernel.py",
+      "reference_sha256": "9cd970cf2dcbcd23c2fec81e8b806af311569ad0dae274962bc13792ed38c99d",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_depthwise_2d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 83,
+      "reference": "83_conv_depthwise_2D_square_input_asymmetric_kernel.py",
+      "reference_sha256": "ccaa89bdc56c5d34e8b4f009cb5258e61d124a30d8bfb1242842832586f22835",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_depthwise_2d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 84,
+      "reference": "84_conv_depthwise_2D_asymmetric_input_square_kernel.py",
+      "reference_sha256": "e482e98f260c091ca19764e4381afecfc86285f2d62278ffd7120b02eae41545",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_depthwise_2d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 85,
+      "reference": "85_conv_depthwise_2D_asymmetric_input_asymmetric_kernel.py",
+      "reference_sha256": "1c0b71d45574e8cf6b8b34adf42abad98c276fb19c15c17ee6c8e19912a4343a",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/conv_depthwise_2d",
+      "reason": "cell size 4, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 86,
+      "reference": "86_conv_depthwise_separable_2D.py",
+      "reference_sha256": "6fb958ece3cff7d7877502c7cd4cccfaf08030b017451a612a8829e813d254e5",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/conv-depthwise-separable",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 87,
+      "reference": "87_conv_pointwise_2D.py",
+      "reference_sha256": "54af8c6b12cea1125b2156dc8eb61d599d31e88a147dc729d1ec8931e9aceb84",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/conv_pointwise",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 88,
+      "reference": "88_MinGPTNewGelu.py",
+      "reference_sha256": "ae3a237ab91e2589255fdc9ef9b9cc4ace03a8d8afe51c25aef4c0a0680cdf23",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-activation-chain",
+      "reason": "cell size 3, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 89,
+      "reference": "89_cumsum.py",
+      "reference_sha256": "2fb0fb197070475cba3a73b0a151e722663d690c25971305b2b62af1088f37de",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-scan",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 90,
+      "reference": "90_cumprod.py",
+      "reference_sha256": "029c4a283aae03fa1b8b39f06190d0a89e2c553253b4c91e0d29043526b5c9ff",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L1/I-scan",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 91,
+      "reference": "91_cumsum_reverse.py",
+      "reference_sha256": "e9d0f300c234f1abbab58930c10a32b4e718c0ecefe26a83195c2145fbe74af0",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-cumsum-variants",
+      "reason": "cell size 3, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 92,
+      "reference": "92_cumsum_exclusive.py",
+      "reference_sha256": "ef79ef0e6387a1b04cde4c3815f4bda5464e79263dcadfeda0e648ec82759260",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L1/F-cumsum-variants",
+      "reason": "cell size 3, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 93,
+      "reference": "93_masked_cumsum.py",
+      "reference_sha256": "65a573b890e9d6a63c44073eb641d560387e7d8771b36b93813615e05a90087e",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-cumsum-variants",
+      "reason": "cell size 3, keep 2"
+    },
+    {
+      "level": 1,
+      "problem_id": 94,
+      "reference": "94_MSELoss.py",
+      "reference_sha256": "538280e46663419892c0acefa6a8264976be2d0327eebd3a288cb4debcfbbe89",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-loss",
+      "reason": "cell size 5, keep 3"
+    },
+    {
+      "level": 1,
+      "problem_id": 95,
+      "reference": "95_CrossEntropyLoss.py",
+      "reference_sha256": "5c666d9e45fd6fcaf2690fabed98b2fab856e02c7fd94906a1d043776f5298f9",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L1/F-loss",
+      "reason": "cell size 5, keep 3"
+    },
+    {
+      "level": 1,
+      "problem_id": 96,
+      "reference": "96_HuberLoss.py",
+      "reference_sha256": "547112ff0b584d76f0d18a182440b9a7c212ab9e6925858f1e8930a0fe44c6c6",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L1/I-huber",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 1,
+      "problem_id": 97,
+      "reference": "97_ScaledDotProductAttention.py",
+      "reference_sha256": "735745270232c3b928377533e3cfebebdcddab44efc097d4968e1c4eb3984b92",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 1,
+      "problem_id": 98,
+      "reference": "98_KLDivLoss.py",
+      "reference_sha256": "2f253e58d23590369c5e860ebe09651eb96276376aa9db4e244c43264eb62ad8",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L1/F-loss",
+      "reason": "cell size 5, keep 3"
+    },
+    {
+      "level": 1,
+      "problem_id": 99,
+      "reference": "99_TripletMarginLoss.py",
+      "reference_sha256": "a64bc248d53b22a5ed6a2533f4a896012b2cac71eb8656eab2f8668939761c6a",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-loss",
+      "reason": "cell size 5, keep 3"
+    },
+    {
+      "level": 1,
+      "problem_id": 100,
+      "reference": "100_HingeLoss.py",
+      "reference_sha256": "695acd3fbedece6b39112b5513816403bc47a28ad6f8503db8ea4471c9e675d7",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L1/F-loss",
+      "reason": "cell size 5, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 1,
+      "reference": "1_Conv2D_ReLU_BiasAdd.py",
+      "reference_sha256": "ba540866a1e581ef93959167d1637b82122c853e95cc48dd8bef7d2c10c758b3",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 2,
+      "reference": "2_ConvTranspose2d_BiasAdd_Clamp_Scaling_Clamp_Divide.py",
+      "reference_sha256": "31f49a84239cb24383e84ea78c778d9fc047455a12df3e2eb269ce6deedaf808",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/pointwise-tail",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 3,
+      "reference": "3_ConvTranspose3d_Sum_LayerNorm_AvgPool_GELU.py",
+      "reference_sha256": "5bac18327a7e80406922981e800f85d5612a758b536f69fc28fb15d5b5b56556",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 4,
+      "reference": "4_Conv2d_Mish_Mish.py",
+      "reference_sha256": "48691719d44ab4bdad7ac2f8e5c21cd8202bb3de369e781c14d18f251a8bfc6f",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 5,
+      "reference": "5_ConvTranspose2d_Subtract_Tanh.py",
+      "reference_sha256": "bbbdcd8069263174b11a4000d0b319145b9958a98abff520d0cf0c44a73f49bc",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/pointwise-tail",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 6,
+      "reference": "6_Conv3d_Softmax_MaxPool_MaxPool.py",
+      "reference_sha256": "c66153344b228be0e6d343641eddd1df5c877d9be84593c216191f5ba774e4cd",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 7,
+      "reference": "7_Conv3d_ReLU_LeakyReLU_GELU_Sigmoid_BiasAdd.py",
+      "reference_sha256": "dc0184aad245553bf5a68da67b78f917d66483ae4cd74b367cff91a22ce5d2cb",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv3d/pointwise-tail",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 8,
+      "reference": "8_Conv3d_Divide_Max_GlobalAvgPool_BiasAdd_Sum.py",
+      "reference_sha256": "1c910449832d9f6052391f3c631ffe20ce3855ec6865bd628283555cf96e1420",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 9,
+      "reference": "9_Matmul_Subtract_Multiply_ReLU.py",
+      "reference_sha256": "24fc232d2a63ba394c49e43f7425408edfab157be4369b9423087884a098afb7",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 10,
+      "reference": "10_ConvTranspose2d_MaxPool_Hardtanh_Mean_Tanh.py",
+      "reference_sha256": "a7ff8fad9a4cd86053a9183fb26f129b1bc73c22d044058594ea05ea2eabd9de",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/reduction-tail",
+      "reason": "cell size 6, keep 2"
+    },
+    {
+      "level": 2,
+      "problem_id": 11,
+      "reference": "11_ConvTranspose2d_BatchNorm_Tanh_MaxPool_GroupNorm.py",
+      "reference_sha256": "8d6e2ba894ebaec25a6fdc27c88b3f051d59e1ad10fe83d23304623e0b4ec749",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/reduction-tail",
+      "reason": "cell size 6, keep 2"
+    },
+    {
+      "level": 2,
+      "problem_id": 12,
+      "reference": "12_Gemm_Multiply_LeakyReLU.py",
+      "reference_sha256": "bfa5d039e0b35af0e8b41a7a5a103aea8dbd3175897bb46b461bd6303358f244",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 13,
+      "reference": "13_ConvTranspose3d_Mean_Add_Softmax_Tanh_Scaling.py",
+      "reference_sha256": "275efb5bc85aab48028130a467a3411632573d641db405ddf8d7d22a25a150fa",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 14,
+      "reference": "14_Gemm_Divide_Sum_Scaling.py",
+      "reference_sha256": "d9e094a0c51342ebc5fd6c8a14bb3108da2584ee6c2ed67a7516b446f5983a66",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 15,
+      "reference": "15_ConvTranspose3d_BatchNorm_Subtract.py",
+      "reference_sha256": "314134ed665768921c1cf9c20b1a3185cebec1e12b30a47d90958d6635f1862a",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 16,
+      "reference": "16_ConvTranspose2d_Mish_Add_Hardtanh_Scaling.py",
+      "reference_sha256": "67ae8541ee1687a56f588227f33acc28ec7fc56f243fa8b1f3cfa6ff32448653",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/pointwise-tail",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 17,
+      "reference": "17_Conv2d_InstanceNorm_Divide.py",
+      "reference_sha256": "838de7f098817f0c866db81ef3ce199280aa2516da901665ca169515952042d5",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 18,
+      "reference": "18_Matmul_Sum_Max_AvgPool_LogSumExp_LogSumExp.py",
+      "reference_sha256": "56bacb42639d47010c14c6cefdb1c913dcf44d9064d4959f22146ea399cc78b3",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 19,
+      "reference": "19_ConvTranspose2d_GELU_GroupNorm.py",
+      "reference_sha256": "c494efb23e569e2cdcf65f8be0c14c157be065d36b8af1faaf458fd27fadb0e4",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/reduction-tail",
+      "reason": "cell size 6, keep 2"
+    },
+    {
+      "level": 2,
+      "problem_id": 20,
+      "reference": "20_ConvTranspose3d_Sum_ResidualAdd_Multiply_ResidualAdd.py",
+      "reference_sha256": "26b0bf48928213578a5965bc693edc5807b8aa45373071df34ce57a1b8c5130e",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 21,
+      "reference": "21_Conv2d_Add_Scale_Sigmoid_GroupNorm.py",
+      "reference_sha256": "bc9fef0d0d164267670dba37432642c2c29ec06eee2284dec6efb95e2043820e",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 22,
+      "reference": "22_Matmul_Scale_ResidualAdd_Clamp_LogSumExp_Mish.py",
+      "reference_sha256": "854798d11b8bbddf0842d3b417b9153e30bc680f7cc7e4a226ceaacefe66a2b7",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 23,
+      "reference": "23_Conv3d_GroupNorm_Mean.py",
+      "reference_sha256": "52ca8191da18b57ebf67f4bfbe3fe20c36f0705bf8b88cc7772ee31e25398436",
+      "role": "probe",
+      "layer": "unclassified",
+      "cell": "defective",
+      "reason": "constant-zero output"
+    },
+    {
+      "level": 2,
+      "problem_id": 24,
+      "reference": "24_Conv3d_Min_Softmax.py",
+      "reference_sha256": "67a444b6a1a885449960e2f1acebcaaab33c86a38b449c6556fad13c4b4d30f3",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 25,
+      "reference": "25_Conv2d_Min_Tanh_Tanh.py",
+      "reference_sha256": "f64b714457a48def6bf6ef9c5f1757d8b121594463826fc14af54ec64593003d",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 26,
+      "reference": "26_ConvTranspose3d_Add_HardSwish.py",
+      "reference_sha256": "4db3bf0488fad20102e911d50f25d30e0d1c8c5b0bf31f89b88b5c06ad1a73a4",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/pointwise-tail",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 27,
+      "reference": "27_Conv3d_HardSwish_GroupNorm_Mean.py",
+      "reference_sha256": "abe2302501cdb9a25a64f5e0b9343db1f4ba4b4ef39a18f71172c5e445dda14c",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 28,
+      "reference": "28_BMM_InstanceNorm_Sum_ResidualAdd_Multiply.py",
+      "reference_sha256": "87337d4d282be3213827bd378d1cc3f009b3a4e55edfd6556a0e8464ab0d3a23",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 29,
+      "reference": "29_Matmul_Mish_Mish.py",
+      "reference_sha256": "1e9eedb83d3bcf8b9916e317bea8624c21c34f9a73f767fe49fa68bd6ea24e6d",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 30,
+      "reference": "30_Gemm_GroupNorm_Hardtanh.py",
+      "reference_sha256": "e96b8f9e9875955cabf5f96c3f1d9fcee06cef1db9198573b90ac06aad64cbdf",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 31,
+      "reference": "31_Conv2d_Min_Add_Multiply.py",
+      "reference_sha256": "5a575fa204921d8326b7b8a1e4ecb333aae0e89326ef264cc00161911015e73b",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 32,
+      "reference": "32_Conv2d_Scaling_Min.py",
+      "reference_sha256": "c7149e3b76727c01622c71789af6ee6d1df7fd2ca91e8fc15d29d34ea69b2970",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 33,
+      "reference": "33_Gemm_Scale_BatchNorm.py",
+      "reference_sha256": "381791fb7ea4b177cc5ddbd8712d17ac6556c28b04b3bfb36ff78bd067df3e29",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 34,
+      "reference": "34_ConvTranspose3d_LayerNorm_GELU_Scaling.py",
+      "reference_sha256": "804ca4baf55ea6e5bbeaab94b8fa3bb48154c032db59960d00d8040fd4efb0f2",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 35,
+      "reference": "35_Conv2d_Subtract_HardSwish_MaxPool_Mish.py",
+      "reference_sha256": "06545dc1324d3b7fe903b3ac720d1dd33a3b521bdf55e7f7812d8f6c8ea11972",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 36,
+      "reference": "36_ConvTranspose2d_Min_Sum_GELU_Add.py",
+      "reference_sha256": "3942bf858c47356bfb9e831bf1b96fc2eb8258539e511e70e889403c3ef9236f",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/reduction-tail",
+      "reason": "cell size 6, keep 2"
+    },
+    {
+      "level": 2,
+      "problem_id": 37,
+      "reference": "37_Matmul_Swish_Sum_GroupNorm.py",
+      "reference_sha256": "bc05ae9407cc9d98307328a7a3c46b0c19dc84740d4cbbc90a1e925a030a15e3",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 38,
+      "reference": "38_ConvTranspose3d_AvgPool_Clamp_Softmax_Multiply.py",
+      "reference_sha256": "c21da157314e0a3602504244725088381d49bc41d49ea5e6e5a3eb5ce1585490",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 39,
+      "reference": "39_Gemm_Scale_BatchNorm.py",
+      "reference_sha256": "6efcf848d388b373beb6fbf4ae28885a943f1d8b4c6e090eb59bc0a7f2e200f7",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 40,
+      "reference": "40_Matmul_Scaling_ResidualAdd.py",
+      "reference_sha256": "559a68f953ce465ded0127fa10dc7974156889934f4e84d7db6445bff5309be9",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 41,
+      "reference": "41_Gemm_BatchNorm_GELU_ReLU.py",
+      "reference_sha256": "264f0601dd95a01187bfe7e228c441c8ce5cc42c62a2a59c7b16caf412a486f0",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 42,
+      "reference": "42_ConvTranspose2d_GlobalAvgPool_BiasAdd_LogSumExp_Sum_Multiply.py",
+      "reference_sha256": "8a462b56da126adc3e1589e87ebbcc5ffb978198d44a2209e4970e701c1f47f1",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 43,
+      "reference": "43_Conv3d_Max_LogSumExp_ReLU.py",
+      "reference_sha256": "1e689e3764f9cc300940c1274875107b6e001831d1078cb5df85e0a29fed9767",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 44,
+      "reference": "44_ConvTranspose2d_Multiply_GlobalAvgPool_GlobalAvgPool_Mean.py",
+      "reference_sha256": "ec7db013c234f3712e274318aac61e869196444644566da44ba78d37f43df67a",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 45,
+      "reference": "45_Gemm_Sigmoid_LogSumExp.py",
+      "reference_sha256": "b1ca8d57447f26ffdc4b9c4ce12a1315b946a1ddd730e8598da41df857e1fde5",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 46,
+      "reference": "46_Conv2d_Subtract_Tanh_Subtract_AvgPool.py",
+      "reference_sha256": "d4e92d787a439e000f0d6331459a37aca40edb9b28d4139a9430eb505bcfd11e",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 47,
+      "reference": "47_Conv3d_Mish_Tanh.py",
+      "reference_sha256": "a5973cf2dbdc2e71788be4b0ca0526e4972267cc886d142414b4f823cfdd8468",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv3d/pointwise-tail",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 48,
+      "reference": "48_Conv3d_Scaling_Tanh_Multiply_Sigmoid.py",
+      "reference_sha256": "15ca8a92dc0fda0436a6488d197a12d69e29201740689dca9881f0d21f99053d",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv3d/pointwise-tail",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 2,
+      "problem_id": 49,
+      "reference": "49_ConvTranspose3d_Softmax_Sigmoid.py",
+      "reference_sha256": "05cef9d9088e2ce0c21d1b8918d5fdf6e1e988f58939de37acd05ddfdb6ef36b",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 50,
+      "reference": "50_ConvTranspose3d_Scaling_AvgPool_BiasAdd_Scaling.py",
+      "reference_sha256": "de69586f157c6d74621b7f3912859caeebe0b0cdef8e48865bd9a028dd6a7b6e",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 51,
+      "reference": "51_Gemm_Subtract_GlobalAvgPool_LogSumExp_GELU_ResidualAdd.py",
+      "reference_sha256": "84207220188137189df4c656d3dbef1c00ebd10fa5a06fee3a9bd0ccf4289f93",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 52,
+      "reference": "52_Conv2d_Activation_BatchNorm.py",
+      "reference_sha256": "8ce597ff927cb578b244a7fea6c8a2f008060eae8204ea94fdb72372c7f9f42e",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 53,
+      "reference": "53_Gemm_Scaling_Hardtanh_GELU.py",
+      "reference_sha256": "bcbacbc69af815aba39f25e8e49b97ab6bfa1599bb3e3570e22071bf4fbeadfe",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 54,
+      "reference": "54_Conv2d_Multiply_LeakyReLU_GELU.py",
+      "reference_sha256": "3a93a348e601a81646b52456091efaf9d968b46b90ef247fc27ed3841e325b63",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 55,
+      "reference": "55_Matmul_MaxPool_Sum_Scale.py",
+      "reference_sha256": "2ac86e0e0934830585a90923fdb2442f6290cf7271c7eee040b896a20eba85c3",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 56,
+      "reference": "56_Matmul_Sigmoid_Sum.py",
+      "reference_sha256": "d5c1f6244996aad6a8666fcd60d40d30824ac2a51d0f9ebfb56b90aa4a6eb628",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 57,
+      "reference": "57_Conv2d_ReLU_HardSwish.py",
+      "reference_sha256": "697c4d26722931ff796352bda8f1478f2ec22cec00eef47627038e0506004b9a",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 58,
+      "reference": "58_ConvTranspose3d_LogSumExp_HardSwish_Subtract_Clamp.py",
+      "reference_sha256": "284e7b4bb26a398e12865be51a6330e399f835206cf049b0a080690150ca2d7f",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 59,
+      "reference": "59_Matmul_Swish_Scaling.py",
+      "reference_sha256": "77f8e2fe6e44c41f6e454c5105ff7fc86b79128ded7176cc6add3f277ced7246",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 60,
+      "reference": "60_ConvTranspose3d_Swish_GroupNorm_HardSwish.py",
+      "reference_sha256": "b84e35276d220c7c3ff4148b1229e306af13a1dceee58307b827d0b73f37b2a7",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 61,
+      "reference": "61_ConvTranspose3d_ReLU_GroupNorm.py",
+      "reference_sha256": "b0456cf7db9ff4e8e546adf3669d7a453a5972260fece7c46659843d7c9cee2a",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 62,
+      "reference": "62_Matmul_GroupNorm_LeakyReLU_Sum.py",
+      "reference_sha256": "05838bd8f7cb34d69481f79ea6657cc5675581cdec492b13cfb44040f4c91f8b",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 63,
+      "reference": "63_Gemm_ReLU_Divide.py",
+      "reference_sha256": "6931eb418cac3a14a8ea15197a1a370af21597e4abf4b1ea8914316bb90ed05c",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 64,
+      "reference": "64_Gemm_LogSumExp_LeakyReLU_LeakyReLU_GELU_GELU.py",
+      "reference_sha256": "4b11de02c18b74ac908dc80ab3b753785f3bacee135caea5043287deffb05277",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 65,
+      "reference": "65_Conv2d_AvgPool_Sigmoid_Sum.py",
+      "reference_sha256": "c210dbcd025851c9a5986aae1627addd6295c2f92a77bba741fa443c6f5d81e0",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 66,
+      "reference": "66_Matmul_Dropout_Softmax.py",
+      "reference_sha256": "c696f1feabbd7a70d0ebc5bd4d7ba5a37ab6707028d616e16f97072e80ee4ce2",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 67,
+      "reference": "67_Conv2d_GELU_GlobalAvgPool.py",
+      "reference_sha256": "8b82fd51b4b866dbf9fb531050e36058a969072fe6fa3f5ad57e063f06bc8731",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 68,
+      "reference": "68_Matmul_Min_Subtract.py",
+      "reference_sha256": "ff97bd992ac5807cab0f5620244ee59e7a4fb089dc69b902eda6ee9bbcd0dd48",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 69,
+      "reference": "69_Conv2d_HardSwish_ReLU.py",
+      "reference_sha256": "2fd812c4db02d6e2648d24ea2ae980c2503da5949a910efa64a9a77a7acd8f3d",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 70,
+      "reference": "70_Gemm_Sigmoid_Scaling_ResidualAdd.py",
+      "reference_sha256": "7a1c85b309abb54fd8f9d540c51a052d2224aa6372eb4b01f2051b69cbd63b8a",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 71,
+      "reference": "71_Conv2d_Divide_LeakyReLU.py",
+      "reference_sha256": "ea87108342e2b2ff0624c9a922fcda46ebc5e6a039a4daee4ddb139741867464",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 72,
+      "reference": "72_ConvTranspose3d_BatchNorm_AvgPool_AvgPool.py",
+      "reference_sha256": "54818aefa857749c915e70affea3c0ea13631a420f5555823e4723b1d3cf4984",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 73,
+      "reference": "73_Conv2d_BatchNorm_Scaling.py",
+      "reference_sha256": "f3f8766fc20d5a9b168d2b912572a29cf7de1d6945eb52b9dc4f6417b77899b7",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 74,
+      "reference": "74_ConvTranspose3d_LeakyReLU_Multiply_LeakyReLU_Max.py",
+      "reference_sha256": "7b2af2a4b98cae1d89fcaccf959eb13fa7bc3f0dfb1d1b642498c46fcee49209",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 75,
+      "reference": "75_Gemm_GroupNorm_Min_BiasAdd.py",
+      "reference_sha256": "047d1129531e484fb4226dd2635f93e6ebb87e9350f0e0e3e3f2031c5568fdf8",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 76,
+      "reference": "76_Gemm_Add_ReLU.py",
+      "reference_sha256": "fc6f0c377c7c8f3e4e99feaae8faf15c69fc75fa0d215109d0700c8715ecee4e",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 77,
+      "reference": "77_ConvTranspose3d_Scale_BatchNorm_GlobalAvgPool.py",
+      "reference_sha256": "646ff9d5b78370f0d54e86360f2475e8b55574dbf62bb083dfc9c3c89e12152d",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 78,
+      "reference": "78_ConvTranspose3d_Max_Max_Sum.py",
+      "reference_sha256": "7864e11a9c87533d87d99c4b45ea7f0de1365bee32fb657d210514ee4d3db893",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 79,
+      "reference": "79_Conv3d_Multiply_InstanceNorm_Clamp_Multiply_Max.py",
+      "reference_sha256": "20aa38776a6828a89d2a2dedafcefdcb05462afdb7e2e91bf2236d8a38963e88",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 80,
+      "reference": "80_Gemm_Max_Subtract_GELU.py",
+      "reference_sha256": "8fda72715b863bd1426ede28a0ced2e82abe770cf354ec6ec7182264247afc2e",
+      "role": "probe",
+      "layer": "unclassified",
+      "cell": "defective",
+      "reason": "constant-zero output"
+    },
+    {
+      "level": 2,
+      "problem_id": 81,
+      "reference": "81_Gemm_Swish_Divide_Clamp_Tanh_Clamp.py",
+      "reference_sha256": "37ea2302eb0d1478c42f21ef33563d419badf4bc94f26b292e0b2dc3e38b0e05",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 82,
+      "reference": "82_Conv2d_Tanh_Scaling_BiasAdd_Max.py",
+      "reference_sha256": "fd857069ae0b74f32e8f067463cb7771bfe76513dc0be0d4031cf7255eff5ef0",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 83,
+      "reference": "83_Conv3d_GroupNorm_Min_Clamp_Dropout.py",
+      "reference_sha256": "f5ff5a6f45fdc7afe2cd00c7b39e0eb626abe62ba7dc18d7ae2952a832af6592",
+      "role": "probe",
+      "layer": "unclassified",
+      "cell": "defective",
+      "reason": "constant-zero output"
+    },
+    {
+      "level": 2,
+      "problem_id": 84,
+      "reference": "84_Gemm_BatchNorm_Scaling_Softmax.py",
+      "reference_sha256": "eb21b820cb5e67217eb4337542adfeb2f6fbff8b7875735a17b49edc0f0c5ca2",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 85,
+      "reference": "85_Conv2d_GroupNorm_Scale_MaxPool_Clamp.py",
+      "reference_sha256": "c3708330e8a0646b3837717a2179b776d137dda91e1e1ecb3b97550b2376b7ee",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 86,
+      "reference": "86_Matmul_Divide_GELU.py",
+      "reference_sha256": "0777d6c87b3b85004bc9512275e82032d87271e3dd8042f34629ad92bece45b8",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 87,
+      "reference": "87_Conv2d_Subtract_Subtract_Mish.py",
+      "reference_sha256": "8afa9f9bec3428f74f6b94e86a29c4fc849f53801ee9d992879b3abe8abe241b",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv2d/pointwise-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 88,
+      "reference": "88_Gemm_GroupNorm_Swish_Multiply_Swish.py",
+      "reference_sha256": "98eb5a64aef2edc2a6d32d7a65d30a057ac8e17dfeeba40a3782a291f5a180c6",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 89,
+      "reference": "89_ConvTranspose3d_MaxPool_Softmax_Subtract_Swish_Max.py",
+      "reference_sha256": "c45b3ac54572356970a00c632ba44460218ec4567015c016faee1bd1b02beb5b",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 90,
+      "reference": "90_Conv3d_LeakyReLU_Sum_Clamp_GELU.py",
+      "reference_sha256": "8d4efa6fa865c106362a016f0a3e8273577ba5e220f9f5769ccec1acec1d7f38",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/conv3d/reduction-tail",
+      "reason": "cell size 7, keep 3"
+    },
+    {
+      "level": 2,
+      "problem_id": 91,
+      "reference": "91_ConvTranspose2d_Softmax_BiasAdd_Scaling_Sigmoid.py",
+      "reference_sha256": "a4c8eef67a61abc7784ac97268852e67b438f1482dab720cafea5607346db55b",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/reduction-tail",
+      "reason": "cell size 6, keep 2"
+    },
+    {
+      "level": 2,
+      "problem_id": 92,
+      "reference": "92_Conv2d_GroupNorm_Tanh_HardSwish_ResidualAdd_LogSumExp.py",
+      "reference_sha256": "a2ac20d478d5a9cdc419d1300785dc70350f92b2dc8db69bdb836d2a9f1bbecd",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/conv2d/reduction-tail",
+      "reason": "cell size 14, keep 5"
+    },
+    {
+      "level": 2,
+      "problem_id": 93,
+      "reference": "93_ConvTranspose2d_Add_Min_GELU_Multiply.py",
+      "reference_sha256": "c847015302d74e464d0e51efabf8c66c70f46137fe0fdfc57f60ca263ad15536",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose2d/reduction-tail",
+      "reason": "cell size 6, keep 2"
+    },
+    {
+      "level": 2,
+      "problem_id": 94,
+      "reference": "94_Gemm_BiasAdd_Hardtanh_Mish_GroupNorm.py",
+      "reference_sha256": "3558f6d924ceeedc03a511e7405b192fca6515f3e7d8dc59ef31d95c0b7be113",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 95,
+      "reference": "95_Matmul_Add_Swish_Tanh_GELU_Hardtanh.py",
+      "reference_sha256": "1e98c23b57053d967c361ec6c974d57b6382075d73ec90318d70c1a50cf89276",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/pointwise-tail",
+      "reason": "cell size 12, keep 4"
+    },
+    {
+      "level": 2,
+      "problem_id": 96,
+      "reference": "96_ConvTranspose3d_Multiply_Max_GlobalAvgPool_Clamp.py",
+      "reference_sha256": "984651340dec798829d5211721bdba6faf45b925ac9abc611c903e7f5953b20a",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 2,
+      "problem_id": 97,
+      "reference": "97_Matmul_BatchNorm_BiasAdd_Divide_Swish.py",
+      "reference_sha256": "629ae63b050972248737337991c19fba59feae61dbba2984820cf67c882a86fe",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 98,
+      "reference": "98_Matmul_AvgPool_GELU_Scale_Max.py",
+      "reference_sha256": "c59a6ab1316760313db25687d28ae2b1a8ac72ba47d7aa4c72b34b8c95f39743",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 2,
+      "problem_id": 99,
+      "reference": "99_Matmul_GELU_Softmax.py",
+      "reference_sha256": "ba8fa8e324315d271633f16aebb3765ba823d101bbe22b061f0e3f86e2ef2208",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L2/gemm/reduction-tail",
+      "reason": "cell size 20, keep 7"
+    },
+    {
+      "level": 2,
+      "problem_id": 100,
+      "reference": "100_ConvTranspose3d_Clamp_Min_Divide.py",
+      "reference_sha256": "afbd703071d4c5983a8445efa37c1cde5409774ba6855e6d9981af0aa5fea52b",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L2/convtranspose3d/reduction-tail",
+      "reason": "cell size 17, keep 6"
+    },
+    {
+      "level": 3,
+      "problem_id": 1,
+      "reference": "1_MLP.py",
+      "reference_sha256": "d78f9c39c087a74f2e924bcd8a0bb73972763094f2de096bec1337ab8836553a",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/MLP",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 2,
+      "reference": "2_ShallowWideMLP.py",
+      "reference_sha256": "97ac6a239b3b13723e44bf783b4fc9886d50d8d1db2ccbf4cc8c36355d0a3ca4",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L3/MLP",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 3,
+      "reference": "3_DeepNarrowMLP.py",
+      "reference_sha256": "283b711bfabf4a01bce42997ee2de2c66374833f8b544915cdf4f0343d162a57",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/MLP",
+      "reason": "cell size 3, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 4,
+      "reference": "4_LeNet5.py",
+      "reference_sha256": "902061771421939d1c4bda54d8f3b87072bea520e8e9137f5f9cc305f1ed0d51",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 5,
+      "reference": "5_AlexNet.py",
+      "reference_sha256": "a57f39f0e738049fca70c539d44bc1c0b011483696d6f2063327b7492bc2e33c",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 6,
+      "reference": "6_GoogleNetInceptionModule.py",
+      "reference_sha256": "6fa5eb8f7868b1e2e29e996ad359b88bcb2ab9c55f24bb6812a54118a69af8ea",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-block",
+      "reason": "cell size 6, keep 4"
+    },
+    {
+      "level": 3,
+      "problem_id": 7,
+      "reference": "7_GoogleNetInceptionV1.py",
+      "reference_sha256": "cdc41b4508cb3a05030d5d09212c9d6e38c49f6bf4dd7dd3aca087a0cb897b60",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 8,
+      "reference": "8_ResNetBasicBlock.py",
+      "reference_sha256": "27ab52b5f1c1b3d626cabc8dc97bc5092ca18c8262bedd045e454d0856df3eb9",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-block",
+      "reason": "cell size 6, keep 4"
+    },
+    {
+      "level": 3,
+      "problem_id": 9,
+      "reference": "9_ResNet18.py",
+      "reference_sha256": "09cb0d7aa15d7e239d1cf360e92b6f173aa06ad965537870c7179adbaa930848",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 10,
+      "reference": "10_ResNet101.py",
+      "reference_sha256": "08e9cc6d9bb650503cc790993531dfaa642a665c21ff3d8b46ac62347939e60c",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 11,
+      "reference": "11_VGG16.py",
+      "reference_sha256": "8c33145177dfa355a099fe0b31b4d9b8670520b57134313411732cff6223b20b",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 12,
+      "reference": "12_VGG19.py",
+      "reference_sha256": "dcc9400c30845cf6f9dec3469a1ad8de3780879b649ea0103bfe55ac57a4d8dc",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 13,
+      "reference": "13_DenseNet121TransitionLayer.py",
+      "reference_sha256": "2788a60304fd83707e8a88501f9e1eebaaff22db8ac81b006028f5bebd06c147",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-block",
+      "reason": "cell size 6, keep 4"
+    },
+    {
+      "level": 3,
+      "problem_id": 14,
+      "reference": "14_DenseNet121DenseBlock.py",
+      "reference_sha256": "fcc1e2e3204575e85e7b9073592cd67f4271474f4bc947b57385076c0bc30bcb",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 15,
+      "reference": "15_DenseNet121.py",
+      "reference_sha256": "2873646fa2cc03d52ca93e794a1a452695f0c371697820e5f38723deba5c5b45",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 16,
+      "reference": "16_DenseNet201.py",
+      "reference_sha256": "0c0edbc737931e3fdd50d0a5a919b18be803c358e897270ea1da03fbb646e713",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 17,
+      "reference": "17_SqueezeNetFireModule.py",
+      "reference_sha256": "4020b7a15a9a050a58de8c61f39112f5925342aaee2771d399287a6db3dde7d3",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-block",
+      "reason": "cell size 6, keep 4"
+    },
+    {
+      "level": 3,
+      "problem_id": 18,
+      "reference": "18_SqueezeNet.py",
+      "reference_sha256": "79b9876cb8531df7ddc2df67713db4801f854cffdbc61a0a869d2bdd7eec9b0e",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 19,
+      "reference": "19_MobileNetV1.py",
+      "reference_sha256": "cd3a24946280f20d0f2ff9c64d277979e57748cb15001f8d580d071431c782d9",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 20,
+      "reference": "20_MobileNetV2.py",
+      "reference_sha256": "0893710956091efd3d84aa936561cd1d2d2a022437c9ef4efd8d5274121c12c6",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 21,
+      "reference": "21_EfficientNetMBConv.py",
+      "reference_sha256": "46da3281450f7bf8f60bdf07e58a8039661e1d0bca1e9be825cbe48b34ef9232",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-block",
+      "reason": "cell size 6, keep 4"
+    },
+    {
+      "level": 3,
+      "problem_id": 22,
+      "reference": "22_EfficientNetB0.py",
+      "reference_sha256": "6da3203f08aef6a42c46a21b5599b8301fc89fd8d5e96643093b19a4795779e9",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 23,
+      "reference": "23_EfficientNetB1.py",
+      "reference_sha256": "7a5beeb21ed2d5a33095a4b126e96e01f816499c6472b3d7f2e7f3874a9752f4",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 24,
+      "reference": "24_EfficientNetB2.py",
+      "reference_sha256": "f5bdbba494d09ae9fac3624a0d84d1217a8df3bf979c5a26a2d99f7d004d8f00",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 25,
+      "reference": "25_ShuffleNetUnit.py",
+      "reference_sha256": "92516bd920358eadbd5642a3216c1887012c2cbeed5ba86f1bb1955afc896d87",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-block",
+      "reason": "cell size 6, keep 4"
+    },
+    {
+      "level": 3,
+      "problem_id": 26,
+      "reference": "26_ShuffleNet.py",
+      "reference_sha256": "8a7631f40c63e470655bfcd6adb92e9204d3016c47454de8a736555faeacb760",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 27,
+      "reference": "27_RegNet.py",
+      "reference_sha256": "905d62920e7c12e10825c0f75ded694b5e078e48b29aa47a6bbbe1cf2e5c82ce",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/CNN-full",
+      "reason": "cell size 17, keep 5"
+    },
+    {
+      "level": 3,
+      "problem_id": 28,
+      "reference": "28_VisionTransformer.py",
+      "reference_sha256": "0309d307b753465c07bbfb4fb8750287192adc1d25a581580a34ca02216e20c5",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/transformer",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 3,
+      "problem_id": 29,
+      "reference": "29_SwinMLP.py",
+      "reference_sha256": "d97e3a7607add0cc89289fd54af4e07360602ef6a3afcc59ef6e7bac933f313e",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/transformer",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 3,
+      "problem_id": 30,
+      "reference": "30_SwinTransformerV2.py",
+      "reference_sha256": "c1f148827733d4432352cf6e32fb4b0a336663de8b382f52c79a56590ee8546b",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/transformer",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 3,
+      "problem_id": 31,
+      "reference": "31_VisionAttention.py",
+      "reference_sha256": "56794699ca64c26338e67867fc43e8bab26d52f5f6fcbf832205f6aae99aee9a",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 32,
+      "reference": "32_ConvolutionalVisionTransformer.py",
+      "reference_sha256": "671388d0212014813dc638e5bd5992f40d6c12f2de6f438d0a79114047fb9fff",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/transformer",
+      "reason": "cell size 4, keep 2"
+    },
+    {
+      "level": 3,
+      "problem_id": 33,
+      "reference": "33_VanillaRNN.py",
+      "reference_sha256": "a8300695605386cf219f26bce8eb00e44d215b05179ece2844dda6e4aea63a69",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L3/RNN-cell",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 34,
+      "reference": "34_VanillaRNNHidden.py",
+      "reference_sha256": "fd0b06460263d06cbc02d844d2a207701bba9f5a6d6440e41e13732777e5edf9",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 35,
+      "reference": "35_LSTM.py",
+      "reference_sha256": "c3dabf3f49a6d01bf7ee93dd4da94e8615fa2d316d72690d6c4ba95fa2487a2d",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 36,
+      "reference": "36_LSTMHn.py",
+      "reference_sha256": "b47f419beae1b55d4c8968709ed88c1dd3b97a23d68cff91adeb02e9889a8434",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 37,
+      "reference": "37_LSTMCn.py",
+      "reference_sha256": "db923f0e386e603c29497a1f19530160b48ad6cba037c8f64fd39b83eb161afd",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 38,
+      "reference": "38_LSTMBidirectional.py",
+      "reference_sha256": "4d002c6c7596f5f76c5ad311198043bc82e4a45aa10ecc0633401681b75ec303",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 39,
+      "reference": "39_GRU.py",
+      "reference_sha256": "30efd0ed24e1f69427a89c51c32fb83dbeb02c05e38465b13f9795722821559d",
+      "role": "extended",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 40,
+      "reference": "40_GRUHidden.py",
+      "reference_sha256": "462667780c2e95c5ab98cad88f17d0937a56e6c3e237aa20afb56348137755fe",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 41,
+      "reference": "41_GRUBidirectional.py",
+      "reference_sha256": "c9a75cfc0ab39b044d8680b6ade0e67d43cf3cafd8d82a3818bc30c7a215bf30",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 42,
+      "reference": "42_GRUBidirectionalHidden.py",
+      "reference_sha256": "21321d9cf15f10ffee5b9ef7390048ca4973a0e7ac9f26afd4cfd34b49ffab64",
+      "role": "scored",
+      "layer": "I",
+      "cell": "L3/cuDNN-RNN",
+      "reason": "cell size 8, keep 3"
+    },
+    {
+      "level": 3,
+      "problem_id": 43,
+      "reference": "43_MinGPTCausalAttention.py",
+      "reference_sha256": "d8b466852583ccd5045fa15397e0062f6e147714a71b01b0ea3068cdeef54bb3",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 44,
+      "reference": "44_MiniGPTBlock.py",
+      "reference_sha256": "79fec66a2839e84922f25145d5d2252f1a6632bdb5355fba951f31eb227ea065",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 45,
+      "reference": "45_UNetSoftmax.py",
+      "reference_sha256": "80a225d44d1a4c69cd435ec2f590c6dd54a5839b1ff72cf58cb0979f8b62a60f",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/UNet",
+      "reason": "cell size 1, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 46,
+      "reference": "46_NetVladWithGhostClusters.py",
+      "reference_sha256": "78c5c35feefc12870e0fa6375040be0e4b5266d542da46367cbb292502c5d393",
+      "role": "scored",
+      "layer": "F",
+      "cell": "L3/NetVLAD",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 47,
+      "reference": "47_NetVladNoGhostClusters.py",
+      "reference_sha256": "9f342c5eb20134ca74cfe214ab93164b67f0396e669f3c896a07e884d8c19402",
+      "role": "extended",
+      "layer": "F",
+      "cell": "L3/NetVLAD",
+      "reason": "cell size 2, keep 1"
+    },
+    {
+      "level": 3,
+      "problem_id": 48,
+      "reference": "48_Mamba2ReturnY.py",
+      "reference_sha256": "c25228132ebf5bb4d61e05ef901654a1bf3b1fd8f9c5a0e57f43d9829c1de26a",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 49,
+      "reference": "49_Mamba2ReturnFinalState.py",
+      "reference_sha256": "1763d0c81092a9aba2a9e59fdf9629a4597bb067098f47bddf9a97dbf4c193a3",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    },
+    {
+      "level": 3,
+      "problem_id": 50,
+      "reference": "50_ReLUSelfAttention.py",
+      "reference_sha256": "44c428b6272de53454190485e184a8d7c85a21317a28f6be27f7e18da15d5754",
+      "role": "scored",
+      "layer": "D",
+      "cell": "design",
+      "reason": "design-type: kept unconditionally"
+    }
+  ]
+}

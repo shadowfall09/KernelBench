@@ -8,12 +8,13 @@ from contextlib import nullcontext
 
 from .common import ROOT, atomic_json, evaluator_digest, read_json, select_problems
 from .config import parse_config
+from .suites import selection_receipt
 
 
 def main(argv=None):
     try:
         config = parse_config(argv)
-        selected = select_problems(config.level, config.start, config.end)
+        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
         if config.hidden_tests and config.stage in {"all", "evaluate"}:
             for pid in selected:
                 path = ROOT / "hidden_tests" / f"level{config.level}" / f"{pid}_hidden.py"
@@ -25,6 +26,7 @@ def main(argv=None):
                     {
                         "config": config.to_dict(),
                         "problems": list(selected),
+                        "suite": selection_receipt(config),
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],
                         "run_dir": str(config.run_dir),
                     },

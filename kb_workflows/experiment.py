@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .common import atomic_json, kernel_name, read_json, select_problems
+from .suites import selection_receipt
 
 
 def protocol(config):
@@ -29,7 +30,7 @@ def protocol(config):
 
 
 def write_budget_report(config, summary):
-    ids = select_problems(config.level, config.start, config.end)
+    ids = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
     slots = [summary.get(f"{pid}_{sid}", {}) for pid in ids for sid in range(config.num_samples)]
     history = read_json(config.run_dir / "generation_attempts.json", {})
     attempts = history.get("slots", {})
@@ -45,7 +46,7 @@ def write_budget_report(config, summary):
         totals[field] = sum(values) if values and all(isinstance(v, (int, float)) for v in values) else None
     if history.get("historical_attempts_unknown"):
         totals = {key: None for key in totals}
-    report = {"protocol": active_protocol, "declared_slots": len(slots), "all_slots_have_receipts": all(isinstance(v, dict) for v in receipts),
+    report = {"protocol": active_protocol, "suite": selection_receipt(config), "declared_slots": len(slots), "all_slots_have_receipts": all(isinstance(v, dict) for v in receipts),
               "complete_resource_receipts": all(value is not None for value in totals.values()),
               "unknown_fields": [key for key, value in totals.items() if value is None],
               "attempt_history": history,
@@ -75,8 +76,10 @@ def compare_runs(directories):
         declared = dict(budget.get("protocol", {"mode": "unattributed"}))
         declared.pop("model", None)
         contract = {"protocol": declared,
+                    "suite": selection_receipt(config),
+                    "layer_assignments": {str(row["problem_id"]): row.get("layer") for row in scoring.get("details", [])},
                     "hardware": config.hardware, "precision": config.precision, "baseline": config.baseline,
-                    "level": config.level, "problems": list(select_problems(config.level, config.start, config.end)),
+                    "level": config.level, "problems": list(select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)),
                     "hidden_tests": config.hidden_tests, "num_correct_trials": config.num_correct_trials,
                     "num_perf_trials": config.num_perf_trials, "cold_calls": config.cold_calls,
                     "fp32_tolerance": config.fp32_tolerance}
@@ -104,7 +107,7 @@ def existing_budget(config):
     if not report:
         return {}
     current = {}
-    for pid in select_problems(config.level, config.start, config.end):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
         for sid in range(config.num_samples):
             path = config.run_dir / kernel_name(config.level, pid, sid)
             current[f"{pid}_{sid}"] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None

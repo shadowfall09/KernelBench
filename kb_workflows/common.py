@@ -37,13 +37,28 @@ def problem_paths(level: int, root: Path = ROOT):
     return dict(sorted(paths.items()))
 
 
-def select_problems(level: int, start: int = 1, end: int | None = None, problem_ids=None, root: Path = ROOT):
+def select_problems(level: int, start: int = 1, end: int | None = None, problem_ids=None, root: Path = ROOT, *, suite="full", suite_role="scored"):
     paths = problem_paths(level, root)
     end = max(paths) if end is None else end
     selected = list(problem_ids) if problem_ids is not None else list(range(start, end + 1))
     missing = sorted(set(selected) - paths.keys())
     if not selected or missing:
         raise ValueError(f"Invalid level {level} problem selection; missing IDs: {missing}")
+    if suite != "full":
+        from .suites import SUITES, suite_rows
+
+        if suite not in SUITES:
+            raise ValueError(f"Unknown suite: {suite}")
+        rows = suite_rows(level, suite_role)
+        selected = [pid for pid in selected if pid in rows]
+        for pid in selected:
+            if (paths[pid].name != rows[pid]["reference"]
+                    or hashlib.sha256(paths[pid].read_bytes()).hexdigest() != rows[pid]["reference_sha256"]):
+                raise ValueError(f"Suite reference snapshot mismatch for level {level} problem {pid}")
+    elif suite_role != "scored":
+        raise ValueError("--suite-role requires --suite kernelbench105")
+    if not selected:
+        raise ValueError("No problems remain in the requested suite, role and range")
     return {pid: paths[pid] for pid in sorted(set(selected))}
 
 
@@ -72,6 +87,7 @@ def evaluator_digest():
         "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
         "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
+        "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
         "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",
     ):

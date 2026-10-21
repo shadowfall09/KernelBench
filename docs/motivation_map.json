@@ -1,0 +1,1277 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "92c27f4c020a4860d5ca546b88a50b007f629e3f",
+  "motivations": {
+    "M1": "题目与区分度",
+    "M2": "正确性与执行可信度",
+    "M3": "可解释且可比较的性能指标",
+    "M4": "现实的Agent回路与预算",
+    "M5": "可复现且可部署的基础设施"
+  },
+  "paused_stash_excluded": "ba76365ce0dd755bce1361e38420bb5f4ec3e196",
+  "changes": [
+    {
+      "id": "V1-01",
+      "title": "统一批量入口",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/cli.py"
+      ],
+      "reason": "一套配置贯穿实验阶段，降低手工交接成本"
+    },
+    {
+      "id": "V1-02",
+      "title": "生成与最终验证独立选择后端",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "生成设备与可信验证设备分别选择"
+    },
+    {
+      "id": "V1-03",
+      "title": "题目范围与多样本批量生成",
+      "primary": "M1",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/generation.py"
+      ],
+      "reason": "统一题集与独立样本槽位，避免各家子集不明"
+    },
+    {
+      "id": "V1-04",
+      "title": "多 GPU 调度与并发限制",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "单卡串行、跨卡并行，减少资源竞争"
+    },
+    {
+      "id": "V1-05",
+      "title": "Docker 生成与验证",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "Dockerfile"
+      ],
+      "reason": "在容器中运行生成和验证，提供可部署环境"
+    },
+    {
+      "id": "V1-06",
+      "title": "Slurm 集群提交",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "batch_run.sbatch"
+      ],
+      "reason": "使用集群分配的设备运行批量任务"
+    },
+    {
+      "id": "V1-07",
+      "title": "Modal 云端执行",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/modal_backend.py"
+      ],
+      "reason": "云端执行与回收内核、日志"
+    },
+    {
+      "id": "V1-08",
+      "title": "持久化 HTTP 验证队列",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/queue_worker.py"
+      ],
+      "reason": "持久化远端任务，重启后继续处理"
+    },
+    {
+      "id": "V1-09",
+      "title": "带内容指纹的断点恢复",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/common.py"
+      ],
+      "reason": "按内容恢复，防止旧证据冒充新结果"
+    },
+    {
+      "id": "V1-10",
+      "title": "批量任务的超时与失败处理",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/transports.py"
+      ],
+      "reason": "明确超时失败并清理任务，禁止复用旧内核"
+    },
+    {
+      "id": "V1-11",
+      "title": "将 Verified 隐藏门接入全部验证后端",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/evaluate_task.py"
+      ],
+      "reason": "所有验证后端统一接受标准和隐藏门约束"
+    },
+    {
+      "id": "V1-12",
+      "title": "基线记录接入批量流程",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "在实际验证设备上记录对应精度的参考基线"
+    },
+    {
+      "id": "V1-13",
+      "title": "子集分析、pass@k 与统一结果归档",
+      "primary": "M3",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "按声明题集和样本数归档分析，缺失不消失"
+    },
+    {
+      "id": "V1-14",
+      "title": "旧入口兼容与配置预览",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/legacy.py"
+      ],
+      "reason": "保留入口兼容并允许无副作用预览"
+    },
+    {
+      "id": "V2-01",
+      "title": "严格比较输出结构、shape 和 dtype",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/validation.py"
+      ],
+      "reason": "防止输出结构或格式不同却通过数值检查"
+    },
+    {
+      "id": "V2-02",
+      "title": "整数与 bool 精确比较",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/validation.py"
+      ],
+      "reason": "索引和逻辑结果不能套用浮点相对容差"
+    },
+    {
+      "id": "V2-03",
+      "title": "核对 NaN、Inf 的位置与符号",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/validation.py"
+      ],
+      "reason": "防止非有限值位置或符号不同被掩盖"
+    },
+    {
+      "id": "V2-04",
+      "title": "隔离参考与候选输入",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/validation.py"
+      ],
+      "reason": "原地修改不污染另一方输入"
+    },
+    {
+      "id": "V2-05",
+      "title": "保存参考输出快照",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py"
+      ],
+      "reason": "防止复用输出缓冲区覆盖参考答案"
+    },
+    {
+      "id": "V2-06",
+      "title": "对齐 forward 随机种子",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py"
+      ],
+      "reason": "同步随机计算条件，减少顺序造成的假失败"
+    },
+    {
+      "id": "V3-01",
+      "title": "默认四变体基线",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/baseline_variants.py"
+      ],
+      "reason": "用正确且最快的真实框架变体替代弱基线"
+    },
+    {
+      "id": "V3-02",
+      "title": "同步墙钟计时",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/measurement.py"
+      ],
+      "reason": "覆盖主机调用与全部设备工作完成时间"
+    },
+    {
+      "id": "V3-03",
+      "title": "变化输入与逐次输出验证",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/measurement.py"
+      ],
+      "reason": "不让缓存固定输入答案取得虚假稳态成绩"
+    },
+    {
+      "id": "V3-04",
+      "title": "冷成本与 K 次摊销",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/measurement.py"
+      ],
+      "reason": "将构建、初始化和首次执行成本摊到声明调用次数"
+    },
+    {
+      "id": "V3-05",
+      "title": "原始样本和测量信息",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/measurement.py"
+      ],
+      "reason": "保留原始时间样本与设备环境供复核"
+    },
+    {
+      "id": "V3-06",
+      "title": "区分旧计时与新结果",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/config.py"
+      ],
+      "reason": "防止旧计时协议与新墙钟结果混用"
+    },
+    {
+      "id": "V4-01",
+      "title": "失败和缺失样本计入分母",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "固定分母，防止只平均成功或最快样本"
+    },
+    {
+      "id": "V4-02",
+      "title": "按 K 摊销成本评分",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "按调用预算比较成本并用区间排除未分离的小收益"
+    },
+    {
+      "id": "V4-03",
+      "title": "兼容性和测量证据检查",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "计分前核对源码、设备、精度和测量证据"
+    },
+    {
+      "id": "V4-04",
+      "title": "分层统计与区间",
+      "primary": "M3",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "分层分析能力并保留题目与样本不确定性"
+    },
+    {
+      "id": "V4-05",
+      "title": "扩大恢复指纹覆盖",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/common.py"
+      ],
+      "reason": "评测代码变化使旧运行和基线失效"
+    },
+    {
+      "id": "V4-06",
+      "title": "旧分析与榜单不能绕过证据检查",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/common.py"
+      ],
+      "reason": "旧结果展示也必须遵守当前证据门"
+    },
+    {
+      "id": "V5-01",
+      "title": "参考前后配对检查",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/reliability.py"
+      ],
+      "reason": "用调用顺序和输出快照检测参考缓存与缓冲污染"
+    },
+    {
+      "id": "V5-02",
+      "title": "隔离源码全局字典与后端设置",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py"
+      ],
+      "reason": "防止同名定义和后端设置污染参考计算"
+    },
+    {
+      "id": "V5-03",
+      "title": "三个种子重新生成隐藏输入",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py"
+      ],
+      "reason": "多种子重建隐藏输入，不只验证一份随机实例"
+    },
+    {
+      "id": "V5-04",
+      "title": "按输入域限定的数值压力测试",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/reliability.py"
+      ],
+      "reason": "只对已核对输入域添加数值压力，避免非法输入"
+    },
+    {
+      "id": "V5-05",
+      "title": "无效验证不能算通过",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py"
+      ],
+      "reason": "空测试、参考异常与零次检查不能冒充通过"
+    },
+    {
+      "id": "V5-06",
+      "title": "分阶段诊断与逐项收据",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "区分编译、数值正确性、有效计时和计分资格"
+    },
+    {
+      "id": "V5-07",
+      "title": "新协议参与恢复指纹",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/common.py"
+      ],
+      "reason": "可靠性协议升级使旧检查缓存失效"
+    },
+    {
+      "id": "V6-01",
+      "title": "论文与旧实验材料",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "NOTICE.md"
+      ],
+      "reason": "清除上游宣传和失效实验材料，维护来源"
+    },
+    {
+      "id": "V6-02",
+      "title": "重复生成材料",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "docs/INPUT_BLIND_GENERATION.md"
+      ],
+      "reason": "删除重复快照，输入盲化由可信配置动态生成"
+    },
+    {
+      "id": "V6-03",
+      "title": "仓库入口",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "README.md"
+      ],
+      "reason": "让仓库入口描述本项目实际安装和能力"
+    },
+    {
+      "id": "V6-04",
+      "title": "维护方式",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "CONTRIBUTING.md"
+      ],
+      "reason": "维护流程与本仓库一致，并保留许可证和版权"
+    },
+    {
+      "id": "V6-05",
+      "title": "项目名称",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "pyproject.toml"
+      ],
+      "reason": "统一项目、包、镜像和任务标识"
+    },
+    {
+      "id": "V6-06",
+      "title": "结果页面",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/generate_leaderboard.py"
+      ],
+      "reason": "结果页面使用实际硬件与采样声明"
+    },
+    {
+      "id": "V6-07",
+      "title": "忽略规则",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        ".gitignore"
+      ],
+      "reason": "保留应审阅源码，排除凭据和运行产物"
+    },
+    {
+      "id": "V6-08",
+      "title": "使用中的文件",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "保留运行中的题库和结果接口，避免清理破坏评测"
+    },
+    {
+      "id": "V6-09",
+      "title": "统一生成后端",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/harbor.py"
+      ],
+      "reason": "外部 agent 产物回到原生样本与评分流程"
+    },
+    {
+      "id": "V6-10",
+      "title": "统一任务导出",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/harbor.py"
+      ],
+      "reason": "同一配置导出可重放任务"
+    },
+    {
+      "id": "V6-11",
+      "title": "验证与 reward",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/harbor_verifier.py"
+      ],
+      "reason": "单独 verifier 重新判断产物，异常奖励为零"
+    },
+    {
+      "id": "V6-12",
+      "title": "GPU 与恢复",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/harbor.py"
+      ],
+      "reason": "GPU lane 和 Harbor 配置纳入调度与恢复"
+    },
+    {
+      "id": "V6-13",
+      "title": "Python 升级",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "pyproject.toml"
+      ],
+      "reason": "固定 Python 与依赖版本以复现实验环境"
+    },
+    {
+      "id": "V6-14",
+      "title": "文档",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "docs/HARBOR.md"
+      ],
+      "reason": "文档同步当前运行方式和真实验证范围"
+    },
+    {
+      "id": "V7-01",
+      "title": "文件配置",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/config.py"
+      ],
+      "reason": "用配置统一硬件目标与工作流参数"
+    },
+    {
+      "id": "V7-02",
+      "title": "GPU 预设",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/gpu_profiles.toml"
+      ],
+      "reason": "将 GPU 型号映射集中为可维护数据"
+    },
+    {
+      "id": "V7-03",
+      "title": "自定义目标",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/gpu.py"
+      ],
+      "reason": "接受自定义架构而非扩充固定白名单"
+    },
+    {
+      "id": "V7-04",
+      "title": "明确选择硬件",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/config.py"
+      ],
+      "reason": "显式硬件选择，避免未知设备被当成 Hopper"
+    },
+    {
+      "id": "V7-05",
+      "title": "后端与子任务",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/generation.py"
+      ],
+      "reason": "子任务保存展开配置，消除宿主文件路径依赖"
+    },
+    {
+      "id": "V7-06",
+      "title": "集群与恢复",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "batch_run.sbatch"
+      ],
+      "reason": "集群尊重配置且硬件变化触发恢复失效"
+    },
+    {
+      "id": "V7-07",
+      "title": "真实 agent loop",
+      "primary": "M4",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agent_loop.py"
+      ],
+      "reason": "接入真实 DefaultAgent 而非仅有多次生成脚本"
+    },
+    {
+      "id": "V7-08",
+      "title": "One-shot",
+      "primary": "M4",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agent_models.py"
+      ],
+      "reason": "定义严格一次调用且没有执行反馈的比较协议"
+    },
+    {
+      "id": "V7-09",
+      "title": "有界反馈",
+      "primary": "M4",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agent_loop.py"
+      ],
+      "reason": "有界反馈保留最快开发正确候选，后续失败不丢结果"
+    },
+    {
+      "id": "V7-10",
+      "title": "开发与最终评测分离",
+      "primary": "M4",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/profile_task.py"
+      ],
+      "reason": "诊断与最终隐藏分分离，profiler 时间不计分"
+    },
+    {
+      "id": "V7-11",
+      "title": "资源与来源记录",
+      "primary": "M4",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/experiment.py"
+      ],
+      "reason": "记录可观测成本与重试历史，未知不算免费"
+    },
+    {
+      "id": "V7-12",
+      "title": "模式比较",
+      "primary": "M4",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/experiment.py"
+      ],
+      "reason": "按设定和预算分组，修改源码丢失生成归属"
+    },
+    {
+      "id": "V7-13",
+      "title": "模型与后端",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agent_models.py"
+      ],
+      "reason": "模型与执行后端共享协议，外部 agent 不伪装受控循环"
+    },
+    {
+      "id": "V7-14",
+      "title": "Coding-agent skill",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        ".claude/skills/kernelbench-pro/SKILL.md"
+      ],
+      "reason": "现成 coding agent 可直接完成任务且会话成本不可观测时单列"
+    },
+    {
+      "id": "V8-01",
+      "title": "五条动机与逐项追踪",
+      "primary": "M5",
+      "secondary": [
+        "M1",
+        "M2",
+        "M3",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "docs/MOTIVATION.md"
+      ],
+      "reason": "将历史改动归到具体问题，并校验覆盖完整性"
+    },
+    {
+      "id": "V8-02",
+      "title": "统一论文与能力状态",
+      "primary": "M5",
+      "secondary": [
+        "M1",
+        "M2",
+        "M3",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "已实现与研究目标使用同一套名称和预算，不将设计写成实验结果"
+    },
+    {
+      "id": "V8-03",
+      "title": "研究证据归档与重建",
+      "primary": "M2",
+      "secondary": [
+        "M1",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "scripts/headroom_evidence.py"
+      ],
+      "reason": "保留逐实现审查依据与来源摘要，不执行缺依赖的原型"
+    },
+    {
+      "id": "V8-04",
+      "title": "KernelBench-105 选集",
+      "primary": "M1",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/suites/kernelbench105.json"
+      ],
+      "reason": "接入105个scored、5个probe、140个extended的固定选集"
+    },
+    {
+      "id": "V8-05",
+      "title": "全流程统一选题",
+      "primary": "M1",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/common.py"
+      ],
+      "reason": "生成、基线、隐藏验证、评分、预算与Harbor均使用同一子集"
+    },
+    {
+      "id": "V8-06",
+      "title": "分层来源与探针隔离",
+      "primary": "M3",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "启发式I/F/D标注来源；probe和extended分组且不标为主榜资格"
+    },
+    {
+      "id": "V8-07",
+      "title": "选集与参考版本证据",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/suites.py"
+      ],
+      "reason": "记录manifest摘要并检查参考快照，阻止静默任务漂移"
+    },
+    {
+      "id": "R-01",
+      "title": "生产难题与反向轨道",
+      "primary": "M1",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "约41道设计、数值设计、实现和backward题需参考程序、测试、基线与见证"
+    },
+    {
+      "id": "R-02",
+      "title": "多dtype任务族与显存缩放",
+      "primary": "M1",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "现有运行精度选项不等于已审阅的逐题dtype契约或按显存自动实例化"
+    },
+    {
+      "id": "R-03",
+      "title": "选集区分度重新验证",
+      "primary": "M1",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "原7模型数据缺失；归档输出分别涉及104和105题，不能据此确认精确排名复现"
+    },
+    {
+      "id": "R-04",
+      "title": "FP64数值契约与精度门",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "需逐题oracle及阈值校准，当前仍用既有dtype容差；误差预算轨道尚未实现"
+    },
+    {
+      "id": "R-05",
+      "title": "参考退化审计与输入校准",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "先诊断全零/小输出，再按合法域和语义修复；不能统一放大全部输入"
+    },
+    {
+      "id": "R-06",
+      "title": "针对算子的输入族与隐藏形状",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "目前只有29道L1数值压力，隐藏多种子不等于隐藏shape或stride覆盖"
+    },
+    {
+      "id": "R-07",
+      "title": "模式、状态、参数更新与输入敏感性",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "需要逐题train/eval、BN、参数可变性与输入域契约；不能生搬原型"
+    },
+    {
+      "id": "R-08",
+      "title": "自写内核执行归因与库轨道",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "Torch算子汇总不证明来源；20%和95%阈值未校准，不作为默认资格"
+    },
+    {
+      "id": "R-09",
+      "title": "执行完整性与缓存审计",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "NaN预填、同对象原地更新、吞吐对照、运行环境拒绝规则尚未完整接入"
+    },
+    {
+      "id": "R-10",
+      "title": "内存与竞态工具",
+      "primary": "M2",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "compute-sanitizer及题目允许非确定性的规则需GPU复现，重复一致不证明无竞态"
+    },
+    {
+      "id": "R-11",
+      "title": "交替计时与噪声底",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "当前为独立基线和候选样本的近似均值区间；分位数范围不是置信区间"
+    },
+    {
+      "id": "R-12",
+      "title": "独立最终重测",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "冻结后的正式验证已有；按当前评分策略独立复测所有获胜结果的完整证据门仍待设计实现"
+    },
+    {
+      "id": "R-13",
+      "title": "扩展基线组合",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "框架等价重写与每个compile变体的Graph组合需逐题验证；目前默认仅四变体"
+    },
+    {
+      "id": "R-14",
+      "title": "设备实测上限与边界证书",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "不将历史H100规格表ledger当成当前设备校准结果；需实测和见证"
+    },
+    {
+      "id": "R-15",
+      "title": "Headroom分层评分与设计证书",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "当前归一分母为ln(1.25)，不是含SOL_target的论文公式；D标签不是设计证明"
+    },
+    {
+      "id": "R-16",
+      "title": "完整性能归因",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "busy时间需并集；FLOPs/bytes与A/E/O拆分、每引擎计数器、launch_only门待实现"
+    },
+    {
+      "id": "R-17",
+      "title": "样本聚合消融",
+      "primary": "M3",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "当前所有声明槽位求均值；论文原提议的中位数、最快样本与均值需同预算对照"
+    },
+    {
+      "id": "R-18",
+      "title": "设备时间与token硬预算",
+      "primary": "M4",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "现有墙钟和候选上限已实现；模型token及纯GPU时间未硬限，费用为调用间估算"
+    },
+    {
+      "id": "R-19",
+      "title": "得分预算曲线与通用agent基线",
+      "primary": "M4",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "当前协议和轨迹已记录；多预算点、多会话及同预算真实模型实验待完成"
+    },
+    {
+      "id": "R-20",
+      "title": "RL训练与奖励验证",
+      "primary": "M4",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "Harbor reward接入不等于完成训练；需红队、排序稳定性与持出集实验"
+    },
+    {
+      "id": "R-21",
+      "title": "Trainium/NKI与设备通用接口",
+      "primary": "M5",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "caps/calibrate/flush/time/attribute是目标设计；当前计算后端仍为NVIDIA CUDA"
+    },
+    {
+      "id": "R-22",
+      "title": "工具能力收据与可选分层",
+      "primary": "M5",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "逐字段not_measured及L0/L1/L2要求尚未实现；不得因此降级已有隐藏门和证据门"
+    },
+    {
+      "id": "R-23",
+      "title": "实机隔离与重评分实验",
+      "primary": "M5",
+      "secondary": [],
+      "status": "planned",
+      "source": "paper_design",
+      "evidence": [
+        "research/headroom/PAPER.md"
+      ],
+      "reason": "Harbor独立verifier配置已接入；GPU、容器网络、沙箱边界、升级后regrade尚待实测"
+    }
+  ]
+}

@@ -24,6 +24,11 @@ LICENSE file in the root directory of this source tree.
 
 默认批量流程支持 Level 1–3。`KernelBench/level4/` 保留实验题目，不属于默认批量评测范围。
 
+项目按五条 motivation 组织：题目区分度、正确性与执行可信度、性能指标、Agent 回路和基础设施。
+[动机与逐项对照](docs/MOTIVATION.md)覆盖每版改动和未完成设计；
+[统一研究稿](research/headroom/PAPER.md)说明 Headroom 目标与当前实现的差额。
+当前计算后端为 NVIDIA CUDA；Trainium/NKI、FP64 精度门和实测下界评分仍属研究设计。
+
 ## 安装
 
 使用 Python 3.12。项目固定依赖 Torch 2.12.0。
@@ -61,6 +66,10 @@ python scripts/run_batch.py --config configs/a6000.toml --resume
 
 在集群上通过 `srun` 或 `sbatch` 获取 GPU 后执行本地评测。Docker、Slurm、Modal、远端队列的完整配置见 [批量工作流](docs/BATCH_WORKFLOWS.md)。
 
+显式添加 `--suite kernelbench105` 可使用研究选集；`start/end` 与选集取交集。
+105 道主集、5 道探针与140 道扩展题分别运行和报告，默认仍为完整题集。
+选择规则、`--suite-role` 用法和未校准输入等局限见 [Headroom 研究索引](research/headroom/README.md)。
+
 运行产物写入 `runs/NAME/`，基线写入 `results/timing/HARDWARE/`：
 
 | 文件 | 内容 |
@@ -82,11 +91,14 @@ python scripts/run_batch.py --config configs/a6000.toml --resume
 ```bash
 python -m pytest -q tests src/unit_tests/test_dataset.py src/unit_tests/test_score.py
 python -m ruff check kb_workflows tests src/reliability.py src/validation.py
+python -m scripts.check_motivations
 ```
 
 | 文档 | 用途 |
 | --- | --- |
 | [功能清单](docs/FEATURE_INVENTORY.md) | 逐版变化、实现入口与验证状态 |
+| [Motivation](docs/MOTIVATION.md) | 每项改动对应的问题，以及论文设计和实现之间的差额 |
+| [Headroom 研究](research/headroom/README.md) | 统一论文、105 题选集、审查证据与来源摘要 |
 | [GPU 配置](docs/GPU_CONFIG.md) | GPU 预设、自定义架构、设备选择与覆盖规则 |
 | [Agent loops](docs/AGENT_LOOPS.md) | one-shot、mini-swe-agent 循环、预算、交互 skill 与比较 |
 | [Harbor 接入](docs/HARBOR.md) | 统一生成后端、任务导出与 reward |

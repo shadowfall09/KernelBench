@@ -27,7 +27,7 @@ where = ["."]
 include = ["src*", "kb_workflows*", "scripts*"]
 
 [tool.setuptools.package-data]
-kb_workflows = ["gpu_profiles.toml"]
+kb_workflows = ["gpu_profiles.toml", "suites/*.json"]
 
 [tool.ruff]
 target-version = "py312"

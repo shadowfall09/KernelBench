@@ -1,8 +1,8 @@
 # KernelBench Pro 功能改进清单（相比 KernelBench-Verified）
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪。
 
-当前已提交能力为第一至第七版的累计功能。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前已提交能力为第一至第八版的累计功能。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -17,7 +17,7 @@
 | Harbor 任务 | 同一 CLI 的 `export-harbor` 阶段 |
 | 结果与恢复 | 原生样本编号、文件格式、基线、计时、评分及指纹 |
 
-下面各版分别记录对应提交、功能变化和验证范围。
+下面各版分别记录对应提交、功能变化和验证范围。按动机组织的完整对照见 [Motivation](MOTIVATION.md)，统一研究稿见 [论文](../research/headroom/PAPER.md)。
 
 第七版同时包含 GPU 配置、one-shot / mini-swe-agent 反馈循环和 coding-agent skill，见后文对应记录。
 
@@ -38,22 +38,22 @@
 
 以下各项在本版均已提交。“迁移整合”表示把原 fork 的能力接入 Verified；“流程增强”表示统一配置、可靠性或结果处理的改进，不表示上游完全没有相关基础能力。
 
-| 编号 | 功能 | 相对 Verified 的改进与用途 | 实现入口（本版快照） |
-| --- | --- | --- | --- |
-| V1-01 | 统一批量入口 | **流程增强。** 用一套配置串联基线、生成、评测和分析；支持 `all`、`generate`、`evaluate`、`analyze`、`baseline` 五种阶段，减少多脚本间的手工传参。 | [cli.py][v1-cli]、[config.py][v1-config] |
-| V1-02 | 生成与最终验证独立选择后端 | **迁移整合。** 生成支持 local / Docker / Modal，验证支持 local / Docker / Modal / HTTP 队列；例如 CPU 容器生成、远端 GPU 验证。不同后端共用参考源码、评测设置与结果协议。 | [engine.py][v1-engine]、[transports.py][v1-transports]、[modal_backend.py][v1-modal] |
-| V1-03 | 题目范围与多样本批量生成 | **迁移整合。** 支持 level 1–3、闭区间题号和每题多次独立 agent 尝试；每次尝试有独立工作目录、日志及内核文件。 | [config.py][v1-config]、[generation.py][v1-generation] |
-| V1-04 | 多 GPU 调度与并发限制 | **迁移整合。** 本地 GPU 生成按选定设备限制并发；最终评测在同一 GPU 上串行、不同 GPU 间并行；远端队列可限制在途任务数。 | [generation.py][v1-generation]、[engine.py][v1-engine]、[transports.py][v1-transports] |
-| V1-05 | Docker 生成与验证 | **迁移整合。** 统一 Dockerfile，提供带 CUDA 工具链的 `agent` 和用于远端验证的 CPU 生成目标 `agent-remote`；镜像包含当前 checkout 的题目、隐藏测试与评测代码。 | [Dockerfile][v1-docker]、[generation.py][v1-generation]、[transports.py][v1-transports] |
-| V1-06 | Slurm 集群提交 | **迁移整合。** 提供批量作业脚本，使用提交目录、可配置 Python 和分配到的 `CUDA_VISIBLE_DEVICES`；通过环境变量指定题目、设备与后端。 | [batch_run.sbatch][v1-slurm]、[transports.py][v1-transports] |
-| V1-07 | Modal 云端执行 | **迁移整合。** 支持云端最终验证及 GPU Sandbox 内的生成、迭代验证；退出 Sandbox 前收集内核和日志，使用同一套 Verified 评测入口。 | [modal_backend.py][v1-modal]、[batch_run_modal.sh][v1-modal-sh] |
-| V1-08 | 持久化 HTTP 验证队列 | **迁移整合与可靠性增强。** HTTP 提交/查询、SQLite 保存任务与结果、重启后重新排队未完成任务；相同请求幂等、瞬时 HTTP 错误重试，并限制待处理任务数量。 | [queue_worker.py][v1-queue]、[transports.py][v1-transports] |
-| V1-09 | 带内容指纹的断点恢复 | **流程增强。** 评测恢复核对参考、内核、评测器、隐藏测试和配置；生成恢复核对模型、prompt 与输出校验和。修改内核后重新执行对应的标准及隐藏评测，旧格式结果重新验证。 | [common.py][v1-common]、[engine.py][v1-engine]、[generation.py][v1-generation] |
-| V1-10 | 批量任务的超时与失败处理 | **流程增强。** 单次验证使用独立子进程与编译目录；超时终止进程组，Docker 验证同时清理容器；缺失内核写入失败记录，失败的重新生成不会继续使用旧内核冒充新结果。 | [transports.py][v1-transports]、[generation.py][v1-generation]、[engine.py][v1-engine] |
-| V1-11 | 将 Verified 隐藏门接入全部验证后端 | **评测整合。** 默认先做标准正确性、CUDA-event 计时和峰值显存，再做隐藏正确性；最终正确性要求两者通过，隐藏结果缺失也不算通过。耗时和显存保留标准评测值。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] |
-| V1-12 | 基线记录接入批量流程 | **流程增强。** 可在选定验证后端记录指定题目基线；完整流程自动补测缺失基线。FP32 默认 TF32，FP16/BF16 分开存储，也可显式选择 `torch.compile` 基线；记录耗时、显存与环境信息。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[config.py][v1-config] |
-| V1-13 | 子集分析、pass@k 与统一结果归档 | **流程增强。** 批量分析使用选定题目作为分母；pass@k 使用声明样本数，缺失和隐藏失败样本计失败；输出分析摘要、逐样本耗时/显存对比，并保持 Verified 结果键格式与原有指标公式。 | [engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] |
-| V1-14 | 旧入口兼容与配置预览 | **流程增强。** 旧 shell / Python 入口转接统一配置，兼容常用 pydra 参数；`--dry-run` 预览配置与题目，不创建运行目录、不调用模型或云服务。 | [legacy.py][v1-legacy]、[cli.py][v1-cli]、[batch_run.sh][v1-shell] |
+| 编号 | 功能 | 相对 Verified 的改进与用途 | 实现入口（本版快照） | Motivation |
+| --- | --- | --- | --- | --- |
+| V1-01 | 统一批量入口 | **流程增强。** 用一套配置串联基线、生成、评测和分析；支持 `all`、`generate`、`evaluate`、`analyze`、`baseline` 五种阶段，减少多脚本间的手工传参。 | [cli.py][v1-cli]、[config.py][v1-config] | [M5](MOTIVATION.md#m5) |
+| V1-02 | 生成与最终验证独立选择后端 | **迁移整合。** 生成支持 local / Docker / Modal，验证支持 local / Docker / Modal / HTTP 队列；例如 CPU 容器生成、远端 GPU 验证。不同后端共用参考源码、评测设置与结果协议。 | [engine.py][v1-engine]、[transports.py][v1-transports]、[modal_backend.py][v1-modal] | [M5](MOTIVATION.md#m5) |
+| V1-03 | 题目范围与多样本批量生成 | **迁移整合。** 支持 level 1–3、闭区间题号和每题多次独立 agent 尝试；每次尝试有独立工作目录、日志及内核文件。 | [config.py][v1-config]、[generation.py][v1-generation] | [M1](MOTIVATION.md#m1) |
+| V1-04 | 多 GPU 调度与并发限制 | **迁移整合。** 本地 GPU 生成按选定设备限制并发；最终评测在同一 GPU 上串行、不同 GPU 间并行；远端队列可限制在途任务数。 | [generation.py][v1-generation]、[engine.py][v1-engine]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
+| V1-05 | Docker 生成与验证 | **迁移整合。** 统一 Dockerfile，提供带 CUDA 工具链的 `agent` 和用于远端验证的 CPU 生成目标 `agent-remote`；镜像包含当前 checkout 的题目、隐藏测试与评测代码。 | [Dockerfile][v1-docker]、[generation.py][v1-generation]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
+| V1-06 | Slurm 集群提交 | **迁移整合。** 提供批量作业脚本，使用提交目录、可配置 Python 和分配到的 `CUDA_VISIBLE_DEVICES`；通过环境变量指定题目、设备与后端。 | [batch_run.sbatch][v1-slurm]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
+| V1-07 | Modal 云端执行 | **迁移整合。** 支持云端最终验证及 GPU Sandbox 内的生成、迭代验证；退出 Sandbox 前收集内核和日志，使用同一套 Verified 评测入口。 | [modal_backend.py][v1-modal]、[batch_run_modal.sh][v1-modal-sh] | [M5](MOTIVATION.md#m5) |
+| V1-08 | 持久化 HTTP 验证队列 | **迁移整合与可靠性增强。** HTTP 提交/查询、SQLite 保存任务与结果、重启后重新排队未完成任务；相同请求幂等、瞬时 HTTP 错误重试，并限制待处理任务数量。 | [queue_worker.py][v1-queue]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
+| V1-09 | 带内容指纹的断点恢复 | **流程增强。** 评测恢复核对参考、内核、评测器、隐藏测试和配置；生成恢复核对模型、prompt 与输出校验和。修改内核后重新执行对应的标准及隐藏评测，旧格式结果重新验证。 | [common.py][v1-common]、[engine.py][v1-engine]、[generation.py][v1-generation] | [M5](MOTIVATION.md#m5) |
+| V1-10 | 批量任务的超时与失败处理 | **流程增强。** 单次验证使用独立子进程与编译目录；超时终止进程组，Docker 验证同时清理容器；缺失内核写入失败记录，失败的重新生成不会继续使用旧内核冒充新结果。 | [transports.py][v1-transports]、[generation.py][v1-generation]、[engine.py][v1-engine] | [M5](MOTIVATION.md#m5) |
+| V1-11 | 将 Verified 隐藏门接入全部验证后端 | **评测整合。** 默认先做标准正确性、CUDA-event 计时和峰值显存，再做隐藏正确性；最终正确性要求两者通过，隐藏结果缺失也不算通过。耗时和显存保留标准评测值。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] | [M2](MOTIVATION.md#m2) |
+| V1-12 | 基线记录接入批量流程 | **流程增强。** 可在选定验证后端记录指定题目基线；完整流程自动补测缺失基线。FP32 默认 TF32，FP16/BF16 分开存储，也可显式选择 `torch.compile` 基线；记录耗时、显存与环境信息。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[config.py][v1-config] | [M3](MOTIVATION.md#m3) |
+| V1-13 | 子集分析、pass@k 与统一结果归档 | **流程增强。** 批量分析使用选定题目作为分母；pass@k 使用声明样本数，缺失和隐藏失败样本计失败；输出分析摘要、逐样本耗时/显存对比，并保持 Verified 结果键格式与原有指标公式。 | [engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] | [M3](MOTIVATION.md#m3) |
+| V1-14 | 旧入口兼容与配置预览 | **流程增强。** 旧 shell / Python 入口转接统一配置，兼容常用 pydra 参数；`--dry-run` 预览配置与题目，不创建运行目录、不调用模型或云服务。 | [legacy.py][v1-legacy]、[cli.py][v1-cli]、[batch_run.sh][v1-shell] | [M5](MOTIVATION.md#m5) |
 
 ### Verified 继承能力与本版行为
 
@@ -122,14 +122,14 @@ git log -1 --format='%h %s' --grep='^Fix output comparison and isolate correctne
 
 本版统一标准评测和隐藏评测的输出判断，防止离散结果被浮点容差放过，以及输入或输出缓冲区被修改后污染比较。
 
-| 编号 | 功能 | 具体变化 | 实现入口 |
-| --- | --- | --- | --- |
-| V2-01 | 严格比较输出结构、shape 和 dtype | 递归检查 Tensor、dict、list、tuple；核对字典键、序列类型和长度，以及各 Tensor 的 shape、dtype；记录具体不一致的输出路径。 | [validation.py](../src/validation.py)：`compare_outputs` |
-| V2-02 | 整数与 bool 精确比较 | 离散 Tensor 使用精确比较。比如整数索引 `100000` 与 `100001` 即使满足相对浮点容差，也会被判为不一致；整数和 bool 输入不再被统一转换为浮点精度。 | [validation.py](../src/validation.py)、[eval.py](../src/eval.py)：`_process_input_tensor` |
-| V2-03 | 核对 NaN、Inf 的位置与符号 | NaN、正 Inf、负 Inf 的掩码分别匹配；匹配后，仅有限数值继续按原 FP32/FP16/BF16 容差比较。 | [validation.py](../src/validation.py)：`compare_outputs` |
-| V2-04 | 隔离参考与候选输入 | 两个模型分别使用独立的 Tensor 副本，支持嵌套容器，避免参考或候选的原地操作修改另一方的输入和调用方原始数据。 | [validation.py](../src/validation.py)：`clone_tensors`；[eval.py](../src/eval.py)：两个正确性入口 |
-| V2-05 | 保存参考输出快照 | 在调用候选前保存参考结果，避免共享或复用输出缓冲区把参考答案覆盖，导致错误实现被判通过。 | [eval.py](../src/eval.py)：`run_and_check_correctness`、`run_correctness_on_fixed_inputs` |
-| V2-06 | 对齐 forward 随机种子 | 参考与候选 forward 使用相同种子，避免 dropout 等随机计算因执行先后产生不同结果。 | [eval.py](../src/eval.py)：两个正确性入口 |
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V2-01 | 严格比较输出结构、shape 和 dtype | 递归检查 Tensor、dict、list、tuple；核对字典键、序列类型和长度，以及各 Tensor 的 shape、dtype；记录具体不一致的输出路径。 | [validation.py](../src/validation.py)：`compare_outputs` | [M2](MOTIVATION.md#m2) |
+| V2-02 | 整数与 bool 精确比较 | 离散 Tensor 使用精确比较。比如整数索引 `100000` 与 `100001` 即使满足相对浮点容差，也会被判为不一致；整数和 bool 输入不再被统一转换为浮点精度。 | [validation.py](../src/validation.py)、[eval.py](../src/eval.py)：`_process_input_tensor` | [M2](MOTIVATION.md#m2) |
+| V2-03 | 核对 NaN、Inf 的位置与符号 | NaN、正 Inf、负 Inf 的掩码分别匹配；匹配后，仅有限数值继续按原 FP32/FP16/BF16 容差比较。 | [validation.py](../src/validation.py)：`compare_outputs` | [M2](MOTIVATION.md#m2) |
+| V2-04 | 隔离参考与候选输入 | 两个模型分别使用独立的 Tensor 副本，支持嵌套容器，避免参考或候选的原地操作修改另一方的输入和调用方原始数据。 | [validation.py](../src/validation.py)：`clone_tensors`；[eval.py](../src/eval.py)：两个正确性入口 | [M2](MOTIVATION.md#m2) |
+| V2-05 | 保存参考输出快照 | 在调用候选前保存参考结果，避免共享或复用输出缓冲区把参考答案覆盖，导致错误实现被判通过。 | [eval.py](../src/eval.py)：`run_and_check_correctness`、`run_correctness_on_fixed_inputs` | [M2](MOTIVATION.md#m2) |
+| V2-06 | 对齐 forward 随机种子 | 参考与候选 forward 使用相同种子，避免 dropout 等随机计算因执行先后产生不同结果。 | [eval.py](../src/eval.py)：两个正确性入口 | [M2](MOTIVATION.md#m2) |
 
 ### 验证程度
 
@@ -162,14 +162,14 @@ python -m pytest -q tests/test_correctness_validation.py tests/test_workflows.py
 git log -1 --format='%h %s' --grep='^Add validated baseline portfolio and synchronized wall timing$'
 ```
 
-| 编号 | 功能 | 具体变化 | 实现入口 |
-| --- | --- | --- | --- |
-| V3-01 | 默认四变体基线 | eager、compile default、compile max-autotune、CUDA Graph 各自独立任务运行；验证初次及每次计时输出，保留失败变体，在正确变体中选最优。组合的 FP32 使用 IEEE；显式单基线仍可使用 TF32。 | `baseline_variants.py`、`evaluate_task.py`、`engine.py` |
-| V3-02 | 同步墙钟计时 | 调用前后同步，计入 Python 调度、调用、输出消费及 GPU 完成等待；输入准备和完整参考校验在计时外。Graph 的输入复制和输出克隆计入 replay 耗时。 | `measurement.py`、`src/eval.py` |
-| V3-03 | 变化输入与逐次输出验证 | 批量基线和候选每次重新调用可信输入生成器，记录新种子；保留输入副本，每次检查输出，失败不作为有效性能结果。固定生成器仍可能产生相同内容。 | `measurement.py`、`evaluate_task.py`、`src/eval.py` |
-| V3-04 | 冷成本与 K 次摊销 | 记录构建/初始化、首次调用和预热；按 `(cold + (K-1) × steady) / K` 报告平均成本，默认 K=10000，同时保留稳态最优与摊销最优基线。 | `measurement.py`、`baseline_variants.py`、`config.py` |
-| V3-05 | 原始样本和测量信息 | 保存毫秒样本、均值/标准差及正态近似 95% 均值区间；记录真实设备、软件版本、输入形状/stride/dtype 和源码指纹，供后续兼容性检查。 | `measurement.py`、`evaluate_task.py` |
-| V3-06 | 区分旧计时与新结果 | 新默认文件名为 `baseline_time_suite_fp32_wall`；`--no-baseline-suite` 可选单基线，编译单基线需同时指定该开关；基线组合未完整记录时重新执行。 | `config.py`、`cli.py`、`engine.py` |
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V3-01 | 默认四变体基线 | eager、compile default、compile max-autotune、CUDA Graph 各自独立任务运行；验证初次及每次计时输出，保留失败变体，在正确变体中选最优。组合的 FP32 使用 IEEE；显式单基线仍可使用 TF32。 | `baseline_variants.py`、`evaluate_task.py`、`engine.py` | [M3](MOTIVATION.md#m3) |
+| V3-02 | 同步墙钟计时 | 调用前后同步，计入 Python 调度、调用、输出消费及 GPU 完成等待；输入准备和完整参考校验在计时外。Graph 的输入复制和输出克隆计入 replay 耗时。 | `measurement.py`、`src/eval.py` | [M2](MOTIVATION.md#m2) |
+| V3-03 | 变化输入与逐次输出验证 | 批量基线和候选每次重新调用可信输入生成器，记录新种子；保留输入副本，每次检查输出，失败不作为有效性能结果。固定生成器仍可能产生相同内容。 | `measurement.py`、`evaluate_task.py`、`src/eval.py` | [M2](MOTIVATION.md#m2) |
+| V3-04 | 冷成本与 K 次摊销 | 记录构建/初始化、首次调用和预热；按 `(cold + (K-1) × steady) / K` 报告平均成本，默认 K=10000，同时保留稳态最优与摊销最优基线。 | `measurement.py`、`baseline_variants.py`、`config.py` | [M3](MOTIVATION.md#m3) |
+| V3-05 | 原始样本和测量信息 | 保存毫秒样本、均值/标准差及正态近似 95% 均值区间；记录真实设备、软件版本、输入形状/stride/dtype 和源码指纹，供后续兼容性检查。 | `measurement.py`、`evaluate_task.py` | [M3](MOTIVATION.md#m3) |
+| V3-06 | 区分旧计时与新结果 | 新默认文件名为 `baseline_time_suite_fp32_wall`；`--no-baseline-suite` 可选单基线，编译单基线需同时指定该开关；基线组合未完整记录时重新执行。 | `config.py`、`cli.py`、`engine.py` | [M3](MOTIVATION.md#m3) |
 
 验证：Python 3.10 / Torch 2.9.0 下，**84 项测试通过**，含 20 项新增基线/计时回归及此前 64 项测试。新增测试为 [test_baseline_timing.py](../tests/test_baseline_timing.py)，包含真实 CPU 公式、模拟异步完成与 Graph replay、原评测入口的计时校验接入。Ruff、目标模块编译和 diff 检查通过。
 
@@ -188,14 +188,14 @@ git log -1 --format='%h %s' --grep='^Add validated baseline portfolio and synchr
 git log -1 --format='%h %s' --grep='^Add failure-inclusive scoring and evidence-aware recovery$'
 ```
 
-| 编号 | 功能 | 具体变化 | 实现入口 |
-| --- | --- | --- | --- |
-| V4-01 | 失败和缺失样本计入分母 | 每个请求题目 × 声明样本数形成固定槽位；失败、超时、缺失、过期或比较证据不足的槽位记 0。先按题取所有样本均值，再按层宏平均，不选择最快样本作为新评分。 | `paper_analysis.py`：`analyze_paper` |
-| V4-02 | 按 K 摊销成本评分 | 在有当前证据的变体中，按声明 K 重新选择摊销最优基线；评分为 `clip(log(T_ref/T_cand)/log(1.25), 0, 1)`，同时要求所选基线与候选的稳态均值区间不重叠。保留稳态加速比和摊销加速比。 | `paper_analysis.py`、`measurement.py` |
-| V4-03 | 兼容性和测量证据检查 | 检查设备类别、Torch/CUDA/HIP、精度/容差、计时协议、输入签名、源码与任务指纹；要求变化输入、逐次校验收据、有效原始样本和冷成本。组合基线必须记录完整，具体变体也须匹配当前任务。 | `paper_analysis.py`：`compatible`、`measurement_evidence`、`current_result` |
-| V4-04 | 分层统计与区间 | `--problem-specs` 可声明 I/F/D 层，未声明为 `unclassified`；保留失败槽位，输出按题和样本两层重采样的 bootstrap 区间。该版本不加入设备校准或 headroom 评分。 | `config.py`、`paper_analysis.py` |
-| V4-05 | 扩大恢复指纹覆盖 | 指纹覆盖共享验证、计时、基线变体、配置、任务编排、传输和分析模块；版本或源码变化使旧任务失效。完整流程发现过期基线时重新记录，客户端与 worker 版本不匹配则拒绝执行。 | `common.py`、`cli.py`、`engine.py`、`evaluate_task.py` |
-| V4-06 | 旧分析与榜单不能绕过证据检查 | 新批量结果经 `eval_results_scored.json` 提供资格；读取时重新核对当前内核、参考题目、隐藏源码、版本、运行配置及原始结果/基线内容。缺失或过期资格拒绝计分；隐藏合并不会把标准失败覆盖为通过。 | `common.py`：`apply_score_gate`；两个分析/榜单脚本 |
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V4-01 | 失败和缺失样本计入分母 | 每个请求题目 × 声明样本数形成固定槽位；失败、超时、缺失、过期或比较证据不足的槽位记 0。先按题取所有样本均值，再按层宏平均，不选择最快样本作为新评分。 | `paper_analysis.py`：`analyze_paper` | [M3](MOTIVATION.md#m3) |
+| V4-02 | 按 K 摊销成本评分 | 在有当前证据的变体中，按声明 K 重新选择摊销最优基线；评分为 `clip(log(T_ref/T_cand)/log(1.25), 0, 1)`，同时要求所选基线与候选的稳态均值区间不重叠。保留稳态加速比和摊销加速比。 | `paper_analysis.py`、`measurement.py` | [M3](MOTIVATION.md#m3) |
+| V4-03 | 兼容性和测量证据检查 | 检查设备类别、Torch/CUDA/HIP、精度/容差、计时协议、输入签名、源码与任务指纹；要求变化输入、逐次校验收据、有效原始样本和冷成本。组合基线必须记录完整，具体变体也须匹配当前任务。 | `paper_analysis.py`：`compatible`、`measurement_evidence`、`current_result` | [M3](MOTIVATION.md#m3) |
+| V4-04 | 分层统计与区间 | `--problem-specs` 可声明 I/F/D 层，未声明为 `unclassified`；保留失败槽位，输出按题和样本两层重采样的 bootstrap 区间。该版本不加入设备校准或 headroom 评分。 | `config.py`、`paper_analysis.py` | [M3](MOTIVATION.md#m3) |
+| V4-05 | 扩大恢复指纹覆盖 | 指纹覆盖共享验证、计时、基线变体、配置、任务编排、传输和分析模块；版本或源码变化使旧任务失效。完整流程发现过期基线时重新记录，客户端与 worker 版本不匹配则拒绝执行。 | `common.py`、`cli.py`、`engine.py`、`evaluate_task.py` | [M5](MOTIVATION.md#m5) |
+| V4-06 | 旧分析与榜单不能绕过证据检查 | 新批量结果经 `eval_results_scored.json` 提供资格；读取时重新核对当前内核、参考题目、隐藏源码、版本、运行配置及原始结果/基线内容。缺失或过期资格拒绝计分；隐藏合并不会把标准失败覆盖为通过。 | `common.py`：`apply_score_gate`；两个分析/榜单脚本 | [M3](MOTIVATION.md#m3) |
 
 新增输出为 `paper_analysis.json` 与 `eval_results_scored.json`。前者记录固定分母评分、区间、原始与摊销加速比及逐项拒绝原因；后者保存计分资格并保留 `raw_correctness`。原 Verified 指标继续使用原有公式，只读取资格检查后的结果；pass@k 仍表示正确性统计，含义与新性能评分不同。
 
@@ -219,15 +219,15 @@ git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel b
 
 本次核对了 KernelBench-Hard、KernelBenchX、robust-kbench 的论文/源码及 TritonRL 论文，按当前题目与工作流独立适配。各项来源、固定上游 commit、采用与未采用部分见 [可靠性说明](RELIABILITY.md)。
 
-| 编号 | 功能 | 具体变化与来源 | 实现入口 |
-| --- | --- | --- | --- |
-| V5-01 | 参考前后配对检查 | 借鉴 robust-kbench 的前后调用，标准与隐藏检查均执行 C→R、R→C 两组，两个模型调用次数一致；同步、重放 RNG、输入隔离与输出快照防止当前参考缓存和共享缓冲污染。 | `src/reliability.py`、`src/eval.py` |
-| V5-02 | 隔离源码全局字典与后端设置 | 候选同名变量/函数不能覆盖参考定义；每次 forward 后恢复共享后端设置，防止候选改变精度设置影响参考比较。属于本地配套实现，不声称提供安全沙箱。 | `src/eval.py`、`src/reliability.py` |
-| V5-03 | 三个种子重新生成隐藏输入 | 借鉴 Hard 的三种子验证，分别在 42、123、456 下调用可信隐藏生成器，全部配置必须通过。硬编码生成器仍可能返回相同内容。 | `src/eval.py`：`run_hidden_correctness_check` |
-| V5-04 | 按输入域限定的数值压力测试 | 借鉴 Hard 的按题压力输入及 KernelBenchX 的 0.1%/×50 离群分布。29 道 Level 1 题的首个隐藏配置增加零值、×32 和稀疏离群值；不改变 shape/stride/dtype 或其他输入，不把扰动施加到未经核对的受限域。 | `src/reliability.py`：`STRESS_TASKS`、`stress_cases` |
-| V5-05 | 无效验证不能算通过 | 空、缺失、格式错误的隐藏集显式报错；参考报错记录来源并判验证失败；标准零次测试不能通过。是落实“所有配置必须实际验证”的本地修补。 | `src/eval.py`、`src/reliability.py` |
-| V5-06 | 分阶段诊断与逐项收据 | 参考 KernelBenchX/TritonRL 对编译、正确性、性能的区分，新增 `validation_summary.json`，失败/缺失样本保留分母；metadata 保存种子、配置、调用顺序和失败来源。阶段诊断不代替第四版的计分资格，也不证明功能合法性。 | `kb_workflows/engine.py`、`src/reliability.py` |
-| V5-07 | 新协议参与恢复指纹 | 新可靠性模块纳入 evaluator digest，使旧缓存不能继续冒充新协议结果；沿用既有 worker 版本核对和过期证据拒绝。 | `kb_workflows/common.py` |
+| 编号 | 功能 | 具体变化与来源 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V5-01 | 参考前后配对检查 | 借鉴 robust-kbench 的前后调用，标准与隐藏检查均执行 C→R、R→C 两组，两个模型调用次数一致；同步、重放 RNG、输入隔离与输出快照防止当前参考缓存和共享缓冲污染。 | `src/reliability.py`、`src/eval.py` | [M2](MOTIVATION.md#m2) |
+| V5-02 | 隔离源码全局字典与后端设置 | 候选同名变量/函数不能覆盖参考定义；每次 forward 后恢复共享后端设置，防止候选改变精度设置影响参考比较。属于本地配套实现，不声称提供安全沙箱。 | `src/eval.py`、`src/reliability.py` | [M2](MOTIVATION.md#m2) |
+| V5-03 | 三个种子重新生成隐藏输入 | 借鉴 Hard 的三种子验证，分别在 42、123、456 下调用可信隐藏生成器，全部配置必须通过。硬编码生成器仍可能返回相同内容。 | `src/eval.py`：`run_hidden_correctness_check` | [M2](MOTIVATION.md#m2) |
+| V5-04 | 按输入域限定的数值压力测试 | 借鉴 Hard 的按题压力输入及 KernelBenchX 的 0.1%/×50 离群分布。29 道 Level 1 题的首个隐藏配置增加零值、×32 和稀疏离群值；不改变 shape/stride/dtype 或其他输入，不把扰动施加到未经核对的受限域。 | `src/reliability.py`：`STRESS_TASKS`、`stress_cases` | [M2](MOTIVATION.md#m2) |
+| V5-05 | 无效验证不能算通过 | 空、缺失、格式错误的隐藏集显式报错；参考报错记录来源并判验证失败；标准零次测试不能通过。是落实“所有配置必须实际验证”的本地修补。 | `src/eval.py`、`src/reliability.py` | [M2](MOTIVATION.md#m2) |
+| V5-06 | 分阶段诊断与逐项收据 | 参考 KernelBenchX/TritonRL 对编译、正确性、性能的区分，新增 `validation_summary.json`，失败/缺失样本保留分母；metadata 保存种子、配置、调用顺序和失败来源。阶段诊断不代替第四版的计分资格，也不证明功能合法性。 | `kb_workflows/engine.py`、`src/reliability.py` | [M3](MOTIVATION.md#m3) |
+| V5-07 | 新协议参与恢复指纹 | 新可靠性模块纳入 evaluator digest，使旧缓存不能继续冒充新协议结果；沿用既有 worker 版本核对和过期证据拒绝。 | `kb_workflows/common.py` | [M5](MOTIVATION.md#m5) |
 
 验证：Python 3.10 / Torch 2.9.0 下 **172 passed**，其中新增 [test_reliability.py](../tests/test_reliability.py) 的 58 项，原有 114 项全部通过。覆盖全部 29 道适配题的小形状真实 CPU 参考执行，以及缓存答案、第二次调用错误、无效隐藏集、非法域排除、源码全局覆盖和恢复指纹回归。Ruff 与 diff 检查通过。
 
@@ -253,16 +253,16 @@ git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel b
 
 本版以 `66fd65c` 为基础，把仓库清理、更名、Harbor 接入和 Python 3.12 升级纳入同一次提交。此前搁置的整合改动仍在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，没有恢复。
 
-| 项目 | 当前变化 |
-| --- | --- |
-| 论文与旧实验材料 | 删除 1 份上游报告 PDF、3 份 LaTeX 稿、1 份参考文献库、9 份图表、1 个论文绘图脚本和 5 份旧实验分析文档，共 20 个文件。 |
-| 重复生成材料 | 删除 4 份未被运行流程读取的 `stripped_prompts` 快照；输入盲化仍由可信配置动态生成。 |
-| 仓库入口 | README 改为本仓库的安装、能力、运行与文档入口；移除上游作者名单、论文宣传、旧榜单图与论文结论。 |
-| 维护方式 | 贡献与行为指南改为本仓库的 GitHub 流程，移除 Meta 内部导入、CLA 和举报渠道；LICENSE 和继承版权头保留，来源集中记录在 `NOTICE.md`。 |
-| 项目名称 | Python distribution 为 `kernelbench-pro`，默认镜像为 `kernelbench-pro:agent`，Modal app 为 `kernelbench-pro`，Slurm job 为 `kernelbench-pro`；CLI、生成 prompt、worker 与结果页面使用 KernelBench Pro 名称。 |
-| 结果页面 | 硬件标签取自本次数据；不再写死 H200、Best-of-5 或 2026 年 5 月，也不替未标注的运行猜测推理强度。 |
-| 忽略规则 | 按目录忽略运行产物、缓存与生成预览，补充凭据和 Slurm 日志规则；取消对全部 JSON、CUDA/C++ 源码及部分个人脚本名的全局忽略。 |
-| 使用中的文件 | 题库、隐藏测试、动态 prompt 示例和兼容脚本保留；`paper_analysis.py` / `paper_analysis.json` 是现有评分接口，保持名称以兼容结果读取。 |
+| 项目 | 当前变化 | Motivation |
+| --- | --- | --- |
+| 论文与旧实验材料 | 删除 1 份上游报告 PDF、3 份 LaTeX 稿、1 份参考文献库、9 份图表、1 个论文绘图脚本和 5 份旧实验分析文档，共 20 个文件。 | [M5](MOTIVATION.md#m5) |
+| 重复生成材料 | 删除 4 份未被运行流程读取的 `stripped_prompts` 快照；输入盲化仍由可信配置动态生成。 | [M5](MOTIVATION.md#m5) |
+| 仓库入口 | README 改为本仓库的安装、能力、运行与文档入口；移除上游作者名单、论文宣传、旧榜单图与论文结论。 | [M5](MOTIVATION.md#m5) |
+| 维护方式 | 贡献与行为指南改为本仓库的 GitHub 流程，移除 Meta 内部导入、CLA 和举报渠道；LICENSE 和继承版权头保留，来源集中记录在 `NOTICE.md`。 | [M5](MOTIVATION.md#m5) |
+| 项目名称 | Python distribution 为 `kernelbench-pro`，默认镜像为 `kernelbench-pro:agent`，Modal app 为 `kernelbench-pro`，Slurm job 为 `kernelbench-pro`；CLI、生成 prompt、worker 与结果页面使用 KernelBench Pro 名称。 | [M5](MOTIVATION.md#m5) |
+| 结果页面 | 硬件标签取自本次数据；不再写死 H200、Best-of-5 或 2026 年 5 月，也不替未标注的运行猜测推理强度。 | [M3](MOTIVATION.md#m3) |
+| 忽略规则 | 按目录忽略运行产物、缓存与生成预览，补充凭据和 Slurm 日志规则；取消对全部 JSON、CUDA/C++ 源码及部分个人脚本名的全局忽略。 | [M5](MOTIVATION.md#m5) |
+| 使用中的文件 | 题库、隐藏测试、动态 prompt 示例和兼容脚本保留；`paper_analysis.py` / `paper_analysis.json` 是现有评分接口，保持名称以兼容结果读取。 | [M5](MOTIVATION.md#m5) |
 
 验证：172 项 CPU/模拟回归和 Ruff 通过；CLI dry-run、实际 HTML 生成、Python 包元数据、脚本语法、文档链接与忽略规则检查通过。270 个参考题目和 250 个隐藏测试文件完整保留，LICENSE、核心比较/计时/评分实现没有改动。此轮不恢复搁置的评测完整性整合，也不重写 Git 历史；删除的研究材料仍可从历史提交恢复。
 
@@ -270,14 +270,14 @@ git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel b
 
 本轮扩展的是第一版建立的统一工作流，沿用同一个 `RunConfig`、题目范围、样本槽位、结果文件、GPU 调度、正式验证和分析；不修改第一版历史提交的能力描述。此前搁置的整合改动仍在原 stash 中。
 
-| 项目 | 当前变化 |
-| --- | --- |
-| 统一生成后端 | `--generation harbor` 调用 Harbor，每个原生样本对应一个 job/attempt；提交文件回收到原内核命名位置，再由原生正式评测和评分处理。 |
-| 统一任务导出 | `--stage export-harbor` 使用同一配置按题号/样本导出 schema 1.4 任务；保留当前输入盲化策略，使用新目录避免覆盖。 |
-| 验证与 reward | 独立 verifier 镜像保存可信代码及隐藏测试，只传递 `solution.py`；复用原生基线、正确性与证据评分，异常 reward 为 0。默认 correctness 与可选 bounded_gain 分开定义。 |
-| GPU 与恢复 | Docker 任务绑定原生 GPU lane，单卡串行；Harbor agent/环境/模型/协议纳入恢复指纹，正式评测不直接复用 Harbor reward。AWS profile 只解析为运行时凭据。 |
-| Python 升级 | `requires-python ==3.12.*`、Ruff py312、Docker Python 3.12 / Ubuntu 24.04、Modal Python 3.12；增加可选 `harbor` extra，固定 Torch 2.12.0。 |
-| 文档 | [Harbor 接入](HARBOR.md)、README 和批量文档同步更新；历史 Python 3.10 测试记录仍保留其真实环境。 |
+| 项目 | 当前变化 | Motivation |
+| --- | --- | --- |
+| 统一生成后端 | `--generation harbor` 调用 Harbor，每个原生样本对应一个 job/attempt；提交文件回收到原内核命名位置，再由原生正式评测和评分处理。 | [M5](MOTIVATION.md#m5) |
+| 统一任务导出 | `--stage export-harbor` 使用同一配置按题号/样本导出 schema 1.4 任务；保留当前输入盲化策略，使用新目录避免覆盖。 | [M5](MOTIVATION.md#m5) |
+| 验证与 reward | 独立 verifier 镜像保存可信代码及隐藏测试，只传递 `solution.py`；复用原生基线、正确性与证据评分，异常 reward 为 0。默认 correctness 与可选 bounded_gain 分开定义。 | [M2](MOTIVATION.md#m2) |
+| GPU 与恢复 | Docker 任务绑定原生 GPU lane，单卡串行；Harbor agent/环境/模型/协议纳入恢复指纹，正式评测不直接复用 Harbor reward。AWS profile 只解析为运行时凭据。 | [M5](MOTIVATION.md#m5) |
+| Python 升级 | `requires-python ==3.12.*`、Ruff py312、Docker Python 3.12 / Ubuntu 24.04、Modal Python 3.12；增加可选 `harbor` extra，固定 Torch 2.12.0。 | [M5](MOTIVATION.md#m5) |
+| 文档 | [Harbor 接入](HARBOR.md)、README 和批量文档同步更新；历史 Python 3.10 测试记录仍保留其真实环境。 | [M5](MOTIVATION.md#m5) |
 
 验证：Python 3.12.12 / Torch 2.12.0 / 正式发布的 Harbor 0.24.0 下 **204 passed**，含 32 项 Harbor 回归；Ruff、依赖一致性、实际 Task 模型校验和 CLI 配置解析通过。两个 Docker 目标的构建定义检查通过。Harbor Docker CPU smoke 因宿主 NAT 网络错误未启动，没有产物或 reward，不算通过；Torch CUDA 13 构建报告当前宿主驱动过旧，真实 GPU 与 agent 端到端验证仍待兼容环境。
 
@@ -295,14 +295,14 @@ git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel b
 
 ### GPU 配置统一
 
-| 功能 | 相对第六版的变化 | 实现入口 |
-| --- | --- | --- |
-| 文件配置 | 新增 `--config FILE.toml`，`[gpu]` 管 GPU，`[run]` 管工作流；命令行显式覆盖文件，文件覆盖默认值；检查类型、未知字段及枚举值。 | `kb_workflows/config.py`、[GPU 配置](GPU_CONFIG.md) |
-| GPU 预设 | 型号到架构和云端类型的映射移出 Python，集中维护在随包分发的 TOML；提供 A6000 本地和 H100 Modal 示例。 | `kb_workflows/gpu_profiles.toml`、`configs/`、`pyproject.toml` |
-| 自定义目标 | `[gpu]` 可直接填写硬件标签、架构、设备和云端类型；编译目标接受架构名或计算能力，不再依赖旧的固定架构白名单。 | `kb_workflows/gpu.py`、`src/utils.py` |
-| 明确选择硬件 | 去掉默认 H100 和未知型号回退 Hopper；未知硬件需显式架构，实际 GPU 任务要求完整目标，Modal 要求云端类型。更换 CLI 目标时清除文件中旧的目标配置。 | `kb_workflows/config.py`、`kb_workflows/cli.py` |
-| 后端与子任务 | 同一解析结果传给现有生成、评测、基线、调度和恢复流程；子任务保存展开后的 JSON，不依赖宿主 TOML 路径；Harbor 省略空云端类型。 | `kb_workflows/harbor.py`、原生 `RunConfig` 及任务协议 |
-| 集群与恢复 | Slurm 使用 `KB_CONFIG`，只让显式环境变量覆盖文件；shell 入口尊重文件后端；GPU 解析模块和预设参与 evaluator digest，切换目标影响恢复指纹。 | `batch_run.sbatch`、`batch_run.sh`、`batch_run_modal.sh`、`kb_workflows/common.py` |
+| 功能 | 相对第六版的变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- |
+| 文件配置 | 新增 `--config FILE.toml`，`[gpu]` 管 GPU，`[run]` 管工作流；命令行显式覆盖文件，文件覆盖默认值；检查类型、未知字段及枚举值。 | `kb_workflows/config.py`、[GPU 配置](GPU_CONFIG.md) | [M5](MOTIVATION.md#m5) |
+| GPU 预设 | 型号到架构和云端类型的映射移出 Python，集中维护在随包分发的 TOML；提供 A6000 本地和 H100 Modal 示例。 | `kb_workflows/gpu_profiles.toml`、`configs/`、`pyproject.toml` | [M5](MOTIVATION.md#m5) |
+| 自定义目标 | `[gpu]` 可直接填写硬件标签、架构、设备和云端类型；编译目标接受架构名或计算能力，不再依赖旧的固定架构白名单。 | `kb_workflows/gpu.py`、`src/utils.py` | [M5](MOTIVATION.md#m5) |
+| 明确选择硬件 | 去掉默认 H100 和未知型号回退 Hopper；未知硬件需显式架构，实际 GPU 任务要求完整目标，Modal 要求云端类型。更换 CLI 目标时清除文件中旧的目标配置。 | `kb_workflows/config.py`、`kb_workflows/cli.py` | [M3](MOTIVATION.md#m3) |
+| 后端与子任务 | 同一解析结果传给现有生成、评测、基线、调度和恢复流程；子任务保存展开后的 JSON，不依赖宿主 TOML 路径；Harbor 省略空云端类型。 | `kb_workflows/harbor.py`、原生 `RunConfig` 及任务协议 | [M5](MOTIVATION.md#m5) |
+| 集群与恢复 | Slurm 使用 `KB_CONFIG`，只让显式环境变量覆盖文件；shell 入口尊重文件后端；GPU 解析模块和预设参与 evaluator digest，切换目标影响恢复指纹。 | `batch_run.sbatch`、`batch_run.sh`、`batch_run_modal.sh`、`kb_workflows/common.py` | [M5](MOTIVATION.md#m5) |
 
 GPU 配置阶段验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 下 **244 passed**，新增 40 项配置与边界回归；Ruff、脚本语法和 diff 检查通过。离线 wheel 构建成功，解包后在仓库外验证 GPU 预设可加载；配置预览不导入 Torch、Modal 或 Harbor，Harbor 任务通过实际 Task 模型校验。真实 GPU 与 agent 端到端验证仍受宿主驱动限制，未新增实机通过声明。
 
@@ -312,20 +312,48 @@ GPU 配置阶段验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 下 **244
 
 与前述 GPU 配置统一改动一起提交。采用 mini-swe-agent 发布版 2.4.6，参考 TIRx 的固定评测契约、诊断与基准分离设计；没有迁入 TIRx 编译器、NumSim、Synccheck、Racecheck 或 KCoral。此前 stash 仍未恢复。
 
-| 功能 | 相对第六版的变化 | 实现入口 |
-| --- | --- | --- |
-| 真实 agent loop | 使用上游 DefaultAgent 的查询/反馈循环、线性消息历史、步数/费用检查与轨迹序列化；自有 Model/Environment 适配器提交源码，控制器负责执行反馈。 | `kb_workflows/agent_loop.py`、`kb_workflows/agent_models.py` |
-| One-shot | 一个样本只发起一次模型适配器调用，不给执行反馈；Claude Code 内置工具、MCP 和自定义加载关闭。多样本采样与单次生成分别记录。 | `configs/a6000-one-shot.toml`、`generation_mode` |
-| 有界反馈 | 默认每样本尝试最多 5 次候选、2400 秒；CLI/TOML 可调。控制器保留开发正确且平均耗时最低的候选，后续错误或超时不覆盖已完成最佳版本。 | `configs/a6000-feedback.toml`、`kb_workflows/generation.py` |
-| 开发与最终评测分离 | 开发任务明确关闭隐藏测试；冻结源码后原生流程重新做标准与多种子隐藏验证。新增独立 Torch profiler 诊断子任务，诊断时间不进入正式评分，也不冒充 NCU 硬件计数器。 | `kb_workflows/agent_loop.py`、`kb_workflows/profile_task.py`、`kb_workflows/evaluate_task.py` |
-| 资源与来源记录 | 记录调用、候选、开发/诊断次数、可观测 token 和估算费用；未知值不当作零。源码 hash 绑定生成回执；已完成失败可恢复而不自动重试，显式重复尝试累计历史成本并标为 repeated-attempts。 | `generation_budget.json`、`generation_attempts.json`、`phase_budget.json`、`kb_workflows/experiment.py` |
-| 模式比较 | 按模式、框架、预算、采样数、题集、硬件和精度分组，模型信息逐行记录；不跨不同实验组直接排名。生成后修改源码标为 unattributed。 | `python -m kb_workflows.experiment`、`paper_analysis.json` |
-| 模型与后端 | Claude Code / LiteLLM 模型入口共用 mini-swe-agent；local / Docker / Modal 生成接入同一循环；队列支持诊断任务。Harbor 保持外部 agent 模式，不冒充原生 one-shot 或受控轮数。 | `requirements.txt`、`kb_workflows/modal_backend.py`、`kb_workflows/queue_worker.py` |
-| Coding-agent skill | Claude Code 的 `/kernelbench-pro` 与 `.agents/skills` 共享 skill。当前会话可准备任务、提交标准开发检查、冻结最佳源码并执行最终评测，不递归启动 Claude CLI；模型调用不可观测时单列 interactive。 | [.claude/skills/kernelbench-pro/SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md)、`kb_workflows/agent_task.py` |
+| 功能 | 相对第六版的变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- |
+| 真实 agent loop | 使用上游 DefaultAgent 的查询/反馈循环、线性消息历史、步数/费用检查与轨迹序列化；自有 Model/Environment 适配器提交源码，控制器负责执行反馈。 | `kb_workflows/agent_loop.py`、`kb_workflows/agent_models.py` | [M4](MOTIVATION.md#m4) |
+| One-shot | 一个样本只发起一次模型适配器调用，不给执行反馈；Claude Code 内置工具、MCP 和自定义加载关闭。多样本采样与单次生成分别记录。 | `configs/a6000-one-shot.toml`、`generation_mode` | [M4](MOTIVATION.md#m4) |
+| 有界反馈 | 默认每样本尝试最多 5 次候选、2400 秒；CLI/TOML 可调。控制器保留开发正确且平均耗时最低的候选，后续错误或超时不覆盖已完成最佳版本。 | `configs/a6000-feedback.toml`、`kb_workflows/generation.py` | [M4](MOTIVATION.md#m4) |
+| 开发与最终评测分离 | 开发任务明确关闭隐藏测试；冻结源码后原生流程重新做标准与多种子隐藏验证。新增独立 Torch profiler 诊断子任务，诊断时间不进入正式评分，也不冒充 NCU 硬件计数器。 | `kb_workflows/agent_loop.py`、`kb_workflows/profile_task.py`、`kb_workflows/evaluate_task.py` | [M4](MOTIVATION.md#m4) |
+| 资源与来源记录 | 记录调用、候选、开发/诊断次数、可观测 token 和估算费用；未知值不当作零。源码 hash 绑定生成回执；已完成失败可恢复而不自动重试，显式重复尝试累计历史成本并标为 repeated-attempts。 | `generation_budget.json`、`generation_attempts.json`、`phase_budget.json`、`kb_workflows/experiment.py` | [M4](MOTIVATION.md#m4) |
+| 模式比较 | 按模式、框架、预算、采样数、题集、硬件和精度分组，模型信息逐行记录；不跨不同实验组直接排名。生成后修改源码标为 unattributed。 | `python -m kb_workflows.experiment`、`paper_analysis.json` | [M4](MOTIVATION.md#m4) |
+| 模型与后端 | Claude Code / LiteLLM 模型入口共用 mini-swe-agent；local / Docker / Modal 生成接入同一循环；队列支持诊断任务。Harbor 保持外部 agent 模式，不冒充原生 one-shot 或受控轮数。 | `requirements.txt`、`kb_workflows/modal_backend.py`、`kb_workflows/queue_worker.py` | [M4](MOTIVATION.md#m4) |
+| Coding-agent skill | Claude Code 的 `/kernelbench-pro` 与 `.agents/skills` 共享 skill。当前会话可准备任务、提交标准开发检查、冻结最佳源码并执行最终评测，不递归启动 Claude CLI；模型调用不可观测时单列 interactive。 | [.claude/skills/kernelbench-pro/SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md)、`kb_workflows/agent_task.py` | [M4](MOTIVATION.md#m4) |
 
 验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下，**270 项完整 CPU/模拟回归通过**。覆盖真实 DefaultAgent、伪模型 CLI 的完整 worker/多样本/恢复路径、LiteLLM SDK 适配、未知费用、费用超限、保留正确候选、诊断反馈、标准/隐藏分离、重试成本、来源归属和嵌套子进程超时清理。Ruff、168 个包的依赖一致性及 skill 校验通过；离线 wheel 构建后，在仓库外核对适配模块、GPU 预设与轻量导入。测试没有调用付费模型，也没有执行真实 GPU 内核；当前宿主仍报告 NVIDIA 驱动不兼容 CUDA 13，实机端到端验证待兼容的已分配 GPU。
 
 运行说明与方案比较见 [Agent loops](AGENT_LOOPS.md)。费用限制是调用间的客户端估算上限，单次可超限；GPU 计费时间保持未知，不宣称完整 OS 沙箱或反作弊认证。
+
+## 第八版：Headroom 研究与 Motivation 统一
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Integrate headroom research with motivation traceability and task suites |
+| 提交定位 | `git log -1 --format='%H %s' --grep='^Integrate headroom research with motivation traceability and task suites$'` |
+| 基础提交 | `92c27f4c020a4860d5ca546b88a50b007f629e3f` |
+| 日期 | 2026-10-21 |
+| 状态 | 已提交；验证结果见本节末尾 |
+
+本版择取用户提供的 `headroom-bench-20261021.zip`，保留研究证据、固定选集与未完成设计，按当前实现重写研究稿；不导入旧论文备份、内部对话或缺依赖的攻击/加固原型。此前 stash 没有恢复，核心正确性/计时检查没有被原型替换。
+
+| 编号 | 功能 | 变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V8-01 | 五条动机与逐项追踪 | 将历史改动归到具体问题，并校验覆盖完整性。 | `docs/MOTIVATION.md` | [M5](MOTIVATION.md#m5) |
+| V8-02 | 统一论文与能力状态 | 已实现与研究目标使用同一套名称和预算，不将设计写成实验结果。 | `research/headroom/PAPER.md` | [M5](MOTIVATION.md#m5) |
+| V8-03 | 研究证据归档与重建 | 保留逐实现审查依据与来源摘要，不执行缺依赖的原型。 | `scripts/headroom_evidence.py` | [M2](MOTIVATION.md#m2) |
+| V8-04 | KernelBench-105 选集 | 接入105个scored、5个probe、140个extended的固定选集。 | `kb_workflows/suites/kernelbench105.json` | [M1](MOTIVATION.md#m1) |
+| V8-05 | 全流程统一选题 | 生成、基线、隐藏验证、评分、预算与Harbor均使用同一子集。 | `kb_workflows/common.py` | [M1](MOTIVATION.md#m1) |
+| V8-06 | 分层来源与探针隔离 | 启发式I/F/D标注来源；probe和extended分组且不标为主榜资格。 | `kb_workflows/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
+| V8-07 | 选集与参考版本证据 | 记录manifest摘要并检查参考快照，阻止静默任务漂移。 | `kb_workflows/suites.py` | [M5](MOTIVATION.md#m5) |
+
+KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 I/F/D 为 30/56/19。它是原始题目上的研究选集，未实现论文输入校准，也不把启发式 D 标签当作算法证书。默认仍跑完整题集；显式选择 `--suite kernelbench105`，范围与选集取交集，probe/extended 单独运行和报告。参考源码改变时需重新审阅清单。详细用法与证据限制见 [研究索引](../research/headroom/README.md)。
+
+相对原稿，本版修正了“仅第一版实现”“默认60分钟”“已支持Trainium”“已有完整FP64/硬件计数器/Headroom评分”等过时或超前表述；当前默认仍为5候选/2400秒，计算后端仍为NVIDIA CUDA，评分仍为测量证据约束的bounded gain。完整未完成项见 Motivation 的23条差额，实验不因文档整合而记为完成。
+
+验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **287 项 CPU/模拟回归通过**，含本轮17项选集与追踪回归。覆盖三类角色与250题分区、范围交集、参考漂移拒绝、无GPU轻量预览、缺失样本分母、实际批量生成路径、基线/预算/子任务一致性、真实Harbor Task导出、层来源标记、证据摘要及全部改动的motivation覆盖。Ruff、168个包依赖一致性、来源重建逐文件比较、文档本地链接和离线wheel检查通过；wheel在仓库外可加载选集且配置不导入Torch。未运行真实GPU内核或付费模型，现有CUDA驱动兼容性限制仍保留。
 
 ## 维护方式
 

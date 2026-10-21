@@ -10,7 +10,7 @@ import time
 from contextlib import nullcontext
 from pathlib import Path
 
-from .common import atomic_json, kernel_name, read_json
+from .common import atomic_json, kernel_name, read_json, select_problems
 from .config import RunConfig, parse_config
 from .experiment import protocol
 
@@ -93,7 +93,8 @@ def main(argv=None):
 
         config = parse_config(options)
         config.require_gpu_target()
-        if config.start != config.end or config.num_samples != 1:
+        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+        if config.start != config.end or config.num_samples != 1 or list(selected) != [config.start]:
             raise ValueError("Interactive preparation requires --start N --end N --num-samples 1")
         if config.generation != "local" or config.evaluation not in {"local", "docker", "queue", "modal"}:
             raise ValueError("Interactive preparation requires --generation local")

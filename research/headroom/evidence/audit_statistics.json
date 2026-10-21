@@ -1,0 +1,139 @@
+{
+  "implementations": 1574,
+  "by_severity": {
+    "无效": 159,
+    "可信": 996,
+    "噪声": 217,
+    "无法验证": 60,
+    "风险": 88,
+    "待核": 14,
+    "说明": 34,
+    "需说明": 6
+  },
+  "by_flag": {
+    "no_custom": {
+      "impls": 85,
+      "tasks": 42,
+      "label": "没有自写kernel承担必要计算"
+    },
+    "train_native": {
+      "impls": 49,
+      "tasks": 14,
+      "label": "按保存的评测代码只执行原生算子"
+    },
+    "lib_speedup": {
+      "impls": 13,
+      "tasks": 7,
+      "label": "提速来自库后端、布局或现成算子"
+    },
+    "tf32": {
+      "impls": 4,
+      "tasks": 4,
+      "label": "FP32题用TF32降低精度"
+    },
+    "wrong": {
+      "impls": 6,
+      "tasks": 5,
+      "label": "计算有确定缺陷"
+    },
+    "behavior": {
+      "impls": 3,
+      "tasks": 1,
+      "label": "参数派生量只算一次、不随参数更新"
+    },
+    "distribution": {
+      "impls": 3,
+      "tasks": 2,
+      "label": "提速依赖测试输入的分布"
+    },
+    "vacuous": {
+      "impls": 46,
+      "tasks": 8,
+      "label": "正确性检查对本题失效"
+    },
+    "weak_check": {
+      "impls": 18,
+      "tasks": 2,
+      "label": "正确性检查近乎失效"
+    },
+    "calc_risk": {
+      "impls": 50,
+      "tasks": 50,
+      "label": "特定合法输入下会算错"
+    },
+    "semantics": {
+      "impls": 9,
+      "tasks": 9,
+      "label": "边界值、算子细节或参数更新的行为与参考不同"
+    },
+    "gelu_approx": {
+      "impls": 20,
+      "tasks": 7,
+      "label": "精确GELU被换成tanh近似（误差约4.7e-4，在容差内）"
+    },
+    "bn_stats": {
+      "impls": 4,
+      "tasks": 2,
+      "label": "训练模式下不更新BN的running统计"
+    },
+    "sync_risk": {
+      "impls": 10,
+      "tasks": 10,
+      "label": "并行同步缺失，可能读到错误数据"
+    },
+    "noise": {
+      "impls": 346,
+      "tasks": 122,
+      "label": "倍率不超过1.05，与测量噪声无法区分"
+    },
+    "global_setting": {
+      "impls": 24,
+      "tasks": 21,
+      "label": "开启全局调优设置，比较条件需核对"
+    },
+    "path_conflict": {
+      "impls": 2,
+      "tasks": 2,
+      "label": "按保存的评测代码不会执行自写路径，但网页倍率与原生路径不符"
+    },
+    "state_count": {
+      "impls": 4,
+      "tasks": 4,
+      "label": "输出不变，但少记录BN运行次数"
+    },
+    "algebra_lib": {
+      "impls": 5,
+      "tasks": 3,
+      "label": "提速来自代数改写，主计算仍由库执行"
+    },
+    "dead_custom": {
+      "impls": 1,
+      "tasks": 1,
+      "label": "自写kernel只加速了不影响返回值的计算"
+    },
+    "algebra": {
+      "impls": 27,
+      "tasks": 5,
+      "label": "倍率主要来自题目冗余的代数化简"
+    },
+    "numerical": {
+      "impls": 25,
+      "tasks": 25,
+      "label": "与参考数值不同，现有证据不足以判错"
+    }
+  },
+  "task_verdicts": {
+    "无绿色实现": 34,
+    "最高倍率无效": 41,
+    "未发现问题": 65,
+    "部分实现有问题，最高倍率未见问题": 52,
+    "倍率不可用：正确性检查失效": 7,
+    "最高倍率有计算风险": 20,
+    "最高倍率无法验证": 2,
+    "最高倍率待核或需说明来源": 11,
+    "只有噪声级倍率": 11,
+    "倍率主要来自题目冗余": 4
+  },
+  "problem_impls_gt1": 150,
+  "tasks_listed": 247
+}

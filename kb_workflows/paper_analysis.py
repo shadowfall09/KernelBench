@@ -9,6 +9,7 @@ from statistics import mean
 
 from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
 from .measurement import amortized
+from .suites import selection_receipt, suite_rows
 
 DEVICE_FIELDS = ("name", "capability", "total_memory", "multiprocessors", "l2_bytes", "torch_version", "cuda_version", "hip_version")
 
@@ -102,17 +103,20 @@ def analyze_paper(config):
     from .engine import task_payload
     from .experiment import existing_budget, protocol
 
-    selected = select_problems(config.level, config.start, config.end)
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
     standard = read_json(config.run_dir / "eval_results.json", {})
     hidden = read_json(config.run_dir / "eval_results_hidden.json", {}) if config.hidden_tests else standard
     baselines = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
     baselines = baselines.get(f"level{config.level}", {})
     specs = read_json(Path(config.problem_specs), {}) if config.problem_specs else {}
     specs = specs.get(f"level{config.level}", {})
+    research_rows = suite_rows(config.level, config.suite_role) if config.suite != "full" else {}
     digest = evaluator_digest()
     groups, rows, scored = {}, [], {}
     for pid, path in selected.items():
-        layer = specs.get(str(pid), {}).get("layer", "unclassified")
+        layer = specs.get(str(pid), {}).get("layer", research_rows.get(pid, {}).get("layer", "unclassified"))
+        layer_source = ("problem_specs" if "layer" in specs.get(str(pid), {}) else
+                        ("provisional_suite_taxonomy" if pid in research_rows else "unclassified"))
         if layer not in {"I", "F", "D", "unclassified"}:
             raise ValueError(f"Unknown layer for {pid}: {layer}")
         baseline = baselines.get(path.name, {})
@@ -120,7 +124,7 @@ def analyze_paper(config):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             raw, secret = standard.get(key, {}), hidden.get(key, {})
-            row = {"problem_id": pid, "sample_id": sid, "layer": layer, "score": 0}
+            row = {"problem_id": pid, "sample_id": sid, "layer": layer, "layer_source": layer_source, "score": 0}
             rows.append(row)
             slots.append(0)
             status = "verified"
@@ -197,6 +201,10 @@ def analyze_paper(config):
     by_layer = {layer: mean(mean(slots) for slots in values) for layer, values in groups.items()}
     report = {
         "kind": "failure_inclusive_measurement_scoring_v1", "problem_ids": list(selected),
+        "suite": selection_receipt(config), "leaderboard_eligible": config.suite_role == "scored",
+        "layer_source": ("problem_specs_with_suite_fallback" if config.problem_specs and research_rows else
+                         ("problem_specs" if config.problem_specs else ("provisional_suite_taxonomy" if research_rows else "unclassified"))),
+        "headroom_score_implemented": False,
         "experiment": existing_budget(config).get("protocol", protocol(config)), "generation_budget": existing_budget(config),
         "generation_receipts_available": bool(existing_budget(config)),
         "declared_samples": config.num_samples, "cold_calls": config.cold_calls, "hidden_gated": config.hidden_tests,

@@ -6,6 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, kernel_name, read_json, select_problems
+from .suites import selection_receipt
 from .transports import docker_evaluate, local_evaluate, queue_evaluate, resolve_devices
 
 
@@ -97,7 +98,7 @@ def evaluate_tasks(config, payloads):
 
 
 def evaluate_run(config):
-    selected = select_problems(config.level, config.start, config.end)
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
     config.run_dir.mkdir(parents=True, exist_ok=True)
     for hidden in [False, True] if config.hidden_tests else [False]:
         label = "hidden" if hidden else "standard"
@@ -135,7 +136,7 @@ def write_pass_at_k(config):
     n = config.num_samples
     ks = sorted({int(k) for k in config.pass_at_k.split(",") if int(k) <= n})
     problems = {}
-    for pid in select_problems(config.level, config.start, config.end):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
         count = sum(
             bool(standard.get(f"{pid}_{sid}", {}).get("compiled"))
             and bool(standard.get(f"{pid}_{sid}", {}).get("correctness"))
@@ -150,6 +151,7 @@ def write_pass_at_k(config):
     atomic_json(
         config.run_dir / "pass_at_k_results.json",
         {
+            "suite": selection_receipt(config),
             "hidden_gated": config.hidden_tests,
             "problems": problems,
             "averages": {f"avg_pass@{k}": sum(p[f"pass@{k}"] for p in problems.values()) / len(problems) for k in ks},
@@ -166,7 +168,7 @@ def write_validation_summary(config, standard=None, hidden=None):
     counts = dict(declared_samples=0, compiled_samples=0, standard_correct_samples=0,
                   hidden_correct_samples=0, correct_samples=0, timed_correct_samples=0)
     rows = []
-    for pid in select_problems(config.level, config.start, config.end):
+    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             raw, secret = standard.get(key, {}), hidden.get(key, {})
@@ -185,7 +187,7 @@ def write_validation_summary(config, standard=None, hidden=None):
                          "correct": correct, "timed_correct": timed,
                          "numeric_stress_enabled": secret.get("metadata", {}).get("numeric_stress_enabled", False),
                          "checks": secret.get("metadata", {}).get("hidden_completed_checks", 0)})
-    report = {"hidden_tests_enabled": config.hidden_tests, "counts": counts, "samples": rows,
+    report = {"suite": selection_receipt(config), "hidden_tests_enabled": config.hidden_tests, "counts": counts, "samples": rows,
               "purpose": "raw_stage_diagnostics", "score_eligibility_checked": False,
               "functional_validity_certified": False}
     atomic_json(config.run_dir / "validation_summary.json", report)
@@ -202,7 +204,7 @@ def record_baseline(config):
     level = results.setdefault(f"level{config.level}", {})
     names = {}
     tasks = []
-    for pid, path in select_problems(config.level, config.start, config.end).items():
+    for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role).items():
         payload = task_payload(config, pid, task="baseline")
         signature = fingerprint(payload)
         if config.resume and (level.get(path.name) or {}).get("metadata", {}).get("workflow_signature") == signature:
@@ -231,7 +233,7 @@ def analyze_run(config):
         analyze_multi_sample_eval(
             config.run_name, config.hardware, config.baseline, config.level,
             use_hidden_eval=config.hidden_tests,
-            problem_ids=list(select_problems(config.level, config.start, config.end)),
+            problem_ids=list(select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)),
             runs_dir=config.runs_dir, detail_limit=30,
         )
     except (ValueError, AssertionError) as exc:
@@ -246,7 +248,7 @@ def record_baseline_suite(config):
     results = read_json(target, {})
     level = results.setdefault(f"level{config.level}", {})
     tasks, names, signatures, variants = [], {}, {}, {}
-    for pid, path in select_problems(config.level, config.start, config.end).items():
+    for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role).items():
         base = task_payload(config, pid, task="baseline")
         signature = fingerprint(base)
         previous = level.get(path.name, {})

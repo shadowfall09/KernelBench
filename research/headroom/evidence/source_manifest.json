@@ -1,0 +1,77 @@
+{
+  "archive": "headroom-bench-20261021.zip",
+  "archive_sha256": "4222a13cd2f19e0ecfbd017a7416125ac8cf4f49dbed95fa11108fe3a253dd85",
+  "candidate_gpu_runs": false,
+  "raw_candidate_sources_included": false,
+  "sources": {
+    "PAPER.md": {
+      "sha256": "a70be0feae06bcdd9574abe47ee859e88883238d81a0293c8e1853e9032b7433",
+      "bytes": 93914
+    },
+    "MOTIVATION_ZH.md": {
+      "sha256": "4b92e79a33b6d42d04ffed32ad7489396e240a19171d91c37e006ee731d14560",
+      "bytes": 9875
+    },
+    "MOTIVATION_EN.md": {
+      "sha256": "92b378a62c1bc3759b8cc45b49464ba352f4c7077296a6f4c8eb590829704cee",
+      "bytes": 10262
+    },
+    "INTERNAL_NOTES.md": {
+      "sha256": "2f7e08e6e1f6c1e2ba0c91f2c4cdeab2df573d1060fc5729e36182351ca16730",
+      "bytes": 38127
+    },
+    "audit/REPORT.md": {
+      "sha256": "4067ecc28685d942a0c314f6727c6cf08e609483273c99b9836c14e2f75d99ae",
+      "bytes": 33210
+    },
+    "audit/eval_hardening/strict_check.py": {
+      "sha256": "6d1d29ac2f6edf8c181980cd091cb83de1ddda531715c8e5d922b77eb43f07f8",
+      "bytes": 7919
+    },
+    "evidence/kb100.csv": {
+      "sha256": "d503abe7dbabd9cc169043118e365665120a7d5f9b0e10cfb31cea33b13afcae",
+      "bytes": 22582
+    },
+    "audit/data/findings.json": {
+      "sha256": "70ca28e33c3a9811adefcbe50e7e46f368a53ef2f84a79fddc036a35887fadac",
+      "bytes": 968614
+    },
+    "audit/data/statistics.json": {
+      "sha256": "bc14d8280f7dc364ba967cb9c7136ca348f774a2775f6d3dfd1adf2161337342",
+      "bytes": 3128
+    },
+    "evidence/ledger_compact.csv": {
+      "sha256": "da58fcc104b5e2815e56dc6ce4351661a9a4f03d325553855b7f937e450eb264",
+      "bytes": 38156
+    },
+    "evidence/l1_value_table.csv": {
+      "sha256": "2b87734dfdc910f199be1ffe0ea933fe1e719605494c22bcb0754189a711346b",
+      "bytes": 11559
+    },
+    "evidence/l2_l3_value_table.csv": {
+      "sha256": "f6067c14ec95003ecd2cd8fe8f1307033e5318dd3946aa0479f26b98c84daed2",
+      "bytes": 3280
+    },
+    "evidence/sakana_l1_sol.csv": {
+      "sha256": "49229dbe6f6dc91da984a51bfd0069e5ee476ff78185bec0e5fcf08b964bdfdf",
+      "bytes": 15778
+    }
+  },
+  "omitted": [
+    "historical drafts",
+    "internal conversation notes",
+    "duplicate checklists",
+    "unexecuted attack scripts and hardening prototype",
+    "machine-specific scripts"
+  ],
+  "historical_analysis": "Archive tables are not recomputed for the current checkout",
+  "outputs": {
+    "audit_implementations.csv": "8e5f8c0a43c71cf4087b17dcfc6dfe3d1644c7dbe6d1dfe3513caa1804c125e2",
+    "audit_statistics.json": "e9d067cfe2078c7ffab2469bf1dd3be8a0c16a9c601a1b012fcebff9a031739a",
+    "l1_value_table.csv": "2b87734dfdc910f199be1ffe0ea933fe1e719605494c22bcb0754189a711346b",
+    "l2_l3_value_table.csv": "5c71926113c38005f51a943ffd0548ea5bd6dd55e8e891b53fddb58e25e8375d",
+    "ledger_compact.csv": "34730afac8e37ffd0c5e9e2b1abca229093fe536a40fe1a301a5611d9cc8efb2",
+    "sakana_l1_sol.csv": "49229dbe6f6dc91da984a51bfd0069e5ee476ff78185bec0e5fcf08b964bdfdf",
+    "selection.csv": "03db31c36524c00aca03de01b515e6de205e040166a65582026885fbd1776732"
+  }
+}

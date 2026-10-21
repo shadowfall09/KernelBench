@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, kernel_name, select_problems
 from .generation import agent_environment, prompt_source
+from .suites import selection_receipt
 from .transports import terminate
 
 HARBOR_SOURCE = "6c9d3d6609854375005a7b5c8f1906371d64c6ff"
@@ -86,7 +87,7 @@ def write_task(directory, config, pid, sid=0, device=None):
     if device is not None:
         for target in (environment, tests):
             (target / "docker-compose.yaml").write_text(_compose(device))
-    child = replace(config, start=pid, end=pid, num_samples=1, run_name="harbor",
+    child = replace(config, suite="full", suite_role="scored", start=pid, end=pid, num_samples=1, run_name="harbor",
                     generation="local", evaluation="local", gpus="0", resume=False,
                     stage="evaluate", problem_specs="", hardware=config.hardware or config.gpu,
                     runs_dir="/logs/verifier/kernelbench-pro/runs", build_image=False,
@@ -164,13 +165,13 @@ def export_tasks(config):
         staged = Path(temporary) / "tasks"
         staged.mkdir()
         tasks = []
-        for pid in select_problems(config.level, config.start, config.end):
+        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role):
             for sid in range(config.num_samples):
                 name = task_name(config.level, pid, sid)
                 write_task(staged / name, config, pid, sid)
                 tasks.append(name)
         staged.rename(output)
-    atomic_json(config.run_dir / "harbor_export.json", {"tasks": tasks, "harbor_source": HARBOR_SOURCE,
+    atomic_json(config.run_dir / "harbor_export.json", {"tasks": tasks, "suite": selection_receipt(config), "harbor_source": HARBOR_SOURCE,
                                                        "evaluator_sha256": evaluator_digest(), "path": str(output)})
     return output
 
