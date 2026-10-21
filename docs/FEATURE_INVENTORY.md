@@ -1,8 +1,8 @@
 # 相比 KernelBench-Verified 的功能改进清单
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复。
 
-当前已提交能力为第一至第三版的累计功能。其余本地评测增强暂缓，未纳入已提交清单。
+当前已提交能力为第一至第四版的累计功能。其余本地评测增强暂缓，未纳入已提交清单。
 
 ## 第一版：Verified + 批量工作流
 
@@ -136,6 +136,7 @@ python -m pytest -q tests/test_correctness_validation.py tests/test_workflows.py
 | 项目 | 版本信息 |
 | --- | --- |
 | 提交标题 | Add validated baseline portfolio and synchronized wall timing |
+| 本版提交哈希 | `d4eed06` |
 | 基础提交 | `d488df8` |
 | 本版提交 | 与本节首次加入同一提交；可用下方命令查询 |
 | 状态 | 已提交；CPU/模拟 CUDA 回归通过；真实 GPU 工具链待验证 |
@@ -156,6 +157,34 @@ git log -1 --format='%h %s' --grep='^Add validated baseline portfolio and synchr
 验证：Python 3.10 / Torch 2.9.0 下，**84 项测试通过**，含 20 项新增基线/计时回归及此前 64 项测试。新增测试为 [test_baseline_timing.py](../tests/test_baseline_timing.py)，包含真实 CPU 公式、模拟异步完成与 Graph replay、原评测入口的计时校验接入。Ruff、目标模块编译和 diff 检查通过。
 
 范围：本版记录摊销成本，不改变聚合评分；评分与恢复另列下一版。H1–H14、FP64 精度门、sanitizer、根因探针、独立最终重测继续暂缓。冷成本不清空编译缓存，未计进程启动和输入准备；不代表完整应用端到端成本。真实 CUDA、torch.compile、Graph 和 Torch 2.12.0 尚待部署验证。旧名 `time_execution_with_cuda_event` 保留为墙钟计时兼容入口；仅原生批量入口提供变化输入及逐次验证。
+
+## 第四版：评分与恢复
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add failure-inclusive scoring and evidence-aware recovery |
+| 基础提交 | `d4eed06` |
+| 本版提交 | 与本节首次加入同一提交；可用下方命令查询 |
+| 状态 | 已提交；CPU/持久化结果回归通过；真实 GPU 与完整反作弊实验待完成 |
+
+```bash
+git log -1 --format='%h %s' --grep='^Add failure-inclusive scoring and evidence-aware recovery$'
+```
+
+| 编号 | 功能 | 具体变化 | 实现入口 |
+| --- | --- | --- | --- |
+| V4-01 | 失败和缺失样本计入分母 | 每个请求题目 × 声明样本数形成固定槽位；失败、超时、缺失、过期或比较证据不足的槽位记 0。先按题取所有样本均值，再按层宏平均，不选择最快样本作为新评分。 | `paper_analysis.py`：`analyze_paper` |
+| V4-02 | 按 K 摊销成本评分 | 在有当前证据的变体中，按声明 K 重新选择摊销最优基线；评分为 `clip(log(T_ref/T_cand)/log(1.25), 0, 1)`，同时要求所选基线与候选的稳态均值区间不重叠。保留稳态加速比和摊销加速比。 | `paper_analysis.py`、`measurement.py` |
+| V4-03 | 兼容性和测量证据检查 | 检查设备类别、Torch/CUDA/HIP、精度/容差、计时协议、输入签名、源码与任务指纹；要求变化输入、逐次校验收据、有效原始样本和冷成本。组合基线必须记录完整，具体变体也须匹配当前任务。 | `paper_analysis.py`：`compatible`、`measurement_evidence`、`current_result` |
+| V4-04 | 分层统计与区间 | `--problem-specs` 可声明 I/F/D 层，未声明为 `unclassified`；保留失败槽位，输出按题和样本两层重采样的 bootstrap 区间。该版本不加入设备校准或 headroom 评分。 | `config.py`、`paper_analysis.py` |
+| V4-05 | 扩大恢复指纹覆盖 | 指纹覆盖共享验证、计时、基线变体、配置、任务编排、传输和分析模块；版本或源码变化使旧任务失效。完整流程发现过期基线时重新记录，客户端与 worker 版本不匹配则拒绝执行。 | `common.py`、`cli.py`、`engine.py`、`evaluate_task.py` |
+| V4-06 | 旧分析与榜单不能绕过证据检查 | 新批量结果经 `eval_results_scored.json` 提供资格；读取时重新核对当前内核、参考题目、隐藏源码、版本、运行配置及原始结果/基线内容。缺失或过期资格拒绝计分；隐藏合并不会把标准失败覆盖为通过。 | `common.py`：`apply_score_gate`；两个分析/榜单脚本 |
+
+新增输出为 `paper_analysis.json` 与 `eval_results_scored.json`。前者记录固定分母评分、区间、原始与摊销加速比及逐项拒绝原因；后者保存计分资格并保留 `raw_correctness`。原 Verified 指标继续使用原有公式，只读取资格检查后的结果；pass@k 仍表示正确性统计，含义与新性能评分不同。
+
+验证：Python 3.10 / Torch 2.9.0 下，**114 项测试通过**，含 30 项新增评分/恢复回归及第三版的 84 项测试。新增测试为 [test_scoring_recovery.py](../tests/test_scoring_recovery.py)，覆盖失败分母、置信区间、冷成本、兼容性、证据失效、旧分析接入、指纹变化重跑、过期基线重测、worker 版本拒绝和子验证器配置传递。Ruff 对工作流/共享验证/测试模块、目标模块编译与 diff 检查通过。
+
+这里的资格只证明本版要求的测量与兼容性证据齐备，报告明确写 `anti_cheat_verified=false`、`cross_device_comparison_certified=false`；不等于 H1–H14 通过。没有完整反作弊模块时，不接受标为反作弊评测的结果获得资格。置信区间为近似统计，冷成本为一次观测，不构成正式的性能或安全证明。真实 CUDA、Torch 2.12.0、跨设备实验、根因探针、sanitizer 和独立最终重测继续暂缓。
 
 ## 维护方式
 

@@ -189,7 +189,7 @@ def merge_hidden_eval(standard_results: dict, hidden_results: dict) -> dict:
     """
     Merge hidden correctness with standard runtime.
     For each key present in standard_results:
-      - correctness: from hidden_results (if key exists), else False
+      - correctness: standard compiled/correct AND hidden correct, else False
       - runtime / compiled / runtime_stats / etc: from standard_results
     Keys in hidden_results but not in standard_results are ignored (no runtime available).
     """
@@ -197,7 +197,10 @@ def merge_hidden_eval(standard_results: dict, hidden_results: dict) -> dict:
     for key, std_entry in standard_results.items():
         merged[key] = dict(std_entry)  # copy runtime, compiled, etc.
         if key in hidden_results:
-            merged[key]["correctness"] = hidden_results[key].get("correctness", False)
+            merged[key]["correctness"] = bool(
+                std_entry.get("compiled") and std_entry.get("correctness")
+                and hidden_results[key].get("correctness", False)
+            )
         else:
             # No hidden result → treat as failed (could not be evaluated)
             merged[key]["correctness"] = False
@@ -227,6 +230,9 @@ def analyze_multi_sample_eval(run_name, hardware, baseline, level, use_hidden_ev
             hidden_results = json.load(f)
         eval_results = merge_hidden_eval(eval_results, hidden_results)
         print(f"[Hidden eval] Using correctness from {hidden_file_path}, runtime from {eval_file_path}")
+
+    from kb_workflows.common import apply_score_gate
+    eval_results = apply_score_gate(eval_results, Path(runs_dir) / run_name)
 
     baseline_lookup = build_baseline_lookup(baseline_results, level)
     baseline_memory_lookup = build_baseline_memory_lookup(baseline_results, level)

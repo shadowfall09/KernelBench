@@ -76,8 +76,13 @@ def fingerprint(payload: dict):
 
 def evaluator_digest():
     digest = hashlib.sha256()
-    for name in ("src/eval.py", "src/utils.py", "src/validation.py", "kb_workflows/evaluate_task.py",
-                 "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py", "requirements.txt"):
+    for name in (
+        "src/eval.py", "src/utils.py", "src/validation.py", "requirements.txt",
+        "kb_workflows/evaluate_task.py", "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py",
+        "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
+        "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
+    ):
+        digest.update(name.encode())
         digest.update((ROOT / name).read_bytes())
     return digest.hexdigest()
 
@@ -104,3 +109,53 @@ def json_safe(value):
     if isinstance(value, (str, int, bool, type(None))):
         return value
     return str(value)
+
+
+def apply_score_gate(results, run_dir):
+    """Bind legacy performance metrics to current measurement and source evidence."""
+    run_dir = Path(run_dir)
+    scored = read_json(run_dir / "eval_results_scored.json", {})
+    config = read_json(run_dir / "run_config.json", {})
+    standard = read_json(run_dir / "eval_results.json", {})
+    hidden = read_json(run_dir / "eval_results_hidden.json", {})
+    digest = None
+    gated = {}
+    for key, raw in results.items():
+        options = raw.get("metadata", {}).get("evaluation_config", {})
+        required = options.get("score_gate_required", config.get("score_gate_required", False)) or options.get("anti_cheat", False)
+        if not required:
+            gated[key] = raw
+            continue
+        if digest is None:
+            digest = evaluator_digest()
+        entry = scored.get(key, {})
+        metadata = entry.get("metadata", {})
+        labels = [metadata.get(field, "") for field in
+                  ("score_kernel_name", "score_hardware", "score_baseline_name", "score_reference_name")]
+        valid_labels = all(isinstance(label, str) and label not in {"", ".", ".."}
+                           and Path(label).name == label for label in labels)
+        valid = False
+        if valid_labels:
+            kernel_name_, hardware, baseline_name, reference_name = labels
+            kernel = run_dir / kernel_name_
+            baselines = read_json(ROOT / "results/timing" / hardware / f"{baseline_name}.json", {})
+            baseline = baselines.get(f"level{metadata.get('score_level')}", {}).get(reference_name, {})
+            secret = hidden.get(key, {}) if metadata.get("score_hidden_required") else standard.get(key, {})
+            level, pid = metadata.get("score_level"), metadata.get("score_problem_id")
+            reference = ROOT / "KernelBench" / f"level{level}" / reference_name
+            hidden_path = ROOT / "hidden_tests" / f"level{level}" / f"{pid}_hidden.py"
+            hidden_source_matches = (not metadata.get("score_hidden_required") or (
+                hidden_path.is_file() and secret.get("metadata", {}).get("evaluation_config", {}).get("hidden_source_sha256")
+                == hashlib.sha256(hidden_path.read_bytes()).hexdigest()))
+            valid = (metadata.get("score_policy") == "measurement_and_compatibility_v1"
+                     and metadata.get("score_gate_evaluator_sha256") == digest and kernel.is_file()
+                     and metadata.get("kernel_sha256") == fingerprint({"source": kernel.read_text()})
+                     and metadata.get("score_standard_sha256") == fingerprint(standard.get(key, {}))
+                     and metadata.get("score_hidden_sha256") == fingerprint(secret)
+                     and metadata.get("score_baseline_sha256") == fingerprint(baseline)
+                     and reference.is_file() and metadata.get("reference_sha256") == fingerprint({"source": reference.read_text()})
+                     and hidden_source_matches and metadata.get("score_run_config_sha256") == fingerprint(config))
+        gated[key] = {**raw, "correctness": bool(valid and entry.get("correctness") and raw.get("correctness")),
+                      "metadata": {**raw.get("metadata", {}), "score_gate_applied": True,
+                                   "score_gate_status": metadata.get("score_gate_status") if valid else "missing_or_stale_score_evidence"}}
+    return gated

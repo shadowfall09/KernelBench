@@ -26,6 +26,7 @@ def settings(config, hidden=False):
         "timing_method": "synchronized_wall",
         "baseline_suite": config.baseline_suite,
         "cold_calls": config.cold_calls,
+        "score_gate_required": config.score_gate_required,
         "evaluator_sha256": evaluator_digest(),
     }
 
@@ -187,17 +188,19 @@ def analyze_run(config):
         raise ValueError("Specify --hardware to choose the matching baseline")
     from scripts.benchmark_eval_analysis import analyze_multi_sample_eval
 
-    selected = select_problems(config.level, config.start, config.end)
-    return analyze_multi_sample_eval(
-        config.run_name,
-        config.hardware,
-        config.baseline,
-        config.level,
-        use_hidden_eval=config.hidden_tests,
-        problem_ids=list(selected),
-        runs_dir=config.runs_dir,
-        detail_limit=30,
-    )
+    from .paper_analysis import analyze_paper
+
+    report = analyze_paper(config)
+    try:
+        analyze_multi_sample_eval(
+            config.run_name, config.hardware, config.baseline, config.level,
+            use_hidden_eval=config.hidden_tests,
+            problem_ids=list(select_problems(config.level, config.start, config.end)),
+            runs_dir=config.runs_dir, detail_limit=30,
+        )
+    except (ValueError, AssertionError) as exc:
+        print(f"Legacy summary unavailable: {exc}", flush=True)
+    return report
 
 
 def record_baseline_suite(config):

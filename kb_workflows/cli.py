@@ -4,7 +4,7 @@ import json
 import sys
 from contextlib import nullcontext
 
-from .common import ROOT, atomic_json, read_json, select_problems
+from .common import ROOT, atomic_json, evaluator_digest, read_json, select_problems
 from .config import parse_config
 
 
@@ -55,6 +55,7 @@ def main(argv=None):
             missing_baseline = any(
                 not isinstance(baseline_data.get(path.name), dict)
                 or not (baseline_data[path.name].get("mean") or 0) > 0
+                or baseline_data[path.name].get("metadata", {}).get("evaluation_config", {}).get("evaluator_sha256") != evaluator_digest()
                 or (config.baseline_suite and not baseline_data[path.name].get("suite_complete"))
                 for path in selected.values()
             )

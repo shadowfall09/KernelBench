@@ -110,6 +110,7 @@ def prepare_job(config, pid, sid):
         runs_dir=str(directory / "runs"),
         build_image=False,
         record_baseline=False,
+        problem_specs="",  # Layer specifications are used only by parent analysis.
     )
     # Evaluation inside a GPU container/sandbox uses its allocated device 0.
     if config.generation == "docker" and config.evaluation == "docker":

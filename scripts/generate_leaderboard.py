@@ -34,6 +34,7 @@ from scripts.benchmark_eval_analysis import (
     parse_eval_results,
     patch_sample,
 )
+from kb_workflows.common import apply_score_gate
 from src.dataset import construct_kernelbench_dataset
 
 
@@ -441,6 +442,7 @@ def assemble_data(hardware: str, baseline_name: str, run_suffix: str = "_test",
                     print(f"         These may be legitimate kernels that timed out. Re-run hidden eval to recover them.")
                 print(f"  [hidden] {run_name}: merged {len(hidden_results)} hidden eval entries")
 
+        eval_results = apply_score_gate(eval_results, os.path.join(runs_dir, run_name))
         by_sample, _, sample_ids = parse_eval_results(eval_results)
 
         # Patch missing entries so every sample has all problem IDs

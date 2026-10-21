@@ -285,3 +285,31 @@ New baseline filenames end in `_wall`; do not reuse CUDA-event baselines.
 
 The added regression suite passes on CPU and simulated CUDA scheduling. Real GPU,
 compile, CUDA Graph and the pinned Torch 2.12.0 toolchain still require validation.
+
+## Failure-inclusive scoring and recovery
+
+`--stage analyze` first writes `paper_analysis.json` and `eval_results_scored.json`,
+then produces the existing Verified summary when its inputs are available. Keep
+the same declared range, sample count, precision, backend and call budget across
+stages. Every declared problem/sample slot remains in the new score denominator;
+failed, missing, stale or incompatible slots earn zero. Eligible variants are
+reselected by amortized cost at K, and a positive bounded log-gain score additionally
+requires non-overlapping steady mean intervals. Original Verified formulas remain.
+
+Optional `--problem-specs FILE` supports `{"level1":{"1":{"layer":"F"}}}` for
+I/F/D macro aggregation; otherwise entries are `unclassified`. Bootstrap intervals
+resample problems and declared sample slots. This version does not calibrate devices
+or certify cross-device scores.
+
+Compatibility checks require matching recorded device/software, reference/kernel
+sources, evaluation settings, wall-timing protocol, input signatures, varied-input
+verification receipts, raw timing samples and cold costs. Recovery fingerprints
+include the measurement, validation, baseline, configuration, orchestration,
+transport and analysis modules. Rebuild remote images/workers after changes.
+
+New batch results require scored evidence in the original analysis and leaderboard
+entrypoints as well. Their gate rejects changed or missing kernels, reference or
+hidden source, configuration, raw results, baseline records and evaluator versions.
+Legacy runs without this policy retain their original behavior. Correctness/pass@k
+and performance eligibility remain separate. Full H1-H14 auditing, sanitizers and
+independent retests are deferred; reports explicitly do not certify anti-cheat.

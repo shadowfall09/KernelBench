@@ -53,6 +53,8 @@ class RunConfig:
     compile_mode: str = "default"
     baseline_suite: bool = True
     cold_calls: int = 10000
+    problem_specs: str = ""
+    score_gate_required: bool = True
     profile: str = ""
     model: str = ""
     small_model: str = ""
@@ -92,6 +94,10 @@ class RunConfig:
             raise ValueError("Queue polling interval and HTTP timeout must be positive")
         if not math.isfinite(self.fp32_tolerance) or self.fp32_tolerance <= 0:
             raise ValueError("FP32 tolerance must be finite and positive")
+        if self.problem_specs:
+            self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
+            if not Path(self.problem_specs).is_file():
+                raise ValueError(f"Problem specs file not found: {self.problem_specs}")
         if self.baseline_suite and self.compile_backend:
             raise ValueError("Use --baseline-suite or --compile-backend, not both")
         devices = self.gpus.split(",")
@@ -180,6 +186,7 @@ def parser():
         "queue_result_path",
         "modal_secret",
         "pass_at_k",
+        "problem_specs",
     ):
         p.add_argument(
             f"--{name.replace('_', '-')}",
@@ -187,7 +194,7 @@ def parser():
             default=getattr(RunConfig(), name),
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("resume", "enable_ncu", "hidden_tests", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite"):
+    for name in ("resume", "enable_ncu", "hidden_tests", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=getattr(RunConfig(), name))
         p.add_argument(f"--no-{flag}", dest=name, action="store_false")
