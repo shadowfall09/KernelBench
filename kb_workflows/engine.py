@@ -155,6 +155,41 @@ def write_pass_at_k(config):
             "averages": {f"avg_pass@{k}": sum(p[f"pass@{k}"] for p in problems.values()) / len(problems) for k in ks},
         },
     )
+    write_validation_summary(config, standard, hidden)
+
+
+def write_validation_summary(config, standard=None, hidden=None):
+    """Keep compilation, numeric correctness and measured performance distinct."""
+    standard = read_json(config.run_dir / "eval_results.json", {}) if standard is None else standard
+    if hidden is None:
+        hidden = read_json(config.run_dir / "eval_results_hidden.json", {}) if config.hidden_tests else standard
+    counts = dict(declared_samples=0, compiled_samples=0, standard_correct_samples=0,
+                  hidden_correct_samples=0, correct_samples=0, timed_correct_samples=0)
+    rows = []
+    for pid in select_problems(config.level, config.start, config.end):
+        for sid in range(config.num_samples):
+            key = f"{pid}_{sid}"
+            raw, secret = standard.get(key, {}), hidden.get(key, {})
+            compiled = bool(raw.get("compiled"))
+            standard_ok = compiled and bool(raw.get("correctness"))
+            hidden_ok = bool(secret.get("compiled") and secret.get("correctness")) if config.hidden_tests else standard_ok
+            correct = standard_ok and hidden_ok
+            runtime = raw.get("runtime")
+            timed = correct and type(runtime) in (int, float) and math.isfinite(runtime) and runtime > 0
+            for field, passed in (("declared_samples", True), ("compiled_samples", compiled),
+                                  ("standard_correct_samples", standard_ok), ("hidden_correct_samples", hidden_ok and config.hidden_tests),
+                                  ("correct_samples", correct), ("timed_correct_samples", timed)):
+                counts[field] += int(passed)
+            rows.append({"problem_id": pid, "sample_id": sid, "compiled": compiled,
+                         "standard_correct": standard_ok, "hidden_correct": hidden_ok if config.hidden_tests else None,
+                         "correct": correct, "timed_correct": timed,
+                         "numeric_stress_enabled": secret.get("metadata", {}).get("numeric_stress_enabled", False),
+                         "checks": secret.get("metadata", {}).get("hidden_completed_checks", 0)})
+    report = {"hidden_tests_enabled": config.hidden_tests, "counts": counts, "samples": rows,
+              "purpose": "raw_stage_diagnostics", "score_eligibility_checked": False,
+              "functional_validity_certified": False}
+    atomic_json(config.run_dir / "validation_summary.json", report)
+    return report
 
 
 def record_baseline(config):
@@ -190,6 +225,7 @@ def analyze_run(config):
 
     from .paper_analysis import analyze_paper
 
+    write_validation_summary(config)
     report = analyze_paper(config)
     try:
         analyze_multi_sample_eval(

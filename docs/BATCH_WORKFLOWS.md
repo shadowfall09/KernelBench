@@ -69,7 +69,7 @@ Modal defaults that label to `--gpu`.
 Every run defaults to two phases:
 
 1. Standard correctness, synchronized wall timing and peak GPU memory measurement; every timed output is verified on freshly generated inputs.
-2. Hidden correctness using the repository's four input distributions; no repeated timing.
+2. Hidden correctness using the repository's four input distributions regenerated under three seeds, plus domain-reviewed stress cases; no repeated timing.
 
 Results use Verified's flat `"problem_id_sample_id"` keys, so its analysis and
 leaderboard scripts can read them directly. Reported correctness is gated by the
@@ -313,3 +313,26 @@ hidden source, configuration, raw results, baseline records and evaluator versio
 Legacy runs without this policy retain their original behavior. Correctness/pass@k
 and performance eligibility remain separate. Full H1-H14 auditing, sanitizers and
 independent retests are deferred; reports explicitly do not certify anti-cheat.
+
+
+## Research-informed correctness checks
+
+Standard and hidden correctness now compare both candidate→reference and
+reference→candidate pairs with isolated inputs, output snapshots and RNG replay.
+Hidden generators run separately under seeds 42, 123 and 456. For 29 reviewed
+Level 1 tasks, the first hidden configuration additionally exercises zeros,
+32× values and sparse Gaussian outliers. Empty suites and reference failures
+cannot count as successful validation. These checks are enabled in both native
+and batch evaluation; `--no-hidden-tests` disables the hidden stage as before.
+
+`validation_summary.json` reports compilation, standard/hidden correctness and
+positive finite timing counts over all declared samples, including missing ones.
+It is a raw diagnostic, not the performance score or an anti-cheat certificate.
+The existing scored-results gate still controls performance eligibility.
+New protocol code participates in the evaluator digest, invalidating old resume
+records. Verifier images/checkouts must be updated together with the client.
+
+See [sources, task coverage, costs and limits](RELIABILITY.md). The original
+four-config hidden suite now runs 12 configuration checks, or 21 for adapted
+tasks; each check has two paired calls per implementation. Performance inputs
+and the synchronized wall timing protocol remain as documented above.

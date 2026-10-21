@@ -20,6 +20,8 @@ and license are retained below. Earlier fork versions remain in Git history.
 
 See the Chinese [feature inventory](docs/FEATURE_INVENTORY.md) for versioned improvements over Verified, including batch workflows and the separately committed correctness validation fixes.
 
+The evaluator also includes [research-informed reliability checks](docs/RELIABILITY.md): candidate/reference order checks, three-seed hidden validation, and domain-reviewed numerical stress cases for 29 Level 1 tasks. Compilation, numerical correctness, and timed results are reported separately in `validation_summary.json`.
+
 This checkout also includes the Docker/Slurm, Modal, local verification queue and
 baseline-analysis workflows migrated from `KernelBench-modified`. They share
 `scripts/run_batch.py`, default to Verified hidden correctness gating and preserve

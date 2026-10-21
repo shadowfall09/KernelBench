@@ -22,6 +22,7 @@ import sys
 from kb_workflows.measurement import CLOCK, input_signature, synchronized_times, timing_stats
 
 from . import utils
+from .reliability import HIDDEN_SEEDS, check_paired_calls, stress_cases, stress_enabled
 from .validation import clone_tensors, compare_outputs, synchronize
 
 REPO_TOP_PATH = os.path.abspath(
@@ -400,6 +401,7 @@ def run_correctness_on_fixed_inputs(
     device=None,
     precision: torch.dtype = torch.float32,
     config_label: str = "",
+    seed: int = 42,
 ) -> bool:
     """
     Run one correctness check on a fixed list of pre-generated inputs.
@@ -410,41 +412,18 @@ def run_correctness_on_fixed_inputs(
     This is used for hidden test configs where inputs are fixed and deterministic.
     """
     inputs = [_process_input_tensor(x, device, precision) for x in raw_inputs]
-
     with torch.no_grad():
-        model = original_model_instance.to(device=device, dtype=precision)
-        model_new = new_model_instance.to(device=device, dtype=precision)
-
-        try:
-            set_seed(42)
-            output = clone_tensors(model(*clone_tensors(inputs)))
-            synchronize(device)
-        except Exception as e:
-            if verbose:
-                print(f"[Hidden] Reference model failed on {config_label}: {e}")
-            # Reference failed → skip this config (not a kernel issue)
-            return True  # Don't penalize the custom kernel for this
-
-        try:
-            set_seed(42)
-            output_new = model_new(*clone_tensors(inputs))
-            synchronize(device)
-        except Exception as e:
-            if verbose:
-                print(f"[Hidden] Custom model failed on {config_label}: {e}")
-            metadata.setdefault("hidden_runtime_error", []).append(
-                f"{config_label}: {str(e)[:200]}"
-            )
-            return False
-
-        issue = compare_outputs(output, output_new, get_tolerance_for_precision(precision))
-        if issue:
-            metadata["hidden_correctness_issue"] = f"{config_label}: {issue}"
-            if verbose:
-                print(f"[Hidden] Output mismatch on {config_label}: {issue}")
-            return False
-
-    return True
+        issue = check_paired_calls(
+            original_model_instance.to(device=device, dtype=precision),
+            new_model_instance.to(device=device, dtype=precision), inputs,
+            seed=seed, tolerance=get_tolerance_for_precision(precision), device=device,
+            set_seed=set_seed, metadata=metadata, label=config_label,
+        )
+    if issue:
+        metadata["hidden_correctness_issue"] = issue
+        if verbose:
+            print(f"[Hidden] FAIL: {issue}")
+    return issue is None
 
 
 def run_hidden_correctness_check(
@@ -456,55 +435,47 @@ def run_hidden_correctness_check(
     device=None,
     precision: torch.dtype = torch.float32,
 ) -> bool:
+    """Regenerate every hidden config under three seeds; every check must execute.
+
+    Reviewed tasks additionally stress their first nominal config. Reference errors
+    invalidate validation rather than silently counting as successful checks.
     """
-    Run all hidden test configs for correctness.
-    Returns True only if ALL configs pass (or if hidden test file is not found).
-
-    The hidden configs use adversarial input distributions (Gaussian, large magnitude,
-    near-zero) and shape variants to expose approximate-math and benchmark-constant hacks.
-
-    Note: The original standard test (torch.rand, default shape) is NOT included here.
-    Hidden configs are the ONLY basis for the correctness gate and performance metric.
-    """
-    hidden_configs = load_hidden_inputs(hidden_test_path)
-
-    if hidden_configs is None:
-        raise RuntimeError(
-            f"[Hidden] FATAL: use_hidden_tests=True but failed to load {hidden_test_path}. "
-            "Cannot silently fall back — aborting eval."
-        )
-
-    if verbose:
-        print(f"[Hidden] Running {len(hidden_configs)} hidden correctness configs from {hidden_test_path}")
-
     failed_configs = []
-    for i, raw_inputs in enumerate(hidden_configs):
-        config_label = f"config_{i + 1}"
-        passed = run_correctness_on_fixed_inputs(
-            original_model_instance,
-            new_model_instance,
-            raw_inputs,
-            metadata,
-            verbose=verbose,
-            device=device,
-            precision=precision,
-            config_label=config_label,
-        )
-        if not passed:
-            failed_configs.append(config_label)
-            if verbose:
-                print(f"[Hidden] FAIL on {config_label}")
+    completed = 0
+    metadata["hidden_validation_seeds"] = list(HIDDEN_SEEDS)
+    metadata["numeric_stress_enabled"] = stress_enabled(hidden_test_path)
+    for seed in HIDDEN_SEEDS:
+        set_seed(seed)
+        hidden_configs = load_hidden_inputs(hidden_test_path)
+        if not isinstance(hidden_configs, (list, tuple)) or not hidden_configs:
+            metadata["hidden_validation_error"] = f"seed {seed}: missing, malformed or empty hidden suite"
+            raise RuntimeError(f"[Hidden] {metadata['hidden_validation_error']}: {hidden_test_path}")
+        for i, raw_inputs in enumerate(hidden_configs):
+            if not isinstance(raw_inputs, (list, tuple)):
+                metadata["hidden_validation_error"] = f"seed {seed}/config_{i + 1}: inputs must be a list or tuple"
+                raise RuntimeError(f"[Hidden] {metadata['hidden_validation_error']}")
 
-    if failed_configs:
-        metadata["hidden_failed_configs"] = failed_configs
-        if verbose:
-            print(f"[Hidden] {len(failed_configs)}/{len(hidden_configs)} configs FAILED")
-        return False
+            def variants():
+                yield "nominal", raw_inputs
+                if i == 0 and metadata["numeric_stress_enabled"]:
+                    yield from stress_cases(raw_inputs, seed)
 
-    metadata["hidden_correctness_trials"] = f"({len(hidden_configs)}/{len(hidden_configs)} hidden configs passed)"
-    if verbose:
-        print(f"[Hidden] All {len(hidden_configs)} hidden configs PASSED")
-    return True
+            for name, inputs in variants():
+                label = f"seed_{seed}/config_{i + 1}/{name}"
+                passed = run_correctness_on_fixed_inputs(
+                    original_model_instance, new_model_instance, inputs, metadata,
+                    verbose=verbose, device=device, precision=precision,
+                    config_label=label, seed=seed,
+                )
+                completed += 1
+                if not passed:
+                    failed_configs.append(label)
+        # Release this seed's tensors before generating the next seed's suite.
+        del hidden_configs, raw_inputs, inputs
+    metadata["hidden_failed_configs"] = failed_configs
+    metadata["hidden_completed_checks"] = completed
+    metadata["hidden_correctness_trials"] = f"({completed - len(failed_configs)}/{completed} hidden configs passed)"
+    return not failed_configs
 
 
 def measure_hidden_speedup(
@@ -636,7 +607,7 @@ def eval_kernel_against_ref(
     try:
         os.environ["TORCH_USE_CUDA_DSA"] = "1"  # compile with device side assertion
         # add hash for later to distinguish between multi-turn kernels
-        ModelNew = load_custom_model(custom_model_src, context, build_dir)
+        ModelNew = load_custom_model(custom_model_src, {}, build_dir)
         torch.cuda.synchronize(device=device)  # not sure if this is too much
     except Exception as e:
         print(
@@ -708,8 +679,7 @@ def eval_kernel_against_ref(
 
     # Hidden Correctness Check [Optional] | run after standard correctness
     # Only runs if hidden_test_path is provided; uses adversarial distributions & shape variants.
-    # Per design: the original standard test (torch.rand) is EXCLUDED from correctness gating.
-    # A kernel must pass ALL hidden configs to be marked correct.
+    # Standard correctness and every hidden config must pass to mark a kernel correct.
     if hidden_test_path is not None and kernel_exec_result and kernel_exec_result.correctness:
         print(f"[Hidden] Running hidden correctness check: {os.path.basename(hidden_test_path)}")
         try:
@@ -859,81 +829,32 @@ def run_and_check_correctness(
 
     num_correct_trials: run the evalutation multiple times with (ideally) different random inputs to ensure correctness
     """
-    pass_count = 0
-
-    # Generate num_correct_trials seeds deterministically from the initial seed
-    torch.manual_seed(seed)
-    correctness_trial_seeds = [
-        torch.randint(0, 2**32 - 1, (1,)).item() for _ in range(num_correct_trials)
-    ]
-
-    with torch.no_grad():
-
-        for trial in range(num_correct_trials):
-
-            trial_seed = correctness_trial_seeds[trial]
-            if verbose:
-                print(f"[Eval] Generating Random Input with seed {trial_seed}")
-
-            set_seed(trial_seed)
-            inputs = get_inputs_fn()
-            inputs = [_process_input_tensor(x, device, precision) for x in inputs]
-
-            set_seed(trial_seed)
-            model = original_model_instance.to(device=device, dtype=precision)
-
-            set_seed(trial_seed)
-            model_new = new_model_instance.to(device=device, dtype=precision)
-
-            set_seed(trial_seed)
-            output = clone_tensors(model(*clone_tensors(inputs)))
-            synchronize(device)
-            # ensure all GPU operations are completed before checking results
-
-            try:
-                set_seed(trial_seed)
-                fresh = clone_tensors(inputs)
-                synchronize(device)
-                first_call_started = CLOCK()
-                output_new = model_new(*fresh)
-                synchronize(device)
-                if trial == 0:
-                    metadata["first_forward_ms"] = (CLOCK() - first_call_started) * 1000
-                    metadata["cold_start_ms"] = metadata.get("candidate_setup_ms", 0) + metadata["first_forward_ms"]
-                issue = compare_outputs(output, output_new, get_tolerance_for_precision(precision))
-                if issue:
-                    metadata["correctness_issue"] = issue
-                    if verbose:
-                        print(f"[FAIL] trial {trial}: {issue}")
-                else:  # pass
-                    pass_count += 1
-                    if verbose:
-                        print(f"[PASS] trial {trial}: New Model matches Model")
-
-            except Exception as e:
-                print("[Error] Exception happens during correctness check")
-                print(f"Error in launching kernel for ModelNew: {e}")
-
-                metadata = register_and_format_exception(
-                    "runtime_error", e, metadata, truncate=True
-                )
-                return KernelExecResult(
-                    compiled=True, correctness=False, metadata=metadata
-                )
-                # break
-
-    if verbose:
-        print(
-            f"[Eval] Pass count: {pass_count}, num_correct_trials: {num_correct_trials}"
-        )
-
-    # put all the useful info here!
-    metadata["correctness_trials"] = f"({pass_count} / {num_correct_trials})"
-
-    if pass_count == num_correct_trials:
-        return KernelExecResult(compiled=True, correctness=True, metadata=metadata)
-    else:
+    if num_correct_trials <= 0:
+        metadata["correctness_issue"] = "Correctness requires at least one trial"
         return KernelExecResult(compiled=True, correctness=False, metadata=metadata)
+    pass_count = 0
+    generator = torch.Generator().manual_seed(seed)
+    seeds = torch.randint(0, 2**32 - 1, (num_correct_trials,), generator=generator).tolist()
+    with torch.no_grad():
+        model = original_model_instance.to(device=device, dtype=precision)
+        model_new = new_model_instance.to(device=device, dtype=precision)
+        for trial, trial_seed in enumerate(seeds):
+            set_seed(trial_seed)
+            inputs = [_process_input_tensor(x, device, precision) for x in get_inputs_fn()]
+            issue = check_paired_calls(
+                model, model_new, inputs, seed=trial_seed,
+                tolerance=get_tolerance_for_precision(precision), device=device,
+                set_seed=set_seed, metadata=metadata, label=f"standard_{trial + 1}",
+                record_first_call=trial == 0, clock=CLOCK,
+            )
+            if issue:
+                metadata["correctness_issue"] = issue
+                if verbose:
+                    print(f"[FAIL] {issue}")
+            else:
+                pass_count += 1
+    metadata["correctness_trials"] = f"({pass_count} / {num_correct_trials})"
+    return KernelExecResult(compiled=True, correctness=pass_count == num_correct_trials, metadata=metadata)
 
 
 def check_metadata_serializable(metadata: dict):

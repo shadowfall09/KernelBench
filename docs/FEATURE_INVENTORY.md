@@ -1,8 +1,8 @@
 # 相比 KernelBench-Verified 的功能改进清单
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查。
 
-当前已提交能力为第一至第四版的累计功能。其余本地评测增强暂缓，未纳入已提交清单。
+当前已提交能力为第一至第五版的累计功能。此前的评测完整性整合与文件清理已保存为 stash，继续暂缓，未混入第五版。
 
 ## 第一版：Verified + 批量工作流
 
@@ -185,6 +185,40 @@ git log -1 --format='%h %s' --grep='^Add failure-inclusive scoring and evidence-
 验证：Python 3.10 / Torch 2.9.0 下，**114 项测试通过**，含 30 项新增评分/恢复回归及第三版的 84 项测试。新增测试为 [test_scoring_recovery.py](../tests/test_scoring_recovery.py)，覆盖失败分母、置信区间、冷成本、兼容性、证据失效、旧分析接入、指纹变化重跑、过期基线重测、worker 版本拒绝和子验证器配置传递。Ruff 对工作流/共享验证/测试模块、目标模块编译与 diff 检查通过。
 
 这里的资格只证明本版要求的测量与兼容性证据齐备，报告明确写 `anti_cheat_verified=false`、`cross_device_comparison_certified=false`；不等于 H1–H14 通过。没有完整反作弊模块时，不接受标为反作弊评测的结果获得资格。置信区间为近似统计，冷成本为一次观测，不构成正式的性能或安全证明。真实 CUDA、Torch 2.12.0、跨设备实验、根因探针、sanitizer 和独立最终重测继续暂缓。
+
+## 第五版：参考相关工作的可靠性检查
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Strengthen correctness checks from kernel benchmark research |
+| 日期 | 2026-10-21 |
+| 基础提交 | `81c7055` |
+| 本版提交 | 实现、测试、来源说明和本节在同一提交；用下方命令定位 |
+| 状态 | 已提交；172 项 CPU/模拟测试通过；真实 GPU 验证尚未完成 |
+
+```bash
+git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel benchmark research$'
+```
+
+本次核对了 KernelBench-Hard、KernelBenchX、robust-kbench 的论文/源码及 TritonRL 论文，按当前题目与工作流独立适配。各项来源、固定上游 commit、采用与未采用部分见 [可靠性说明](RELIABILITY.md)。
+
+| 编号 | 功能 | 具体变化与来源 | 实现入口 |
+| --- | --- | --- | --- |
+| V5-01 | 参考前后配对检查 | 借鉴 robust-kbench 的前后调用，标准与隐藏检查均执行 C→R、R→C 两组，两个模型调用次数一致；同步、重放 RNG、输入隔离与输出快照防止当前参考缓存和共享缓冲污染。 | `src/reliability.py`、`src/eval.py` |
+| V5-02 | 隔离源码全局字典与后端设置 | 候选同名变量/函数不能覆盖参考定义；每次 forward 后恢复共享后端设置，防止候选改变精度设置影响参考比较。属于本地配套实现，不声称提供安全沙箱。 | `src/eval.py`、`src/reliability.py` |
+| V5-03 | 三个种子重新生成隐藏输入 | 借鉴 Hard 的三种子验证，分别在 42、123、456 下调用可信隐藏生成器，全部配置必须通过。硬编码生成器仍可能返回相同内容。 | `src/eval.py`：`run_hidden_correctness_check` |
+| V5-04 | 按输入域限定的数值压力测试 | 借鉴 Hard 的按题压力输入及 KernelBenchX 的 0.1%/×50 离群分布。29 道 Level 1 题的首个隐藏配置增加零值、×32 和稀疏离群值；不改变 shape/stride/dtype 或其他输入，不把扰动施加到未经核对的受限域。 | `src/reliability.py`：`STRESS_TASKS`、`stress_cases` |
+| V5-05 | 无效验证不能算通过 | 空、缺失、格式错误的隐藏集显式报错；参考报错记录来源并判验证失败；标准零次测试不能通过。是落实“所有配置必须实际验证”的本地修补。 | `src/eval.py`、`src/reliability.py` |
+| V5-06 | 分阶段诊断与逐项收据 | 参考 KernelBenchX/TritonRL 对编译、正确性、性能的区分，新增 `validation_summary.json`，失败/缺失样本保留分母；metadata 保存种子、配置、调用顺序和失败来源。阶段诊断不代替第四版的计分资格，也不证明功能合法性。 | `kb_workflows/engine.py`、`src/reliability.py` |
+| V5-07 | 新协议参与恢复指纹 | 新可靠性模块纳入 evaluator digest，使旧缓存不能继续冒充新协议结果；沿用既有 worker 版本核对和过期证据拒绝。 | `kb_workflows/common.py` |
+
+验证：Python 3.10 / Torch 2.9.0 下 **172 passed**，其中新增 [test_reliability.py](../tests/test_reliability.py) 的 58 项，原有 114 项全部通过。覆盖全部 29 道适配题的小形状真实 CPU 参考执行，以及缓存答案、第二次调用错误、无效隐藏集、非法域排除、源码全局覆盖和恢复指纹回归。Ruff 与 diff 检查通过。
+
+范围与成本：原四配置隐藏集变为每题 12 次配置检查；适配题增加压力输入后为 21 次，每配置两组配对。额外检查不进入稳态计时；首次候选 forward 提前到首次参考 forward 前，冷成本仍记录。Level 2/3 本次没有新增数值扰动。保留当前浮点容差与匹配 NaN/Inf 规则，没有迁入 Hard/X 题集、SOTA 外部库、TFLOPS/带宽评分、模型裁判或 backward 验证，不宣称完整反作弊通过。
+
+本次 Slurm GPU smoke 作业 50702 因 `Requested nodes are busy` 未能启动；真实 CUDA 和固定 Torch 2.12.0 尚未验证。
+
+原先未提交的整合与清理保存在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，本次没有恢复。以后恢复需处理与本版重叠的正确性入口，并重新验证。
 
 ## 维护方式
 
