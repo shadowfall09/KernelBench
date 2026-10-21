@@ -35,6 +35,16 @@ def task_name(level, pid, sid):
     return f"l{level}-p{pid}-s{sid}"
 
 
+def verification_timeout(config, pid):
+    from .baseline_variants import variants_for
+
+    count = len(variants_for(config, pid)) if config.baseline_suite else 1
+    count += 2 + 2 * config.final_repeats
+    if config.paired_timing:
+        count += config.final_repeats or 1
+    return count * config.timeout + 180
+
+
 def _compose(device):
     if not re.fullmatch(r"[A-Za-z0-9_-]+", device):
         raise ValueError("Harbor Docker device must be one numeric ID or GPU UUID")
@@ -121,7 +131,7 @@ The final verifier runs standard and multi-seed hidden correctness checks,
 measures synchronized wall time and compares against PyTorch baselines.
 It runs in a fresh environment; only /app/solution.py is submitted.
 """)
-    budget = (6 if config.baseline_suite else 3) * config.timeout + 180
+    budget = verification_timeout(config, pid)
     resources = f"""build_timeout_sec = 1800.0
 cpus = 4
 memory_mb = {config.harbor_memory_mb}
@@ -192,7 +202,7 @@ def run_harbor_agent(directory, config, pid, device=None, sid=0):
         process = subprocess.Popen(command, env=runtime_environment(config),
                                    stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
-            code = process.wait(timeout=config.agent_timeout + 4800 + 6 * config.timeout + 180)
+            code = process.wait(timeout=config.agent_timeout + 4800 + verification_timeout(config, pid))
         except subprocess.TimeoutExpired:
             return {"status": "timeout", "error": "Harbor job timed out", "harbor_job": str(jobs / job_name)}
         finally:

@@ -434,6 +434,7 @@ def run_hidden_correctness_check(
     verbose: bool = False,
     device=None,
     precision: torch.dtype = torch.float32,
+    seeds=None,
 ) -> bool:
     """Regenerate every hidden config under three seeds; every check must execute.
 
@@ -442,9 +443,13 @@ def run_hidden_correctness_check(
     """
     failed_configs = []
     completed = 0
-    metadata["hidden_validation_seeds"] = list(HIDDEN_SEEDS)
+    seeds = HIDDEN_SEEDS if seeds is None else seeds
+    if (not isinstance(seeds, (tuple, list)) or not seeds or len(set(seeds)) != len(seeds)
+            or any(type(seed) is not int or seed < 0 for seed in seeds)):
+        raise ValueError("Hidden seeds must be a nonempty list of distinct nonnegative integers")
+    metadata["hidden_validation_seeds"] = list(seeds)
     metadata["numeric_stress_enabled"] = stress_enabled(hidden_test_path)
-    for seed in HIDDEN_SEEDS:
+    for seed in seeds:
         set_seed(seed)
         hidden_configs = load_hidden_inputs(hidden_test_path)
         if not isinstance(hidden_configs, (list, tuple)) or not hidden_configs:
@@ -553,6 +558,7 @@ def eval_kernel_against_ref(
     device: torch.device = torch.cuda.current_device() if torch.cuda.is_available() else None, # have to run on GPU
     precision: torch.dtype = torch.float32,
     hidden_test_path: str = None,  # path to {pid}_hidden.py, or None to skip
+    hidden_seeds=None,
 ) -> KernelExecResult:
     """
     Evaluate the custom kernel against the original model
@@ -691,6 +697,7 @@ def eval_kernel_against_ref(
                 verbose=verbose,
                 device=device,
                 precision=precision,
+                **({"seeds": hidden_seeds} if hidden_seeds is not None else {}),
             )
             if not hidden_passed:
                 print("[Hidden] HIDDEN CHECK FAILED — marking kernel as incorrect")

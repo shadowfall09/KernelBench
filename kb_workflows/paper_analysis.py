@@ -115,6 +115,9 @@ def analyze_paper(config):
     research_rows = suite_rows(config.level, config.suite_role) if config.suite != "full" else {}
     digest = evaluator_digest()
     groups, rows, scored = {}, [], {}
+    auxiliary_files = {}
+    for name in (["final_manifest.json", "final_results.json"] if config.final_repeats else []) + (["paired_results.json"] if config.paired_timing else []):
+        auxiliary_files[name] = fingerprint(read_json(config.run_dir / name, {}))
     for pid, path in selected.items():
         layer = specs.get(str(pid), {}).get("layer", research_rows.get(pid, {}).get("layer", "unclassified"))
         layer_source = ("problem_specs" if "layer" in specs.get(str(pid), {}) else
@@ -158,6 +161,12 @@ def analyze_paper(config):
                 status = score_issue(raw, options, "standard") or status
                 if config.hidden_tests and status == "verified":
                     status = score_issue(secret, options, "hidden") or status
+            final_results = []
+            if status == "verified" and config.final_repeats:
+                from .final_verification import validate
+
+                issue, final_results = validate(config, pid, sid, baseline)
+                status = issue or status
             # A future audit-enabled result cannot claim its unfinished gates here.
             if status == "verified" and raw.get("metadata", {}).get("evaluation_config", {}).get("anti_cheat"):
                 status = "anti_cheat_evidence_not_implemented_in_this_version"
@@ -180,17 +189,43 @@ def analyze_paper(config):
                 else:
                     winner = min(cold_options, key=cold_options.get)
                     chosen = options[winner]
+                    # Final repeats use all declared fresh processes, never their fastest member.
+                    final_stats = None
+                    if final_results:
+                        from .final_verification import timing_summary
+
+                        final_stats = timing_summary(final_results)
+                    candidate_steady = final_stats["mean"] if final_stats else raw["runtime"]
+                    baseline_steady = chosen["mean"]
+                    paired = None
+                    if config.paired_timing:
+                        from .paired_task import validate_for_score
+
+                        issue, paired = validate_for_score(config, pid, sid, winner, chosen)
+                        if issue:
+                            status = issue
+                        else:
+                            candidate_steady, baseline_steady = paired["candidate_mean_ms"], paired["reference_mean_ms"]
                     reference, runtime = cold_options[winner], amortized(
-                        raw["runtime"], raw["metadata"]["cold_start_ms"], config.cold_calls)
+                        candidate_steady, raw["metadata"]["cold_start_ms"], config.cold_calls)
+                    if paired:
+                        reference = amortized(baseline_steady, chosen["cold_start_ms"], config.cold_calls)
                     b_ci = chosen.get("mean_ci95_ms")
-                    c_ci = raw.get("runtime_stats", {}).get("mean_ci95_ms")
+                    c_stats = final_stats or raw.get("runtime_stats", {})
+                    c_ci = c_stats.get("mean_ci95_ms")
                     separated = (isinstance(b_ci, list) and isinstance(c_ci, list) and len(b_ci) == len(c_ci) == 2
-                                 and chosen.get("num_trials", 0) >= 2 and raw.get("runtime_stats", {}).get("num_trials", 0) >= 2
+                                 and chosen.get("num_trials", 0) >= 2 and c_stats.get("num_trials", 0) >= 2
                                  and all(map(valid_time, b_ci + c_ci)) and c_ci[1] < b_ci[0])
+                    if paired:
+                        separated = paired["significantly_faster"]
+                        row.update(paired_speedup_ci95=paired["speedup_ci95"], noise_ci95=paired["reference_control_ci95"],
+                                   paired_trial_count=paired["num_pairs"], paired_repeat_groups=paired["independent_repeat_groups"])
+                    if final_results:
+                        row.update(final_remeasurement_count=len(final_results), final_runtime_mean_ms=candidate_steady)
                     row.update(speedup=baseline["mean"] / raw["runtime"], cold_calls=config.cold_calls,
                                cold_winning_baseline=winner, amortized_speedup=reference / runtime,
                                significantly_faster=bool(separated), score_cost_policy="declared_K_amortized; cold_cost_point_estimate")
-                    row["score"] = bounded_gain(reference, runtime) if separated else 0
+                    row["score"] = bounded_gain(reference, runtime) if separated and status == "verified" else 0
                     slots[-1] = row["score"]
             row["status"] = status
             entry = {**raw, "metadata": dict(raw.get("metadata", {})), "correctness": status == "verified"}
@@ -202,6 +237,7 @@ def analyze_paper(config):
                 score_baseline_name=config.baseline, score_reference_name=path.name, score_level=config.level,
                 score_hidden_required=config.hidden_tests, score_policy="measurement_and_compatibility_v1",
                 score_problem_id=pid, score_run_config_sha256=fingerprint(read_json(config.run_dir / "run_config.json", {})),
+                score_auxiliary_files=auxiliary_files,
             )
             scored[key] = entry
         groups.setdefault(layer, []).append(slots)

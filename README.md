@@ -17,7 +17,7 @@ LICENSE file in the root directory of this source tree.
 - 生成支持本地、Docker、Modal 和 Harbor；验证支持本地、Docker、Modal 和 HTTP 队列。
 - GPU 型号、架构、设备和云端类型统一使用 TOML 配置；支持型号预设及自定义目标。
 - 原生生成接入 mini-swe-agent：支持 one-shot 和有预算的反馈循环，开发反馈与最终隐藏评测分开。
-- 默认比较 eager、torch.compile default、max-autotune、CUDA Graph 四种基线。
+- 默认比较四种基线，可配置扩展compile/Graph组合和可信框架改写；支持交替计时、噪声控制与冻结后独立重测。
 - 使用同步墙钟计时，逐次更换输入并校验输出，记录稳态耗时和冷启动成本。
 - 严格检查输出结构、shape、dtype、整数、bool 和非有限值；隐藏测试使用三个种子，29 道 Level 1 题另有数值压力测试。
 - 评分包含失败和缺失样本，恢复时核对源码、配置和测量证据。
@@ -104,6 +104,7 @@ python -m scripts.check_motivations
 | [Agent loops](docs/AGENT_LOOPS.md) | one-shot、mini-swe-agent 循环、预算、交互 skill 与比较 |
 | [Harbor 接入](docs/HARBOR.md) | 统一生成后端、任务导出与 reward |
 | [批量工作流](docs/BATCH_WORKFLOWS.md) | 各后端、恢复、基线与评分配置 |
+| [交替与最终计时](docs/PAIRED_TIMING.md) | 扩展基线、平衡配对、噪声控制、独立重测与恢复 |
 | [严格验证](docs/STRICT_VALIDATION.md) | FP64附加契约、输入/状态检查、证据等级与聚合消融 |
 | [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |
 | [输入盲化](docs/INPUT_BLIND_GENERATION.md) | 生成材料如何去掉测试输入 |

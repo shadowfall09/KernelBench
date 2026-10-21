@@ -5,6 +5,42 @@ from __future__ import annotations
 import math
 
 VARIANTS = ("eager", "compile_default", "compile_max_autotune", "cuda_graph")
+EXTENDED_VARIANTS = (*VARIANTS, "compile_default_cuda_graph", "compile_max_autotune_cuda_graph")
+
+
+def variants_for(config, pid):
+    if config.baseline_portfolio == "standard":
+        return VARIANTS
+    from .baseline_rewrites import rewrite_for
+    from .common import select_problems
+
+    source = select_problems(config.level, problem_ids=[pid])[pid].read_text()
+    return (*EXTENDED_VARIANTS, "library_rewrite", "library_rewrite_cuda_graph") if rewrite_for(config.level, pid, source) else EXTENDED_VARIANTS
+
+
+def prepare_baseline(model, args, device, variant, *, backend="", mode="default", rewrite=None):
+    import torch
+
+    from .baseline_rewrites import framework_rewrite
+
+    if variant not in {*EXTENDED_VARIANTS, "library_rewrite", "library_rewrite_cuda_graph"}:
+        raise ValueError(f"Unknown baseline variant: {variant}")
+    if variant.startswith("library_rewrite"):
+        if rewrite is None:
+            raise ValueError("No reviewed library rewrite for this task")
+        model = framework_rewrite(model, rewrite)
+    if variant.startswith("compile_"):
+        backend, mode = "inductor", "max-autotune" if variant.startswith("compile_max_autotune") else "default"
+        if variant.endswith("_cuda_graph") and mode == "max-autotune":
+            mode = "max-autotune-no-cudagraphs"  # The outer capture owns replay and its input copies.
+    if backend:
+        options = {"backend": backend}
+        if backend == "inductor":
+            options["mode"] = mode
+        model = torch.compile(model, **options)
+    if variant == "cuda_graph" or variant.endswith("_cuda_graph"):
+        model = cuda_graph_model(model, args, device)
+    return model, backend, mode
 
 
 def select_baseline(variants, cold_calls=10000):

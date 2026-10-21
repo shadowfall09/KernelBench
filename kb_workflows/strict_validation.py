@@ -220,15 +220,16 @@ def evaluate_contract(payload, reference_source, build):
     dtype = get_torch_dtype_from_string(settings["precision"])
     device = torch.device("cuda:0")
     Model, init, _ = load_original_model_and_inputs(reference_source, {})
-    set_seed(42)
+    seed = settings.get("evaluation_seed", 42)
+    set_seed(seed)
     reference = Model(*init()).to(device=device, dtype=dtype)
     changes = []
     with environment_guard(changes):
         Candidate = load_custom_model(payload["kernel_src"], {}, str(build))
-        set_seed(42)
+        set_seed(seed)
         candidate = Candidate(*init()).to(device=device, dtype=dtype)
     checks = run_checks(reference, candidate, contract, hidden=settings.get("use_hidden_tests", False),
-                        seed=42, device=device, dtype=dtype, set_seed=set_seed)
+                        seed=seed, device=device, dtype=dtype, set_seed=set_seed)
     if changes:
         checks["environment_integrity"] = check("failed", reason="Candidate import/initialization changed process settings",
                                                  values={"changed_names": sorted(set(changes))})

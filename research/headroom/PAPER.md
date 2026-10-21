@@ -105,7 +105,7 @@ The intended precision gate should distinguish acceptable precision emulation fr
 
 ### 4.1 Implemented baseline and timing protocol
 
-The default baseline portfolio contains eager, torch.compile default, torch.compile max-autotune, and CUDA Graph. Variants run as independent tasks, validate initial and timed outputs, retain failures, and choose among valid variants. The suite's fp32 contract uses IEEE settings; explicit legacy single-baseline behavior is recorded separately. The target portfolio additionally includes reviewed in-library rewrites and more graph combinations; those are not part of today's four-variant claim.
+The default baseline portfolio contains eager, torch.compile default, torch.compile max-autotune, and CUDA Graph. Variants run as independent tasks, validate initial and timed outputs, retain failures, and choose among valid variants. The suite's fp32 contract uses IEEE settings; explicit legacy single-baseline behavior is recorded separately. An optional extended portfolio now adds default/max-autotune compile variants with outer CUDA Graph capture and reviewed framework rewrites for channel RMSNorm and L1/L2 normalization. The latter are tied to three reference-source hashes and retain their exact eps and mean-vs-sum semantics. All variants still validate every measured output, retain failures, and select only validated members.
 
 Synchronized wall time covers host invocation, output consumption, and completion of device work. Input construction is outside the interval; each timed call uses newly generated inputs with recorded seeds, and its output is checked outside the timed region. Graph replay includes input copying and output cloning. A deterministic generator can still yield identical contents despite a different seed.
 
@@ -121,7 +121,7 @@ The default is K=10000; reporting K=1 or other values is configurable. Input pre
 
 Every selected task and declared sample contributes a slot. Failed, missing, stale, incompatible or evidence-incomplete slots receive zero. Current analysis uses all declared slots, first averaging samples per task, then macro-averaging task layers; it does not take the fastest sample. The report now computes mean, median and best-of-N sensitivity on the identical declared slots, retaining failures and cost receipts. This ablation does not change official mean scoring, spend additional model calls or certify unknown budgets.
 
-Eligible comparisons require matching reference and kernel sources, evaluator version, input signature, precision/tolerance, device/software class, workflow configuration, raw timing samples, changing-input/verification receipts and cold costs. The strongest valid amortized baseline is selected at the declared K. A positive score additionally requires separated approximate steady-state mean intervals. Cold-cost uncertainty is not modeled by this interval test.
+Eligible comparisons require matching reference and kernel sources, evaluator version, input signature, precision/tolerance, device/software class, workflow configuration, raw timing samples, changing-input/verification receipts and cold costs. The strongest valid amortized baseline is selected at the declared K. A positive score additionally requires separated approximate steady-state mean intervals. Cold-cost uncertainty is not modeled by this interval test. When independent repeats or paired timing are enabled, their current measured samples and interval protocol replace the corresponding legacy steady-state values; incomplete or stale auxiliary evidence blocks the score.
 
 Current bounded gain is:
 
@@ -163,7 +163,9 @@ Its usefulness depends on trustworthy work counts and ceilings; deviations can e
 
 NVIDIA's target tooling combines activity timelines with Nsight Compute and optional compute-sanitizer. Trainium's target uses Neuron timelines, per-engine tensor/vector/scalar/DMA information, and compiler reports where available. These collection adapters, per-engine decomposition, calibrated ceilings, custom-kernel shares and `launch_only` exclusion are not implemented. Current Torch operator summaries are development diagnostics only.
 
-Same-process interleaved baseline/candidate measurements, randomized or balanced order, a reference-vs-reference noise floor and a justified paired interval remain targets. They need to coexist with protection of the baseline from candidate side effects. The archived p10–p90 range is descriptive, not a validated confidence interval. Independent final winner remeasurement is also a separate target beyond the existing frozen-submission final verification.
+Balanced same-process timing is now implemented as an optional task against the selected validated baseline, with an independent same-variant reference control. Every output is verified, measured order is balanced, and candidate process settings are audited/restored. Bootstrap first resamples independent final processes, then their paired log ratios; speedup requires its lower interval bound to exceed both 1 and the reference/control upper bound. The exchangeability assumptions and shared-device limits remain explicit. The archived p10–p90 range is not used as a confidence interval.
+
+Independent final remeasurement now freezes every declared source by hash, issues fresh initialization and hidden seeds, and runs all declared standard/hidden repeats in independent tasks. All repeats must pass. The score uses their mean rather than the fastest repeat, with process-then-sample bootstrap uncertainty when pairing is disabled. Original cold costs remain point estimates. The saved nonce/source/evaluator/configuration plan supports resume without silently repeating completed attempts; changed source invalidates only affected sample repeats. Auxiliary results and frozen source content are rechecked by the legacy score gate as well. [Timing protocol](../../docs/PAIRED_TIMING.md) records implementation and deployment limits.
 
 Scores are defined per device and protocol. No device-independent efficiency transfer or merged cross-platform ranking is claimed.
 
@@ -229,7 +231,7 @@ Real GPU end-to-end validation remains outstanding. Prior attempts encountered b
 | E0 | How does a general-purpose agent perform? | Historical author report only; raw artifacts absent; rerun under current protocol |
 | E1 | Which gains survive reliable evaluation and how are they attributed? | Audit taxonomy and workflow exist; original candidates, calibrated checks and GPU attribution needed |
 | E1b | How does feedback change scores and budgets? | Both protocols and receipts exist; same-budget multi-session model experiments and curves needed |
-| E2 | How sensitive are conclusions to stronger baselines at current sizes? | Four-variant portfolio exists; actual baseline/candidate GPU measurements needed |
+| E2 | How sensitive are conclusions to stronger baselines at current sizes? | Standard and extended portfolios, paired controls and final repeats exist; real GPU measurements and drift pilot needed |
 | E3 | Do design and implementation strata rank agents differently? | Provisional labels exist; certified design tasks, model population and held-out analysis needed |
 | E4 | Are design targets valid and reachable? | Witnesses, bounds and high-precision equivalence checks needed |
 | E5 | Do hardening checks block real loopholes without false positives? | Source-review table retained; raw sources missing, known-good cases and GPU red-team reproduction needed |

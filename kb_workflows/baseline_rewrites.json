@@ -1,0 +1,17 @@
+{
+  "1/36": {
+    "rewrite": "channel_rms_norm",
+    "reference_sha256": "5219d89deaa2522637880af7981c9078b9f8e0808bc9bc7101e905650cd4faf1",
+    "contract": "framework-only algebraic equivalent; every measured output is validated; eps preserved"
+  },
+  "1/38": {
+    "rewrite": "l1_normalize",
+    "reference_sha256": "f6dc16b4edfc7a6700002794ccc3708caca2609eb2ef32126855ba8a09158204",
+    "contract": "framework-only algebraic equivalent; every measured output is validated; eps preserved"
+  },
+  "1/39": {
+    "rewrite": "l2_normalize",
+    "reference_sha256": "0b483cf3c5c4c963163e8b0e388452f20679c41ac4201e1e4bc436949b8c146f",
+    "contract": "framework-only algebraic equivalent; every measured output is validated; eps preserved"
+  }
+}

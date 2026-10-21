@@ -63,6 +63,7 @@ def evaluate(payload: dict):
     build = Path(payload.get("build_root", ROOT / "cache" / "workflow")) / signature
     build.mkdir(parents=True, exist_ok=True)
     os.environ["TORCH_EXTENSIONS_DIR"] = str(build)
+    os.environ["TORCH_USE_CUDA_DSA"] = "1"  # Trusted native compiler scaffolding, before the candidate audit.
     native_changes = []
     if settings.get("strict_validation"):
         from .strict_validation import environment_guard
@@ -74,6 +75,7 @@ def evaluate(payload: dict):
         result = eval_kernel_against_ref(
             original_model_src=reference,
             custom_model_src=payload["kernel_src"],
+            seed_num=settings.get("evaluation_seed", 42),
             num_correct_trials=settings["num_correct_trials"],
             num_perf_trials=settings["num_perf_trials"],
             measure_performance=settings.get("measure_performance", not hidden),
@@ -82,6 +84,7 @@ def evaluate(payload: dict):
             device=torch.device("cuda:0"),
             precision=get_torch_dtype_from_string(settings["precision"]),
             hidden_test_path=path,
+            **({"hidden_seeds": settings["hidden_seeds"]} if "hidden_seeds" in settings else {}),
         )
     if result is None:
         return failure("Evaluator returned no result (possible compilation lock failure)")
@@ -142,7 +145,8 @@ def baseline(payload: dict):
     )
     from src.validation import clone_tensors, compare_outputs
 
-    from .baseline_variants import cuda_graph_model
+    from .baseline_rewrites import rewrite_for
+    from .baseline_variants import prepare_baseline
     from .measurement import (
         CLOCK,
         amortized,
@@ -179,16 +183,8 @@ def baseline(payload: dict):
         model = Model(*init_inputs).to(device=device, dtype=dtype)
         backend = settings.get("compile_backend")
         mode = settings.get("compile_mode", "default")
-        if variant.startswith("compile_"):
-            backend = "inductor"
-            mode = "max-autotune" if variant == "compile_max_autotune" else "default"
-        if backend:
-            options = {"backend": backend}
-            if backend == "inductor":
-                options["mode"] = mode
-            model = torch.compile(model, **options)
-        if variant == "cuda_graph":
-            model = cuda_graph_model(model, args, device)
+        model, backend, mode = prepare_baseline(model, args, device, variant, backend=backend, mode=mode,
+                                                rewrite=rewrite_for(payload["level"], payload["problem_id"], reference))
         synchronize(device)
         setup_ms = (CLOCK() - started) * 1000
         set_seed(42)
@@ -252,7 +248,11 @@ def baseline(payload: dict):
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
-        if payload.get("task") == "profile":
+        if payload.get("task") == "paired_timing":
+            from .paired_task import evaluate_paired
+
+            result = evaluate_paired(payload)
+        elif payload.get("task") == "profile":
             from .profile_task import profile
 
             result = profile(payload)

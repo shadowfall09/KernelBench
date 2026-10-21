@@ -26,6 +26,10 @@ def settings(config, hidden=False):
         "measure_performance": not hidden,
         "timing_method": "synchronized_wall",
         "baseline_suite": config.baseline_suite,
+        "baseline_portfolio": config.baseline_portfolio,
+        "paired_timing": config.paired_timing,
+        "paired_trials": config.paired_trials,
+        "final_repeats": config.final_repeats,
         "cold_calls": config.cold_calls,
         "score_gate_required": config.score_gate_required,
         "strict_validation": config.strict_validation,
@@ -45,7 +49,7 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         "ref_arch_src": path.read_text(),
         "eval_config": options,
     }
-    if task in {"evaluate", "profile"}:
+    if task in {"evaluate", "profile", "paired_timing"}:
         payload["kernel_src"] = (config.run_dir / kernel_name(config.level, pid, sid)).read_text()
     else:
         options.update(compile_backend=config.compile_backend, compile_mode=config.compile_mode)
@@ -128,11 +132,19 @@ def evaluate_run(config):
             atomic_json(target, results)
             print(f"[{label}] {key}: compiled={result['compiled']}, correct={result['correctness']}", flush=True)
         atomic_json(target, results)
+    if config.final_repeats:
+        from .final_verification import run
+
+        run(config)
+    if config.paired_timing:
+        run_paired(config)
     write_pass_at_k(config)
     return config.run_dir
 
 
 def write_pass_at_k(config):
+    from .final_verification import correctness_passed
+
     standard = read_json(config.run_dir / "eval_results.json", {})
     hidden = read_json(config.run_dir / "eval_results_hidden.json", {}) if config.hidden_tests else standard
     n = config.num_samples
@@ -143,6 +155,7 @@ def write_pass_at_k(config):
             bool(standard.get(f"{pid}_{sid}", {}).get("compiled"))
             and bool(standard.get(f"{pid}_{sid}", {}).get("correctness"))
             and bool(hidden.get(f"{pid}_{sid}", {}).get("correctness"))
+            and correctness_passed(config, pid, sid)
             for sid in range(n)
         )
         problems[str(pid)] = {
@@ -244,7 +257,7 @@ def analyze_run(config):
 
 
 def record_baseline_suite(config):
-    from .baseline_variants import VARIANTS, select_baseline
+    from .baseline_variants import select_baseline, variants_for
 
     target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
     results = read_json(target, {})
@@ -258,21 +271,73 @@ def record_baseline_suite(config):
             continue
         signatures[path.name] = signature
         variants[path.name] = {}
-        for variant in VARIANTS:
+        for variant in variants_for(config, pid):
             payload = task_payload(config, pid, task="baseline")
             payload["eval_config"]["baseline_variant"] = variant
             payload["request_id"] = "kb-" + fingerprint(payload)
             key = f"baseline-{pid}-{variant}"
-            names[key] = path.name, variant
+            names[key] = path.name, variant, pid
             tasks.append((key, payload))
     for key, result in evaluate_tasks(config, tasks):
-        name, variant = names[key]
+        name, variant, pid = names[key]
         variants[name][variant] = result
         chosen = select_baseline(variants[name], config.cold_calls)
         chosen.setdefault("metadata", {})["workflow_signature"] = signatures[name]
-        chosen["suite_complete"] = len(variants[name]) == len(VARIANTS)
+        chosen["suite_complete"] = set(variants[name]) == set(variants_for(config, pid))
+        chosen["requested_variants"] = list(variants_for(config, pid))
         level[name] = chosen
         atomic_json(target, results)
         print(f"[baseline] {name}/{variant}: {result.get('mean', result.get('metadata'))}", flush=True)
     atomic_json(target, results)
     return target
+
+
+def paired_variant(config, pid):
+    from .measurement import amortized
+
+    reference = select_problems(config.level, problem_ids=[pid])[pid]
+    data = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
+    baseline = data.get(f"level{config.level}", {}).get(reference.name, {})
+    options = baseline.get("variants", {"eager": baseline})
+    valid = {name: value for name, value in options.items() if value.get("baseline_correctness") is True
+             and type(value.get("mean")) in (int, float) and math.isfinite(value["mean"]) and value["mean"] > 0
+             and type(value.get("cold_start_ms")) in (int, float) and math.isfinite(value["cold_start_ms"]) and value["cold_start_ms"] > 0}
+    if not valid:
+        raise ValueError("Paired timing requires a validated baseline portfolio")
+    return min(valid, key=lambda name: amortized(valid[name]["mean"], valid[name]["cold_start_ms"], config.cold_calls))
+
+
+def paired_payload(config, pid, sid, *, repeat=None, variant=None):
+    variant = paired_variant(config, pid) if variant is None else variant
+    if repeat is not None:
+        from .final_verification import payload_for
+
+        return payload_for(config, pid, sid, repeat, task="paired_timing", variant=variant)
+    payload = task_payload(config, pid, sid, task="paired_timing")
+    payload["eval_config"]["paired_baseline_variant"] = variant
+    payload["request_id"] = "kb-" + fingerprint(payload)
+    return payload
+
+
+def run_paired(config):
+    target = config.run_dir / "paired_results.json"
+    results = read_json(target, {}) if config.resume else {}
+    tasks = []
+    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+    for pid in selected:
+        for sid in range(config.num_samples):
+            for repeat in range(config.final_repeats or 1):
+                key = f"{pid}_{sid}:{repeat}"
+                try:
+                    payload = paired_payload(config, pid, sid, repeat=repeat if config.final_repeats else None)
+                except (ValueError, OSError, KeyError):
+                    results[key] = failure("Paired timing source or baseline unavailable")
+                    continue
+                if config.resume and results.get(key, {}).get("metadata", {}).get("workflow_signature") == fingerprint(payload):
+                    continue
+                tasks.append(("paired-" + key, payload))
+    for key, result in evaluate_tasks(config, tasks):
+        results[key.removeprefix("paired-")] = result
+        atomic_json(target, results)
+    atomic_json(target, results)
+    return results

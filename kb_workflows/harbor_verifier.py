@@ -51,6 +51,15 @@ def verify(manifest, candidate, logs):
         hidden = read_json(config.run_dir / "eval_results_hidden.json", {}).get(key, {})
         correct = bool(standard.get("compiled") and standard.get("correctness")
                        and hidden.get("compiled") and hidden.get("correctness"))
+        if config.final_repeats:
+            from .final_verification import correctness_passed
+
+            correct = correct and correctness_passed(config, config.start, 0)
+        if config.paired_timing:
+            paired = read_json(config.run_dir / "paired_results.json", {})
+            correct = correct and all(paired.get(f"{config.start}_0:{repeat}", {}).get("correctness") is True
+                                      and paired.get(f"{config.start}_0:{repeat}", {}).get("compiled") is True
+                                      for repeat in range(config.final_repeats or 1))
         gain = scores["bounded_gain_macro"]
         if type(gain) not in (float, int) or not math.isfinite(gain) or not 0 <= gain <= 1:
             raise ValueError("Invalid native performance score")

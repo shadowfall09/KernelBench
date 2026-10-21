@@ -92,6 +92,8 @@ def evaluator_digest():
         "kb_workflows/verification_contracts.json",
         "kb_workflows/aggregation.py",
         "kb_workflows/contract_specs.py",
+        "kb_workflows/paired_statistics.py", "kb_workflows/paired_task.py", "kb_workflows/final_verification.py",
+        "kb_workflows/baseline_rewrites.py", "kb_workflows/baseline_rewrites.json",
         "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
         "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",
     ):
@@ -133,6 +135,8 @@ def apply_score_gate(results, run_dir):
     hidden = read_json(run_dir / "eval_results_hidden.json", {})
     digest = None
     gated = {}
+    auxiliary = {name: read_json(run_dir / name, {}) for name in ("final_manifest.json", "final_results.json", "paired_results.json")}
+    auxiliary_hashes = {name: fingerprint(value) for name, value in auxiliary.items()}
     for key, raw in results.items():
         options = raw.get("metadata", {}).get("evaluation_config", {})
         required = options.get("score_gate_required", config.get("score_gate_required", False)) or options.get("anti_cheat", False)
@@ -168,6 +172,16 @@ def apply_score_gate(results, run_dir):
                      and metadata.get("score_baseline_sha256") == fingerprint(baseline)
                      and reference.is_file() and metadata.get("reference_sha256") == fingerprint({"source": reference.read_text()})
                      and hidden_source_matches and metadata.get("score_run_config_sha256") == fingerprint(config))
+            final_required = options.get("final_repeats", config.get("final_repeats", 0))
+            paired_required = options.get("paired_timing", config.get("paired_timing", False))
+            required_auxiliary = (["final_manifest.json", "final_results.json"] if final_required else []) + (["paired_results.json"] if paired_required else [])
+            valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
+            if valid and final_required:
+                final_entry = auxiliary["final_manifest.json"].get("slots", {}).get(key, {})
+                source_hash = hashlib.sha256(kernel.read_bytes()).hexdigest()
+                frozen = run_dir / "final_artifacts" / (source_hash + ".py")
+                valid = (final_entry.get("source_sha256") == source_hash and frozen.is_file()
+                         and hashlib.sha256(frozen.read_bytes()).hexdigest() == source_hash)
         gated[key] = {**raw, "correctness": bool(valid and entry.get("correctness") and raw.get("correctness")),
                       "metadata": {**raw.get("metadata", {}), "score_gate_applied": True,
                                    "score_gate_status": metadata.get("score_gate_status") if valid else "missing_or_stale_score_evidence"}}

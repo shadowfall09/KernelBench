@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前已提交能力为第一至第九版的累计功能；第九版开始落地23项设计，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前已提交能力为第一至第十版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -380,6 +380,31 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 通过`--strict-validation`或`--evidence-level L0`启用；L1/L2会要求尚未实现的设备证据，缺失时不给相应等级或评分资格。未适配题在严格模式下明确失败，不退回旧容差冒充严格通过。详细契约、误差公式、范围及等级定义见[严格验证](STRICT_VALIDATION.md)。
 
 验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **368项CPU/模拟回归通过**，较第八版新增81项。17道实际参考分别以FP32、FP16、BF16执行小规模FP64及隐藏形状检查；反例覆盖BF16计算冒充FP32、GELU近似、单元素错误、缓存、参数更新、BN状态、进程设置恢复、极端量级RMS溢出、首轮原生评测篡改、评分收据缺失/伪汇总和轻量预检。Ruff、168包依赖一致性、motivation覆盖、本地链接与独立wheel轻量加载通过。真实GPU、GPU阈值校准和模型实验未执行；搁置的stash没有恢复。
+
+## 第十版：交替计时、独立最终重测与扩展基线
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add paired timing and independent frozen-source remeasurement |
+| 基础提交 | `bcab5645b8e0dbad3937226706fb405e316ef1f2` |
+| 日期 | 2026-10-21 |
+| 状态 | 已提交；404项CPU/模拟回归通过；真实GPU验收仍待完成 |
+
+本版交付R-11/12的代码并推进R-13，继续保持全部23项设计目标。新增机制可配置，不修改未启用它们的既有计分口径；当前设备相关结论仍需真实GPU验收。
+
+| 编号 | 功能 | 变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V10-01 | 交替计时与噪声对照 | 同进程平衡参考/候选/参考控制顺序，逐次验证输出，按重复进程与配对样本重采样估计倍率区间。 | `kb_workflows/paired_task.py` | [M3](MOTIVATION.md#m3) |
+| V10-02 | 冻结后独立最终重测 | 冻结源码按新种子在独立任务重测标准和隐藏正确性，保留全部重复，正式分数使用重测而非最快重复。 | `kb_workflows/final_verification.py` | [M3](MOTIVATION.md#m3) |
+| V10-03 | 扩展基线组合与可信改写 | 增加compile default/max-autotune各自Graph组合；3道归一化题增加源码指纹约束的框架等价改写。 | `kb_workflows/baseline_variants.py` | [M3](MOTIVATION.md#m3) |
+| V10-04 | 附加证据与旧评分门 | 最终和交替测量必须匹配当前源码/基线/配置，收据文件及冻结内容参与旧评分资格复核。 | `kb_workflows/common.py` | [M3](MOTIVATION.md#m3) |
+| V10-05 | 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母。 | `kb_workflows/final_verification.py` | [M5](MOTIVATION.md#m5) |
+
+新增`baseline_portfolio = "extended"`、`paired_timing = true`、`paired_trials = 30`、`final_repeats = 2`。交替计时要求已验证的组合基线；普通四变体组合仍默认。最终重测和交替计时不向agent返回隐藏反馈。原有均值槽位聚合保留，重测使用全部新进程样本，并保留原冷成本点估计。完整流程、假设和输出见[配对与最终计时](PAIRED_TIMING.md)。
+
+另外修正严格验证将受信任的`TORCH_USE_CUDA_DSA`编译设置误记为候选修改的风险：设置在进入候选审计之前完成。实际候选的首次导入/执行修改仍受审计。
+
+验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **404项CPU/模拟回归通过**，新增36项。覆盖六种顺序平衡、输入准备排除、数值错误拒绝、噪声控制、重复进程bootstrap、3个真实参考改写、扩展任务/Graph编排、冻结来源与种子、仅变更样本恢复、最终失败门、附加收据和旧资格篡改拒绝、Harbor预算与reward。Ruff、来源/文档检查及离线wheel独立轻量导入通过。Slurm作业50703（taurus）和50704（aries）在即时申请窗口返回`Requested nodes are busy`，未运行GPU；不能据此声明CUDA Graph、真实计时或GPU隔离已验证。之前stash保持原样。
 
 ## 维护方式
 

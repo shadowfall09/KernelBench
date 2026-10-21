@@ -5,7 +5,7 @@ import shutil
 
 import pytest
 
-from kb_workflows import common, engine, paper_analysis
+from kb_workflows import common, engine, generation, paper_analysis
 from kb_workflows.common import atomic_json, fingerprint, kernel_name, read_json
 from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.measurement import timing_stats
@@ -110,6 +110,67 @@ def test_persisted_strict_evidence_is_required_at_scoring_boundary(run, damage):
     assert report["details"][0]["status"] == "verified" if damage == "none" else report["details"][0]["status"] != "verified"
     assert report["bounded_gain_macro"] == pytest.approx(1 if damage == "none" else 2 / 3)
     assert report["aggregation_sensitivity"]["declared_slots"] == config.num_samples
+
+
+@pytest.mark.parametrize("damage", ["none", "final_missing", "final_hidden", "frozen", "paired_missing", "paired_summary"])
+def test_final_and_paired_evidence_drive_scores_and_legacy_gate(run, monkeypatch, damage):
+    from kb_workflows import final_verification
+    from kb_workflows.paired_statistics import paired_summary
+
+    config, baseline, standard, secret, save = run
+    config.baseline_suite, config.paired_timing, config.paired_trials, config.final_repeats = True, True, 12, 2
+    monkeypatch.setattr(final_verification, "select_problems", engine.select_problems)
+    monkeypatch.setattr(final_verification, "evaluator_digest", lambda: "current")
+    atomic_json(config.run_dir / "run_config.json", config.to_dict())
+    generic = engine.task_payload(config, 1, task="baseline")
+    baseline["metadata"].update(evaluation_config=generic["eval_config"], workflow_signature=fingerprint(generic))
+    variant = copy.deepcopy(baseline)
+    variant_payload = copy.deepcopy(generic)
+    variant_payload["eval_config"]["baseline_variant"] = "eager"
+    variant["metadata"].update(evaluation_config=variant_payload["eval_config"], workflow_signature=fingerprint(variant_payload))
+    baseline.update(baseline_suite=True, suite_complete=True, variants={"eager": variant})
+    for hidden, results in ((False, standard), (True, secret)):
+        for sid in range(config.num_samples):
+            payload = engine.task_payload(config, 1, sid, hidden=hidden)
+            results[f"1_{sid}"]["metadata"].update(evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload))
+    manifest = final_verification.freeze(config)
+    final, paired = {}, {}
+    for sid in range(config.num_samples):
+        for repeat in range(config.final_repeats):
+            for hidden, originals in ((False, standard), (True, secret)):
+                payload = final_verification.payload_for(config, 1, sid, repeat, hidden=hidden)
+                record = copy.deepcopy(originals[f"1_{sid}"])
+                record["metadata"].update(evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload))
+                final[f"1_{sid}:{repeat}:{'hidden' if hidden else 'standard'}"] = record
+            payload = engine.paired_payload(config, 1, sid, repeat=repeat, variant="eager")
+            summary = paired_summary([{"reference_ms": 10, "candidate_ms": 5, "control_ms": 10} for _ in range(12)])
+            summary.update(baseline_variant="eager", output_consumed=True, varied_inputs=True, all_outputs_verified=True)
+            metadata = {**copy.deepcopy(standard[f"1_{sid}"]["metadata"]), "paired_timing": summary,
+                        "evaluation_config": payload["eval_config"], "workflow_signature": fingerprint(payload)}
+            paired[f"1_{sid}:{repeat}"] = {"compiled": True, "correctness": True, "runtime": 5, "metadata": metadata}
+    if damage == "final_missing":
+        del final["1_0:1:standard"]
+    elif damage == "final_hidden":
+        final["1_0:1:hidden"]["correctness"] = False
+    elif damage == "frozen":
+        path = config.run_dir / "final_artifacts" / (manifest["slots"]["1_0"]["source_sha256"] + ".py")
+        path.write_text("changed frozen source")
+    elif damage == "paired_missing":
+        del paired["1_0:1"]
+    elif damage == "paired_summary":
+        paired["1_0:1"]["metadata"]["paired_timing"]["speedup_ci95"] = [100, 100]
+    atomic_json(config.run_dir / "final_results.json", final)
+    atomic_json(config.run_dir / "paired_results.json", paired)
+    save()
+    report = paper_analysis.analyze_paper(config)
+    assert report["bounded_gain_macro"] == pytest.approx(1 if damage == "none" else 2 / 3)
+    assert report["details"][1]["paired_repeat_groups"] == 2
+    gated = common.apply_score_gate(standard, config.run_dir)
+    assert gated["1_0"]["correctness"] is (damage == "none")
+    assert gated["1_1"]["correctness"]
+    final["1_1:0:standard"]["runtime"] = 999
+    atomic_json(config.run_dir / "final_results.json", final)
+    assert not common.apply_score_gate(standard, config.run_dir)["1_1"]["correctness"]
 
 
 @pytest.mark.parametrize("kind", ["kernel", "reference", "hidden", "version", "settings", "timing_receipt", "samples", "baseline", "incomplete_suite", "precision", "device", "software", "cold"])
@@ -253,7 +314,7 @@ def test_resume_reuses_current_results_and_reruns_changed_evaluator(run, monkeyp
 
 
 def test_full_pipeline_rerecords_stale_existing_baseline(run, monkeypatch):
-    from kb_workflows import cli, generation
+    from kb_workflows import cli
 
     config, baseline, _, _, save = run
     config.stage, config.generation, config.evaluation = "all", "local", "queue"
@@ -273,7 +334,6 @@ def test_full_pipeline_rerecords_stale_existing_baseline(run, monkeypatch):
 
 
 def test_child_verifier_accepts_serialized_options_and_omits_parent_layers(run):
-    from kb_workflows import generation
 
     config, _, _, _, _ = run
     specs = config.run_dir / "layers.json"

@@ -1127,36 +1127,38 @@
       "title": "交替计时与噪声底",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/paired_task.py",
+        "kb_workflows/paired_statistics.py"
       ],
-      "reason": "当前为独立基线和候选样本的近似均值区间；分位数范围不是置信区间"
+      "reason": "已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收"
     },
     {
       "id": "R-12",
       "title": "独立最终重测",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/final_verification.py"
       ],
-      "reason": "冻结后的正式验证已有；按当前评分策略独立复测所有获胜结果的完整证据门仍待设计实现"
+      "reason": "已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行"
     },
     {
       "id": "R-13",
       "title": "扩展基线组合",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/baseline_variants.py",
+        "kb_workflows/baseline_rewrites.py"
       ],
-      "reason": "框架等价重写与每个compile变体的Graph组合需逐题验证；目前默认仅四变体"
+      "reason": "已增加compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖、CUDA/编译部署和逐题验证尚未齐备"
     },
     {
       "id": "R-14",
@@ -1384,6 +1386,75 @@
         "kb_workflows/aggregation.py"
       ],
       "reason": "对同一批声明槽位计算mean、median、best-of-N，保留失败零分和成本记录，正式分数不变"
+    },
+    {
+      "id": "V10-01",
+      "title": "交替计时与噪声对照",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/paired_task.py"
+      ],
+      "reason": "同进程平衡参考/候选/参考控制顺序，逐次验证输出，按重复进程与配对样本重采样估计倍率区间"
+    },
+    {
+      "id": "V10-02",
+      "title": "冻结后独立最终重测",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/final_verification.py"
+      ],
+      "reason": "冻结源码按新种子在独立任务重测标准和隐藏正确性，保留全部重复，正式分数使用重测而非最快重复"
+    },
+    {
+      "id": "V10-03",
+      "title": "扩展基线组合与可信改写",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/baseline_variants.py"
+      ],
+      "reason": "增加compile default/max-autotune各自Graph组合；3道归一化题增加源码指纹约束的框架等价改写"
+    },
+    {
+      "id": "V10-04",
+      "title": "附加证据与旧评分门",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/common.py"
+      ],
+      "reason": "最终和交替测量必须匹配当前源码/基线/配置，收据文件及冻结内容参与旧评分资格复核"
+    },
+    {
+      "id": "V10-05",
+      "title": "重测恢复与失败分母",
+      "primary": "M5",
+      "secondary": [
+        "M3",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/final_verification.py"
+      ],
+      "reason": "恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母"
     }
   ]
 }

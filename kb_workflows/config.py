@@ -61,6 +61,10 @@ class RunConfig:
     compile_backend: str = ""
     compile_mode: str = "default"
     baseline_suite: bool = True
+    baseline_portfolio: str = "standard"
+    paired_timing: bool = False
+    paired_trials: int = 30
+    final_repeats: int = 0
     cold_calls: int = 10000
     problem_specs: str = ""
     score_gate_required: bool = True
@@ -135,6 +139,14 @@ class RunConfig:
             self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
             if not Path(self.problem_specs).is_file():
                 raise ValueError(f"Problem specs file not found: {self.problem_specs}")
+        if self.baseline_portfolio not in {"standard", "extended"}:
+            raise ValueError("Unknown baseline portfolio")
+        if type(self.final_repeats) is not int or self.final_repeats < 0:
+            raise ValueError("final_repeats must be nonnegative")
+        if type(self.paired_trials) is not int or self.paired_trials < 10:
+            raise ValueError("paired_trials must be at least 10")
+        if self.paired_timing and not self.baseline_suite:
+            raise ValueError("Paired timing requires the validated baseline portfolio")
         if self.baseline_suite and self.compile_backend:
             raise ValueError("Use --baseline-suite or --compile-backend, not both")
         if self.harbor_environment not in {"docker", "modal"} or self.harbor_reward not in {"correctness", "bounded_gain"}:
@@ -163,7 +175,7 @@ class RunConfig:
             else "baseline_time_torch"
         )
         if self.baseline_suite:
-            prefix = "baseline_time_suite"
+            prefix = "baseline_time_suite" if self.baseline_portfolio == "standard" else "baseline_time_suite_extended"
         self.baseline = self.baseline or f"{prefix}_{suffix}_wall"
         safe_name(self.baseline)
         if self.hardware and Path(self.hardware).name != self.hardware:
@@ -219,12 +231,15 @@ def parser():
         "queue_wait_timeout",
         "cold_calls",
         "harbor_memory_mb",
+        "paired_trials",
+        "final_repeats",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
             aliases.append("--num-parallel")
         p.add_argument(*aliases, dest=name, type=int, default=argparse.SUPPRESS)
     choices = {
+        "baseline_portfolio": ("standard", "extended"),
         "evidence_level": ("current", "L0", "L1", "L2"),
         "suite": ("full", "kernelbench105"),
         "suite_role": ("scored", "probe", "extended"),
@@ -238,6 +253,7 @@ def parser():
         "agent_backend": ("claude-code", "litellm"),
     }
     for name in (
+        "baseline_portfolio",
         "evidence_level",
         "suite",
         "suite_role",
@@ -277,7 +293,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile"):
+    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)

@@ -72,6 +72,13 @@ def test_export_uses_native_samples_and_does_not_overwrite(config):
         harbor.export_tasks(config)
 
 
+def test_export_timeout_accounts_for_expanded_baselines_pairing_and_all_final_repeats(config):
+    config.baseline_portfolio, config.final_repeats, config.paired_timing = "extended", 3, True
+    task = harbor.write_task(config.run_dir / "expanded-task", config, 90)
+    data = tomllib.loads((task / "task.toml").read_text())
+    assert data["verifier"]["timeout_sec"] == (6 + 2 + 6 + 3) * config.timeout + 180
+
+
 def test_export_does_not_embed_host_authentication_configuration(config):
     config.profile = "private-profile"
     config.modal_secret = "private-secret-name"
@@ -220,6 +227,15 @@ def test_harbor_reward_reuses_native_verification(verifier, mode, correct, gain,
     assert report["reward"] == expected
     assert float((logs / "reward.txt").read_text()) == expected
     assert state["calls"] == ["baseline", "evaluate", "analyze"]
+
+
+@pytest.mark.parametrize("option", ["final_repeats", "paired_timing"])
+def test_harbor_correctness_cannot_bypass_required_fresh_evidence(verifier, option):
+    spec, manifest, candidate, logs, _ = verifier
+    spec["config"][option] = 1 if option == "final_repeats" else True
+    atomic_json(manifest, spec)
+    report = harbor_verifier.verify(manifest, candidate, logs)
+    assert report["correctness"] is False and report["reward"] == 0
 
 
 @pytest.mark.parametrize("kind", ["version", "empty", "multiple", "hidden", "mode", "exception", "nonfinite"])

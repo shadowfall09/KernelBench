@@ -10,6 +10,15 @@ five candidate submissions and 2400 seconds per sample. Development feedback is
 standard-only; hidden correctness runs after selection. See [Agent loops](AGENT_LOOPS.md)
 for model adapters, resource receipts, replay behavior and the Claude Code/Codex skill.
 
+## Paired timing and frozen final repeats
+
+Set `baseline_portfolio = "extended"`, `paired_timing = true`, `paired_trials = 30`,
+and `final_repeats = 2` in `[run]` to enable the expanded reference portfolio,
+balanced same-process timing and independent frozen-source remeasurement.
+All repeats are required; final failures count in correctness pass@k and score gates.
+Defaults retain the standard portfolio and no additional repeats. See
+[paired and final timing](PAIRED_TIMING.md) for assumptions, evidence and outputs.
+
 ## Install
 
 Use Python 3.12:
