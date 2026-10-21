@@ -20,6 +20,9 @@ from .numerical import PrecisionContract, precision_gate, signal_audit, to_oracl
 
 def _backend_flags():
     flags = [(torch.backends.cudnn, "benchmark"), (torch.backends.cudnn, "deterministic")]
+    flags += [(torch.backends.cuda.matmul, name) for name in (
+        "allow_fp16_reduced_precision_reduction", "allow_bf16_reduced_precision_reduction")
+        if hasattr(torch.backends.cuda.matmul, name)]
     if hasattr(torch.backends.cuda.matmul, "fp32_precision"):
         flags += [(torch.backends, "fp32_precision"), (torch.backends.cuda.matmul, "fp32_precision"),
                   (torch.backends.cudnn, "fp32_precision")]

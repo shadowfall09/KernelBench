@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import secrets
 import statistics
+import subprocess
 from time import perf_counter
 
 import torch
@@ -122,11 +123,23 @@ def device_fingerprint(device):
     if not torch.cuda.is_available():
         return {**info, "available": False}
     properties = torch.cuda.get_device_properties(device)
+    uuid = str(getattr(properties, "uuid", ""))
+    driver = None
+    if uuid and not torch.version.hip:
+        try:
+            query = subprocess.run(["nvidia-smi", "--query-gpu=uuid,driver_version", "--format=csv,noheader,nounits"],
+                                   capture_output=True, text=True, timeout=2, check=False)
+            for line in query.stdout.splitlines() if query.returncode == 0 else []:
+                fields = [field.strip() for field in line.split(",")]
+                if len(fields) == 2 and fields[0] == uuid:
+                    driver = fields[1]
+        except (OSError, subprocess.TimeoutExpired):
+            pass
     return {
         **info, "available": True, "name": properties.name,
         "capability": list(torch.cuda.get_device_capability(device)), "total_memory": properties.total_memory,
         "multiprocessors": properties.multi_processor_count,
-        "l2_bytes": getattr(properties, "L2_cache_size", None), "uuid": str(getattr(properties, "uuid", "")),
+        "l2_bytes": getattr(properties, "L2_cache_size", None), "uuid": uuid, "driver_version": driver,
     }
 
 

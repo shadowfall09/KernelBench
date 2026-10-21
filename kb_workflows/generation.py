@@ -106,6 +106,8 @@ def prepare_job(config, pid, sid):
         build_image=False,
         record_baseline=False,
         problem_specs="",  # Layer specifications are used only by parent analysis.
+        score_mode="bounded_gain",
+        device_calibration="",
     )
     # Evaluation inside a GPU container/sandbox uses its allocated device 0.
     if config.generation == "docker" and config.evaluation == "docker":

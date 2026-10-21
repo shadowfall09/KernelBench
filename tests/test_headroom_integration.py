@@ -97,7 +97,8 @@ def test_missing_candidates_keep_selection_denominator_in_evaluation_and_score(t
     assert report["problem_ids"] == [2, 3, 6, 8, 9, 10]
     assert len(report["details"]) == 12 and report["bounded_gain_macro"] == 0
     assert report["layer_source"] == "provisional_suite_taxonomy"
-    assert not report["headroom_score_implemented"]
+    assert report["headroom_score_implemented"] and report["score_mode"] == "bounded_gain"
+    assert report["headroom_macro"] is None
     assert report["suite"]["layer_certificates"] is False
 
 
@@ -201,10 +202,10 @@ def test_audit_and_selection_artifacts_match_provenance_and_totals():
 def test_every_change_has_a_current_motivation_and_real_local_evidence():
     report = validate()
     assert report["historical_changes"] == 67
-    assert report["implemented_changes"] == 87
-    assert report["planned_designs"] == 13
-    assert report["in_progress_designs"] == 6
-    assert report["completed_designs"] == 4
+    assert report["implemented_changes"] == 92
+    assert report["planned_designs"] == 10
+    assert report["in_progress_designs"] == 7
+    assert report["completed_designs"] == 6
 
 
 def test_motivation_validation_detects_inventory_drift(tmp_path):

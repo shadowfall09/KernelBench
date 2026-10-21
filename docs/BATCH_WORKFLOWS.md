@@ -19,6 +19,11 @@ All repeats are required; final failures count in correctness pass@k and score g
 Defaults retain the standard portfolio and no additional repeats. See
 [paired and final timing](PAIRED_TIMING.md) for assumptions, evidence and outputs.
 
+Optional `score_mode = "headroom"` additionally requires `problem_specs` containing reviewed
+work certificates and a `device_calibration` receipt. It uses steady-state gains with
+the SOL target denominator and reports amortized bounded gain separately. Calibration is
+an explicit opt-in command, never an automatic phase. See [headroom scoring](HEADROOM_SCORING.md).
+
 ## Install
 
 Use Python 3.12:

@@ -75,6 +75,9 @@ def preserve_backend_settings():
     """Restore shared backend flags after candidate import, construction or forward."""
     cudnn = torch.backends.cudnn
     attributes = [(cudnn, "benchmark"), (cudnn, "deterministic")]
+    attributes += [(torch.backends.cuda.matmul, name) for name in (
+        "allow_fp16_reduced_precision_reduction", "allow_bf16_reduced_precision_reduction")
+        if hasattr(torch.backends.cuda.matmul, name)]
     if hasattr(torch.backends.cuda.matmul, "fp32_precision"):
         attributes += [
             (torch.backends, "fp32_precision"),

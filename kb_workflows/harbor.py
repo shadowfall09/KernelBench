@@ -103,6 +103,15 @@ def write_task(directory, config, pid, sid=0, device=None):
                     runs_dir="/logs/verifier/kernelbench-pro/runs", build_image=False,
                     profile="", bedrock=False, model="", small_model="", modal_secret="",
                     queue_url="http://127.0.0.1:8000", harbor_command="harbor")
+    # Reviewed models and calibration are verifier-only data, never agent inputs.
+    if config.problem_specs:
+        document = json.loads(Path(config.problem_specs).read_text())
+        selected_spec = document.get(f"level{config.level}", {}).get(str(pid), {})
+        atomic_json(tests / "problem_specs.json", {f"level{config.level}": {str(pid): selected_spec}})
+        child.problem_specs = "/tests/problem_specs.json"
+    if config.device_calibration:
+        shutil.copy2(config.device_calibration, tests / "device_calibration.json")
+        child.device_calibration = "/tests/device_calibration.json"
     atomic_json(tests / "config.json", {"protocol": "kernelbench-pro-harbor-v1", "sample_id": sid,
                                        "evaluator_sha256": evaluator_digest(), "config": child.to_dict(),
                                        "reward": config.harbor_reward})

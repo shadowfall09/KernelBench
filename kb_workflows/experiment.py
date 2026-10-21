@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .common import atomic_json, kernel_name, read_json, select_problems
+from .common import atomic_json, fingerprint, kernel_name, read_json, select_problems
 from .suites import selection_receipt
 
 
@@ -86,10 +86,13 @@ def compare_runs(directories):
         contract.update(strict_validation=config.strict_validation, evidence_level=config.evidence_level)
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
+        contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))
+                        for option in ("problem_specs", "device_calibration") if getattr(config, option)})
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})
         entry["runs"].append({"run": directory.name, "declared_model": config.model, "observed_models": budget.get("observed_models"),
                               "bounded_gain_macro": scoring.get("bounded_gain_macro"),
+                              "headroom_macro": scoring.get("headroom_macro"), "score_macro": scoring.get("score_macro"),
                               "generation_totals": budget.get("totals"), "resource_receipts_complete": budget.get("complete_resource_receipts", False),
                               "provenance_valid": budget.get("provenance_valid", False)})
     return {"comparison_policy": "separate_by_protocol_budget_model_workload_precision_and_hardware; no_cross_group_ranking",

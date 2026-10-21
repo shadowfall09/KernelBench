@@ -304,6 +304,8 @@ def paired_variant(config, pid):
              and type(value.get("cold_start_ms")) in (int, float) and math.isfinite(value["cold_start_ms"]) and value["cold_start_ms"] > 0}
     if not valid:
         raise ValueError("Paired timing requires a validated baseline portfolio")
+    if config.score_mode == "headroom":
+        return min(valid, key=lambda name: valid[name]["mean"])
     return min(valid, key=lambda name: amortized(valid[name]["mean"], valid[name]["cold_start_ms"], config.cold_calls))
 
 

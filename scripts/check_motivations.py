@@ -15,9 +15,18 @@ def inventory_features(text):
     version, header, counts = 0, "", Counter()
     features = {}
     for line in text.splitlines():
-        match = re.match(r"## 第([一二三四五六七八九十])版", line)
+        match = re.match(r"## 第([一二三四五六七八九十\d]+)版", line)
         if match:
-            version, header = "一二三四五六七八九十".index(match[1]) + 1, ""
+            raw = match[1]
+            digits = {name: i for i, name in enumerate("一二三四五六七八九", 1)}
+            if raw.isdecimal():
+                version = int(raw)
+            elif "十" in raw:
+                tens, units = raw.split("十")
+                version = 10 * (digits[tens] if tens else 1) + (digits[units] if units else 0)
+            else:
+                version = digits[raw]
+            header = ""
         if not line.startswith("|"):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]

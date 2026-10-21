@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
+from pathlib import Path
+
 from .common import ROOT, fingerprint
 
 
@@ -38,13 +42,28 @@ def profile(payload):
     with torch.no_grad():
         model(*clone_tensors(args))
         torch.cuda.synchronize(device)
+        profile_args = clone_tensors(args)
+        torch.cuda.synchronize(device)
         with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA]) as capture:
-            output = model(*clone_tensors(args))
-            torch.cuda.synchronize(device)
+            with torch.profiler.record_function("kernelbench_profile"):
+                output = model(*profile_args)
+                torch.cuda.synchronize(device)
         del output
+    from .performance import timeline
+
+    with tempfile.TemporaryDirectory(prefix="kb-profile-") as directory:
+        trace_path = Path(directory) / "trace.json"
+        capture.export_chrome_trace(str(trace_path))
+        trace = json.loads(trace_path.read_text())
+    try:
+        activity = timeline(trace, device=0)
+        activity.pop("activities")  # Keep the interactive response small.
+    except (KeyError, TypeError, ValueError) as exc:
+        activity = {"status": "not_measured", "reason": str(exc)}
     events = [{"name": item.key, "calls": item.count, "cpu_self_us": item.self_cpu_time_total,
                "device_self_us": getattr(item, "self_device_time_total", 0)} for item in capture.key_averages()]
     events.sort(key=lambda row: row["device_self_us"], reverse=True)
     return {"status": "ok", "purpose": "development_diagnostics_only", "events": events[:15],
+            "device_activity": activity, "trace_sha256": fingerprint(trace),
             "timings_are_diagnostic": True, "hardware_counters_collected": False,
             "hint": "Inspect kernel count and CPU/device time; these are profiler durations, not scored benchmark times"}

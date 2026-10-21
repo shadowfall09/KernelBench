@@ -998,6 +998,78 @@
       "reason": "记录manifest摘要并检查参考快照，阻止静默任务漂移"
     },
     {
+      "id": "V11-01",
+      "title": "设备校准接口与原始收据",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/calibration.py",
+        "scripts/calibrate_device.py"
+      ],
+      "reason": "提供显式设备探针与cache flush/time接口，绑定物理UUID、驱动、软件和评测器，重算原始样本速率；本轮只实现不运行校准"
+    },
+    {
+      "id": "V11-02",
+      "title": "工作量证书与独立可达性见证",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/headroom.py",
+        "scripts/export_reachability.py"
+      ],
+      "reason": "核对参考源码、输入、精度和校准；D标签要求算法说明与至少两次独立标准/隐藏记录，历史暂定标签不能代替证书"
+    },
+    {
+      "id": "V11-03",
+      "title": "Headroom评分与证据失效",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py",
+        "kb_workflows/common.py"
+      ],
+      "reason": "按SOL_target归一稳态收益，缺证书置零并保留固定分母；另报摊销bounded gain，外部规格/校准修改使旧资格失效"
+    },
+    {
+      "id": "V11-04",
+      "title": "设备时间并集与性能解释",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/performance.py",
+        "kb_workflows/profile_task.py"
+      ],
+      "reason": "计算重叠活动并集与kernel数，来源未知不猜测；缺工作计数器时A/E为null，启动收益须有测量解释，暂为诊断"
+    },
+    {
+      "id": "V11-05",
+      "title": "Verifier配置与精度设置恢复",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/harbor.py",
+        "kb_workflows/generation.py",
+        "src/validation.py"
+      ],
+      "reason": "可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计"
+    },
+    {
       "id": "R-01",
       "title": "生产难题与反向轨道",
       "primary": "M1",
@@ -1158,43 +1230,48 @@
         "kb_workflows/baseline_variants.py",
         "kb_workflows/baseline_rewrites.py"
       ],
-      "reason": "已增加compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖、CUDA/编译部署和逐题验证尚未齐备"
+      "reason": "已有compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖仍需实现，真实GPU部署和实验按用户要求不运行"
     },
     {
       "id": "R-14",
       "title": "设备实测上限与边界证书",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/calibration.py",
+        "kb_workflows/headroom.py",
+        "scripts/calibrate_device.py"
       ],
-      "reason": "不将历史H100规格表ledger当成当前设备校准结果；需实测和见证"
+      "reason": "已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理"
     },
     {
       "id": "R-15",
       "title": "Headroom分层评分与设计证书",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/headroom.py",
+        "kb_workflows/paper_analysis.py",
+        "tests/test_device_headroom.py"
       ],
-      "reason": "当前归一分母为ln(1.25)，不是含SOL_target的论文公式；D标签不是设计证明"
+      "reason": "已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果"
     },
     {
       "id": "R-16",
       "title": "完整性能归因",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/performance.py",
+        "kb_workflows/profile_task.py"
       ],
-      "reason": "busy时间需并集；FLOPs/bytes与A/E/O拆分、每引擎计数器、launch_only门待实现"
+      "reason": "已实现设备busy并集、保守来源份额、缺计数器时AE/O及launch_only诊断；实际Nsight/Neuron计数器采集、二进制来源与正式归因评分门待实现"
     },
     {
       "id": "R-17",

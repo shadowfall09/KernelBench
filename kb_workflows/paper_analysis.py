@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 import random
 from pathlib import Path
@@ -18,7 +19,7 @@ DEVICE_FIELDS = ("name", "capability", "total_memory", "multiprocessors", "l2_by
 def same_device_class(first, second):
     return bool(first.get("available") and second.get("available")) and all(
         name in first and name in second and first[name] == second[name] for name in DEVICE_FIELDS
-    )
+    ) and first.get("driver_version") == second.get("driver_version")
 
 
 def valid_time(value):
@@ -112,32 +113,54 @@ def analyze_paper(config):
     baselines = baselines.get(f"level{config.level}", {})
     specs = read_json(Path(config.problem_specs), {}) if config.problem_specs else {}
     specs = specs.get(f"level{config.level}", {})
+    calibration = read_json(Path(config.device_calibration), {}) if config.device_calibration else {}
     research_rows = suite_rows(config.level, config.suite_role) if config.suite != "full" else {}
     digest = evaluator_digest()
-    groups, rows, scored = {}, [], {}
+    groups, bounded_groups, rows, scored, certificate_coverage = {}, {}, [], {}, {}
+    external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
+                      for option in ("problem_specs", "device_calibration") if getattr(config, option)}
     auxiliary_files = {}
     for name in (["final_manifest.json", "final_results.json"] if config.final_repeats else []) + (["paired_results.json"] if config.paired_timing else []):
         auxiliary_files[name] = fingerprint(read_json(config.run_dir / name, {}))
     for pid, path in selected.items():
         layer = specs.get(str(pid), {}).get("layer", research_rows.get(pid, {}).get("layer", "unclassified"))
+        bound_record = specs.get(str(pid), {}).get("headroom_certificate", {})
         layer_source = ("problem_specs" if "layer" in specs.get(str(pid), {}) else
                         ("provisional_suite_taxonomy" if pid in research_rows else "unclassified"))
         if layer not in {"I", "F", "D", "unclassified"}:
             raise ValueError(f"Unknown layer for {pid}: {layer}")
         baseline = baselines.get(path.name, {})
-        slots = []
+        bound_issue = None
+        if config.score_mode == "headroom":
+            from .headroom import certificate
+
+            try:
+                info = certificate(bound_record, calibration, baseline,
+                                   source_sha256=hashlib.sha256(path.read_bytes()).hexdigest(), digest=digest)
+                layer, layer_source = info["layer"], "reviewed_headroom_certificate"
+                certificate_coverage[str(pid)] = {"valid": True, "certificate_sha256": info["certificate_sha256"]}
+            except (KeyError, TypeError, ValueError) as exc:
+                bound_issue = str(exc)
+                layer, layer_source = "unclassified", "invalid_headroom_certificate"
+                certificate_coverage[str(pid)] = {"valid": False, "reason": bound_issue}
+        slots, bounded_slots = [], []
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             raw, secret = standard.get(key, {}), hidden.get(key, {})
             row = {"problem_id": pid, "sample_id": sid, "layer": layer, "layer_source": layer_source, "score": 0}
             rows.append(row)
             slots.append(0)
+            bounded_slots.append(0)
             status = "verified"
             if not (raw.get("compiled") and raw.get("correctness") and secret.get("compiled") and secret.get("correctness")):
                 status = "failed_or_missing"
             kernel = config.run_dir / kernel_name(config.level, pid, sid)
             if status == "verified" and not kernel.is_file():
                 status = "kernel_source_changed_or_missing"
+            if status == "verified":
+                if bound_issue is not None:
+                    status = "headroom_certificate_missing_or_invalid"
+                    row["headroom_error"] = bound_issue
             if status == "verified":
                 payload = task_payload(config, pid, sid)
                 status = current_result(raw, payload) or status
@@ -187,7 +210,8 @@ def analyze_paper(config):
                 if not cold_options:
                     status = "validated_amortized_baseline_missing"
                 else:
-                    winner = min(cold_options, key=cold_options.get)
+                    winner = (min(cold_options, key=lambda name: options[name]["mean"])
+                              if config.score_mode == "headroom" else min(cold_options, key=cold_options.get))
                     chosen = options[winner]
                     # Final repeats use all declared fresh processes, never their fastest member.
                     final_stats = None
@@ -223,9 +247,27 @@ def analyze_paper(config):
                     if final_results:
                         row.update(final_remeasurement_count=len(final_results), final_runtime_mean_ms=candidate_steady)
                     row.update(speedup=baseline["mean"] / raw["runtime"], cold_calls=config.cold_calls,
-                               cold_winning_baseline=winner, amortized_speedup=reference / runtime,
+                               cold_winning_baseline=min(cold_options, key=cold_options.get), selected_baseline=winner,
+                               baseline_selection="minimum_steady_mean" if config.score_mode == "headroom" else "minimum_K_amortized",
+                               amortized_speedup=reference / runtime,
                                significantly_faster=bool(separated), score_cost_policy="declared_K_amortized; cold_cost_point_estimate")
-                    row["score"] = bounded_gain(reference, runtime) if separated and status == "verified" else 0
+                    row["bounded_gain"] = bounded_gain(reference, runtime) if separated and status == "verified" else 0
+                    bounded_slots[-1] = row["bounded_gain"]
+                    row["score"] = row["bounded_gain"]
+                    if config.score_mode == "headroom" and status == "verified":
+                        from .headroom import evaluate
+
+                        try:
+                            bound = evaluate(bound_record, calibration, raw["metadata"],
+                                source_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                                reference_ms=baseline_steady, candidate_ms=candidate_steady, digest=digest)
+                            row.update(headroom=bound, headroom_score=bound["score"] if separated else 0,
+                                       layer_source="reviewed_headroom_certificate",
+                                       score_cost_policy="headroom_steady_state; amortized_bounded_gain_reported_separately")
+                            row["score"] = row["headroom_score"]
+                        except (KeyError, TypeError, ValueError) as exc:
+                            status = "headroom_certificate_missing_or_invalid"
+                            row.update(headroom_error=str(exc), score=0, headroom_score=0)
                     slots[-1] = row["score"]
             row["status"] = status
             entry = {**raw, "metadata": dict(raw.get("metadata", {})), "correctness": status == "verified"}
@@ -238,22 +280,34 @@ def analyze_paper(config):
                 score_hidden_required=config.hidden_tests, score_policy="measurement_and_compatibility_v1",
                 score_problem_id=pid, score_run_config_sha256=fingerprint(read_json(config.run_dir / "run_config.json", {})),
                 score_auxiliary_files=auxiliary_files,
+                score_external_files=external_files,
             )
             scored[key] = entry
         groups.setdefault(layer, []).append(slots)
+        bounded_groups.setdefault(layer, []).append(bounded_slots)
     by_layer = {layer: mean(mean(slots) for slots in values) for layer, values in groups.items()}
+    label_source = ("problem_specs_with_suite_fallback" if config.problem_specs and research_rows else
+                    ("problem_specs" if config.problem_specs else ("provisional_suite_taxonomy" if research_rows else "unclassified")))
+    if config.score_mode == "headroom":
+        label_source = "reviewed_headroom_certificates; invalid_models_unclassified"
     report = {
         "kind": "failure_inclusive_measurement_scoring_v1", "problem_ids": list(selected),
-        "suite": selection_receipt(config), "leaderboard_eligible": config.suite_role == "scored",
-        "layer_source": ("problem_specs_with_suite_fallback" if config.problem_specs and research_rows else
-                         ("problem_specs" if config.problem_specs else ("provisional_suite_taxonomy" if research_rows else "unclassified"))),
-        "headroom_score_implemented": False,
+        "suite": selection_receipt(config), "leaderboard_eligible": config.suite_role == "scored" and
+            (config.score_mode != "headroom" or all(item["valid"] for item in certificate_coverage.values())),
+        "headroom_certificate_coverage": certificate_coverage,
+        "layer_source": label_source,
+        "headroom_score_implemented": True, "score_mode": config.score_mode,
+        "bounded_gain_baseline_policy": "same_selected_variant; K_optimized_in_bounded_gain_mode; steady_optimized_in_headroom_mode",
         "strict_validation": config.strict_validation, "requested_evidence_level": config.evidence_level,
         "experiment": existing_budget(config).get("protocol", protocol(config)), "generation_budget": existing_budget(config),
         "generation_receipts_available": bool(existing_budget(config)),
         "declared_samples": config.num_samples, "cold_calls": config.cold_calls, "hidden_gated": config.hidden_tests,
         "aggregation": "problem_mean_then_layer_macro; failures_and_missing_slots_zero; no_best_of_n",
-        "bounded_gain_by_layer": by_layer, "bounded_gain_macro": mean(by_layer.values()),
+        "score_by_layer": by_layer, "score_macro": mean(by_layer.values()),
+        "bounded_gain_by_layer": {layer: mean(mean(slots) for slots in values) for layer, values in bounded_groups.items()},
+        "bounded_gain_macro": mean(mean(mean(slots) for slots in values) for values in bounded_groups.values()),
+        "headroom_by_layer": by_layer if config.score_mode == "headroom" else None,
+        "headroom_macro": mean(by_layer.values()) if config.score_mode == "headroom" else None,
         "layer_ci95": {layer: bootstrap_ci(values) for layer, values in groups.items()},
         "cross_device_comparison_certified": False, "anti_cheat_verified": False,
         "gate_scope": "current_sources_settings_measurement_evidence_device_and_software; not_H1_H14",
@@ -262,5 +316,5 @@ def analyze_paper(config):
     report["aggregation_sensitivity"] = sensitivity(report)
     atomic_json(config.run_dir / "paper_analysis.json", report)
     atomic_json(config.run_dir / "eval_results_scored.json", scored)
-    print(f"[Scoring] bounded gain macro={report['bounded_gain_macro']:.4f}; report: {config.run_dir / 'paper_analysis.json'}")
+    print(f"[Scoring] {config.score_mode} macro={report['score_macro']:.4f}; report: {config.run_dir / 'paper_analysis.json'}")
     return report

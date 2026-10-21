@@ -30,7 +30,7 @@
 
 当前默认比较四个经过正确性验证的基线变体，保留原始墙钟样本、设备与软件信息、冷成本及 K 次摊销结果。评分要求当前源码和测量证据匹配，按声明题目和样本计入失败；先按题求均值，再分层宏平均，并报告 bootstrap 区间。I/F/D 可由规格文件或选集暂定分类提供。不同设备、协议和预算分开比较。
 
-聚合报告已新增同一批槽位上的mean/median/best-of-N消融，正式均值口径不变。当前 bounded gain 的分母为 `ln(1.25)`；没有设备实测上限时，它**不是论文提出的 headroom 分数**。现有 Torch profiler 是开发诊断，不提供自写时间占比、硬件计数器或 A/E/O 归因。第十版已实现交替计时、参考控制噪声、冻结后的独立重测、扩展Graph组合和部分框架等价改写；真实GPU试点待完成。实测roofline、算法边界及见证、完整性能分解和`launch_only`门仍需实现。
+聚合报告已新增同一批槽位上的mean/median/best-of-N消融，正式均值口径不变。当前 bounded gain 的分母为 `ln(1.25)`；没有设备实测上限时，它**不是论文提出的 headroom 分数**。第十版已实现交替计时、参考控制噪声、冻结后的独立重测、扩展Graph组合和部分框架等价改写。第十一版实现显式设备校准、工作量证书、D类独立可达性见证及可选Headroom评分；缺证据不能计分。开发profiler增加设备活动并集，A/E缺计数器时保持null，launch_only只作为诊断；正式来源归因与实际硬件计数器采集仍需实现。按用户要求不运行校准、GPU/Trainium、模型或训练实验，结果保持未采集。
 
 <a id="m4"></a>
 
@@ -50,11 +50,13 @@
 
 当前有统一 TOML/CLI、显式 GPU 目标、local/Docker/Modal/HTTP 队列、Slurm、Harbor 任务导出与独立 verifier 配置；运行采用独立任务、超时清理和内容恢复。Python 3.12 与依赖版本固定，项目命名、文档、来源和版权集中维护。不同执行后端不等于不同计算平台：现有 GPU 配置仍描述 NVIDIA CUDA。
 
-CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等于部署成功。真实 CUDA、容器/云端、Harbor 隔离与 regrade 仍待实机验证。Trainium/NKI和通用设备接口仍属设计；逐项证据收据和等级门已实现，L1/L2设备证据尚未采集；“缺工具可选”不能关闭已有正确性门或把未知字段写成通过。
+CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等于部署成功。真实 CUDA、容器/云端、Harbor 隔离与 regrade 未进行实机验证。已新增CUDA校准接口，Trainium/NKI与完整通用设备层仍需实现；逐项证据收据和等级门已实现，L1/L2设备证据尚未采集；“缺工具可选”不能关闭已有正确性门或把未知字段写成通过。
+
+当前任务范围是完成23项设计所需的实现、配置、runner和必要回归，**不运行科研实验**。实际GPU、Trainium、真实模型和训练结果保持未运行；它们不作为本轮代码交付的前置条件。
 
 ## 逐项归档
 
-下表覆盖第一至第七版的 **67 项**改动、第八版 **7 项**整合、第九版 **8 项**和第十版 **5 项**设计落地。每项指定一个主要 motivation，必要时附关联动机。仓库清理、命名和兼容性属于 M5 的维护工作，不包装成新的研究贡献。V6/V7 编号在本轮追踪表中补齐；不改变历史提交内容。
+下表覆盖第一至第七版的 **67 项**改动、第八版 **7 项**整合、第九版 **8 项**、第十版 **5 项**与第十一版 **5 项**设计落地。每项指定一个主要 motivation，必要时附关联动机。仓库清理、命名和兼容性属于 M5 的维护工作，不包装成新的研究贡献。V6/V7 编号在本轮追踪表中补齐；不改变历史提交内容。
 
 <!-- changes:start -->
 ### M1：题目与区分度的改动
@@ -110,6 +112,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V6-06 结果页面 | 结果页面使用实际硬件与采样声明 | M5 | [generate_leaderboard.py](../scripts/generate_leaderboard.py) |
 | V7-04 明确选择硬件 | 显式硬件选择，避免未知设备被当成 Hopper | M5 | [config.py](../kb_workflows/config.py) |
 | V8-06 分层来源与探针隔离 | 启发式I/F/D标注来源；probe和extended分组且不标为主榜资格 | M1 | [paper_analysis.py](../kb_workflows/paper_analysis.py) |
+| V11-01 设备校准接口与原始收据 | 提供显式设备探针与cache flush/time接口，绑定物理UUID、驱动、软件和评测器，重算原始样本速率；本轮只实现不运行校准 | M5 | [calibration.py](../kb_workflows/calibration.py), [calibrate_device.py](../scripts/calibrate_device.py) |
+| V11-02 工作量证书与独立可达性见证 | 核对参考源码、输入、精度和校准；D标签要求算法说明与至少两次独立标准/隐藏记录，历史暂定标签不能代替证书 | M2 | [headroom.py](../kb_workflows/headroom.py), [export_reachability.py](../scripts/export_reachability.py) |
+| V11-03 Headroom评分与证据失效 | 按SOL_target归一稳态收益，缺证书置零并保留固定分母；另报摊销bounded gain，外部规格/校准修改使旧资格失效 | — | [paper_analysis.py](../kb_workflows/paper_analysis.py), [common.py](../kb_workflows/common.py) |
+| V11-04 设备时间并集与性能解释 | 计算重叠活动并集与kernel数，来源未知不猜测；缺工作计数器时A/E为null，启动收益须有测量解释，暂为诊断 | — | [performance.py](../kb_workflows/performance.py), [profile_task.py](../kb_workflows/profile_task.py) |
 | V9-07 严格评分门与协议隔离 | 显式严格模式下，未适配题、失败检查和缺失收据拒绝资格；后端设置与等级参与任务及比较指纹 | M2 | [paper_analysis.py](../kb_workflows/paper_analysis.py) |
 | V9-08 样本聚合消融 | 对同一批声明槽位计算mean、median、best-of-N，保留失败零分和成本记录，正式分数不变 | M4 | [aggregation.py](../kb_workflows/aggregation.py) |
 | V10-01 交替计时与噪声对照 | 同进程平衡参考/候选/参考控制顺序，逐次验证输出，按重复进程与配对样本重采样估计倍率区间 | M2 | [paired_task.py](../kb_workflows/paired_task.py) |
@@ -166,6 +172,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V8-01 五条动机与逐项追踪 | 将历史改动归到具体问题，并校验覆盖完整性 | M1, M2, M3, M4 | [MOTIVATION.md](../docs/MOTIVATION.md) |
 | V8-02 统一论文与能力状态 | 已实现与研究目标使用同一套名称和预算，不将设计写成实验结果 | M1, M2, M3, M4 | [PAPER.md](../research/headroom/PAPER.md) |
 | V8-07 选集与参考版本证据 | 记录manifest摘要并检查参考快照，阻止静默任务漂移 | M3 | [suites.py](../kb_workflows/suites.py) |
+| V11-05 Verifier配置与精度设置恢复 | 可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计 | M2 | [harbor.py](../kb_workflows/harbor.py), [generation.py](../kb_workflows/generation.py), [validation.py](../src/validation.py) |
 | V9-06 逐项证据等级 | 实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级 | M2, M3 | [evidence.py](../kb_workflows/evidence.py) |
 | V10-05 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母 | M3, M4 | [final_verification.py](../kb_workflows/final_verification.py) |
 <!-- changes:end -->
@@ -189,10 +196,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-10 内存与竞态工具 | 待实现 | M2 | compute-sanitizer及题目允许非确定性的规则需GPU复现，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |
 | R-12 独立最终重测 | 代码已实现 | M3 | 已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行 |
-| R-13 扩展基线组合 | 部分实现 | M3 | 已增加compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖、CUDA/编译部署和逐题验证尚未齐备 |
-| R-14 设备实测上限与边界证书 | 待实现 | M3 | 不将历史H100规格表ledger当成当前设备校准结果；需实测和见证 |
-| R-15 Headroom分层评分与设计证书 | 待实现 | M3 | 当前归一分母为ln(1.25)，不是含SOL_target的论文公式；D标签不是设计证明 |
-| R-16 完整性能归因 | 待实现 | M3 | busy时间需并集；FLOPs/bytes与A/E/O拆分、每引擎计数器、launch_only门待实现 |
+| R-13 扩展基线组合 | 部分实现 | M3 | 已有compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖仍需实现，真实GPU部署和实验按用户要求不运行 |
+| R-14 设备实测上限与边界证书 | 代码已实现 | M3 | 已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理 |
+| R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
+| R-16 完整性能归因 | 部分实现 | M3 | 已实现设备busy并集、保守来源份额、缺计数器时AE/O及launch_only诊断；实际Nsight/Neuron计数器采集、二进制来源与正式归因评分门待实现 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 待实现 | M4 | 现有墙钟和候选上限已实现；模型token及纯GPU时间未硬限，费用为调用间估算 |
 | R-19 得分预算曲线与通用agent基线 | 待实现 | M4 | 当前协议和轨迹已记录；多预算点、多会话及同预算真实模型实验待完成 |

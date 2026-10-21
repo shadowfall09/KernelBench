@@ -406,6 +406,29 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 
 验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **404项CPU/模拟回归通过**，新增36项。覆盖六种顺序平衡、输入准备排除、数值错误拒绝、噪声控制、重复进程bootstrap、3个真实参考改写、扩展任务/Graph编排、冻结来源与种子、仅变更样本恢复、最终失败门、附加收据和旧资格篡改拒绝、Harbor预算与reward。Ruff、来源/文档检查及离线wheel独立轻量导入通过。Slurm作业50703（taurus）和50704（aries）在即时申请窗口返回`Requested nodes are busy`，未运行GPU；不能据此声明CUDA Graph、真实计时或GPU隔离已验证。之前stash保持原样。
 
+## 第十一版：设备模型与Headroom评分
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add device calibration and certificate-gated headroom scoring |
+| 日期 | 2026-10-21 |
+| 基础提交 | `b0d4b09` |
+| 状态 | 已提交；只进行CPU/模拟回归，按用户要求不运行任何实验 |
+
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V11-01 | 设备校准接口与原始收据 | 提供显式设备探针与cache flush/time接口，绑定物理UUID、驱动、软件和评测器，重算原始样本速率；本轮只实现不运行校准 | `kb_workflows/calibration.py` | [M3](MOTIVATION.md#m3) |
+| V11-02 | 工作量证书与独立可达性见证 | 核对参考源码、输入、精度和校准；D标签要求算法说明与至少两次独立标准/隐藏记录，历史暂定标签不能代替证书 | `kb_workflows/headroom.py` | [M3](MOTIVATION.md#m3) |
+| V11-03 | Headroom评分与证据失效 | 按SOL_target归一稳态收益，缺证书置零并保留固定分母；另报摊销bounded gain，外部规格/校准修改使旧资格失效 | `kb_workflows/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
+| V11-04 | 设备时间并集与性能解释 | 计算重叠活动并集与kernel数，来源未知不猜测；缺工作计数器时A/E为null，启动收益须有测量解释，暂为诊断 | `kb_workflows/performance.py` | [M3](MOTIVATION.md#m3) |
+| V11-05 | Verifier配置与精度设置恢复 | 可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计 | `kb_workflows/harbor.py` | [M5](MOTIVATION.md#m5) |
+
+默认评分保持不变；显式选择 `score_mode = "headroom"` 并提供可信规格和校准收据后，使用论文分母计算稳态分数。原K摊销bounded gain另报。达到的微基准速率是设备模型依据，不包装成物理上限证明。缺证书、输入/设备/精度不匹配及独立见证失败不能计分；低于模型估计只提示核查。完整格式与边界见[Headroom评分说明](HEADROOM_SCORING.md)。
+
+验证：Python 3.12.12 / Torch 2.12.0 下446项CPU/模拟回归通过，其中42项为本版新增。覆盖校准调度和CUDA events调用顺序的模拟、原始数据/驱动/UUID/版本绑定、SOL资源最大值、证书与D独立见证、持久化评分与外部证据失效、Harbor可信文件分离、区间并集与未知计数器。Ruff、动机表、本地文档链接与离线wheel轻量导入检查通过。
+
+本版未运行GPU/Trainium校准、模型生成、训练或科研实验。设备收据与实验结果维持未采集；后续实现按同一范围推进。来源归因和实际硬件计数器采集仍未完成；A/E不会填造数值。之前stash保持不变。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

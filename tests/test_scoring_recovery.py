@@ -37,7 +37,8 @@ def run(tmp_path, monkeypatch):
         (config.run_dir / kernel_name(1, 1, sid)).write_text(f"candidate source {sid}")
     atomic_json(config.run_dir / "run_config.json", config.to_dict())
     device = {"available": True, "name": "GPU", "capability": [9, 0], "total_memory": 10**10,
-              "multiprocessors": 100, "l2_bytes": 10**6, "torch_version": "test", "cuda_version": "test", "hip_version": None}
+              "multiprocessors": 100, "l2_bytes": 10**6, "torch_version": "test", "cuda_version": "test", "hip_version": None,
+              "uuid": "physical-test-device", "driver_version": "test"}
     receipt = {"output_consumed": True, "fresh_inputs": True, "varied_input_contents": True,
                "timed_outputs_verified": True, "input_seeds": [101, 102, 103]}
     payload = engine.task_payload(config, 1, task="baseline")
@@ -168,6 +169,18 @@ def test_final_and_paired_evidence_drive_scores_and_legacy_gate(run, monkeypatch
     gated = common.apply_score_gate(standard, config.run_dir)
     assert gated["1_0"]["correctness"] is (damage == "none")
     assert gated["1_1"]["correctness"]
+    if damage == "none":
+        from kb_workflows import calibration, headroom
+
+        monkeypatch.setattr(headroom, "ROOT", common.ROOT)
+        monkeypatch.setattr(headroom, "select_problems", engine.select_problems)
+        monkeypatch.setattr(headroom, "evaluator_digest", lambda: "current")
+        measured = calibration.seal(baseline["device_fingerprint"],
+            {"memory_bytes": calibration.probe_record(1000, [1] * 5, unit="bytes/s", parameters={})},
+            [0.01] * 5, settings={"test_fixture": True}, digest="current")
+        witness = headroom.witness_from_run(config, 1, 0, measured)
+        assert witness["runtime_ms"] == 5 and len(witness["verification"]) == 2
+        assert witness["source_sha256"] == manifest["slots"]["1_0"]["source_sha256"]
     final["1_1:0:standard"]["runtime"] = 999
     atomic_json(config.run_dir / "final_results.json", final)
     assert not common.apply_score_gate(standard, config.run_dir)["1_1"]["correctness"]
@@ -267,6 +280,60 @@ def test_optional_layers_keep_missing_slots_and_bootstrap(run):
     assert report["bounded_gain_by_layer"] == {"F": 1}
     assert report["layer_ci95"]["F"] == [1, 1]
     assert not report["cross_device_comparison_certified"]
+
+
+@pytest.mark.parametrize("damage", ["none", "missing_certificate", "different_device", "design_without_witness", "rate"])
+def test_headroom_scoring_uses_reviewed_certificate_and_invalidates_external_inputs(run, damage):
+    import hashlib
+    import math
+
+    from kb_workflows import calibration, headroom
+
+    config, baseline, standard, secret, save = run
+    baseline["device_fingerprint"]["uuid"] = "physical-test-device"
+    baseline["device_fingerprint"]["driver_version"] = "test"
+    for records in (standard, secret):
+        for record in records.values():
+            record["metadata"]["device_fingerprint"]["uuid"] = "physical-test-device"
+            record["metadata"]["device_fingerprint"]["driver_version"] = "test"
+    measured = calibration.seal(baseline["device_fingerprint"],
+        {"memory_bytes": calibration.probe_record(1000, [1] * 5, unit="bytes/s", parameters={})},
+        [0.01] * 5, settings={"test_fixture": True}, digest="current")
+    spec = {"protocol": headroom.PROTOCOL, "layer": "F", "reference_sha256": hashlib.sha256(b"reference source").hexdigest(),
+            "precision": "fp32", "input_signature": baseline["input_signature"],
+            "review": {"reviewer": "unit-test", "rationale": "Synthetic protocol fixture"},
+            "calibration_sha256": measured["receipt_sha256"],
+            "reference_work": {"memory_bytes": 1000}, "algorithm_work": {"memory_bytes": 1000}}
+    if damage == "missing_certificate":
+        spec = {}
+    elif damage == "different_device":
+        measured["device"]["uuid"] = "other-device"
+    elif damage == "design_without_witness":
+        spec["layer"] = "D"
+    elif damage == "rate":
+        measured["probes"]["memory_bytes"]["rate"] = 1e20
+    calibration_path, specs_path = config.run_dir / "calibration.json", config.run_dir / "specs.json"
+    atomic_json(calibration_path, measured)
+    atomic_json(specs_path, {"level1": {"1": {"layer": "F", "headroom_certificate": spec}}})
+    config.score_mode, config.device_calibration, config.problem_specs = "headroom", str(calibration_path), str(specs_path)
+    atomic_json(config.run_dir / "run_config.json", config.to_dict())
+    save()
+    report = paper_analysis.analyze_paper(config)
+    if damage == "none":
+        assert report["headroom_macro"] == pytest.approx(math.log(2) / math.log(10))
+        assert report["leaderboard_eligible"]
+        assert report["headroom_by_layer"] == {"F": pytest.approx(math.log(2) / math.log(10))}
+        assert report["bounded_gain_macro"] == 1
+        assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+        measured["launch_median_ms"] = 500
+        atomic_json(calibration_path, measured)
+        assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    else:
+        assert report["headroom_macro"] == 0
+        assert not report["leaderboard_eligible"]
+        assert report["details"][0]["layer"] == "unclassified"
+        assert report["details"][0]["status"] == "headroom_certificate_missing_or_invalid"
+        assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
 
 
 def test_batch_analysis_writes_gate_before_legacy_metrics(run, monkeypatch):

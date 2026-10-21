@@ -67,6 +67,8 @@ class RunConfig:
     final_repeats: int = 0
     cold_calls: int = 10000
     problem_specs: str = ""
+    score_mode: str = "bounded_gain"
+    device_calibration: str = ""
     score_gate_required: bool = True
     profile: str = ""
     model: str = ""
@@ -139,6 +141,14 @@ class RunConfig:
             self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
             if not Path(self.problem_specs).is_file():
                 raise ValueError(f"Problem specs file not found: {self.problem_specs}")
+        if self.score_mode not in {"bounded_gain", "headroom"}:
+            raise ValueError("Unknown score mode")
+        if self.device_calibration:
+            self.device_calibration = str(Path(self.device_calibration).expanduser().resolve())
+            if not Path(self.device_calibration).is_file():
+                raise ValueError("Device calibration file not found")
+        if self.score_mode == "headroom" and not (self.problem_specs and self.device_calibration):
+            raise ValueError("Headroom scoring requires reviewed problem specs and a measured device calibration")
         if self.baseline_portfolio not in {"standard", "extended"}:
             raise ValueError("Unknown baseline portfolio")
         if type(self.final_repeats) is not int or self.final_repeats < 0:
@@ -239,6 +249,7 @@ def parser():
             aliases.append("--num-parallel")
         p.add_argument(*aliases, dest=name, type=int, default=argparse.SUPPRESS)
     choices = {
+        "score_mode": ("bounded_gain", "headroom"),
         "baseline_portfolio": ("standard", "extended"),
         "evidence_level": ("current", "L0", "L1", "L2"),
         "suite": ("full", "kernelbench105"),
@@ -253,6 +264,8 @@ def parser():
         "agent_backend": ("claude-code", "litellm"),
     }
     for name in (
+        "score_mode",
+        "device_calibration",
         "baseline_portfolio",
         "evidence_level",
         "suite",
@@ -326,7 +339,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value
