@@ -20,6 +20,7 @@ from io import StringIO
 import sys
 
 from . import utils
+from .validation import clone_tensors, compare_outputs, synchronize
 
 REPO_TOP_PATH = os.path.abspath(
     os.path.join(
@@ -123,7 +124,7 @@ def _process_input_tensor(input, device, precision=torch.float32):
         return input
 
     # cast to the desired precision dtype for activations
-    input_tensor = input.to(dtype=precision)
+    input_tensor = input.to(dtype=precision) if input.is_floating_point() else input
 
     # Default for all other backends and float types
     return input_tensor.to(device=device)
@@ -413,8 +414,9 @@ def run_correctness_on_fixed_inputs(
         model_new = new_model_instance.to(device=device, dtype=precision)
 
         try:
-            output = model(*inputs)
-            torch.cuda.synchronize(device=device)
+            set_seed(42)
+            output = clone_tensors(model(*clone_tensors(inputs)))
+            synchronize(device)
         except Exception as e:
             if verbose:
                 print(f"[Hidden] Reference model failed on {config_label}: {e}")
@@ -422,8 +424,9 @@ def run_correctness_on_fixed_inputs(
             return True  # Don't penalize the custom kernel for this
 
         try:
-            output_new = model_new(*inputs)
-            torch.cuda.synchronize(device=device)
+            set_seed(42)
+            output_new = model_new(*clone_tensors(inputs))
+            synchronize(device)
         except Exception as e:
             if verbose:
                 print(f"[Hidden] Custom model failed on {config_label}: {e}")
@@ -432,30 +435,11 @@ def run_correctness_on_fixed_inputs(
             )
             return False
 
-        if output.shape != output_new.shape:
+        issue = compare_outputs(output, output_new, get_tolerance_for_precision(precision))
+        if issue:
+            metadata["hidden_correctness_issue"] = f"{config_label}: {issue}"
             if verbose:
-                print(f"[Hidden] Shape mismatch on {config_label}: {output.shape} vs {output_new.shape}")
-            metadata.setdefault("hidden_shape_mismatch", []).append(
-                f"{config_label}: expected {output.shape}, got {output_new.shape}"
-            )
-            return False
-
-        tolerance = get_tolerance_for_precision(precision)
-        if not torch.allclose(output, output_new, atol=tolerance, rtol=tolerance):
-            max_diff = torch.max(torch.abs(output - output_new)).item()
-            avg_diff = torch.mean(torch.abs(output - output_new)).item()
-            if verbose:
-                print(
-                    f"[Hidden] Output mismatch on {config_label}: "
-                    f"max_diff={max_diff:.6f}, avg_diff={avg_diff:.6f}"
-                )
-            metadata.setdefault("hidden_max_difference", []).append(
-                f"{config_label}: {max_diff:.6f}"
-            )
-            metadata.setdefault("hidden_avg_difference", []).append(
-                f"{config_label}: {avg_diff:.6f}"
-            )
-            metadata["hidden_correctness_issue"] = f"Output mismatch on {config_label}"
+                print(f"[Hidden] Output mismatch on {config_label}: {issue}")
             return False
 
     return True
@@ -920,39 +904,20 @@ def run_and_check_correctness(
             set_seed(trial_seed)
             model_new = new_model_instance.to(device=device, dtype=precision)
 
-            output = model(*inputs)
-            torch.cuda.synchronize(device=device)
+            set_seed(trial_seed)
+            output = clone_tensors(model(*clone_tensors(inputs)))
+            synchronize(device)
             # ensure all GPU operations are completed before checking results
 
             try:
-                output_new = model_new(*inputs)
-                torch.cuda.synchronize(device=device)
-                if output.shape != output_new.shape:
-                    metadata = register_and_format_exception(
-                        "correctness_issue",
-                        f"Output shape mismatch: Expected {output.shape}, got {output_new.shape}",
-                        metadata,
-                    )
+                set_seed(trial_seed)
+                output_new = model_new(*clone_tensors(inputs))
+                synchronize(device)
+                issue = compare_outputs(output, output_new, get_tolerance_for_precision(precision))
+                if issue:
+                    metadata["correctness_issue"] = issue
                     if verbose:
-                        print(
-                            f"[FAIL] trial {trial}: Output shape mismatch: Expected {output.shape}, got {output_new.shape}"
-                        )
-                    return KernelExecResult(
-                        compiled=True, correctness=False, metadata=metadata
-                    )
-
-                # check output value difference
-                tolerance = get_tolerance_for_precision(precision)
-                if not torch.allclose(
-                    output, output_new, atol=tolerance, rtol=tolerance
-                ):  # fail
-                    max_diff = torch.max(torch.abs(output - output_new)).item()
-                    avg_diff = torch.mean(torch.abs(output - output_new)).item()
-                    metadata.setdefault("max_difference", []).append(f"{max_diff:.6f}")
-                    metadata.setdefault("avg_difference", []).append(f"{avg_diff:.6f}")
-                    metadata["correctness_issue"] = "Output mismatch"
-                    if verbose:
-                        print(f"[FAIL] trial {trial}: Output mismatch")
+                        print(f"[FAIL] trial {trial}: {issue}")
                 else:  # pass
                     pass_count += 1
                     if verbose:

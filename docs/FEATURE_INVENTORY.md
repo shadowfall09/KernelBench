@@ -1,0 +1,161 @@
+# 相比 KernelBench-Verified 的功能改进清单
+
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录单独提交的正确性判断与输入隔离。
+
+当前已提交能力为第一版与第二版的累计功能。其余本地评测增强暂缓，未纳入已提交清单。
+
+## 第一版：Verified + 批量工作流
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 本版提交 | `2bce940c631c01086c262eef9c9efc9d3693e1de` |
+| 提交时间 | 2026-10-04 17:02:18（America/New_York，UTC−04:00） |
+| 提交标题 | Replace legacy fork with Verified and integrated batch workflows |
+| 记录的上游基准 | Meta KernelBench-Verified `3fdf6fec7372a4d0cb682635f00e7bdcbc55d50e` |
+| 工作流来源 | 原 KernelBench fork / `KernelBench-modified` |
+| 核对日期 | 2026-10-20（America/New_York） |
+
+这一版把 Verified 的参考题目、隐藏测试和评测器，与原 fork 的批量运行能力整合到同一条流程中。使用者可以统一配置题目范围、生成方式、验证方式和结果分析，在本地、集群或云端运行实验。
+
+### 功能清单
+
+以下各项在本版均已提交。“迁移整合”表示把原 fork 的能力接入 Verified；“流程增强”表示统一配置、可靠性或结果处理的改进，不表示上游完全没有相关基础能力。
+
+| 编号 | 功能 | 相对 Verified 的改进与用途 | 实现入口（本版快照） |
+| --- | --- | --- | --- |
+| V1-01 | 统一批量入口 | **流程增强。** 用一套配置串联基线、生成、评测和分析；支持 `all`、`generate`、`evaluate`、`analyze`、`baseline` 五种阶段，减少多脚本间的手工传参。 | [cli.py][v1-cli]、[config.py][v1-config] |
+| V1-02 | 生成与最终验证独立选择后端 | **迁移整合。** 生成支持 local / Docker / Modal，验证支持 local / Docker / Modal / HTTP 队列；例如 CPU 容器生成、远端 GPU 验证。不同后端共用参考源码、评测设置与结果协议。 | [engine.py][v1-engine]、[transports.py][v1-transports]、[modal_backend.py][v1-modal] |
+| V1-03 | 题目范围与多样本批量生成 | **迁移整合。** 支持 level 1–3、闭区间题号和每题多次独立 agent 尝试；每次尝试有独立工作目录、日志及内核文件。 | [config.py][v1-config]、[generation.py][v1-generation] |
+| V1-04 | 多 GPU 调度与并发限制 | **迁移整合。** 本地 GPU 生成按选定设备限制并发；最终评测在同一 GPU 上串行、不同 GPU 间并行；远端队列可限制在途任务数。 | [generation.py][v1-generation]、[engine.py][v1-engine]、[transports.py][v1-transports] |
+| V1-05 | Docker 生成与验证 | **迁移整合。** 统一 Dockerfile，提供带 CUDA 工具链的 `agent` 和用于远端验证的 CPU 生成目标 `agent-remote`；镜像包含当前 checkout 的题目、隐藏测试与评测代码。 | [Dockerfile][v1-docker]、[generation.py][v1-generation]、[transports.py][v1-transports] |
+| V1-06 | Slurm 集群提交 | **迁移整合。** 提供批量作业脚本，使用提交目录、可配置 Python 和分配到的 `CUDA_VISIBLE_DEVICES`；通过环境变量指定题目、设备与后端。 | [batch_run.sbatch][v1-slurm]、[transports.py][v1-transports] |
+| V1-07 | Modal 云端执行 | **迁移整合。** 支持云端最终验证及 GPU Sandbox 内的生成、迭代验证；退出 Sandbox 前收集内核和日志，使用同一套 Verified 评测入口。 | [modal_backend.py][v1-modal]、[batch_run_modal.sh][v1-modal-sh] |
+| V1-08 | 持久化 HTTP 验证队列 | **迁移整合与可靠性增强。** HTTP 提交/查询、SQLite 保存任务与结果、重启后重新排队未完成任务；相同请求幂等、瞬时 HTTP 错误重试，并限制待处理任务数量。 | [queue_worker.py][v1-queue]、[transports.py][v1-transports] |
+| V1-09 | 带内容指纹的断点恢复 | **流程增强。** 评测恢复核对参考、内核、评测器、隐藏测试和配置；生成恢复核对模型、prompt 与输出校验和。修改内核后重新执行对应的标准及隐藏评测，旧格式结果重新验证。 | [common.py][v1-common]、[engine.py][v1-engine]、[generation.py][v1-generation] |
+| V1-10 | 批量任务的超时与失败处理 | **流程增强。** 单次验证使用独立子进程与编译目录；超时终止进程组，Docker 验证同时清理容器；缺失内核写入失败记录，失败的重新生成不会继续使用旧内核冒充新结果。 | [transports.py][v1-transports]、[generation.py][v1-generation]、[engine.py][v1-engine] |
+| V1-11 | 将 Verified 隐藏门接入全部验证后端 | **评测整合。** 默认先做标准正确性、CUDA-event 计时和峰值显存，再做隐藏正确性；最终正确性要求两者通过，隐藏结果缺失也不算通过。耗时和显存保留标准评测值。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] |
+| V1-12 | 基线记录接入批量流程 | **流程增强。** 可在选定验证后端记录指定题目基线；完整流程自动补测缺失基线。FP32 默认 TF32，FP16/BF16 分开存储，也可显式选择 `torch.compile` 基线；记录耗时、显存与环境信息。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[config.py][v1-config] |
+| V1-13 | 子集分析、pass@k 与统一结果归档 | **流程增强。** 批量分析使用选定题目作为分母；pass@k 使用声明样本数，缺失和隐藏失败样本计失败；输出分析摘要、逐样本耗时/显存对比，并保持 Verified 结果键格式与原有指标公式。 | [engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] |
+| V1-14 | 旧入口兼容与配置预览 | **流程增强。** 旧 shell / Python 入口转接统一配置，兼容常用 pydra 参数；`--dry-run` 预览配置与题目，不创建运行目录、不调用模型或云服务。 | [legacy.py][v1-legacy]、[cli.py][v1-cli]、[batch_run.sh][v1-shell] |
+
+### Verified 继承能力与本版行为
+
+TF32 基线、四分布隐藏测试、显存效率指标和特定题目的 input-blind 策略来自 Verified。本版的贡献是把它们接入上述批量流程，统一后端的配置、调用与输出。
+
+本版遵循上游 input-blind 题目列表：相应题目的生成材料去掉测试输入，隐藏测试不放进 prompt。其他题目仍按本版原有策略提供源码。工作目录和 prompt 管理不构成阻止 agent 访问文件的安全沙箱。
+
+本版关键配置如下，便于与后续版本对照：
+
+| 配置或行为 | 第一版取值 |
+| --- | --- |
+| 默认生成 / 验证后端 | Docker / local |
+| 默认隐藏测试 | 开启 |
+| 标准性能计时 | CUDA event |
+| 默认 FP32 基线名 | `baseline_time_torch_tf32` |
+| 可选编译基线 | 通过 `--compile-backend`、`--compile-mode` 显式配置 |
+| 默认 pass@k | 在样本数足够时计算 k=1、5 |
+| 恢复失败结果 | 指纹匹配时保留已记录失败；重试需修改源码/设置或关闭 resume |
+
+六类根因检查、四变体基线组合、同步墙钟计时、H1–H14、独立最终重测和新的 K 次摊销评分均不属于本版清单。它们在核对时仍是本地未提交改动，后续应另列版本。
+
+### 结果放在哪里
+
+| 路径 | 内容 |
+| --- | --- |
+| `runs/NAME/run_config.json` | 本次运行配置 |
+| `runs/NAME/generation_summary.json` | 各次生成状态与校验信息 |
+| `runs/NAME/level_L_problem_P_sample_S_kernel.py` | 生成的内核 |
+| `runs/NAME/eval_results.json` | 标准正确性、耗时与显存 |
+| `runs/NAME/eval_results_hidden.json` | 隐藏正确性 |
+| `runs/NAME/pass_at_k_results.json` | 隐藏门约束后的 pass@k |
+| `runs/NAME/analysis_summary.json` | Verified 指标与逐题比较 |
+| `runs/NAME/work/pP_sS/`、`runs/NAME/logs/` | agent 工作目录及执行日志 |
+| `results/timing/HARDWARE/BASELINE.json` | 对应硬件标签下的基线 |
+
+### 验证程度
+
+本版提交说明与随提交保存的 [工作流文档][v1-doc] 记录：**17 项工作流测试 + 4 项上游 dataset/score 测试，共 21 项通过**。测试使用临时 Python 3.10 / Torch 2.9.0 环境。测试源码见 [test_workflows.py][v1-tests]。
+
+| 检查范围 | 本版记录的验证情况 |
+| --- | --- |
+| 配置、题目范围、GPU 索引与旧参数兼容 | CPU 测试覆盖 |
+| HTTP 队列、持久化、幂等与重启恢复 | 真实 HTTP 服务配合模拟 GPU 评测器验证 |
+| 隐藏门、缺失样本、pass@k、子集分母与显存字段 | CPU / 模拟任务测试覆盖 |
+| 内核变化后的恢复、生成失败后的旧文件处理、超时与 dry-run | 工作流测试覆盖 |
+| 项目固定 Torch 2.12.0 | 依赖解析通过；运行验证仍待完成 |
+| 两个 Docker 目标 | 构建定义检查通过；未证明实际镜像构建和 GPU 运行成功 |
+| Modal | SDK 镜像定义构造通过；实际云端执行仍待完成 |
+| Slurm、真实 CUDA 内核与模型生成 | GPU 申请因节点忙未成功；完整执行仍待完成 |
+
+这里记录的是该提交已有的验证结果。本次维护清单没有重跑历史测试，也不据此宣称性能提升或全部后端已经实机跑通。
+
+## 第二版：正确性判断与输入隔离
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Fix output comparison and isolate correctness inputs |
+| 提交日期 | 2026-10-20（America/New_York） |
+| 基础提交 | `2bce940c631c01086c262eef9c9efc9d3693e1de` |
+| 本版提交 | 实现、回归测试与本节文档在同一提交；哈希可用下方命令查询 |
+| 状态 | 已提交；CPU 回归通过；真实 CUDA 验证待完成 |
+
+```bash
+git log -1 --format='%h %s' --grep='^Fix output comparison and isolate correctness inputs$'
+```
+
+本版统一标准评测和隐藏评测的输出判断，防止离散结果被浮点容差放过，以及输入或输出缓冲区被修改后污染比较。
+
+| 编号 | 功能 | 具体变化 | 实现入口 |
+| --- | --- | --- | --- |
+| V2-01 | 严格比较输出结构、shape 和 dtype | 递归检查 Tensor、dict、list、tuple；核对字典键、序列类型和长度，以及各 Tensor 的 shape、dtype；记录具体不一致的输出路径。 | [validation.py](../src/validation.py)：`compare_outputs` |
+| V2-02 | 整数与 bool 精确比较 | 离散 Tensor 使用精确比较。比如整数索引 `100000` 与 `100001` 即使满足相对浮点容差，也会被判为不一致；整数和 bool 输入不再被统一转换为浮点精度。 | [validation.py](../src/validation.py)、[eval.py](../src/eval.py)：`_process_input_tensor` |
+| V2-03 | 核对 NaN、Inf 的位置与符号 | NaN、正 Inf、负 Inf 的掩码分别匹配；匹配后，仅有限数值继续按原 FP32/FP16/BF16 容差比较。 | [validation.py](../src/validation.py)：`compare_outputs` |
+| V2-04 | 隔离参考与候选输入 | 两个模型分别使用独立的 Tensor 副本，支持嵌套容器，避免参考或候选的原地操作修改另一方的输入和调用方原始数据。 | [validation.py](../src/validation.py)：`clone_tensors`；[eval.py](../src/eval.py)：两个正确性入口 |
+| V2-05 | 保存参考输出快照 | 在调用候选前保存参考结果，避免共享或复用输出缓冲区把参考答案覆盖，导致错误实现被判通过。 | [eval.py](../src/eval.py)：`run_and_check_correctness`、`run_correctness_on_fixed_inputs` |
+| V2-06 | 对齐 forward 随机种子 | 参考与候选 forward 使用相同种子，避免 dropout 等随机计算因执行先后产生不同结果。 | [eval.py](../src/eval.py)：两个正确性入口 |
+
+### 验证程度
+
+在以 `2bce940` 为基础、仅包含本版代码的独立快照中执行：
+
+```bash
+python -m pytest -q tests/test_correctness_validation.py tests/test_workflows.py \
+  src/unit_tests/test_dataset.py src/unit_tests/test_score.py
+```
+
+结果为 **64 passed**：43 项新增正确性回归用例，加上 21 项原有工作流与 dataset/score 测试。环境为 Python 3.10 / Torch 2.9.0。
+
+新增用例覆盖嵌套输出、结构/shape/dtype 不匹配、整数偏差、bool、非有限值位置与符号、原浮点容差、原地操作、共享输出缓冲区、嵌套输入副本及随机种子。Ruff 和 diff 格式检查通过。测试源码为 [test_correctness_validation.py](../tests/test_correctness_validation.py)。
+
+真实 CUDA 执行和项目固定 Torch 2.12.0 的运行验证仍待完成。本版没有加入根因探针、反作弊、墙钟计时、四变体基线或新计分流程；参考报错和空隐藏测试集的处理规则也未在本版修改。
+
+本节实现入口的相对链接会打开当前 checkout；查看本版准确源码时，使用上述命令取得提交哈希，再执行 `git show <hash>:src/eval.py` 或对应文件路径。
+
+## 维护方式
+
+1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。
+2. 功能编号保持稳定。后续改变默认值、替换实现或删除功能时，引用原编号说明变化。
+3. “已提交”“CPU/模拟验证”“真实 GPU/云端验证”分别记录；仅代码接入不等于完成实机验证。
+4. 未提交工作单独标记，提交后再固定版本，保留旧版行为，避免混淆历史能力。
+5. 实现证据使用固定提交链接。即使当前工作区继续变化，仍可核查本版内容。
+6. 每次提交功能变化时，同步更新对应清单条目与验证结果，并将文档纳入同一提交。记录本提交时可用唯一提交标题与定位命令，避免文档引用自身哈希的问题。
+
+上游基准来自该提交的 provenance 记录；本地没有 `3fdf6fec` 对象，本清单依据 `git show 2bce940:<path>` 核对整合内容，不是对上游源码逐文件 diff 的证明。第一版完整操作说明见 [本版工作流文档][v1-doc]。
+
+[v1-cli]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/cli.py
+[v1-config]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/config.py
+[v1-engine]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/engine.py
+[v1-transports]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/transports.py
+[v1-modal]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/modal_backend.py
+[v1-generation]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/generation.py
+[v1-docker]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/Dockerfile
+[v1-slurm]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/batch_run.sbatch
+[v1-modal-sh]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/batch_run_modal.sh
+[v1-queue]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/queue_worker.py
+[v1-common]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/common.py
+[v1-task]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/evaluate_task.py
+[v1-analysis]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/scripts/benchmark_eval_analysis.py
+[v1-legacy]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/legacy.py
+[v1-shell]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/batch_run.sh
+[v1-doc]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/docs/BATCH_WORKFLOWS.md
+[v1-tests]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/tests/test_workflows.py

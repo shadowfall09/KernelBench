@@ -18,6 +18,8 @@ and license are retained below. Earlier fork versions remain in Git history.
 
 ## Integrated batch workflows
 
+See the Chinese [feature inventory](docs/FEATURE_INVENTORY.md) for versioned improvements over Verified, including batch workflows and the separately committed correctness validation fixes.
+
 This checkout also includes the Docker/Slurm, Modal, local verification queue and
 baseline-analysis workflows migrated from `KernelBench-modified`. They share
 `scripts/run_batch.py`, default to Verified hidden correctness gating and preserve
