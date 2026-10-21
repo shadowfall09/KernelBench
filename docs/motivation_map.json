@@ -1038,48 +1038,52 @@
       "title": "FP64数值契约与精度门",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/strict_validation.py",
+        "kb_workflows/numerical.py"
       ],
-      "reason": "需逐题oracle及阈值校准，当前仍用既有dtype容差；误差预算轨道尚未实现"
+      "reason": "已接入17道L1附加实例的FP64/RMS/全元素契约和参考自资格；原尺寸全面校准、其他题目和误差预算设计轨道待完成"
     },
     {
       "id": "R-05",
       "title": "参考退化审计与输入校准",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/strict_validation.py",
+        "kb_workflows/numerical.py"
       ],
-      "reason": "先诊断全零/小输出，再按合法域和语义修复；不能统一放大全部输入"
+      "reason": "已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成"
     },
     {
       "id": "R-06",
       "title": "针对算子的输入族与隐藏形状",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/strict_validation.py",
+        "kb_workflows/numerical.py"
       ],
-      "reason": "目前只有29道L1数值压力，隐藏多种子不等于隐藏shape或stride覆盖"
+      "reason": "已为17道L1实现合法输入族、奇数尺寸与最终非连续stride；全题集、特殊值及参数化生产shape域待完成"
     },
     {
       "id": "R-07",
       "title": "模式、状态、参数更新与输入敏感性",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/strict_validation.py",
+        "kb_workflows/numerical.py"
       ],
-      "reason": "需要逐题train/eval、BN、参数可变性与输入域契约；不能生搬原型"
+      "reason": "已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成"
     },
     {
       "id": "R-08",
@@ -1098,12 +1102,13 @@
       "title": "执行完整性与缓存审计",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/strict_validation.py",
+        "kb_workflows/numerical.py"
       ],
-      "reason": "NaN预填、同对象原地更新、吞吐对照、运行环境拒绝规则尚未完整接入"
+      "reason": "已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成"
     },
     {
       "id": "R-10",
@@ -1194,12 +1199,12 @@
       "title": "样本聚合消融",
       "primary": "M3",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/aggregation.py"
       ],
-      "reason": "当前所有声明槽位求均值；论文原提议的中位数、最快样本与均值需同预算对照"
+      "reason": "已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告"
     },
     {
       "id": "R-18",
@@ -1254,12 +1259,12 @@
       "title": "工具能力收据与可选分层",
       "primary": "M5",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/evidence.py"
       ],
-      "reason": "逐字段not_measured及L0/L1/L2要求尚未实现；不得因此降级已有隐藏门和证据门"
+      "reason": "已实现逐项状态收据、缺项null、等级判定与评分门；L1/L2缺少的设备工具证据不会降格冒充通过，GPU验收仍独立记录"
     },
     {
       "id": "R-23",
@@ -1272,6 +1277,113 @@
         "research/headroom/PAPER.md"
       ],
       "reason": "Harbor独立verifier配置已接入；GPU、容器网络、沙箱边界、升级后regrade尚待实测"
+    },
+    {
+      "id": "V9-01",
+      "title": "FP64数值契约",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/numerical.py"
+      ],
+      "reason": "在17道已审阅L1的附加实例上，参考与候选均须通过RMS及全元素FP64门"
+    },
+    {
+      "id": "V9-02",
+      "title": "参考信号诊断",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/numerical.py"
+      ],
+      "reason": "记录输出量级、非有限值、常数与容差覆盖；至少一组合法实例有信息量"
+    },
+    {
+      "id": "V9-03",
+      "title": "合法输入族与隐藏形状",
+      "primary": "M2",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/strict_validation.py"
+      ],
+      "reason": "限定17题的耦合维度、符号、近常数、动态范围、边界、GELU辨别输入及最终非连续stride"
+    },
+    {
+      "id": "V9-04",
+      "title": "模式状态与同对象缓存检查",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/strict_validation.py"
+      ],
+      "reason": "审计train/eval、同名buffer、参数原地更新与同对象输入修改后的响应"
+    },
+    {
+      "id": "V9-05",
+      "title": "进程设置审计",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/strict_validation.py"
+      ],
+      "reason": "记录并恢复候选导入和执行修改的后端、默认dtype、线程和环境变量；收据不含环境变量值"
+    },
+    {
+      "id": "V9-06",
+      "title": "逐项证据等级",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/evidence.py"
+      ],
+      "reason": "实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级"
+    },
+    {
+      "id": "V9-07",
+      "title": "严格评分门与协议隔离",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "显式严格模式下，未适配题、失败检查和缺失收据拒绝资格；后端设置与等级参与任务及比较指纹"
+    },
+    {
+      "id": "V9-08",
+      "title": "样本聚合消融",
+      "primary": "M3",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/aggregation.py"
+      ],
+      "reason": "对同一批声明槽位计算mean、median、best-of-N，保留失败零分和成本记录，正式分数不变"
     }
   ]
 }

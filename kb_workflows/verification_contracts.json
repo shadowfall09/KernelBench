@@ -1,0 +1,517 @@
+{
+  "version": 1,
+  "threshold_source": "Explicit initial contracts; reference must qualify against FP64 on every case; GPU calibration pending",
+  "timing_inputs_changed": false,
+  "tasks": {
+    "1/1": {
+      "reference_sha256": "2d349d77a97fd1a6f29365553275729685ab1cfff57ca4458bb6a8c09b88e91d",
+      "family": "square_matmul",
+      "operator": "Square_matrix_multiplication_",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/2": {
+      "reference_sha256": "bce22f4d7998a206e01997a59183bd8290b8d2e9993e19ec44d40fe019ff6965",
+      "family": "matmul",
+      "operator": "Standard_matrix_multiplication_",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/3": {
+      "reference_sha256": "f785135fb4b6dcce703e086882993fddda81c107eef5dd425da53b1d26a1e04e",
+      "family": "batched_matmul",
+      "operator": "Batched_matrix_multiplication",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/19": {
+      "reference_sha256": "3f3571481e280fdd960ec50ca9cbda184948b86b283c62af3ea6eb971848d84c",
+      "family": "unary",
+      "operator": "ReLU",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/20": {
+      "reference_sha256": "324f633b00a15888a798203317d76bd14287d50804c9b3f75f62b9e9cbda9345",
+      "family": "unary",
+      "operator": "LeakyReLU",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/21": {
+      "reference_sha256": "2220654dea1baaa2be7805ae74fc072b3c0a715d3bd6eb13098077eaf1fbe90a",
+      "family": "unary",
+      "operator": "Sigmoid",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/22": {
+      "reference_sha256": "d72fb7d9001f9d19b712ac2030187c7f9a123963ae00ef74db083268efd12c88",
+      "family": "unary",
+      "operator": "Tanh",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/23": {
+      "reference_sha256": "4314753740f2f885486149f2449e04d463314dd0daa35a961e3b8b61bf334a8c",
+      "family": "unary",
+      "operator": "Softmax",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/24": {
+      "reference_sha256": "e22665b54ec00bf7510cdcde13dec2d645721976f3e12486ca2bddfc875b3a7e",
+      "family": "unary",
+      "operator": "LogSoftmax",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/25": {
+      "reference_sha256": "455a745129977ab79abb2ca0cee1b3aad5fea82ccbf2eac975185237ae275b89",
+      "family": "unary",
+      "operator": "Swish",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/26": {
+      "reference_sha256": "5a63f7999287a10c0974b9beb591253b5b9c6d27d5d067583abad208dd322f6e",
+      "family": "unary",
+      "operator": "gelu",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/27": {
+      "reference_sha256": "c54c764742a5ec1994ac41f9e4becae6f4ada027b1b554e7a5b31af6513e0b16",
+      "family": "unary",
+      "operator": "SELU_",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/47": {
+      "reference_sha256": "ee0a62cb65f320beb6388016e670195c2a7795f83527d76264eefec6b27ea158",
+      "family": "reduction",
+      "operator": "Sum_reduction_over_a_dimension",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/48": {
+      "reference_sha256": "653ab19c0481d741f13967747d5874b8573031f555eb663228d5d8b280497023",
+      "family": "reduction",
+      "operator": "Mean_reduction_over_a_dimension",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/49": {
+      "reference_sha256": "3c7b0ca3422c0da3679e69bf4cc59e58da18df99666b1d6745655e50a7d31f78",
+      "family": "reduction",
+      "operator": "Max_reduction_over_a_dimension",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/51": {
+      "reference_sha256": "c1ce09c9f6168c5c9b759668d36afd6ef24433d07ec5af11a173b69490634f3d",
+      "family": "reduction",
+      "operator": "argmax",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    },
+    "1/52": {
+      "reference_sha256": "a3b221e180f6d6f436ce42e292ee06b4e260df6a60d1b43b175b19f038a0ce27",
+      "family": "reduction",
+      "operator": "argmin",
+      "legal_domain": "finite real-valued input tensors; matmul dimensions coupled; integer init arguments retained",
+      "state_contract": "train/eval outputs, same-name reference buffers, same-name mutable parameters",
+      "precision": {
+        "float32": {
+          "norm_rtol": 5e-06,
+          "norm_atol": 1e-07,
+          "element_rtol": 5e-05,
+          "element_atol": 5e-07,
+          "element_scale_rtol": 1e-06
+        },
+        "float16": {
+          "norm_rtol": 0.005,
+          "norm_atol": 1e-05,
+          "element_rtol": 0.02,
+          "element_atol": 0.001,
+          "element_scale_rtol": 0.001
+        },
+        "bfloat16": {
+          "norm_rtol": 0.03,
+          "norm_atol": 0.0001,
+          "element_rtol": 0.06,
+          "element_atol": 0.01,
+          "element_scale_rtol": 0.01
+        }
+      }
+    }
+  }
+}

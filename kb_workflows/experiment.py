@@ -83,6 +83,7 @@ def compare_runs(directories):
                     "hidden_tests": config.hidden_tests, "num_correct_trials": config.num_correct_trials,
                     "num_perf_trials": config.num_perf_trials, "cold_calls": config.cold_calls,
                     "fp32_tolerance": config.fp32_tolerance}
+        contract.update(strict_validation=config.strict_validation, evidence_level=config.evidence_level)
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})
         entry["runs"].append({"run": directory.name, "declared_model": config.model, "observed_models": budget.get("observed_models"),

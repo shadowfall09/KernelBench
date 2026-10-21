@@ -54,6 +54,8 @@ class RunConfig:
     num_correct_trials: int = 5
     num_perf_trials: int = 100
     hidden_tests: bool = True
+    strict_validation: bool = False
+    evidence_level: str = "current"
     baseline: str = ""
     record_baseline: bool = False
     compile_backend: str = ""
@@ -125,6 +127,10 @@ class RunConfig:
             raise ValueError("Invalid suite or suite role")
         if self.suite == "full" and self.suite_role != "scored":
             raise ValueError("--suite-role requires --suite kernelbench105")
+        if self.evidence_level not in {"current", "L0", "L1", "L2"}:
+            raise ValueError("Unknown evidence level")
+        if self.evidence_level != "current":
+            self.strict_validation = True
         if self.problem_specs:
             self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
             if not Path(self.problem_specs).is_file():
@@ -219,6 +225,7 @@ def parser():
             aliases.append("--num-parallel")
         p.add_argument(*aliases, dest=name, type=int, default=argparse.SUPPRESS)
     choices = {
+        "evidence_level": ("current", "L0", "L1", "L2"),
         "suite": ("full", "kernelbench105"),
         "suite_role": ("scored", "probe", "extended"),
         "stage": ("all", "generate", "evaluate", "analyze", "baseline", "export-harbor"),
@@ -231,6 +238,7 @@ def parser():
         "agent_backend": ("claude-code", "litellm"),
     }
     for name in (
+        "evidence_level",
         "suite",
         "suite_role",
         "run_name",
@@ -269,7 +277,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("resume", "enable_ncu", "hidden_tests", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile"):
+    for name in ("resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)

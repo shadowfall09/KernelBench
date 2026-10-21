@@ -70,26 +70,26 @@ The records motivate checks for library substitution, unused custom paths, mode-
 
 ### 3.2 Implemented correctness contract
 
-Current standard and hidden checks share recursive comparison of structure, tensor shape and dtype. Integer and boolean tensors are exact. Floating outputs retain the existing dtype tolerances; NaN positions and positive/negative infinity positions must match before finite values are compared. This is not an FP64 precision gate.
+Current standard and hidden checks share recursive comparison of structure, tensor shape and dtype. Integer and boolean tensors are exact. Floating outputs retain the existing dtype tolerances; NaN positions and positive/negative infinity positions must match before finite values are compared. The default remains this contract; opt-in strict validation adds FP64 gates on reviewed auxiliary cases, described below.
 
 Reference and candidate receive separate input snapshots. Outputs are saved before another forward can overwrite a reused buffer. RNG state is replayed so stochastic operations face matching conditions. Paired-order checks run candidate→reference and reference→candidate, advancing each model equally. Separate source namespaces prevent candidate definitions replacing reference globals; shared backend settings are restored around candidate activity. These measures address specific contamination paths, not arbitrary host compromise.
 
-Hidden input generators run under seeds 42, 123 and 456. For 29 reviewed Level 1 tasks, the first hidden configuration also receives zero, scaled and sparse-outlier variants, without changing shape, dtype or unreviewed input roles. No generic perturbation is applied to probability, mask, index or structural domains. Hidden sets that are empty, malformed, unavailable or fail in the reference cannot count as successful validation. These additions do not provide hidden-shape coverage.
+Hidden input generators run under seeds 42, 123 and 456. For 29 reviewed Level 1 tasks, the first hidden configuration also receives zero, scaled and sparse-outlier variants, without changing shape, dtype or unreviewed input roles. No generic perturbation is applied to probability, mask, index or structural domains. Hidden sets that are empty, malformed, unavailable or fail in the reference cannot count as successful validation. The default additions do not provide hidden-shape coverage. Opt-in strict contracts separately cover odd-sized and non-contiguous auxiliary cases for the 17 reviewed L1 tasks.
 
 ### 3.3 Union of implemented checks and target checks
 
 | Concern | Current implementation | Remaining target |
 | --- | --- | --- |
 | Wrong output representation | Recursive structure, shape, dtype, discrete and non-finite comparison | Per-task numerical error contracts and role-preserving instantiation |
-| Weak absolute tolerance / degenerate reference | Existing tolerances and limited pressure inputs | Diagnose output signal, construct informative legal inputs, calibrate oracle error budgets |
+| Weak absolute tolerance / degenerate reference | Default tolerances; strict auxiliary FP64 gate and signal diagnostics on 17 L1 tasks | Diagnose output signal, construct informative legal inputs, calibrate oracle error budgets |
 | Rounding and unstable statistics | Reviewed generic stress on a limited allowlist | Per-operator cancellation, dynamic-range and near-constant input families |
 | Extremes and boundary behavior | Matching non-finite masks, limited input stresses | Legal-domain extremes, GELU discriminators, asymmetric indexing and border cases |
-| Reference-result or input caching | Paired order, snapshots, changing timed inputs | Same-object mutation probes and complete parameter/state contracts |
-| Wrong train/eval path or BN state | Existing reference mode retained; no complete state audit | Check both declared modes and running state, time in the required mode |
+| Reference-result or input caching | Paired order, snapshots, changing timed inputs; strict same-object mutation probes | Same-object mutation probes and complete parameter/state contracts |
+| Wrong train/eval path or BN state | Strict same-name mode/buffer/parameter contract implemented and tested on CPU counterexamples | Check both declared modes and running state, time in the required mode |
 | Work outside the timed stream | Device-wide synchronization and output consumption | Throughput contrast, leftover-work checks and broader tampering rejection |
 | No custom kernel doing useful work | No certified origin attribution | Attribute launched device work by submission/library/framework origin; separate tracks |
 | Synchronization / memory safety | Some repeat behavior is checked | Optional sanitizer, task-specific determinism policies and GPU red-team reproduction |
-| Overfitting a fixed input shape | Some input constructors withheld, value-only hidden tests | Reviewed hidden shape/stride families and input-sensitivity probes |
+| Overfitting a fixed input shape | Default value-only hidden tests; reviewed strict auxiliary odd/strided shape cases | Reviewed hidden shape/stride families and input-sensitivity probes |
 
 The archived hardening prototype is not imported as the evaluator. Its uniform transforms can violate input roles, its numerical oracle assumptions need review, its percentile interval is not a confidence interval, and its suggested 20% custom-time threshold conflicts with the paper's proposed 95% track threshold. Neither threshold is calibrated here. Silently skipping a non-finite reference or treating every repeated bitwise difference as a race would also change semantics incorrectly.
 
@@ -99,7 +99,7 @@ The target evaluator distinguishes fixed-format tasks from error-budget tasks. A
 
 Input design has three layers: diagnose and repair non-informative reference outputs using legal inputs or parameters; instantiate operator-specific counterexamples; and vary hidden shapes and strides. Calibration inputs would also define the timing workload, while adversarial families remain correctness-only. Calibrating a reference changes the workload and requires new baselines and protocol labels. A constant-output task can be semantically valid, so degeneracy is evidence of a weak test rather than automatic proof that the task or candidate is wrong.
 
-The intended precision gate should distinguish acceptable precision emulation from unacceptable single-pass lower precision under the same contract. This discrimination is an experiment, not an assumption. Generalized oracle casting, tolerance calibration and the numerical-design track remain unimplemented.
+The intended precision gate should distinguish acceptable precision emulation from unacceptable single-pass lower precision under the same contract. This discrimination is an experiment, not an assumption. The first implementation supplies role-preserving FP64 oracle conversion and explicit initial thresholds for auxiliary instances of 17 L1 tasks (1–3, 19–27, 47–49, 51–52). Both the reference and candidate must meet RMS and all-element bounds. Element limits include an explicit global RMS-scaled term to accommodate legitimate cancellation error. Original-size timing inputs retain the native comparator; their full FP64 calibration, GPU error distributions and the numerical-design track remain outstanding.
 
 ## 4. Motivation 3: explain and compare performance honestly
 
@@ -119,7 +119,7 @@ The default is K=10000; reporting K=1 or other values is configurable. Input pre
 
 ### 4.2 Implemented scoring and recovery
 
-Every selected task and declared sample contributes a slot. Failed, missing, stale, incompatible or evidence-incomplete slots receive zero. Current analysis uses all declared slots, first averaging samples per task, then macro-averaging task layers; it does not take the fastest sample. The archive's proposed median aggregation is retained as an experiment, not silently substituted.
+Every selected task and declared sample contributes a slot. Failed, missing, stale, incompatible or evidence-incomplete slots receive zero. Current analysis uses all declared slots, first averaging samples per task, then macro-averaging task layers; it does not take the fastest sample. The report now computes mean, median and best-of-N sensitivity on the identical declared slots, retaining failures and cost receipts. This ablation does not change official mean scoring, spend additional model calls or certify unknown budgets.
 
 Eligible comparisons require matching reference and kernel sources, evaluator version, input signature, precision/tolerance, device/software class, workflow configuration, raw timing samples, changing-input/verification receipts and cold costs. The strongest valid amortized baseline is selected at the declared K. A positive score additionally requires separated approximate steady-state mean intervals. Cold-cost uncertainty is not modeled by this interval test.
 
@@ -214,9 +214,11 @@ Regrading saved artifacts after baseline/library/rule updates is an important de
 
 The target device interface has five responsibilities: `caps()`, `calibrate()`, `flush()`, `time()`, and `attribute()`. It would isolate per-device capabilities, measured ceilings, cache policy, timing and origin profiling. The current GPU configuration module is not this interface. A Trainium/NKI implementation still needs Neuron-compatible tasks, baselines, execution, profiling and reachability evidence; it is not present merely because AWS credentials or a Modal backend exist.
 
-The earlier design proposes compatibility/default/full evidence levels, L0/L1/L2. They are not implemented conformance levels. Future receipts should report active checks and per-field states such as measured, derived, not measured and failed. Missing optional profiling may leave diagnostic fields empty; it must never convert required correctness failure or missing score evidence into success, nor claim the stronger level. This resolves the earlier draft's overly broad promise that all additions can always fall back to plain KernelBench.
+Implemented evidence receipts now distinguish passed, failed, not_measured and justified not_applicable checks, with unknown measurement values remaining null. The current level requires native correctness; L0 additionally requires the reviewed auxiliary precision, signal, input-family, sensitivity, environment and mode/state contracts. L1 adds paired timing, noise, origin, calibration and bound evidence; L2 adds counters, memory safety and algorithm evidence. Those device measurements are not collected yet, so requesting L1/L2 cannot receive that level or score eligibility. The scorer recomputes eligibility from checks, scope and requested level. These operational levels and their limited task coverage are specified in [strict validation](../../docs/STRICT_VALIDATION.md); they do not imply the entire broader research design has been validated. Missing diagnostics never weaken existing gates.
 
 ## 7. Validation and experimental plan
+
+The first design-delivery batch adds strict contract and evidence-level code, tested using the 17 actual CPU references plus known bad arithmetic, input/parameter caches, BN state errors and process-setting changes. It also adds saved-slot aggregation sensitivity. Current full regression results are maintained in version nine of the inventory; this extends software validation, not GPU or paid-model research evidence.
 
 At baseline `92c27f4`, 270 CPU/simulated tests passed under Python 3.12.12, Torch 2.12.0, Harbor 0.24.0 and mini-swe-agent 2.4.6. These include real DefaultAgent control flow and actual Task model validation, with model/GPU execution mocked where appropriate. The integration's selection, provenance and motivation-coverage tests are recorded separately in the current feature inventory. Ruff, dependency consistency, skill validation and offline packaging were checked. These are software validation results, not E1–E9 research findings.
 
@@ -246,7 +248,7 @@ The supplied manuscript also discusses SOL-ExecBench, MultiKernelBench, producti
 
 The audit snapshot, analytic ledger and public-kernel studies mix historical reference sizes and software versions. Some device identities were inferred; spec-based ceilings and meta traces have blind spots, especially on convolution algorithms and recurrent models. A reference-graph estimate is not a best-known-algorithm proof. Historical speedups and aggregate rankings must not be treated as newly measured data.
 
-Other limitations are substantive: no universal numerical oracle, incomplete state/mode contracts, no hidden-shape guarantee, no verified custom-work attribution, no calibrated hardware bounds, no completed two-platform implementation, no complete security isolation and no model/GPU experiment for the unified protocol. Bootstrap intervals and approximate timing intervals do not remove shared-device drift. Changing inputs does not guarantee different values. Optional diagnostics do not prove absence of races or cheating.
+Other limitations are substantive: no universal numerical oracle, strict auxiliary contracts limited to 17 L1 tasks, incomplete general state/mode mappings, no full-suite hidden-shape guarantee, no verified custom-work attribution, no calibrated hardware bounds, no completed two-platform implementation, no complete security isolation and no model/GPU experiment for the unified protocol. Bootstrap intervals and approximate timing intervals do not remove shared-device drift. Changing inputs does not guarantee different values. Optional diagnostics do not prove absence of races or cheating.
 
 ## 9. Conclusion
 

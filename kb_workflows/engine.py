@@ -28,6 +28,8 @@ def settings(config, hidden=False):
         "baseline_suite": config.baseline_suite,
         "cold_calls": config.cold_calls,
         "score_gate_required": config.score_gate_required,
+        "strict_validation": config.strict_validation,
+        "evidence_level": config.evidence_level,
         "evaluator_sha256": evaluator_digest(),
     }
 

@@ -81,6 +81,37 @@ def test_failures_and_missing_slots_stay_in_denominator(run):
     assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
 
 
+@pytest.mark.parametrize("damage", ["none", "missing", "scope", "summary"])
+def test_persisted_strict_evidence_is_required_at_scoring_boundary(run, damage):
+    from kb_workflows import evidence
+
+    config, baseline, standard, secret, save = run
+    config.strict_validation, config.evidence_level = True, "L0"
+    atomic_json(config.run_dir / "run_config.json", config.to_dict())
+    payload = engine.task_payload(config, 1, task="baseline")
+    baseline["metadata"].update(evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload))
+    for hidden, results in ((False, standard), (True, secret)):
+        for sid in range(config.num_samples):
+            payload = engine.task_payload(config, 1, sid, hidden=hidden)
+            checks = {name: evidence.check("passed", reason="Persisted evidence fixture") for name in evidence.LEVELS["L0"]}
+            results[f"1_{sid}"]["metadata"].update(
+                evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload),
+                evidence_receipt=evidence.receipt(checks, requested="L0", scope="hidden" if hidden else "standard"))
+    record = standard["1_0"]["metadata"]["evidence_receipt"]
+    if damage == "missing":
+        del standard["1_0"]["metadata"]["evidence_receipt"]
+    elif damage == "scope":
+        record["scope"] = "hidden"
+    elif damage == "summary":
+        record["checks"]["precision_contract"] = evidence.check("not_measured", reason="Missing oracle proof")
+        record["requested_level_met"] = True
+    save()
+    report = paper_analysis.analyze_paper(config)
+    assert report["details"][0]["status"] == "verified" if damage == "none" else report["details"][0]["status"] != "verified"
+    assert report["bounded_gain_macro"] == pytest.approx(1 if damage == "none" else 2 / 3)
+    assert report["aggregation_sensitivity"]["declared_slots"] == config.num_samples
+
+
 @pytest.mark.parametrize("kind", ["kernel", "reference", "hidden", "version", "settings", "timing_receipt", "samples", "baseline", "incomplete_suite", "precision", "device", "software", "cold"])
 def test_missing_or_incompatible_evidence_blocks_scoring(run, kind):
     config, baseline, standard, secret, save = run

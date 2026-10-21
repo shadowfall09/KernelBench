@@ -27,7 +27,8 @@ LICENSE file in the root directory of this source tree.
 项目按五条 motivation 组织：题目区分度、正确性与执行可信度、性能指标、Agent 回路和基础设施。
 [动机与逐项对照](docs/MOTIVATION.md)覆盖每版改动和未完成设计；
 [统一研究稿](research/headroom/PAPER.md)说明 Headroom 目标与当前实现的差额。
-当前计算后端为 NVIDIA CUDA；Trainium/NKI、FP64 精度门和实测下界评分仍属研究设计。
+当前计算后端为 NVIDIA CUDA；Trainium/NKI和实测下界评分仍属研究设计。
+显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/STRICT_VALIDATION.md)。
 
 ## 安装
 
@@ -103,6 +104,7 @@ python -m scripts.check_motivations
 | [Agent loops](docs/AGENT_LOOPS.md) | one-shot、mini-swe-agent 循环、预算、交互 skill 与比较 |
 | [Harbor 接入](docs/HARBOR.md) | 统一生成后端、任务导出与 reward |
 | [批量工作流](docs/BATCH_WORKFLOWS.md) | 各后端、恢复、基线与评分配置 |
+| [严格验证](docs/STRICT_VALIDATION.md) | FP64附加契约、输入/状态检查、证据等级与聚合消融 |
 | [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |
 | [输入盲化](docs/INPUT_BLIND_GENERATION.md) | 生成材料如何去掉测试输入 |
 | [贡献指南](CONTRIBUTING.md) | 本仓库的开发与评审方式 |

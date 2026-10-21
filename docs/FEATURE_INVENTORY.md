@@ -1,8 +1,8 @@
 # KernelBench Pro 功能改进清单（相比 KernelBench-Verified）
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前已提交能力为第一至第八版的累计功能。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前已提交能力为第一至第九版的累计功能；第九版开始落地23项设计，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -354,6 +354,32 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 相对原稿，本版修正了“仅第一版实现”“默认60分钟”“已支持Trainium”“已有完整FP64/硬件计数器/Headroom评分”等过时或超前表述；当前默认仍为5候选/2400秒，计算后端仍为NVIDIA CUDA，评分仍为测量证据约束的bounded gain。完整未完成项见 Motivation 的23条差额，实验不因文档整合而记为完成。
 
 验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **287 项 CPU/模拟回归通过**，含本轮17项选集与追踪回归。覆盖三类角色与250题分区、范围交集、参考漂移拒绝、无GPU轻量预览、缺失样本分母、实际批量生成路径、基线/预算/子任务一致性、真实Harbor Task导出、层来源标记、证据摘要及全部改动的motivation覆盖。Ruff、168个包依赖一致性、来源重建逐文件比较、文档本地链接和离线wheel检查通过；wheel在仓库外可加载选集且配置不导入Torch。未运行真实GPU内核或付费模型，现有CUDA驱动兼容性限制仍保留。
+
+## 第九版：严格数值契约与证据等级（第一批设计落地）
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Implement strict numerical contracts and evidence-gated evaluation |
+| 基础提交 | `7915423553f5e0cc385dd800a9497aef276d5936` |
+| 日期 | 2026-10-21 |
+| 状态 | 已提交；368项CPU/模拟测试通过，GPU校准与实机验证待完成 |
+
+本版推进23项设计中的R-04/05/06/07/09，交付R-17聚合消融和R-22证据收据的代码。严格校验显式开启；默认既有协议保留。严格契约先覆盖17道L1（1–3、19–27、47–49、51–52），使用小规模附加实例，不改变原计时输入，也不声称原尺寸已通过FP64校准。完整差额仍在Motivation逐项记录。
+
+| 编号 | 功能 | 变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V9-01 | FP64数值契约 | 在17道已审阅L1的附加实例上，参考与候选均须通过RMS及全元素FP64门。 | `kb_workflows/numerical.py` | [M2](MOTIVATION.md#m2) |
+| V9-02 | 参考信号诊断 | 记录输出量级、非有限值、常数与容差覆盖；至少一组合法实例有信息量。 | `kb_workflows/numerical.py` | [M2](MOTIVATION.md#m2) |
+| V9-03 | 合法输入族与隐藏形状 | 限定17题的耦合维度、符号、近常数、动态范围、边界、GELU辨别输入及最终非连续stride。 | `kb_workflows/strict_validation.py` | [M2](MOTIVATION.md#m2) |
+| V9-04 | 模式状态与同对象缓存检查 | 审计train/eval、同名buffer、参数原地更新与同对象输入修改后的响应。 | `kb_workflows/strict_validation.py` | [M2](MOTIVATION.md#m2) |
+| V9-05 | 进程设置审计 | 记录并恢复候选导入和执行修改的后端、默认dtype、线程和环境变量；收据不含环境变量值。 | `kb_workflows/strict_validation.py` | [M2](MOTIVATION.md#m2) |
+| V9-06 | 逐项证据等级 | 实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级。 | `kb_workflows/evidence.py` | [M5](MOTIVATION.md#m5) |
+| V9-07 | 严格评分门与协议隔离 | 显式严格模式下，未适配题、失败检查和缺失收据拒绝资格；后端设置与等级参与任务及比较指纹。 | `kb_workflows/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
+| V9-08 | 样本聚合消融 | 对同一批声明槽位计算mean、median、best-of-N，保留失败零分和成本记录，正式分数不变。 | `kb_workflows/aggregation.py` | [M3](MOTIVATION.md#m3) |
+
+通过`--strict-validation`或`--evidence-level L0`启用；L1/L2会要求尚未实现的设备证据，缺失时不给相应等级或评分资格。未适配题在严格模式下明确失败，不退回旧容差冒充严格通过。详细契约、误差公式、范围及等级定义见[严格验证](STRICT_VALIDATION.md)。
+
+验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **368项CPU/模拟回归通过**，较第八版新增81项。17道实际参考分别以FP32、FP16、BF16执行小规模FP64及隐藏形状检查；反例覆盖BF16计算冒充FP32、GELU近似、单元素错误、缓存、参数更新、BN状态、进程设置恢复、极端量级RMS溢出、首轮原生评测篡改、评分收据缺失/伪汇总和轻量预检。Ruff、168包依赖一致性、motivation覆盖、本地链接与独立wheel轻量加载通过。真实GPU、GPU阈值校准和模型实验未执行；搁置的stash没有恢复。
 
 ## 维护方式
 

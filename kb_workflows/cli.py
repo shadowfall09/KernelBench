@@ -15,6 +15,11 @@ def main(argv=None):
     try:
         config = parse_config(argv)
         selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
+        strict_coverage = None
+        if config.strict_validation:
+            from .contract_specs import coverage
+
+            strict_coverage = coverage(config.level, selected)
         if config.hidden_tests and config.stage in {"all", "evaluate"}:
             for pid in selected:
                 path = ROOT / "hidden_tests" / f"level{config.level}" / f"{pid}_hidden.py"
@@ -27,6 +32,7 @@ def main(argv=None):
                         "config": config.to_dict(),
                         "problems": list(selected),
                         "suite": selection_receipt(config),
+                        "strict_coverage": strict_coverage,
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],
                         "run_dir": str(config.run_dir),
                     },
@@ -34,6 +40,9 @@ def main(argv=None):
                 )
             )
             return 0
+        if (strict_coverage and strict_coverage["unsupported"]
+                and config.stage in {"all", "generate", "evaluate", "export-harbor"}):
+            raise ValueError(f"Strict contracts unavailable for level {config.level} IDs {strict_coverage['unsupported']}; choose reviewed tasks")
         if config.stage != "analyze":
             config.require_gpu_target()
         if config.stage == "export-harbor":

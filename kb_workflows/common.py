@@ -88,6 +88,10 @@ def evaluator_digest():
         "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
+        "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
+        "kb_workflows/verification_contracts.json",
+        "kb_workflows/aggregation.py",
+        "kb_workflows/contract_specs.py",
         "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
         "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",
     ):

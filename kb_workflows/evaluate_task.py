@@ -7,6 +7,7 @@ import json
 import math
 import os
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
@@ -62,18 +63,26 @@ def evaluate(payload: dict):
     build = Path(payload.get("build_root", ROOT / "cache" / "workflow")) / signature
     build.mkdir(parents=True, exist_ok=True)
     os.environ["TORCH_EXTENSIONS_DIR"] = str(build)
-    result = eval_kernel_against_ref(
-        original_model_src=reference,
-        custom_model_src=payload["kernel_src"],
-        num_correct_trials=settings["num_correct_trials"],
-        num_perf_trials=settings["num_perf_trials"],
-        measure_performance=settings.get("measure_performance", not hidden),
-        verbose=settings.get("verbose", False),
-        build_dir=str(build),
-        device=torch.device("cuda:0"),
-        precision=get_torch_dtype_from_string(settings["precision"]),
-        hidden_test_path=path,
-    )
+    native_changes = []
+    if settings.get("strict_validation"):
+        from .strict_validation import environment_guard
+
+        context = environment_guard(native_changes)
+    else:
+        context = nullcontext()
+    with context:
+        result = eval_kernel_against_ref(
+            original_model_src=reference,
+            custom_model_src=payload["kernel_src"],
+            num_correct_trials=settings["num_correct_trials"],
+            num_perf_trials=settings["num_perf_trials"],
+            measure_performance=settings.get("measure_performance", not hidden),
+            verbose=settings.get("verbose", False),
+            build_dir=str(build),
+            device=torch.device("cuda:0"),
+            precision=get_torch_dtype_from_string(settings["precision"]),
+            hidden_test_path=path,
+        )
     if result is None:
         return failure("Evaluator returned no result (possible compilation lock failure)")
     runtime = result.runtime if isinstance(result.runtime, (int, float)) and math.isfinite(result.runtime) else -1.0
@@ -87,6 +96,25 @@ def evaluate(payload: dict):
     if runtime > 0 and isinstance(cold, (int, float)) and math.isfinite(cold) and cold > 0:
         result.metadata.update(cold_calls=settings.get("cold_calls", 10000),
                                amortized_runtime_ms=amortized(runtime, cold, settings.get("cold_calls", 10000)))
+    from .evidence import LEVELS, accepted, check, from_result
+
+    strict_checks = {}
+    if settings.get("strict_validation") and result.compiled and result.correctness:
+        from .strict_validation import evaluate_contract
+
+        try:
+            strict_checks = evaluate_contract(payload, reference, build)
+        except Exception as exc:
+            strict_checks = {"precision_contract": check("not_measured", reason=f"Strict verifier error: {type(exc).__name__}")}
+        if native_changes:
+            strict_checks["environment_integrity"] = check("failed", reason="Native evaluation changed process settings",
+                                                           values={"changed_names": sorted(set(native_changes))})
+        strict_ok = all(accepted(strict_checks.get(name)) for name in LEVELS["L0"] if name != "correctness")
+        if not strict_ok:
+            result.correctness = False
+            result.metadata["strict_validation_error"] = "Required strict contract evidence failed or is unavailable"
+    result.metadata["evidence_receipt"] = from_result(
+        {"correctness": result.correctness}, settings, scope="hidden" if hidden else "standard", additional=strict_checks)
     return json_safe(
         {
             "compiled": result.compiled,

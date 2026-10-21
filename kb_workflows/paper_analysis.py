@@ -8,6 +8,7 @@ from pathlib import Path
 from statistics import mean
 
 from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
+from .evidence import score_issue
 from .measurement import amortized
 from .suites import selection_receipt, suite_rows
 
@@ -100,6 +101,7 @@ def current_result(result, payload):
 
 
 def analyze_paper(config):
+    from .aggregation import sensitivity
     from .engine import task_payload
     from .experiment import existing_budget, protocol
 
@@ -151,6 +153,11 @@ def analyze_paper(config):
                     status = "stale_or_incompatible_baseline_workflow"
             if status == "verified":
                 status = measurement_evidence(raw, candidate=True) or measurement_evidence(baseline) or status
+            if status == "verified":
+                options = task_payload(config, pid, sid)["eval_config"]
+                status = score_issue(raw, options, "standard") or status
+                if config.hidden_tests and status == "verified":
+                    status = score_issue(secret, options, "hidden") or status
             # A future audit-enabled result cannot claim its unfinished gates here.
             if status == "verified" and raw.get("metadata", {}).get("evaluation_config", {}).get("anti_cheat"):
                 status = "anti_cheat_evidence_not_implemented_in_this_version"
@@ -205,6 +212,7 @@ def analyze_paper(config):
         "layer_source": ("problem_specs_with_suite_fallback" if config.problem_specs and research_rows else
                          ("problem_specs" if config.problem_specs else ("provisional_suite_taxonomy" if research_rows else "unclassified"))),
         "headroom_score_implemented": False,
+        "strict_validation": config.strict_validation, "requested_evidence_level": config.evidence_level,
         "experiment": existing_budget(config).get("protocol", protocol(config)), "generation_budget": existing_budget(config),
         "generation_receipts_available": bool(existing_budget(config)),
         "declared_samples": config.num_samples, "cold_calls": config.cold_calls, "hidden_gated": config.hidden_tests,
@@ -215,6 +223,7 @@ def analyze_paper(config):
         "gate_scope": "current_sources_settings_measurement_evidence_device_and_software; not_H1_H14",
         "details": rows,
     }
+    report["aggregation_sensitivity"] = sensitivity(report)
     atomic_json(config.run_dir / "paper_analysis.json", report)
     atomic_json(config.run_dir / "eval_results_scored.json", scored)
     print(f"[Scoring] bounded gain macro={report['bounded_gain_macro']:.4f}; report: {config.run_dir / 'paper_analysis.json'}")

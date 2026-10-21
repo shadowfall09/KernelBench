@@ -36,18 +36,19 @@ def inventory_features(text):
 
 
 def render_tables(data):
-    changes, roadmap = [], ["| 设计 | Motivation | 尚缺什么 |", "| --- | --- | --- |"]
+    changes, roadmap = [], ["| 设计 | 状态 | Motivation | 已交付与剩余范围 |", "| --- | --- | --- | --- |"]
     for motivation, title in data["motivations"].items():
         changes += [f"### {motivation}：{title}的改动", "", "| 改动 | 回应 | 关联 | 证据 |", "| --- | --- | --- | --- |"]
         for row in data["changes"]:
-            if row["primary"] != motivation or row["status"] != "implemented":
+            if row["primary"] != motivation or row["status"] != "implemented" or not row["id"].startswith("V"):
                 continue
             evidence = ", ".join(f"[{Path(path).name}](../{path})" for path in row["evidence"])
             changes.append(f"| {row['id']} {row['title']} | {row['reason']} | {', '.join(row['secondary']) or '—'} | {evidence} |")
         changes.append("")
     for row in data["changes"]:
-        if row["status"] == "planned":
-            roadmap.append(f"| {row['id']} {row['title']} | {row['primary']} | {row['reason']} |")
+        if row["id"].startswith("R-"):
+            state = {"planned": "待实现", "in_progress": "部分实现", "implemented": "代码已实现"}[row["status"]]
+            roadmap.append(f"| {row['id']} {row['title']} | {state} | {row['primary']} | {row['reason']} |")
     return {"changes": "\n".join(changes).strip(), "roadmap": "\n".join(roadmap)}
 
 
@@ -58,11 +59,11 @@ def validate(root=ROOT, write=False):
     by_id = {row["id"]: row for row in data["changes"]}
     if len(by_id) != len(data["changes"]):
         raise ValueError("Duplicate motivation mapping IDs")
-    implemented = {key: row for key, row in by_id.items() if row["status"] == "implemented"}
+    implemented = {key: row for key, row in by_id.items() if row["status"] == "implemented" and key.startswith("V")}
     if set(indexed) != set(implemented):
         raise ValueError(f"Inventory/motivation coverage mismatch: {set(indexed) ^ set(implemented)}")
     for row in by_id.values():
-        if (row["primary"] not in data["motivations"] or row["status"] not in {"implemented", "planned"}
+        if (row["primary"] not in data["motivations"] or row["status"] not in {"implemented", "in_progress", "planned"}
                 or any(key not in data["motivations"] or key == row["primary"] for key in row["secondary"])):
             raise ValueError(f"Invalid mapping: {row['id']}")
         if not row["reason"] or not row["evidence"]:
@@ -71,7 +72,7 @@ def validate(root=ROOT, write=False):
             path = (root / name).resolve()
             if not path.is_relative_to(root.resolve()) or not path.is_file():
                 raise ValueError(f"Evidence unavailable in checkout: {name}")
-        if row["status"] == "implemented" and indexed[row["id"]] != row["title"]:
+        if row["id"].startswith("V") and row["status"] == "implemented" and indexed[row["id"]] != row["title"]:
             raise ValueError(f"Inventory title drift: {row['id']}")
     path = root / "docs/MOTIVATION.md"
     text = path.read_text()
@@ -85,7 +86,10 @@ def validate(root=ROOT, write=False):
         path.write_text(updated)
     elif updated != text:
         raise ValueError("Motivation tables are stale; run python -m scripts.check_motivations --write")
-    return {"implemented_changes": len(implemented), "planned_designs": len(by_id) - len(implemented),
+    designs = [row for row in by_id.values() if row["id"].startswith("R-")]
+    return {"implemented_changes": len(implemented), "planned_designs": sum(row["status"] == "planned" for row in designs),
+            "in_progress_designs": sum(row["status"] == "in_progress" for row in designs),
+            "completed_designs": sum(row["status"] == "implemented" for row in designs),
             "historical_changes": sum(key.startswith(tuple(f"V{i}-" for i in range(1, 8))) for key in implemented),
             "paused_stash_excluded": data["paused_stash_excluded"]}
 
