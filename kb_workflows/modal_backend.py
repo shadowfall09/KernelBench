@@ -23,7 +23,7 @@ def make_image(agent=False):
     import modal
 
     image = (
-        modal.Image.from_registry("nvidia/cuda:13.0.0-devel-ubuntu22.04", add_python="3.10")
+        modal.Image.from_registry("nvidia/cuda:13.0.0-devel-ubuntu24.04", add_python="3.12")
         .apt_install("build-essential", "git", "curl", "jq")
         .pip_install_from_requirements(str(ROOT / "requirements.txt"))
         .env({"PYTHONPATH": "/app/KernelBench", "PYTHONUNBUFFERED": "1"})
@@ -43,7 +43,7 @@ def modal_session(config):
     global _SESSION
     import modal
 
-    app = modal.App("kernelbench-verified")
+    app = modal.App("kernelbench-pro")
     evaluate = app.function(image=make_image(), gpu=config.gpu, timeout=config.timeout + 60, cpu=4.0, memory=32768)(
         _remote_evaluate
     )

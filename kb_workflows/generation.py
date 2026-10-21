@@ -1,4 +1,4 @@
-"""Claude Code generation shared by local processes, Docker and Modal Sandboxes."""
+"""Generation shared by local processes, Docker, Modal and Harbor."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from pathlib import Path
 
-from .common import ROOT, atomic_json, fingerprint, kernel_name, read_json, select_problems
+from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
 from .transports import resolve_devices, terminate
 
 
@@ -23,11 +23,11 @@ def input_blind_problems():
             isinstance(t, ast.Name) and t.id == "STRIP_TEST_CONFIG_PIDS" for t in node.targets
         ):
             return ast.literal_eval(node.value)
-    raise ValueError("Verified's input-blind configuration is missing")
+    raise ValueError("Input-blind problem configuration is missing")
 
 
 def prompt_source(source, level, pid):
-    # Follow Verified's input-blind policy without importing its API-client dependencies.
+    # Follow the configured input-blind policy without importing its API-client dependencies.
     if (level, pid) not in input_blind_problems():
         return source
     tree = ast.parse(source)
@@ -76,7 +76,7 @@ def agent_command(prompt, config):
 
 def build_prompt(config, pid):
     filename = kernel_name(config.level, pid)
-    return f"""Implement ModelNew for KernelBench-Verified level {config.level}, problem {pid}.
+    return f"""Implement ModelNew for KernelBench Pro level {config.level}, problem {pid}.
 The reference is model.py in this working directory. Read it and implement real CUDA kernels.
 Target hardware: {config.hardware or config.gpu}; architecture: {config.gpu_arch}; precision: {config.precision}.
 Write your solution to runs/agent/{filename}. Use the standard ModelNew interface.
@@ -85,7 +85,7 @@ Some references intentionally omit the test harness. Implement from the supplied
 do not inspect hidden_tests, original test inputs, or other repository problem files.
 Verify with: python verify.py
 The verifier records standard runtime and peak GPU memory, then checks the hidden input distributions.
-Verification uses a TF32-enabled PyTorch baseline when measuring speedup for FP32.
+Verification uses the configured PyTorch baseline portfolio and precision policy.
 Iterate up to {config.optimization_rounds} optimization rounds, keeping a correct implementation if further optimization fails.
 Do not run generate_samples.py. Do not change the verifier or reference source.
 {"Use ncu to profile your kernel if it is available on this GPU." if config.enable_ncu else "Do not use ncu."}
@@ -254,6 +254,9 @@ def generation_signature(config, pid, sid):
             "prompt": build_prompt(config, pid),
             "sample_id": sid,
             "generation": config.generation,
+            "harbor": {"agent": config.harbor_agent, "environment": config.harbor_environment,
+                       "command": config.harbor_command, "reward": config.harbor_reward,
+                       "evaluator_sha256": evaluator_digest()} if config.generation == "harbor" else None,
             "model": config.model,
             "small_model": config.small_model,
             "bedrock": config.bedrock,
@@ -282,7 +285,8 @@ def generate_run(config):
                 print(f"[generate] {key}: matching existing kernel", flush=True)
                 continue
             tasks.append((pid, sid))
-    local_gpu = config.generation in {"local", "docker"} and config.evaluation in {"local", "docker"}
+    local_gpu = ((config.generation in {"local", "docker"} and config.evaluation in {"local", "docker"})
+                 or (config.generation == "harbor" and config.harbor_environment == "docker"))
     devices = resolve_devices(config.gpus) if local_gpu else ["0"]
     # Generation with a local GPU must not run two agents concurrently on that GPU.
     import threading
@@ -296,7 +300,11 @@ def generate_run(config):
         try:
             lane = index % len(devices)
             with locks[lane] if local_gpu else nullcontext():
-                if config.generation == "modal":
+                if config.generation == "harbor":
+                    from .harbor import run_harbor_agent
+
+                    result = run_harbor_agent(directory, config, pid, devices[lane] if local_gpu else None, sid=sid)
+                elif config.generation == "modal":
                     from .modal_backend import run_modal_agent
 
                     result = run_modal_agent(directory, config, pid)

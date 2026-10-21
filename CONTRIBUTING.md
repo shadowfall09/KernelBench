@@ -6,51 +6,28 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-# Contributing to KernelBench Verified
-We want to make contributing to this project as easy and transparent as
-possible.
+# KernelBench Pro 贡献指南
 
-## Our Development Process
-KernelBench Verified is developed jointly by Meta and Stanford University, and its source code is synced out to this public GitHub repository. Because of this, our primary source of truth is our internal version control system, and the GitHub repository acts as a mirror.
+本仓库在 [shadowfall09/KernelBench](https://github.com/shadowfall09/KernelBench) 通过 GitHub issue 和 pull request 维护。
 
-To accommodate this setup, our pull request (PR) workflow is slightly different than a standard GitHub-only project. When you submit a PR on GitHub, it will go through the following process:
+## 开发流程
 
-1. **Review:** A project maintainer will review your code on GitHub and provide feedback.
-2. **Import:** Once your PR is approved, a maintainer will import your changes into Meta's internal systems.
-3. **Internal Testing:** We will run your changes against our internal test suites and continuous integration (CI) pipelines.
-4. **Merge & Sync:** Upon passing all internal checks, your code will be merged internally. Shortly after, an automated sync process will push the merged commit back to the public GitHub repository.
+1. 从 `main` 创建分支，围绕一个具体问题修改。
+2. 在说明中写清问题、修改后的行为和验证结果；接口或默认值变化时同步更新文档。
+3. 功能变化同步更新 `docs/FEATURE_INVENTORY.md`，区分 CPU/模拟验证和真实 GPU 验证。
+4. 运行与修改相关的测试及 Ruff 检查，再提交 pull request 供维护者评审。
 
-**Note:** This automated sync process will close your original GitHub PR automatically (rather than showing as "Merged" via the GitHub UI), but the commit history will still properly attribute the changes to you. Because of this internal testing phase, it may take a little extra time for approved PRs to show up in the `main` branch. We appreciate your patience!
+```bash
+python -m pytest -q tests src/unit_tests/test_dataset.py src/unit_tests/test_score.py
+python -m ruff check kb_workflows tests src/reliability.py src/validation.py
+```
 
-## Pull Requests
-We actively welcome your pull requests.
+Python 使用 4 空格缩进，项目 Ruff 配置位于 `pyproject.toml`。GPU 测试在分配到的设备上执行；报告设备、依赖版本和实际完成的检查。
 
-1. Fork the repo and create your branch from `main`.
-2. If you've added code that should be tested, add tests.
-3. If you've changed APIs, update the documentation.
-4. Ensure the test suite passes.
-5. Make sure your code lints.
-6. If you haven't already, complete the Contributor License Agreement ("CLA").
+## 文件与结果
 
-## Contributor License Agreement ("CLA")
-In order to accept your pull request, we need you to submit a CLA. You only need
-to do this once to work on any of Meta's open source projects.
+题目放在 `KernelBench/`，隐藏测试放在 `hidden_tests/`，批量流程放在 `kb_workflows/`。
+生成内核、运行结果、编译缓存和凭据不作为项目源码提交。隐藏测试不放入生成 prompt。
+论文材料与旧实验产物不随仓库维护；需要核对来源时使用 `NOTICE.md` 和版本历史。
 
-Complete your CLA here: <https://code.facebook.com/cla>
-
-## Issues
-We use GitHub issues to track public bugs. Please ensure your description is
-clear and has sufficient instructions to be able to reproduce the issue.
-
-Meta has a [bounty program](https://bugbounty.meta.com/) for the safe
-disclosure of security bugs. In those cases, please go through the process
-outlined on that page and do not file a public issue.
-
-## Coding Style
-* 2 spaces for indentation rather than tabs
-* 80 character line length
-* ...
-
-## License
-By contributing to KernelBench Verified, you agree that your contributions will be licensed
-under the LICENSE file in the root directory of this source tree.
+继承代码的版权与许可证声明应保留。贡献按仓库的 [MIT License](LICENSE) 提供。

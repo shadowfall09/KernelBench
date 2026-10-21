@@ -3,14 +3,17 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kernelbench-verified"
+name = "kernelbench-pro"
 version = "0.1.0"
-requires-python = "==3.10.*"
+description = "KernelBench Pro: GPU kernel generation, validation and benchmarking workflows"
+readme = "README.md"
+requires-python = "==3.12.*"
 dynamic = ["dependencies"]
 
 [project.optional-dependencies]
 gpu = ["triton", "nvidia-cutlass-dsl", "tilelang", "cupy-cuda12x", "nsight-python"]
 dev = ["pytest", "ruff"]
+harbor = ["harbor[modal]==0.24.0"]
 
 [project.scripts]
 kb-batch = "kb_workflows.cli:main"
@@ -24,7 +27,7 @@ where = ["."]
 include = ["src*", "kb_workflows*", "scripts*"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 120
 
 [tool.ruff.lint]

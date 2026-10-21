@@ -5,7 +5,7 @@
 #SBATCH --mem=100G
 #SBATCH --gpus=1
 #SBATCH --time=08:00:00
-#SBATCH --job-name=kernelbench-verified
+#SBATCH --job-name=kernelbench-pro
 #SBATCH --output=slurm-%j.out
 set -euo pipefail
 # Submit from the checkout root. Set partition/account/gpu count using sbatch flags.

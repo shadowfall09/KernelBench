@@ -27,7 +27,7 @@ def validate_sources(payload):
         raise ValueError("Client and verifier evaluator versions differ; rebuild the verifier image/checkout")
     reference = problem_paths(payload["level"])[payload["problem_id"]].read_text()
     if reference != payload["ref_arch_src"]:
-        raise ValueError("Client and verifier reference sources differ; use the same Verified checkout")
+        raise ValueError("Client and verifier reference sources differ; use the same repository checkout")
     return reference
 
 

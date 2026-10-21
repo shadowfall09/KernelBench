@@ -59,7 +59,7 @@ class RunConfig:
     model: str = ""
     small_model: str = ""
     bedrock: bool = False
-    docker_image: str = "kernelbench-verified:agent"
+    docker_image: str = "kernelbench-pro:agent"
     build_image: bool = True
     queue_url: str = os.environ.get("KB_QUEUE_BASE_URL", "http://127.0.0.1:8000")
     queue_submit_path: str = "/v1/verify"
@@ -69,13 +69,18 @@ class RunConfig:
     queue_http_timeout: float = 30.0
     queue_wait_timeout: int = 3600
     modal_secret: str = ""
+    harbor_command: str = "harbor"
+    harbor_agent: str = "claude-code"
+    harbor_environment: str = "docker"
+    harbor_reward: str = "correctness"
+    harbor_memory_mb: int = 65536
     dry_run: bool = False
 
     def validate(self):
         self.run_name = safe_name(self.run_name or f"run_{datetime.now(timezone.utc):%Y%m%d_%H%M%S}")
         self.runs_dir = str(Path(self.runs_dir).expanduser().resolve())
         if self.level not in (1, 2, 3) or self.start < 1 or (self.end is not None and self.end < self.start):
-            raise ValueError("Verified supports levels 1–3; start/end must form a valid inclusive range")
+            raise ValueError("KernelBench Pro batch workflows support levels 1–3; start/end must form a valid inclusive range")
         for name in (
             "parallel",
             "num_samples",
@@ -87,6 +92,7 @@ class RunConfig:
             "queue_max_inflight",
             "queue_wait_timeout",
             "cold_calls",
+            "harbor_memory_mb",
         ):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
@@ -100,6 +106,12 @@ class RunConfig:
                 raise ValueError(f"Problem specs file not found: {self.problem_specs}")
         if self.baseline_suite and self.compile_backend:
             raise ValueError("Use --baseline-suite or --compile-backend, not both")
+        if self.harbor_environment not in {"docker", "modal"} or self.harbor_reward not in {"correctness", "bounded_gain"}:
+            raise ValueError("Invalid Harbor environment or reward mode")
+        if not self.harbor_command.strip() or not self.harbor_agent.strip():
+            raise ValueError("Harbor command and agent must not be empty")
+        if (self.generation == "harbor" or self.stage == "export-harbor") and not self.hidden_tests:
+            raise ValueError("Harbor requires hidden correctness tests")
         devices = self.gpus.split(",")
         if any(not d.isdigit() for d in devices) or len(set(devices)) != len(devices):
             raise ValueError("--gpus must contain distinct numeric device IDs")
@@ -136,7 +148,7 @@ class RunConfig:
 
 def parser():
     p = argparse.ArgumentParser(
-        description="KernelBench-Verified: generate, evaluate, and analyze with one configuration"
+        description="KernelBench Pro: generate, evaluate, and analyze with one configuration"
     )
     for name in (
         "level",
@@ -152,16 +164,19 @@ def parser():
         "queue_max_inflight",
         "queue_wait_timeout",
         "cold_calls",
+        "harbor_memory_mb",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
             aliases.append("--num-parallel")
         p.add_argument(*aliases, dest=name, type=int, default=getattr(RunConfig(), name))
     choices = {
-        "stage": ("all", "generate", "evaluate", "analyze", "baseline"),
-        "generation": ("local", "docker", "modal"),
+        "stage": ("all", "generate", "evaluate", "analyze", "baseline", "export-harbor"),
+        "generation": ("local", "docker", "modal", "harbor"),
         "evaluation": ("local", "docker", "modal", "queue"),
         "precision": ("fp32", "fp16", "bf16"),
+        "harbor_environment": ("docker", "modal"),
+        "harbor_reward": ("correctness", "bounded_gain"),
     }
     for name in (
         "run_name",
@@ -187,6 +202,10 @@ def parser():
         "modal_secret",
         "pass_at_k",
         "problem_specs",
+        "harbor_command",
+        "harbor_agent",
+        "harbor_environment",
+        "harbor_reward",
     ):
         p.add_argument(
             f"--{name.replace('_', '-')}",

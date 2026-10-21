@@ -182,7 +182,7 @@ def main(argv=None):
     worker = threading.Thread(target=worker_loop, args=(store, device, stop), daemon=True)
     server = ThreadingHTTPServer((args.host, args.port), handler_for(store))
     worker.start()
-    print(f"Verified worker: http://{args.host}:{args.port}; state: {args.state}", flush=True)
+    print(f"KernelBench Pro worker: http://{args.host}:{args.port}; state: {args.state}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

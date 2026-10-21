@@ -26,7 +26,7 @@ def convert_arguments(arguments):
         key, value = argument.split("=", 1)
         if key == "dataset_src":
             if value != "local":
-                raise ValueError("Verified batch workflows use local references and hidden tests")
+                raise ValueError("Batch workflows use local references and hidden tests")
             continue
         if key == "subset":
             start, end = ast.literal_eval(value)

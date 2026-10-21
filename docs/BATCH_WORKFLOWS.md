@@ -1,12 +1,12 @@
-# Unified batch workflows
+# KernelBench Pro batch workflows
 
-The workflows migrated from `KernelBench-modified` share one configuration and one
-Verified evaluator. The original Verified generation and evaluation scripts remain
-available. New workflows use local references and hidden tests from this checkout.
+Local, Docker, Modal and Harbor generation share one configuration and evaluator, using local references and
+hidden tests from this checkout. Compatibility entrypoints remain available.
+See [NOTICE](../NOTICE.md) for code provenance.
 
 ## Install
 
-Use Python 3.10, as in the original repository:
+Use Python 3.12:
 
 ```bash
 uv sync --extra dev
@@ -14,7 +14,7 @@ source .venv/bin/activate
 python scripts/run_batch.py --help
 ```
 
-The project keeps upstream's `torch==2.12.0` requirement. Add `--extra gpu` for
+The project pins `torch==2.12.0`. Add `--extra gpu` for
 optional Triton, CuTe, TileLang, CuPy and Nsight Python packages. A local verifier
 needs a CUDA GPU and a compatible CUDA toolkit/compiler for generated extensions.
 Local generation also needs the Claude Code CLI. Docker and Modal generation
@@ -35,7 +35,7 @@ python scripts/run_batch.py \
   --parallel 2 --profile bedrock --resume
 ```
 
-`--start` and `--end` are inclusive. Verified supports levels 1–3. `--num-samples`
+`--start` and `--end` are inclusive. The batch workflow supports levels 1–3. `--num-samples`
 controls independent agent attempts per problem. Every attempt has its own work
 directory, logs and output file. Local GPU generation runs at most one agent per
 selected GPU. CPU generation for queue/Modal verification uses `--parallel`.
@@ -64,14 +64,14 @@ missing or failed baseline measurements cause an explicit analysis error.
 `--hardware` is required for `all`, `baseline` and `analyze` with local/queue GPUs.
 Modal defaults that label to `--gpu`.
 
-## Verified evaluation is the same on every backend
+## Evaluation is the same on every backend
 
 Every run defaults to two phases:
 
 1. Standard correctness, synchronized wall timing and peak GPU memory measurement; every timed output is verified on freshly generated inputs.
 2. Hidden correctness using the repository's four input distributions regenerated under three seeds, plus domain-reviewed stress cases; no repeated timing.
 
-Results use Verified's flat `"problem_id_sample_id"` keys, so its analysis and
+Results use flat `"problem_id_sample_id"` keys, so its analysis and
 leaderboard scripts can read them directly. Reported correctness is gated by the
 hidden result while runtime and memory come from the standard result. A missing
 hidden result counts as incorrect.
@@ -196,7 +196,7 @@ python scripts/run_batch.py --generation modal --evaluation modal \
   --gpu H100 --parallel 4 --modal-secret MY_MODEL_CREDENTIALS --resume
 ```
 
-Modal images include Verified's references, hidden tests and evaluator. Sandbox
+Modal images include the repository references, hidden tests and evaluator. Sandbox
 agents use their allocated GPU for iterative verification; final verification
 uses the selected evaluation backend. Kernels and logs are downloaded before
 sandbox termination. Credentials use a named Modal secret, or environment
@@ -224,7 +224,7 @@ The subset is used as the denominator for batch analysis. Native analysis retain
 its full-dataset default when no subset is given. It prints the first 30 per-sample
 timing/memory comparisons and writes `analysis_summary.json`. Invalid timing
 values are excluded from speedup calculations. Memory and speed metrics retain
-Verified's formulas.
+the inherited metric formulas.
 
 | Output | Contents |
 | --- | --- |
@@ -234,13 +234,13 @@ Verified's formulas.
 | `runs/NAME/eval_results.json` | Standard correctness, timing and memory |
 | `runs/NAME/eval_results_hidden.json` | Hidden correctness results |
 | `runs/NAME/pass_at_k_results.json` | Hidden-gated pass@k; missing samples count as failures |
-| `runs/NAME/analysis_summary.json` | Native Verified metrics and per-problem comparisons |
+| `runs/NAME/analysis_summary.json` | Inherited benchmark metrics and per-problem comparisons |
 | `runs/NAME/work/pP_sS/` | Agent workspace, staged reference and logs |
 | `runs/NAME/logs/` | Local/Docker evaluator logs |
 | `results/timing/HARDWARE/BASELINE.json` | Baseline timing, memory and environment information |
 
 Pass@k defaults to the values 1 and 5 where at least k samples are requested.
-Override with `--pass-at-k 1,2,5`. Existing Verified leaderboard generation can
+Override with `--pass-at-k 1,2,5`. Leaderboard generation can
 consume the result files with `--use_hidden_eval` and a matching TF32 baseline.
 
 ## Validation
@@ -289,12 +289,12 @@ compile, CUDA Graph and the pinned Torch 2.12.0 toolchain still require validati
 ## Failure-inclusive scoring and recovery
 
 `--stage analyze` first writes `paper_analysis.json` and `eval_results_scored.json`,
-then produces the existing Verified summary when its inputs are available. Keep
+then produces the compatible benchmark summary when its inputs are available. Keep
 the same declared range, sample count, precision, backend and call budget across
 stages. Every declared problem/sample slot remains in the new score denominator;
 failed, missing, stale or incompatible slots earn zero. Eligible variants are
 reselected by amortized cost at K, and a positive bounded log-gain score additionally
-requires non-overlapping steady mean intervals. Original Verified formulas remain.
+requires non-overlapping steady mean intervals. Inherited metric formulas remain.
 
 Optional `--problem-specs FILE` supports `{"level1":{"1":{"layer":"F"}}}` for
 I/F/D macro aggregation; otherwise entries are `unclassified`. Bootstrap intervals
@@ -311,8 +311,8 @@ New batch results require scored evidence in the original analysis and leaderboa
 entrypoints as well. Their gate rejects changed or missing kernels, reference or
 hidden source, configuration, raw results, baseline records and evaluator versions.
 Legacy runs without this policy retain their original behavior. Correctness/pass@k
-and performance eligibility remain separate. Full H1-H14 auditing, sanitizers and
-independent retests are deferred; reports explicitly do not certify anti-cheat.
+and performance eligibility remain separate. Additional integrity checks, sanitizers and independent retests are deferred;
+reports explicitly do not certify anti-cheat.
 
 
 ## Research-informed correctness checks
@@ -336,3 +336,33 @@ See [sources, task coverage, costs and limits](RELIABILITY.md). The original
 four-config hidden suite now runs 12 configuration checks, or 21 for adapted
 tasks; each check has two paired calls per implementation. Performance inputs
 and the synchronized wall timing protocol remain as documented above.
+
+
+## Local project names
+
+The Python distribution is `kernelbench-pro`; CLI commands remain
+`kb-batch` and `kb-verify-worker`. New Docker runs default to `kernelbench-pro:agent`,
+Modal uses `kernelbench-pro`, and Slurm jobs use `kernelbench-pro`.
+Rebuild the Docker image after this update. To use a previously built image,
+select its tag explicitly with `--docker-image` and ensure its evaluator version
+matches the client. Evaluator/configuration fingerprints will invalidate old
+cached measurements when affected code or settings change.
+
+`paper_analysis.py` and `paper_analysis.json` keep their existing names for
+compatibility; they implement the active scoring workflow and are not stored
+paper assets. The results page uses the requested hardware label and does not
+claim an evaluation date or a fixed sample count.
+
+
+## Harbor and Python 3.12
+
+The current project requires Python 3.12. Docker uses Python 3.12 and a CUDA
+Ubuntu 24.04 base; Modal uses `add_python="3.12"`. Historical validation records
+above describe their original Python 3.10 environments, not the current requirement.
+
+`--generation harbor` reuses the native generation slots, GPU lanes, recovery and
+formal evaluation/analysis pipeline. Install `uv sync --extra dev --extra harbor`,
+configure the Harbor agent credentials, and use `--harbor-agent`,
+`--harbor-environment` and `--harbor-reward` as needed. The `export-harbor` stage
+uses the same level/range/sample/precision/trial settings without starting an agent.
+See [Harbor integration](HARBOR.md) for commands, task layout and validation limits.

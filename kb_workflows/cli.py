@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from contextlib import nullcontext
 
@@ -30,6 +31,13 @@ def main(argv=None):
                 )
             )
             return 0
+        if config.stage == "export-harbor":
+            from .harbor import export_tasks
+
+            print(f"Harbor tasks: {export_tasks(config)}", flush=True)
+            return 0
+        if config.generation == "harbor" and config.stage in {"all", "generate"} and not shutil.which(config.harbor_command):
+            raise ValueError("Harbor executable not found; install the harbor extra or set --harbor-command")
         if config.stage in {"all", "analyze", "baseline"} and not config.hardware:
             raise ValueError("Specify --hardware for the actual verifier GPU to select/record its baseline")
         from .engine import analyze_run, evaluate_run, record_baseline
@@ -70,7 +78,7 @@ def main(argv=None):
                 analyze_run(config)
         print(f"Results: {config.run_dir}", flush=True)
         return 0 if generation_ok else 1
-    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+    except (ValueError, OSError, RuntimeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 

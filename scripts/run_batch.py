@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unified Verified workflow; see docs/BATCH_WORKFLOWS.md."""
+"""Unified KernelBench Pro workflow; see docs/BATCH_WORKFLOWS.md."""
 
 import sys
 from pathlib import Path

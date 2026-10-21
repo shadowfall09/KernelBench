@@ -81,6 +81,7 @@ def evaluator_digest():
         "kb_workflows/evaluate_task.py", "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py",
         "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
         "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
+        "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
     ):
         digest.update(name.encode())
         digest.update((ROOT / name).read_bytes())

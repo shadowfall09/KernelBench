@@ -1,8 +1,20 @@
-# 相比 KernelBench-Verified 的功能改进清单
+# KernelBench Pro 功能改进清单（相比 KernelBench-Verified）
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查。
+本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12。
 
-当前已提交能力为第一至第五版的累计功能。此前的评测完整性整合与文件清理已保存为 stash，继续暂缓，未混入第五版。
+当前已提交能力为第一至第六版的累计功能。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+
+当前版本继续沿用统一入口：
+
+| 能力 | 当前配置 |
+| --- | --- |
+| Python | 3.12；验证依赖 Torch 2.12.0 |
+| 生成 | local / Docker / Modal / Harbor |
+| 正式验证 | local / Docker / Modal / HTTP 队列 |
+| Harbor 任务 | 同一 CLI 的 `export-harbor` 阶段 |
+| 结果与恢复 | 原生样本编号、文件格式、基线、计时、评分及指纹 |
+
+下面各版分别记录对应提交、功能变化和验证范围。
 
 ## 第一版：Verified + 批量工作流
 
@@ -219,6 +231,50 @@ git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel b
 本次 Slurm GPU smoke 作业 50702 因 `Requested nodes are busy` 未能启动；真实 CUDA 和固定 Torch 2.12.0 尚未验证。
 
 原先未提交的整合与清理保存在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，本次没有恢复。以后恢复需处理与本版重叠的正确性入口，并重新验证。
+
+## 第六版：KernelBench Pro、Harbor 与 Python 3.12
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Unify KernelBench Pro with Harbor and Python 3.12 |
+| 定位命令 | `git log -1 --format='%H %s' --grep='^Unify KernelBench Pro with Harbor and Python 3.12$'` |
+| 基础提交 | `66fd65c5272c72572f0144989e97da1e98778771` |
+| 记录日期 | 2026-10-21 |
+| 状态 | 已提交；CPU/模拟回归通过，真实 GPU 与 agent 端到端验证待兼容环境 |
+
+### 仓库定位与文件清理
+
+项目名称统一为 **KernelBench Pro**，包、镜像、Modal 与 Slurm 标识使用 `kernelbench-pro`。现有 checkout 路径、题库目录和 GitHub 地址保留。
+
+本版以 `66fd65c` 为基础，把仓库清理、更名、Harbor 接入和 Python 3.12 升级纳入同一次提交。此前搁置的整合改动仍在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，没有恢复。
+
+| 项目 | 当前变化 |
+| --- | --- |
+| 论文与旧实验材料 | 删除 1 份上游报告 PDF、3 份 LaTeX 稿、1 份参考文献库、9 份图表、1 个论文绘图脚本和 5 份旧实验分析文档，共 20 个文件。 |
+| 重复生成材料 | 删除 4 份未被运行流程读取的 `stripped_prompts` 快照；输入盲化仍由可信配置动态生成。 |
+| 仓库入口 | README 改为本仓库的安装、能力、运行与文档入口；移除上游作者名单、论文宣传、旧榜单图与论文结论。 |
+| 维护方式 | 贡献与行为指南改为本仓库的 GitHub 流程，移除 Meta 内部导入、CLA 和举报渠道；LICENSE 和继承版权头保留，来源集中记录在 `NOTICE.md`。 |
+| 项目名称 | Python distribution 为 `kernelbench-pro`，默认镜像为 `kernelbench-pro:agent`，Modal app 为 `kernelbench-pro`，Slurm job 为 `kernelbench-pro`；CLI、生成 prompt、worker 与结果页面使用 KernelBench Pro 名称。 |
+| 结果页面 | 硬件标签取自本次数据；不再写死 H200、Best-of-5 或 2026 年 5 月，也不替未标注的运行猜测推理强度。 |
+| 忽略规则 | 按目录忽略运行产物、缓存与生成预览，补充凭据和 Slurm 日志规则；取消对全部 JSON、CUDA/C++ 源码及部分个人脚本名的全局忽略。 |
+| 使用中的文件 | 题库、隐藏测试、动态 prompt 示例和兼容脚本保留；`paper_analysis.py` / `paper_analysis.json` 是现有评分接口，保持名称以兼容结果读取。 |
+
+验证：172 项 CPU/模拟回归和 Ruff 通过；CLI dry-run、实际 HTML 生成、Python 包元数据、脚本语法、文档链接与忽略规则检查通过。270 个参考题目和 250 个隐藏测试文件完整保留，LICENSE、核心比较/计时/评分实现没有改动。此轮不恢复搁置的评测完整性整合，也不重写 Git 历史；删除的研究材料仍可从历史提交恢复。
+
+### Harbor 统一接入与 Python 3.12
+
+本轮扩展的是第一版建立的统一工作流，沿用同一个 `RunConfig`、题目范围、样本槽位、结果文件、GPU 调度、正式验证和分析；不修改第一版历史提交的能力描述。此前搁置的整合改动仍在原 stash 中。
+
+| 项目 | 当前变化 |
+| --- | --- |
+| 统一生成后端 | `--generation harbor` 调用 Harbor，每个原生样本对应一个 job/attempt；提交文件回收到原内核命名位置，再由原生正式评测和评分处理。 |
+| 统一任务导出 | `--stage export-harbor` 使用同一配置按题号/样本导出 schema 1.4 任务；保留当前输入盲化策略，使用新目录避免覆盖。 |
+| 验证与 reward | 独立 verifier 镜像保存可信代码及隐藏测试，只传递 `solution.py`；复用原生基线、正确性与证据评分，异常 reward 为 0。默认 correctness 与可选 bounded_gain 分开定义。 |
+| GPU 与恢复 | Docker 任务绑定原生 GPU lane，单卡串行；Harbor agent/环境/模型/协议纳入恢复指纹，正式评测不直接复用 Harbor reward。AWS profile 只解析为运行时凭据。 |
+| Python 升级 | `requires-python ==3.12.*`、Ruff py312、Docker Python 3.12 / Ubuntu 24.04、Modal Python 3.12；增加可选 `harbor` extra，固定 Torch 2.12.0。 |
+| 文档 | [Harbor 接入](HARBOR.md)、README 和批量文档同步更新；历史 Python 3.10 测试记录仍保留其真实环境。 |
+
+验证：Python 3.12.12 / Torch 2.12.0 / 正式发布的 Harbor 0.24.0 下 **204 passed**，含 32 项 Harbor 回归；Ruff、依赖一致性、实际 Task 模型校验和 CLI 配置解析通过。两个 Docker 目标的构建定义检查通过。Harbor Docker CPU smoke 因宿主 NAT 网络错误未启动，没有产物或 reward，不算通过；Torch CUDA 13 构建报告当前宿主驱动过旧，真实 GPU 与 agent 端到端验证仍待兼容环境。
 
 ## 维护方式
 

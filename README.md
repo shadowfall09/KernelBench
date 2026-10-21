@@ -6,213 +6,87 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-# KernelBench-Verified: Do LLM-Generated Kernels Actually Beat PyTorch?
+# KernelBench Pro
 
-## Fork provenance
+用于 GPU 内核生成、正确性验证和性能评测的批量工作流。
+由 [shadowfall09/KernelBench](https://github.com/shadowfall09/KernelBench) 维护。
 
-This repository is maintained at [shadowfall09/KernelBench](https://github.com/shadowfall09/KernelBench).
-The current code is based on [Meta KernelBench-Verified](https://github.com/facebookresearch/kernel_bench_verified)
-at commit `3fdf6fec7372a4d0cb682635f00e7bdcbc55d50e`, with the batch workflows
-migrated from the previous KernelBench fork. The original research attribution
-and license are retained below. Earlier fork versions remain in Git history.
+## 当前能力
 
-## Integrated batch workflows
+- 统一运行基线、生成、评测和分析，支持按题目范围运行和多样本尝试。
+- 生成支持本地、Docker、Modal 和 Harbor；验证支持本地、Docker、Modal 和 HTTP 队列。
+- 默认比较 eager、torch.compile default、max-autotune、CUDA Graph 四种基线。
+- 使用同步墙钟计时，逐次更换输入并校验输出，记录稳态耗时和冷启动成本。
+- 严格检查输出结构、shape、dtype、整数、bool 和非有限值；隐藏测试使用三个种子，29 道 Level 1 题另有数值压力测试。
+- 评分包含失败和缺失样本，恢复时核对源码、配置和测量证据。
 
-See the Chinese [feature inventory](docs/FEATURE_INVENTORY.md) for versioned improvements over Verified, including batch workflows and the separately committed correctness validation fixes.
+默认批量流程支持 Level 1–3。`KernelBench/level4/` 保留实验题目，不属于默认批量评测范围。
 
-The evaluator also includes [research-informed reliability checks](docs/RELIABILITY.md): candidate/reference order checks, three-seed hidden validation, and domain-reviewed numerical stress cases for 29 Level 1 tasks. Compilation, numerical correctness, and timed results are reported separately in `validation_summary.json`.
+## 安装
 
-This checkout also includes the Docker/Slurm, Modal, local verification queue and
-baseline-analysis workflows migrated from `KernelBench-modified`. They share
-`scripts/run_batch.py`, default to Verified hidden correctness gating and preserve
-timing/memory outputs. See [Batch workflows](docs/BATCH_WORKFLOWS.md) for setup,
-backend choices, resume behavior and compatibility entrypoints.
+使用 Python 3.12。项目固定依赖 Torch 2.12.0。
 
 ```bash
+git clone https://github.com/shadowfall09/KernelBench.git
+cd KernelBench
+uv sync --extra dev
+source .venv/bin/activate
+python scripts/run_batch.py --help
+```
+
+需要 Triton、CuTe、TileLang 等可选工具时，使用 `uv sync --extra dev --extra gpu`。
+本地验证需要 CUDA GPU 和兼容的编译工具链；本地生成还需要 Claude Code CLI 及运行时认证。
+
+## Harbor
+
+Harbor 使用同一个批量入口和结果格式；安装 `uv sync --extra dev --extra harbor` 后，选择 `--generation harbor`。也可用 `--stage export-harbor` 只导出任务。完整配置与独立验证环境说明见 [Harbor 接入](docs/HARBOR.md)。
+
+## 运行
+
+```bash
+# 预览配置与题目范围，不创建运行目录或调用模型。
+python scripts/run_batch.py --dry-run \
+  --level 1 --start 1 --end 10 --run-name my_run
+
+# 基线 → 生成 → 评测 → 分析；按实际设备修改硬件标签与架构。
 python scripts/run_batch.py --generation docker --evaluation docker \
   --level 1 --start 1 --end 10 --run-name my_run \
   --hardware RTX_A6000 --gpu-arch Ampere --gpus 0 --resume
 ```
 
-**Extended evaluation framework for LLM-generated GPU kernels with realistic baselines and robust correctness validation.**
+在集群上通过 `srun` 或 `sbatch` 获取 GPU 后执行本地评测。Docker、Slurm、Modal、远端队列的完整配置见 [批量工作流](docs/BATCH_WORKFLOWS.md)。
 
-Yunxiang Zhang<sup>1</sup>, Ping Yu<sup>2</sup>, Jianyu Wang<sup>1</sup>, Max (Xiangjun) Fan<sup>1</sup>, Julian Reed<sup>3</sup>, Azalia Mirhoseini<sup>3</sup>, Will Su<sup>1</sup>
+运行产物写入 `runs/NAME/`，基线写入 `results/timing/HARDWARE/`：
 
-<sup>1</sup>Meta &nbsp;&nbsp; <sup>2</sup>FAIR at Meta SuperIntelligence Lab &nbsp;&nbsp; <sup>3</sup>Stanford University
+| 文件 | 内容 |
+| --- | --- |
+| `eval_results.json` | 标准正确性、耗时和显存 |
+| `eval_results_hidden.json` | 隐藏正确性与检查记录 |
+| `validation_summary.json` | 编译、正确性和计时阶段统计 |
+| `paper_analysis.json` | 保留现有文件名的性能评分报告 |
+| `eval_results_scored.json` | 通过证据检查后的计分资格 |
+| `pass_at_k_results.json` | 正确性 pass@k |
 
-[![Leaderboard](https://img.shields.io/badge/Leaderboard-Verified-blue)](https://scalingintelligence.stanford.edu/kernelbenchverifiedleaderboard/)
-[![Paper](https://img.shields.io/badge/Paper-PDF-red)](KernelBench_Verified_Report.pdf)
+阶段统计中的正耗时不等于有效加速；性能结论以评分报告和对应测量证据为准。
 
----
-
-Recent large language models (LLMs) can generate custom CUDA kernels that appear to outperform PyTorch on benchmarks such as KernelBench. Building upon this foundational framework, we demonstrate that [...]
-
-We introduce **KernelBench-Verified**, an extended evaluation framework that incorporates:
-1. **TF32-enabled baseline** - Realistic performance measurement with Tensor Core acceleration
-2. **Four-distribution hidden test suite** - Robust correctness validation across varied inputs
-3. **Memory efficiency metrics** - Capturing the speed-memory tradeoff in kernel optimization
-
-Under verified evaluation with seven frontier LLMs, GPT-5.5 achieves **0.88×** geometric mean speedup, significantly lower than the 1.43× speedup observed under standard evaluation. No model consist [...]
-
-## Leaderboard
-
-![Memory–Speedup Tradeoff (per level)](docs/figures/mem_speedup_tradeoff.png)
-
-Each dot is one model. **X** = Correct Speedup (geomean of baseline / kernel runtime over correct problems only; higher = faster). **Y** = Memory Efficiency (geomean of baseline mem / kernel mem over correct problems only; higher = uses less GPU memory than baseline). The upper-right corner is best (fast *and* memory-efficient); dashed lines mark the 1× reference (no change vs baseline). See the full interactive [Verified Leaderboard](https://scalingintelligence.stanford.edu/kernelbenchverifiedleaderboard/).
-
-## Framework Components
-
-### TF32 Baseline Configuration
-
-Enable TF32 in PyTorch to match practitioner deployment:
-
-```python
-# Enable TF32 acceleration in PyTorch
-torch.set_float32_matmul_precision('high')
-# Equivalent: torch.backends.cuda.matmul.allow_tf32 = True
-```
-
-This routes all float32 matmul and convolution operations through Tensor Cores, providing the realistic baseline against which speedups should be measured.
-
-### Multi-Distribution Hidden Test Suite
-
-Each problem has a hidden test file at `hidden_tests/level{L}/{pid}_hidden.py` defining `get_hidden_inputs()` that returns four distributions. A kernel must pass **all four distributions** to be consi [...]
-
-| Distribution | Transform | Catches |
-|--------------|-----------|---------|
-| **D1** | Original (×1.0) | Baseline correctness |
-| **D2** | Scale ×3.0 | Overflow, precision issues |
-| **D3** | Scale ×0.01 | Underflow, epsilon issues |
-| **D4** | Negate ×(-1.0) | Sign shortcuts, identity tricks |
-
-### Input-Blind Generation
-
-For 4 problems susceptible to reward hacking, test inputs are automatically stripped from the generation prompt. See [docs/INPUT_BLIND_GENERATION.md](docs/INPUT_BLIND_GENERATION.md) for details.
-
-## Installation
+## 开发与文档
 
 ```bash
-# Clone the repository
-git clone https://github.com/facebookresearch/kernel_bench_verified.git
-cd kernel_bench_verified
-
-# Create conda environment
-conda create -n kernel-bench python=3.10
-conda activate kernel-bench
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set API keys (for OpenAI, Anthropic, etc.)
-export OPENAI_API_KEY="your-key-here"
-export ANTHROPIC_API_KEY="your-key-here"
-# ... other provider keys as needed
+python -m pytest -q tests src/unit_tests/test_dataset.py src/unit_tests/test_score.py
+python -m ruff check kb_workflows tests src/reliability.py src/validation.py
 ```
 
-## Usage
+| 文档 | 用途 |
+| --- | --- |
+| [功能清单](docs/FEATURE_INVENTORY.md) | 逐版变化、实现入口与验证状态 |
+| [Harbor 接入](docs/HARBOR.md) | 统一生成后端、任务导出与 reward |
+| [批量工作流](docs/BATCH_WORKFLOWS.md) | 各后端、恢复、基线与评分配置 |
+| [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |
+| [输入盲化](docs/INPUT_BLIND_GENERATION.md) | 生成材料如何去掉测试输入 |
+| [贡献指南](CONTRIBUTING.md) | 本仓库的开发与评审方式 |
 
-### Full Evaluation Pipeline
+Python 3.12 / Torch 2.12.0 的 CPU/模拟回归已执行；真实 CUDA 和各云后端仍需对应环境的实机验证。
 
-```bash
-# 1. Generate kernels (5 samples per problem)
-python scripts/generate_samples.py \
-  run_name=gpt-5.5_level1_test \
-  dataset_src=local \
-  level=1 \
-  num_samples=5 \
-  server_type=openai \
-  model_name=gpt-5.5 \
-  max_tokens=32000 \
-  temperature=0.8 \
-  num_workers=4
+## 许可证与来源
 
-# 2. Standard evaluation (correctness + timing + memory)
-python scripts/eval_from_generations.py \
-  run_name=gpt-5.5_level1_test \
-  dataset_src=local \
-  level=1 \
-  num_samples=5 \
-  eval_mode=local \
-  gpu_arch="['Hopper']" \
-  num_gpu_devices=8 \
-  timeout=600 \
-  build_cache=True \
-  num_cpu_workers=1 \
-  precision=fp32 \
-  measure_performance=True
-
-# 3. Hidden evaluation (4-distribution correctness gating)
-python scripts/eval_from_generations.py \
-  run_name=gpt-5.5_level1_test \
-  dataset_src=local \
-  level=1 \
-  num_samples=5 \
-  eval_mode=local \
-  gpu_arch="['Hopper']" \
-  num_gpu_devices=8 \
-  timeout=600 \
-  build_cache=True \
-  num_cpu_workers=1 \
-  precision=fp32 \
-  use_hidden_tests=True \
-  measure_performance=False
-
-# 4. Generate leaderboard with verified metrics
-python scripts/generate_leaderboard.py \
-  --use_hidden_eval \
-  --baseline baseline_time_torch_tf32 \
-  --fp32_tolerance 1e-3 \
-  --out leaderboard.html
-```
-
-### Key Flags
-
-- `--use_hidden_tests`: Enable 4-distribution hidden correctness testing (outputs `eval_results_hidden.json`)
-- `--use_hidden_eval`: Apply hidden eval gating in leaderboard (only kernels passing all 4 distributions count as correct)
-- `--baseline baseline_time_torch_tf32`: Use TF32-enabled PyTorch baseline (realistic performance)
-- `--fp32_tolerance 1e-3`: FP32 numerical tolerance for correctness checking
-
-### Generate Hidden Tests
-
-```bash
-# Regenerate hidden tests for all Level 1 problems
-python scripts/generate_hidden_inputs.py --level 1
-
-# Regenerate for a single problem
-python scripts/generate_hidden_inputs.py --level 1 --pid 90
-```
-
-### Adding New Problems to Input-Blind List
-
-1. Add `(level, pid)` to `STRIP_TEST_CONFIG_PIDS` in `src/prompt_constructor.py`
-2. Add shape annotations to the problem's `forward()` docstring in `KernelBench/level{L}/{problem}.py`
-3. Regenerate stripped prompts and re-evaluate
-
-## Output Files
-
-- `runs/{run_name}/eval_results.json` — Standard evaluation (correctness, runtime, memory)
-- `runs/{run_name}/eval_results_hidden.json` — Hidden evaluation (4-distribution gated correctness)
-- `leaderboard.html` — Interactive HTML leaderboard with verified metrics
-
-## Citation
-
-If you use KernelBench-Verified in your research, please cite:
-
-```bibtex
-@article{zhang2026kernelbenchverified,
-  title={KernelBench-Verified: Do LLM-Generated Kernels Actually Beat PyTorch?},
-  author={Zhang, Yunxiang and Yu, Ping and Wang, Jianyu and Fan, Max (Xiangjun) and Reed, Julian and Mirhoseini, Azalia and Su, Will},
-  journal={arXiv preprint},
-  year={2026}
-}
-```
-
-## License
-
-This source code is licensed under the MIT License. See the LICENSE file for details.
-
-Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
-
-## Acknowledgments
-
-KernelBench-Verified builds upon the original [KernelBench](https://github.com/ScalingIntelligence/KernelBench) benchmark. We thank the KernelBench authors for their foundational work.
+代码采用 [MIT License](LICENSE)。继承代码的版权声明及来源记录见 [NOTICE](NOTICE.md)。
