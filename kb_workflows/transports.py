@@ -14,6 +14,7 @@ import uuid
 from pathlib import Path
 
 from .common import ROOT, failure
+from .resource_budgets import record_device_lease
 
 
 def resolve_devices(gpus):
@@ -39,6 +40,7 @@ def terminate(process):
             process.wait()
 
 
+@record_device_lease
 def local_evaluate(payload, device="0", log_path=None):
     """Isolate CUDA state and compilation per task; kill children on timeout."""
     timeout = payload["eval_config"]["timeout"]
@@ -108,6 +110,7 @@ def queue_evaluate(payload, config):
     return failure("Queue wait timed out", queue_request_id=request_id, timeout_s=config.queue_wait_timeout)
 
 
+@record_device_lease
 def docker_evaluate(payload, config, device="0", log_path=None):
     name = "kb-eval-" + uuid.uuid4().hex[:12]
     with tempfile.TemporaryDirectory(prefix="kb-docker-eval-") as temporary:

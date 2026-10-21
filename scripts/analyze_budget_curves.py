@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from kb_workflows.budget_curves import AXES, budget_curves, plot_curves
+from kb_workflows.budget_curves import AXES, VARY, budget_curves, plot_curves
 from kb_workflows.common import atomic_json
 from kb_workflows.study_data import METRICS, collect_manifest
 
@@ -14,7 +14,7 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", type=Path)
     parser.add_argument("--axis", choices=sorted(AXES), default="declared_wall_seconds")
-    parser.add_argument("--vary", choices=("wall", "candidates"), default="wall")
+    parser.add_argument("--vary", choices=sorted(VARY), default="wall")
     parser.add_argument("--metric", choices=sorted(METRICS), default="score")
     parser.add_argument("--speedup-threshold", type=float, default=1.0)
     parser.add_argument("--aggregation", choices=("task_mean", "layer_macro"), default="task_mean")

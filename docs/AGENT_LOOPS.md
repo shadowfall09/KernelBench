@@ -42,6 +42,8 @@ agent_profile = true
 
 `agent_cost_limit` 为客户端估算费用上限，0 表示不设美元上限。循环在调用之间检查，单次请求可能超过上限；它不是账单硬限制。要求费用上限但供应商没有费用证据时，停止继续调用。未知费用或 token 不记为零。API SDK 内部重试、服务端推理和 GPU 账单不能由候选次数精确推算；记录的 model_calls 是适配器调用尝试数。
 
+可选资源预留增加本地`local-transformers`精确总token计数、单请求LiteLLM输出限额和local/Docker开发worker占用额度；配置、失败处理、恢复限制和计分证据见[资源预算](RESOURCE_BUDGETS.md)。设备额度按父进程墙钟结算，尚未提供纯GPU busy时间硬限。不会自动下载或运行本地checkpoint。
+
 ## 反馈与最终验证分开
 
 控制器只把经过现有 input-blind 策略处理的公开参考发给模型。反馈通道明确关闭隐藏测试，模型没有读取测试源码的 shell/file 工具。开发正确性和计时复用当前评测器，仍检查输出结构、dtype、非有限值、变化输入及逐次计时输出。

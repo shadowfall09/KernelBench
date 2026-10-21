@@ -26,6 +26,8 @@
 
 `base_config` 也可指向相对该spec文件的现有TOML。原生agent/backend、GPU目标、精度、题集、验证等级等沿用RunConfig。每个job在生成计划时就经过配置及选题校验；每个会话、预算和层使用独立run目录。
 
+`vary`还支持`total_tokens`、`output_tokens`、`device_lease_seconds`，分别改变`agent_token_limit`、`agent_output_token_limit`和`agent_device_seconds`，并提供对应`declared_*`曲线横轴。token额度是正整数，设备额度可为正小数；后端支持范围、设备占用口径和证明要求见[资源预算](RESOURCE_BUDGETS.md)。Harbor只能使用wall网格。
+
 ```bash
 python -m scripts.plan_study --spec study_spec.json --output-dir study
 ```

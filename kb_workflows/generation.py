@@ -281,6 +281,7 @@ def build_docker_image(config):
 
 def generation_signature(config, pid, sid):
     from .experiment import protocol
+    from .local_model import checkpoint_digest
 
     return fingerprint(
         {
@@ -292,6 +293,7 @@ def generation_signature(config, pid, sid):
                        "command": config.harbor_command, "reward": config.harbor_reward,
                        "evaluator_sha256": evaluator_digest()} if config.generation == "harbor" else None,
             "model": config.model,
+            "local_checkpoint_sha256": checkpoint_digest(config.model) if config.agent_backend == "local-transformers" else None,
             "small_model": config.small_model,
             "bedrock": config.bedrock,
             "precision": config.precision,
@@ -302,6 +304,8 @@ def generation_signature(config, pid, sid):
 
 
 def generate_run(config):
+    from .resource_budgets import active
+
     config.run_dir.mkdir(parents=True, exist_ok=True)
     target = config.run_dir / "generation_summary.json"
     previous = read_json(target, {})
@@ -322,6 +326,8 @@ def generate_run(config):
             ):
                 print(f"[generate] {key}: matching completed attempt ({entry['status']})", flush=True)
                 continue
+            if active(config) and (history.get("slots", {}).get(key) or key in previous):
+                raise ValueError(f"Capped sample {key} already has an attempt; use resume for identical completed work or a new run name")
             tasks.append((pid, sid))
     local_gpu = ((config.generation in {"local", "docker"} and config.evaluation in {"local", "docker"})
                  or (config.generation == "harbor" and config.harbor_environment == "docker"))

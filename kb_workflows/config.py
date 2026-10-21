@@ -49,6 +49,12 @@ class RunConfig:
     generation_mode: str = "feedback"
     agent_backend: str = "claude-code"
     agent_cost_limit: float = 0.0
+    agent_token_limit: int = 0
+    agent_output_token_limit: int = 0
+    agent_max_output_tokens: int = 8192
+    agent_device_seconds: float = 0.0
+    agent_temperature: float = 0.0
+    local_model_device: str = "cpu"
     agent_profile: bool = True
     resume: bool = False
     enable_ncu: bool = True
@@ -133,8 +139,32 @@ class RunConfig:
             raise ValueError("agent-cost-limit must be finite and nonnegative; 0 disables the estimated-cost cap")
         if self.generation_mode not in {"one-shot", "feedback", "external"}:
             raise ValueError("Invalid generation mode")
-        if self.agent_backend not in {"claude-code", "litellm"}:
+        if self.agent_backend not in {"claude-code", "litellm", "local-transformers"}:
             raise ValueError("Invalid agent backend")
+        for name in ("agent_token_limit", "agent_output_token_limit", "agent_max_output_tokens"):
+            if type(getattr(self, name)) is not int or getattr(self, name) < (1 if name == "agent_max_output_tokens" else 0):
+                raise ValueError(f"{name} must be an integer in its nonnegative/positive range")
+        for name in ("agent_device_seconds", "agent_temperature"):
+            value = getattr(self, name)
+            if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and nonnegative")
+        from .resource_budgets import active
+
+        if active(self) and self.generation not in {"local", "docker"}:
+            raise ValueError("Resource reservations require native local/docker generation; remote/Harbor enforcement is unavailable")
+        if self.agent_token_limit and self.agent_backend != "local-transformers":
+            raise ValueError("Exact total-token caps require local-transformers; provider token estimates cannot certify this cap")
+        if self.agent_output_token_limit and self.agent_backend not in {"local-transformers", "litellm"}:
+            raise ValueError("Output-token reservations require local-transformers or a supported single-call LiteLLM provider")
+        if self.agent_device_seconds and self.evaluation not in {"local", "docker"}:
+            raise ValueError("Device lease reservations require local/docker evaluation with parent-owned timing")
+        if self.agent_backend == "local-transformers":
+            if self.generation != "local":
+                raise ValueError("Local checkpoints currently require generation=local; container checkpoint mounting is unavailable")
+            if self.agent_cost_limit:
+                raise ValueError("Local model billing is not measured; use token/device reservations rather than a dollar cap")
+            if not isinstance(self.local_model_device, str) or not self.local_model_device:
+                raise ValueError("local_model_device must name an explicit Torch device")
         if self.generation == "harbor":
             if self.generation_mode == "one-shot":
                 raise ValueError("Harbor agents cannot certify one-shot; use native generation or external mode")
@@ -206,7 +236,11 @@ class RunConfig:
             raise ValueError("Hardware must be a directory label, not a path")
         if self.profile:
             self.bedrock = True
-        self.model = self.model or os.environ.get("ANTHROPIC_MODEL", "")
+        self.model = self.model or (os.environ.get("ANTHROPIC_MODEL", "") if self.agent_backend != "local-transformers" else "")
+        if self.agent_backend == "local-transformers":
+            self.model = str(Path(self.model).expanduser().resolve()) if self.model else ""
+            if self.stage in {"all", "generate"} and (not self.model or not Path(self.model).is_dir()):
+                raise ValueError("local-transformers requires an existing local checkpoint directory")
         if self.agent_backend == "litellm" and not self.model and self.generation != "harbor" and self.stage in {"all", "generate"}:
             raise ValueError("LiteLLM requires an explicit provider/model via --model or run.model")
         self.small_model = self.small_model or os.environ.get("ANTHROPIC_SMALL_FAST_MODEL", "")
@@ -258,6 +292,9 @@ def parser():
         "paired_trials",
         "final_repeats",
         "task_memory_mb",
+        "agent_token_limit",
+        "agent_output_token_limit",
+        "agent_max_output_tokens",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
@@ -278,7 +315,7 @@ def parser():
         "harbor_environment": ("docker", "modal"),
         "harbor_reward": ("correctness", "bounded_gain"),
         "generation_mode": ("one-shot", "feedback", "external"),
-        "agent_backend": ("claude-code", "litellm"),
+        "agent_backend": ("claude-code", "litellm", "local-transformers"),
     }
     for name in (
         "score_mode",
@@ -318,6 +355,7 @@ def parser():
         "harbor_reward",
         "generation_mode",
         "agent_backend",
+        "local_model_device",
     ):
         p.add_argument(
             f"--{name.replace('_', '-')}",
@@ -329,7 +367,7 @@ def parser():
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)
-    for name in ("queue_poll_interval", "queue_http_timeout", "fp32_tolerance", "agent_cost_limit"):
+    for name in ("queue_poll_interval", "queue_http_timeout", "fp32_tolerance", "agent_cost_limit", "agent_device_seconds", "agent_temperature"):
         p.add_argument(f"--{name.replace('_', '-')}", dest=name, type=float, default=argparse.SUPPRESS)
     return p
 
@@ -363,6 +401,9 @@ def file_options(path, argument_parser):
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value
     options.update(gpu_options(document.get("gpu", {})))
+    if options.get("agent_backend") == "local-transformers" and options.get("model"):
+        checkpoint = Path(options["model"]).expanduser()
+        options["model"] = str((checkpoint if checkpoint.is_absolute() else path.parent / checkpoint).resolve())
     return options
 
 

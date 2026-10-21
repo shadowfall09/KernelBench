@@ -10,10 +10,15 @@ from .study_data import assert_session_identity, study_digest, validate_record
 from .study_statistics import aggregate, finite, interval, paired_draw
 
 AXES = {"declared_wall_seconds": None, "declared_candidates": None,
+        "declared_total_tokens": None, "declared_output_tokens": None, "declared_device_lease_seconds": None,
         "observed_total_tokens": "total_tokens", "observed_output_tokens": "output_tokens",
         "observed_model_calls": "model_calls", "observed_estimated_cost_usd": "estimated_cost_usd",
         "observed_generation_wall_seconds": "generation_wall_seconds"}
-VARY = {"wall": "wall_limit_seconds_per_sample", "candidates": "candidate_limit_per_sample"}
+VARY = {"wall": "wall_limit_seconds_per_sample", "candidates": "candidate_limit_per_sample",
+        "total_tokens": "total_token_limit_per_sample", "output_tokens": "output_token_limit_per_sample",
+        "device_lease_seconds": "development_device_lease_seconds_per_sample"}
+DECLARED_AXES = dict(zip(("declared_wall_seconds", "declared_candidates", "declared_total_tokens",
+                          "declared_output_tokens", "declared_device_lease_seconds"), VARY))
 
 
 def area(points, left, right):
@@ -45,7 +50,7 @@ def point_summary(point, layers, axis, aggregation, trials, seed):
              for _ in range(trials)]
     resource_field = AXES[axis]
     if resource_field is None:
-        field = VARY["wall" if axis == "declared_wall_seconds" else "candidates"]
+        field = VARY[DECLARED_AXES[axis]]
         x = point["generation_protocol"].get(field)
     else:
         values = [record["resource_totals"].get(resource_field) for record in point["records"]]
@@ -65,7 +70,7 @@ def budget_curves(records, *, axis="declared_wall_seconds", vary="wall", aggrega
     if (axis not in AXES or vary not in VARY or aggregation not in {"task_mean", "layer_macro"}
             or type(trials) is not int or trials < 100):
         raise ValueError("Unknown axis/vary/aggregation or insufficient bootstrap trials")
-    if axis.startswith("declared_") and ((axis == "declared_wall_seconds") != (vary == "wall")):
+    if axis.startswith("declared_") and DECLARED_AXES[axis] != vary:
         raise ValueError("The declared x axis must be the varied protocol limit")
     groups, evidence_sessions = {}, {}
     for record in records:

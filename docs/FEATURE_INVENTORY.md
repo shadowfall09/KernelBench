@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前已提交能力为第一至第十版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第十四版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -476,6 +476,27 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 验证：Python 3.12.12 / Torch 2.12.0 下644项CPU/模拟回归通过，本版新增30项；覆盖实际计分重算、来源失效、并列与全失败排名、分母/重复会话拒绝、曲线回落与AUC区间、真实CLI解析24个模拟job、Harbor/cache用量及Matplotlib静态导出。Ruff、动机表、文档链接和离线wheel轻量导入检查通过。
 
 本版没有运行模型/GPU/Trainium或训练实验，也没有补造原7模型数据或声称精确排名重现。token/设备时间硬上限仍未实现，估算费用和agent墙钟不等于GPU账单；之前stash保持不变。
+
+## 第十四版：资源预留、本地模型与预算证据
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Enforce auditable agent token reservations and development leases |
+| 日期 | 2026-10-21 |
+| 基础提交 | `511b1ab` |
+| 状态 | 软件实现与CPU/模拟回归；没有运行实验 |
+
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V14-01 | 调用前token预留与用量结算 | 本地总token与支持的API输出上限；请求前预留、已知用量返还、缺失或超额停机；不支持的后端拒绝配置 | `kb_workflows/agent_models.py` | [M4](MOTIVATION.md#m4) |
+| V14-02 | 离线本地模型适配 | 精确chat template输入ID、单序列生成、禁止下载与远端代码、safetensors加载、模型及tokenizer内容绑定 | `kb_workflows/local_model.py` | [M4](MOTIVATION.md#m4) |
+| V14-03 | 开发worker占用预留 | local/Docker父进程计时覆盖编译/验证/profiling与清理，预留清理时间；超额可见，不宣称纯GPU时间物理抢占 | `kb_workflows/resource_budgets.py` | [M4](MOTIVATION.md#m4) |
+| V14-04 | 预算恢复与计分资格 | 限额样本只许一个可审计尝试；重算账本并绑定历史/汇总/源码/配置，改收据使新旧评分门失效 | `kb_workflows/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
+| V14-05 | token与设备占用预算网格 | 增加三种预留额度的研究计划与曲线横轴，按后端能力预检，其他预算继续分组；默认不执行 | `kb_workflows/study_plan.py` | [M4](MOTIVATION.md#m4) |
+
+配置、作用范围、未知用量处理与恢复规则见[资源预算](RESOURCE_BUDGETS.md)。R-18推进为部分实现；纯GPU busy时间硬限与远端可信取消仍待实现。不会把worker墙钟、模型token计数或客户端估算费用写成GPU账单。
+
+验证：Python 3.12.12 / Torch 2.12.0下681项CPU/模拟回归通过，本版新增37项；覆盖预留/返还/未知扣款、超额与不支持后端、最佳候选保留、模型资产变更、评分证据失效与预算网格。真实模型与设备实验均未运行，Ruff、动机表与文档链接检查通过。此前stash保持原样。
 
 ## 维护方式
 

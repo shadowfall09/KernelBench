@@ -13,6 +13,12 @@ from pathlib import Path
 from .common import atomic_json, kernel_name, read_json, select_problems
 from .config import RunConfig, parse_config
 from .experiment import protocol
+from .resource_budgets import active
+
+
+def require_interactive_budget(config):
+    if active(config):
+        raise ValueError("Interactive sessions have unobserved calls; resource reservations require the native controller")
 
 
 def verify_directory(directory, *, evaluator=None):
@@ -21,6 +27,7 @@ def verify_directory(directory, *, evaluator=None):
 
     directory = Path(directory).resolve()
     config = RunConfig(**read_json(directory / "job_config.json")).validate()
+    require_interactive_budget(config)
     if config.generation_mode == "one-shot":
         print("One-shot mode does not allow development feedback")
         return 2
@@ -92,6 +99,7 @@ def main(argv=None):
         from .generation import prepare_job
 
         config = parse_config(options)
+        require_interactive_budget(config)
         config.require_gpu_target()
         selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         if config.start != config.end or config.num_samples != 1 or list(selected) != [config.start]:
@@ -110,6 +118,7 @@ def main(argv=None):
     directory = args.directory.resolve()
     state = read_json(directory / "interactive_state.json")
     config = RunConfig(**read_json(directory / "job_config.json")).validate()
+    require_interactive_budget(config)
     if state.get("frozen"):
         raise ValueError("Submission is already frozen")
     source = (config.run_dir / kernel_name(config.level, config.start)).read_text() if config.generation_mode == "one-shot" else state.get("best", {}).get("source")

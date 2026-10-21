@@ -1479,12 +1479,14 @@
       "title": "设备时间与token硬预算",
       "primary": "M4",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/resource_budgets.py",
+        "kb_workflows/local_model.py",
+        "docs/RESOURCE_BUDGETS.md"
       ],
-      "reason": "现有墙钟和候选上限已实现；模型token及纯GPU时间未硬限，费用为调用间估算"
+      "reason": "已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验"
     },
     {
       "id": "R-19",
@@ -1723,6 +1725,82 @@
         "kb_workflows/final_verification.py"
       ],
       "reason": "恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母"
+    },
+    {
+      "id": "V14-01",
+      "title": "调用前token预留与用量结算",
+      "primary": "M4",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/agent_models.py",
+        "kb_workflows/resource_budgets.py"
+      ],
+      "reason": "调用前预留本地精确总token或API输出额度，已知用量返还，缺失或超额停止并拒绝计分；不支持的后端显式拒绝"
+    },
+    {
+      "id": "V14-02",
+      "title": "离线本地模型适配",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/local_model.py"
+      ],
+      "reason": "直接使用实际chat template输入ID与单条生成序列；只加载本地safetensors且禁止远端代码，权重和tokenizer内容绑定恢复与评分"
+    },
+    {
+      "id": "V14-03",
+      "title": "开发worker占用预留",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/resource_budgets.py",
+        "kb_workflows/transports.py"
+      ],
+      "reason": "local/Docker父进程记录包含启动/清理的开发worker墙钟，评测和profile均先预留；超额/未知不合格，不冒充物理GPU抢占或账单"
+    },
+    {
+      "id": "V14-04",
+      "title": "预算恢复与计分资格",
+      "primary": "M3",
+      "secondary": [
+        "M4",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/generation.py",
+        "kb_workflows/paper_analysis.py",
+        "kb_workflows/common.py"
+      ],
+      "reason": "限额槽位只允许一次可审计尝试，匹配完成记录可resume；重算账本、绑定历史与汇总，修改预算证据使新旧计分门均失效"
+    },
+    {
+      "id": "V14-05",
+      "title": "token与设备占用预算网格",
+      "primary": "M4",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/study_plan.py",
+        "kb_workflows/budget_curves.py"
+      ],
+      "reason": "研究计划和曲线增加总token、输出token和开发worker占用三种额度；按真实后端能力预检，保持其他预算分组，默认不执行"
     }
   ]
 }

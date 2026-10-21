@@ -105,6 +105,8 @@ def analyze_paper(config):
     from .aggregation import sensitivity
     from .engine import task_payload
     from .experiment import existing_budget, protocol
+    from .resource_budgets import active
+    from .resource_budgets import score_issue as resource_score_issue
 
     selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
     standard = read_json(config.run_dir / "eval_results.json", {})
@@ -120,7 +122,9 @@ def analyze_paper(config):
     external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
                       for option in ("problem_specs", "device_calibration") if getattr(config, option)}
     auxiliary_files = {}
-    for name in (["final_manifest.json", "final_results.json"] if config.final_repeats else []) + (["paired_results.json"] if config.paired_timing else []):
+    for name in ((["final_manifest.json", "final_results.json"] if config.final_repeats else [])
+                 + (["paired_results.json"] if config.paired_timing else [])
+                 + (["generation_budget.json", "generation_attempts.json", "generation_summary.json"] if active(config) else [])):
         auxiliary_files[name] = fingerprint(read_json(config.run_dir / name, {}))
     for pid, path in selected.items():
         layer = specs.get(str(pid), {}).get("layer", research_rows.get(pid, {}).get("layer", "unclassified"))
@@ -158,6 +162,8 @@ def analyze_paper(config):
             kernel = config.run_dir / kernel_name(config.level, pid, sid)
             if status == "verified" and not kernel.is_file():
                 status = "kernel_source_changed_or_missing"
+            if status == "verified":
+                status = resource_score_issue(config, pid, sid) or status
             if status == "verified":
                 if bound_issue is not None:
                     status = "headroom_certificate_missing_or_invalid"

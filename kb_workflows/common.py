@@ -89,6 +89,7 @@ def evaluator_digest():
         "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
         "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
         "kb_workflows/harbor_budget.py",
+        "kb_workflows/resource_budgets.py", "kb_workflows/local_model.py",
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
@@ -141,11 +142,14 @@ def apply_score_gate(results, run_dir):
     hidden = read_json(run_dir / "eval_results_hidden.json", {})
     digest = None
     gated = {}
-    auxiliary = {name: read_json(run_dir / name, {}) for name in ("final_manifest.json", "final_results.json", "paired_results.json")}
+    auxiliary = {name: read_json(run_dir / name, {}) for name in (
+        "final_manifest.json", "final_results.json", "paired_results.json", "generation_budget.json",
+        "generation_attempts.json", "generation_summary.json")}
     auxiliary_hashes = {name: fingerprint(value) for name, value in auxiliary.items()}
     for key, raw in results.items():
         options = raw.get("metadata", {}).get("evaluation_config", {})
-        required = options.get("score_gate_required", config.get("score_gate_required", False)) or options.get("anti_cheat", False)
+        capped = any(config.get(name) for name in ("agent_token_limit", "agent_output_token_limit", "agent_device_seconds"))
+        required = options.get("score_gate_required", config.get("score_gate_required", False)) or options.get("anti_cheat", False) or capped
         if not required:
             gated[key] = raw
             continue
@@ -181,6 +185,8 @@ def apply_score_gate(results, run_dir):
             final_required = options.get("final_repeats", config.get("final_repeats", 0))
             paired_required = options.get("paired_timing", config.get("paired_timing", False))
             required_auxiliary = (["final_manifest.json", "final_results.json"] if final_required else []) + (["paired_results.json"] if paired_required else [])
+            if capped:
+                required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
             for option in ("problem_specs", "device_calibration"):
                 declared = config.get(option)

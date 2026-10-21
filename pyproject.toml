@@ -15,6 +15,7 @@ gpu = ["triton", "nvidia-cutlass-dsl", "tilelang", "cupy-cuda12x", "nsight-pytho
 dev = ["pytest", "ruff"]
 harbor = ["harbor[modal]==0.24.0"]
 analysis = ["matplotlib>=3.9,<4"]
+local-model = ["transformers>=4.56,<6", "safetensors>=0.4"]
 
 [project.scripts]
 kb-batch = "kb_workflows.cli:main"

@@ -31,6 +31,21 @@ def seal(value):
     return value
 
 
+@pytest.mark.parametrize("vary,axis,field", [
+    ("total_tokens", "declared_total_tokens", "total_token_limit_per_sample"),
+    ("output_tokens", "declared_output_tokens", "output_token_limit_per_sample"),
+    ("device_lease_seconds", "declared_device_lease_seconds", "development_device_lease_seconds_per_sample"),
+])
+def test_resource_limit_curves_group_the_varied_cap_into_one_series(vary, axis, field):
+    records = [record(budget=60), record(budget=60)]
+    for item, cap in zip(records, [10, 20]):
+        item["generation_protocol"][field] = cap
+        seal(item)
+    output = budget_curves.budget_curves(records, vary=vary, axis=axis, trials=100)
+    series = output["groups"][0]["series"]
+    assert len(series) == 1 and [row["x"] for row in series[0]["points"]] == [10, 20]
+
+
 def test_ties_and_constant_rankings_are_not_fake_perfect_agreement():
     assert stats.ranks([1, 1, 2]) == [1.5, 1.5, 3]
     assert stats.spearman([1, 1, 2], [1, 2, 2]) == pytest.approx(0.5)

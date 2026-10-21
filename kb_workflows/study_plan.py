@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .budget_curves import VARY
 from .common import atomic_json, evaluator_digest, fingerprint, read_json, safe_name, select_problems
 from .config import RunConfig, file_options, parser
 from .study_data import study_digest
@@ -36,13 +37,14 @@ def make_plan(specification, *, directory, base_directory=None):
     if (not isinstance(models, list) or not models or any(not isinstance(model, str) or not model for model in models)
             or len(set(models)) != len(models) or not isinstance(methods, list) or not methods
             or set(methods) - METHODS or len(set(methods)) != len(methods)
-            or type(sessions) is not int or sessions < 1 or vary not in {"wall", "candidates"}
+            or type(sessions) is not int or sessions < 1 or vary not in VARY
             or not isinstance(budgets, list) or not budgets or len(set(budgets)) != len(budgets)
-            or any(type(value) is not int or value <= 0 for value in budgets)
+            or any((type(value) is not int if vary != "device_lease_seconds" else type(value) not in (int, float))
+                   or not 0 < value < float("inf") for value in budgets)
             or not isinstance(levels, list) or not levels or len(set(levels)) != len(levels)):
         raise ValueError("Invalid models, methods, levels, sessions, or positive integer budget grid")
-    if vary == "candidates" and "harbor" in methods:
-        raise ValueError("Harbor does not certify native candidate counts; use a wall-time grid")
+    if vary != "wall" and "harbor" in methods:
+        raise ValueError("Harbor does not certify native candidate/token/device reservations; use a wall-time grid")
     jobs, skipped = [], []
     for mi, model in enumerate(models):
         for method in methods:
@@ -57,10 +59,9 @@ def make_plan(specification, *, directory, base_directory=None):
                         config.run_name = f"{name}_m{mi}_{method}_b{bi}_s{si}_l{level}"
                         config.runs_dir = str(directory / "runs")
                         config.stage, config.dry_run, config.resume = "all", False, True
-                        if vary == "wall":
-                            config.agent_timeout = budget
-                        else:
-                            config.optimization_rounds = budget
+                        field = {"wall": "agent_timeout", "candidates": "optimization_rounds", "total_tokens": "agent_token_limit",
+                                 "output_tokens": "agent_output_token_limit", "device_lease_seconds": "agent_device_seconds"}[vary]
+                        setattr(config, field, budget)
                         if method == "harbor":
                             config.generation, config.generation_mode = "harbor", "external"
                             config.harbor_agent = document.get("harbor_agent", base.harbor_agent)

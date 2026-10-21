@@ -82,6 +82,51 @@ def test_failures_and_missing_slots_stay_in_denominator(run):
     assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
 
 
+@pytest.mark.parametrize("damage", [None, "receipt", "history", "usage", "signature"])
+def test_resource_budget_proof_is_required_and_invalidates_both_score_gates(run, monkeypatch, damage):
+    import hashlib
+
+    from kb_workflows.experiment import protocol, write_budget_report
+    from kb_workflows.resource_budgets import Ledger
+
+    config, _, standard, _, _ = run
+    config.agent_backend, config.model, config.agent_output_token_limit = "litellm", "fake/provider", 10
+    config.validate()
+    monkeypatch.setattr(generation, "generation_signature", lambda *args: "cap-signature")
+    atomic_json(config.run_dir / "run_config.json", config.to_dict())
+    summary, history = {}, {"slots": {}}
+    for sid in range(config.num_samples):
+        ledger = Ledger(10, "tokens", integer=True)
+        ledger.settle(ledger.reserve(10), 3)
+        receipt = {"protocol": {**protocol(config), "samples_per_problem": 1}, "model_calls": 1, "output_tokens": 3,
+                   "resource_budgets": {"output_tokens": ledger.snapshot()}}
+        key = f"1_{sid}"
+        summary[key] = {"status": "success", "signature": "cap-signature", "budget": receipt,
+                        "kernel_sha256": hashlib.sha256((config.run_dir / kernel_name(1, 1, sid)).read_bytes()).hexdigest()}
+        history["slots"][key] = [{"status": "success", "signature": "cap-signature", "budget": receipt}]
+    atomic_json(config.run_dir / "generation_summary.json", summary)
+    atomic_json(config.run_dir / "generation_attempts.json", history)
+    write_budget_report(config, summary)
+    assert paper_analysis.analyze_paper(config)["bounded_gain_macro"] == pytest.approx(1)
+    assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    if damage is None:
+        return
+    if damage == "receipt":
+        (config.run_dir / "generation_budget.json").unlink()
+    elif damage == "history":
+        history["slots"]["1_0"].append(history["slots"]["1_0"][0])
+        atomic_json(config.run_dir / "generation_attempts.json", history)
+    elif damage == "usage":
+        summary["1_0"]["budget"]["output_tokens"] = 30
+        atomic_json(config.run_dir / "generation_summary.json", summary)
+    else:
+        summary["1_0"]["signature"] = "different-config-or-evaluator"
+        atomic_json(config.run_dir / "generation_summary.json", summary)
+    assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    report = paper_analysis.analyze_paper(config)
+    assert report["details"][0]["score"] == 0 and report["details"][0]["status"].startswith("resource_budget")
+
+
 def test_study_export_recomputes_current_qualification_without_running_workloads(run, monkeypatch):
     import hashlib
 

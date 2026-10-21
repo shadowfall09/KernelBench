@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 from .common import atomic_json
+from .resource_budgets import BudgetExhausted, Ledger, amount
 from .transports import terminate
 
 
@@ -63,11 +64,18 @@ def claude_response(messages, config, directory, timeout, remaining_cost=None):
             "num_turns": response.get("num_turns")}
 
 
-def litellm_response(messages, config, directory, timeout, remaining_cost=None):
+def litellm_response(messages, config, directory, timeout, remaining_cost=None, *, max_output_tokens=None):
     import litellm
 
+    options = {}
+    if max_output_tokens is not None:
+        supported = litellm.get_supported_openai_params(model=config.model) or []
+        parameter = next((key for key in ("max_completion_tokens", "max_tokens") if key in supported), None)
+        if parameter is None:
+            raise ValueError("Provider cannot enforce a completion-token limit; refusing the request")
+        options = {parameter: max_output_tokens, "drop_params": False, "n": 1}
     response = litellm.completion(model=config.model, messages=[{"role": m["role"], "content": m["content"]}
-                                                            for m in messages], timeout=timeout, num_retries=0)
+                                                            for m in messages], timeout=timeout, num_retries=0, **options)
     try:
         cost = litellm.completion_cost(completion_response=response)
     except Exception:
@@ -84,19 +92,54 @@ class KernelModel:
 
     def __init__(self, config, directory, remaining, response_fn=None):
         self.config, self.directory, self.remaining = config, Path(directory), remaining
+        if response_fn is None and config.agent_backend == "local-transformers":
+            from .local_model import LocalTransformersModel
+
+            response_fn = LocalTransformersModel(config)
         self.response_fn = response_fn or (claude_response if config.agent_backend == "claude-code" else litellm_response)
         self.receipts = []
+        self.ledgers = {name: Ledger(limit, "tokens", integer=True) for name, limit in (
+            ("total_tokens", config.agent_token_limit), ("output_tokens", config.agent_output_token_limit)) if limit}
 
     def query(self, messages):
+        reservations, prompt_tokens = {}, None
+        cap = self.config.agent_max_output_tokens
+        if "total_tokens" in self.ledgers:
+            prompt_tokens = self.response_fn.count_tokens(messages)
+            if not amount(prompt_tokens, integer=True) or prompt_tokens < 1:
+                raise ValueError("Exact local tokenizer evidence is required before reserving tokens")
+            cap = min(cap, self.ledgers["total_tokens"].remaining - prompt_tokens)
+        if "output_tokens" in self.ledgers:
+            cap = min(cap, self.ledgers["output_tokens"].remaining)
+        if cap <= 0:
+            raise BudgetExhausted("No room for another prompt and completion; retained prior best candidate")
+        for name, ledger in self.ledgers.items():
+            reservations[name] = ledger.reserve(cap + (prompt_tokens if name == "total_tokens" else 0))
         remaining_cost = None
         if self.config.agent_cost_limit:
             remaining_cost = self.config.agent_cost_limit - sum(r["cost"] for r in self.receipts if nonnegative(r.get("cost")))
         try:
-            response = self.response_fn(messages, self.config, self.directory, self.remaining(), remaining_cost)
+            options = {"max_output_tokens": cap} if self.ledgers or self.config.agent_backend == "local-transformers" else {}
+            response = self.response_fn(messages, self.config, self.directory, self.remaining(), remaining_cost, **options)
+            if not isinstance(response, dict):
+                raise ValueError("Model response must be a usage-bearing object")
         except Exception as exc:
+            for name, nonce in reservations.items():
+                self.ledgers[name].settle(nonce)
             self.receipts.append({"error": type(exc).__name__})
             atomic_json(self.directory / "model_calls" / f"{len(self.receipts):03}.json", self.receipts[-1])
             raise
+        resource_error = False
+        for name, nonce in reservations.items():
+            observed = response.get(name)
+            if name == "total_tokens" and (response.get("input_tokens") != prompt_tokens
+                    or not amount(response.get("output_tokens"), integer=True)
+                    or observed != prompt_tokens + response["output_tokens"] or response["output_tokens"] > cap):
+                observed = None
+            resource_error |= not self.ledgers[name].settle(nonce, observed)
+        if reservations:
+            response["resource_reservations"] = {"nonces": reservations, "max_output_tokens": cap,
+                                                  "prompt_tokens": prompt_tokens, "compliant": not resource_error}
         for key in ("cost", "input_tokens", "output_tokens", "total_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
             if not nonnegative(response.get(key)):
                 response[key] = None
@@ -104,6 +147,10 @@ class KernelModel:
         atomic_json(self.directory / "model_calls" / f"{len(self.receipts):03}.json", response)
         action = {}
         try:
+            if resource_error:
+                action["stop"] = True
+                action["exit_status"] = "ResourceEvidenceMissingOrExceeded"
+                raise ValueError("Resource usage was missing or exceeded its reservation; stopping without evaluating this response")
             if self.config.agent_cost_limit and not nonnegative(response.get("cost")):
                 action["stop"] = True
                 raise ValueError("Estimated-cost cap requires cost evidence; provider returned none")
@@ -136,9 +183,13 @@ class KernelModel:
     def usage(self):
         result = {"model_calls": len(self.receipts)}
         result["models"] = sorted({name for item in self.receipts for name in item.get("models") or []}) or None
+        if self.config.agent_backend == "local-transformers":
+            snapshots = [item.get("model_snapshot_sha256") for item in self.receipts]
+            result["local_checkpoint_sha256"] = sorted(set(snapshots)) if snapshots and all(isinstance(value, str) for value in snapshots) else None
         for field, source in (("estimated_cost_usd", "cost"), ("input_tokens", "input_tokens"), ("total_tokens", "total_tokens"),
                               ("output_tokens", "output_tokens"), ("cache_read_input_tokens", "cache_read_input_tokens"),
                               ("cache_creation_input_tokens", "cache_creation_input_tokens")):
             values = [item.get(source) for item in self.receipts]
             result[field] = sum(values) if values and all(nonnegative(value) for value in values) else None
+        result["resource_budgets"] = {name: ledger.snapshot() for name, ledger in self.ledgers.items()}
         return result
