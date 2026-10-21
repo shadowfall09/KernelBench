@@ -82,6 +82,38 @@ def test_failures_and_missing_slots_stay_in_denominator(run):
     assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
 
 
+def test_study_export_recomputes_current_qualification_without_running_workloads(run, monkeypatch):
+    import hashlib
+
+    from kb_workflows import study_data
+    from kb_workflows.experiment import write_budget_report
+
+    config, _, _, _, _ = run
+    config.model = "declared-test-model"
+    atomic_json(config.run_dir / "run_config.json", config.to_dict())
+    monkeypatch.setattr(study_data, "ROOT", common.ROOT)
+    monkeypatch.setattr(study_data, "evaluator_digest", lambda: "current")
+    monkeypatch.setattr(study_data, "select_problems", engine.select_problems)
+    monkeypatch.setattr(engine, "evaluate_tasks", lambda *a, **k: pytest.fail("Analysis started evaluation"))
+    monkeypatch.setattr(generation, "generate_run", lambda *a, **k: pytest.fail("Analysis started generation"))
+    receipts = {}
+    for sid in range(config.num_samples):
+        source = config.run_dir / kernel_name(1, 1, sid)
+        receipts[f"1_{sid}"] = {"kernel_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                                "budget": {"model_calls": 1, "candidate_submissions": 1,
+                                           "input_tokens": 10, "output_tokens": 20, "total_tokens": 30,
+                                           "estimated_cost_usd": 0.01, "generation_wall_seconds": 3,
+                                           "development_request_wall_seconds": 1, "models": ["actual-test-model"]}}
+    write_budget_report(config, receipts)
+    exported = study_data.collect_run(config.run_dir, session="replica-0")
+    assert exported["tasks"] == {"1/1": [1, 1, 1]}
+    assert exported["resource_totals"]["total_tokens"] == 90
+    assert exported["formal_comparison_eligible"] and exported["model_identity"] == "actual-test-model"
+    (config.run_dir / kernel_name(1, 1)).write_text("changed source after evaluation")
+    updated = study_data.collect_run(config.run_dir, session="replica-0")
+    assert updated["tasks"] == {"1/1": [0, 1, 1]} and not updated["formal_comparison_eligible"]
+
+
 @pytest.mark.parametrize("damage", ["none", "missing", "scope", "summary"])
 def test_persisted_strict_evidence_is_required_at_scoring_boundary(run, damage):
     from kb_workflows import evidence

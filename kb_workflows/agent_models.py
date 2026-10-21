@@ -51,9 +51,12 @@ def claude_response(messages, config, directory, timeout, remaining_cost=None):
             terminate(process)
     response = json.loads(output)
     usage = response.get("usage", {})
+    token_fields = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+    total_tokens = sum(usage[key] for key in token_fields) if all(nonnegative(usage.get(key)) for key in token_fields) else None
     return {"text": response.get("result", ""), "cost": response.get("total_cost_usd"),
             "models": sorted(response.get("modelUsage", {})) or None,
             "input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens"),
+            "total_tokens": total_tokens,
             "cache_read_input_tokens": usage.get("cache_read_input_tokens"),
             "cache_creation_input_tokens": usage.get("cache_creation_input_tokens"),
             "provider_error": response.get("is_error", False) or process.returncode != 0 or response.get("num_turns", 1) != 1,
@@ -72,7 +75,8 @@ def litellm_response(messages, config, directory, timeout, remaining_cost=None):
     usage = response.usage
     return {"text": response.choices[0].message.content, "cost": cost,
             "models": [response.model] if response.model else None,
-            "input_tokens": getattr(usage, "prompt_tokens", None), "output_tokens": getattr(usage, "completion_tokens", None)}
+            "input_tokens": getattr(usage, "prompt_tokens", None), "output_tokens": getattr(usage, "completion_tokens", None),
+            "total_tokens": getattr(usage, "total_tokens", None)}
 
 
 class KernelModel:
@@ -93,7 +97,7 @@ class KernelModel:
             self.receipts.append({"error": type(exc).__name__})
             atomic_json(self.directory / "model_calls" / f"{len(self.receipts):03}.json", self.receipts[-1])
             raise
-        for key in ("cost", "input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+        for key in ("cost", "input_tokens", "output_tokens", "total_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
             if not nonnegative(response.get(key)):
                 response[key] = None
         self.receipts.append(response)
@@ -132,7 +136,7 @@ class KernelModel:
     def usage(self):
         result = {"model_calls": len(self.receipts)}
         result["models"] = sorted({name for item in self.receipts for name in item.get("models") or []}) or None
-        for field, source in (("estimated_cost_usd", "cost"), ("input_tokens", "input_tokens"),
+        for field, source in (("estimated_cost_usd", "cost"), ("input_tokens", "input_tokens"), ("total_tokens", "total_tokens"),
                               ("output_tokens", "output_tokens"), ("cache_read_input_tokens", "cache_read_input_tokens"),
                               ("cache_creation_input_tokens", "cache_creation_input_tokens")):
             values = [item.get(source) for item in self.receipts]

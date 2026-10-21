@@ -198,6 +198,7 @@ def export_tasks(config):
 def run_harbor_agent(directory, config, pid, device=None, sid=0):
     """One Harbor attempt maps to one native (problem, sample) generation slot."""
     directory = Path(directory)
+    from .harbor_budget import harbor_budget
     job_name = "trial-" + uuid.uuid4().hex[:12]
     task = write_task(directory / job_name, config, pid, sid=sid,
                       device=device if config.harbor_environment == "docker" else None)
@@ -213,17 +214,19 @@ def run_harbor_agent(directory, config, pid, device=None, sid=0):
         try:
             code = process.wait(timeout=config.agent_timeout + 4800 + verification_timeout(config, pid))
         except subprocess.TimeoutExpired:
-            return {"status": "timeout", "error": "Harbor job timed out", "harbor_job": str(jobs / job_name)}
+            return {"status": "timeout", "error": "Harbor job timed out", "harbor_job": str(jobs / job_name),
+                    "budget": harbor_budget(jobs / job_name)}
         finally:
             terminate(process)
     candidates = list((jobs / job_name).glob("*/artifacts/app/solution.py"))
+    budget = harbor_budget(jobs / job_name)
     if len(candidates) != 1 or candidates[0].is_symlink() or not candidates[0].is_file() or not candidates[0].stat().st_size:
-        return {"status": "failed", "exit_code": code, "error": "Missing or ambiguous Harbor submission"}
+        return {"status": "failed", "exit_code": code, "error": "Missing or ambiguous Harbor submission", "budget": budget}
     output = directory / "runs" / "agent" / kernel_name(config.level, pid)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(candidates[0].read_bytes())
     return {"status": "success" if code == 0 else "failed", "exit_code": code,
-            "harbor_job": str(jobs / job_name)}
+            "harbor_job": str(jobs / job_name), "budget": budget}
 
 
 def runtime_environment(config):

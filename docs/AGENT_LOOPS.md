@@ -87,3 +87,5 @@ Harbor 仍可用于外部 agent，但标为 `external`，不声称其内部执�
 | [FlashInfer agent baseline](https://github.com/flashinfer-ai/mlsys26-agent-baseline) | 现成 iterative / evolve 两类搜索 | 本次保留独立采样与有限轮反馈，不引入额外 elite-pool 进化预算 |
 
 TIRx 的模拟、同步与竞争检查只覆盖受支持的 TIRx 程序和给定输入，不是通用 CUDA/Triton 的正确性证明；本次没有把这些能力写成已经接入。
+
+Multi-model/session budget plans and a Harbor general-agent baseline are now available through [study workflows](STUDIES.md). Planning is nonexecuting by default; current score export, tie-aware selection diagnostics and independent budget curves do not launch models or workloads. Resource receipts distinguish declared caps, observed token/agent time, unknown values and uncertified GPU billing.

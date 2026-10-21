@@ -10,7 +10,7 @@
 
 当前支持 Level 1–3 范围、多样本，以及从研究包接入的 KernelBench-105 固定选集：105 道主集、5 道审查探针、140 道扩展题。三种角色独立运行。I/F/D 是研究者给出的暂定分类，不是算法最优性或可达性证书；原始输入尚未按论文的退化审计重新校准。用法和选择规则见[研究索引](../research/headroom/README.md)。
 
-第十二版已新增独立Level 5的Production-41：12设计、6数值设计、12固定格式与11反向题；支持逐角色dtype、合法输入与隐藏形状、按设备容量的确定性显存计划。11个反向家族有FP64 gradcheck与有限差分回归，四轨分开评分；软件实现不等于GPU可达性或区分度实验已完成。旧题的完整输入校准及当前协议下的区分度分析仍需推进。历史 7 模型原始结果未在压缩包中提供；论文声称的精确排名一致性不能在本仓库独立重现。
+第十二版已新增独立Level 5的Production-41：12设计、6数值设计、12固定格式与11反向题；支持逐角色dtype、合法输入与隐藏形状、按设备容量的确定性显存计划。11个反向家族有FP64 gradcheck与有限差分回归，四轨分开评分；软件实现不等于GPU可达性或区分度实验已完成。旧题的完整输入校准仍需推进；第十三版已实现当前协议下的选集分析与独立研究runner，实际区分度实验按用户范围不运行。历史 7 模型原始结果未在压缩包中提供；论文声称的精确排名一致性不能在本仓库独立重现。
 
 <a id="m2"></a>
 
@@ -42,7 +42,7 @@
 
 当前原生流程使用 mini-swe-agent 2.4.6，区分 one-shot 与 feedback。默认每样本最多 5 次候选、2400 秒，可配置；开发检查只看公开实例，控制器保留开发正确且最快的候选，再冻结源码执行正式标准和隐藏验证。开发 profiler 单独运行。Claude Code/LiteLLM 使用相同协议；Harbor 标为 external，当前 coding-agent skill 会话标为 interactive。
 
-保存轨迹、每轮源码、生成回执和重试历史；可观测 token 与费用如实记录，未知为 null。费用限制是调用间的客户端估算检查，不能保证单次请求不超限；纯 GPU 时间及 token 硬预算尚未实现。得分—预算曲线、多会话稳定性、同预算通用 agent 基线和 RL 奖励效果仍需实验。
+保存轨迹、每轮源码、生成回执和重试历史；可观测 token 与费用如实记录，未知为 null。费用限制是调用间的客户端估算检查，不能保证单次请求不超限；纯 GPU 时间及 token 硬预算尚未实现。第十三版已提供得分—预算曲线、多会话网格与Harbor通用agent基线计划，保留真实回落、共同区间AUC及未知成本；默认不执行实验。实际模型比较和RL奖励效果仍未测量，RL训练runner继续待实现。
 
 <a id="m5"></a>
 
@@ -58,7 +58,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 
 ## 逐项归档
 
-下表覆盖第一至第七版的 **67 项**改动、第八版 **7 项**整合、第九版 **8 项**、第十版 **5 项**、第十一版 **5 项**与第十二版 **6 项**设计落地。每项指定一个主要 motivation，必要时附关联动机。仓库清理、命名和兼容性属于 M5 的维护工作，不包装成新的研究贡献。V6/V7 编号在本轮追踪表中补齐；不改变历史提交内容。
+下表覆盖第一至第七版的 **67 项**改动、第八版 **7 项**整合、第九版 **8 项**、第十版 **5 项**、第十一版 **5 项**、第十二版 **6 项**与第十三版 **6 项**设计落地。每项指定一个主要 motivation，必要时附关联动机。仓库清理、命名和兼容性属于 M5 的维护工作，不包装成新的研究贡献。V6/V7 编号在本轮追踪表中补齐；不改变历史提交内容。
 
 <!-- changes:start -->
 ### M1：题目与区分度的改动
@@ -71,6 +71,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V12-01 Production-41参数化题集 | 独立Level 5增加12设计、6数值设计、12固定格式与11反向任务，保留旧250题及旧Level 4模型 | — | [production_specs.py](../kb_workflows/production_specs.py), [production41.json](../kb_workflows/suites/production41.json) |
 | V12-02 独立反向轨道与梯度参考 | 11个VJP参考支持外层no_grad下执行；FP64 gradcheck和方向有限差分核对梯度，轨道分别选题与评分 | M2 | [production_ops.py](../kb_workflows/production_ops.py), [test_production.py](../tests/test_production.py) |
 | V12-03 逐输入角色的dtype契约 | 保留FP32缩放、bool mask与离散索引，支持FP8存储/packed INT4及E2M1软件量化；有效精度写入任务而非统一强转 | M2 | [production.py](../kb_workflows/production.py), [eval.py](../src/eval.py) |
+| V13-01 研究结果的当前证据导出 | 重新核对当前源码与计分资格后导出固定槽位，合并互不重叠层级并拒绝复制运行冒充独立会话；不调用生成或评测 | M5 | [study_data.py](../kb_workflows/study_data.py) |
+| V13-02 选集区分度与统计不确定性 | 支持并列秩Spearman、Kendall tau-b、差值/排名反转、任务/会话/样本bootstrap与显式二元power假设；常量相关为null，不假称旧排名已复现 | M3 | [study_statistics.py](../kb_workflows/study_statistics.py), [analyze_selection.py](../scripts/analyze_selection.py) |
 
 ### M2：正确性与执行可信度的改动
 
@@ -142,6 +144,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V7-12 模式比较 | 按设定和预算分组，修改源码丢失生成归属 | M3 | [experiment.py](../kb_workflows/experiment.py) |
 | V7-13 模型与后端 | 模型与执行后端共享协议，外部 agent 不伪装受控循环 | M5 | [agent_models.py](../kb_workflows/agent_models.py) |
 | V7-14 Coding-agent skill | 现成 coding agent 可直接完成任务且会话成本不可观测时单列 | M5 | [SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md) |
+| V13-03 多预算多会话与通用agent计划 | 生成原生one-shot/反馈及Harbor coding-agent网格，保留真实候选限制；默认不执行，显式执行时经过原生配置校验与resume | M5 | [study_plan.py](../kb_workflows/study_plan.py), [plan_study.py](../scripts/plan_study.py) |
+| V13-04 得分预算曲线与共同区间AUC | 独立预算点保留失败分母与非单调结果，区间覆盖任务/会话/样本；未知成本不免费，AUC不外推或取最好历史 | M3 | [budget_curves.py](../kb_workflows/budget_curves.py) |
+| V13-05 缓存与外部agent用量核算 | 补总token和样本执行时间，区分Claude与Harbor cache口径；多步缺项保持未知，外部agent收据绑定结果文件，不冒充GPU账单 | M5 | [agent_models.py](../kb_workflows/agent_models.py), [harbor_budget.py](../kb_workflows/harbor_budget.py), [experiment.py](../kb_workflows/experiment.py) |
 
 ### M5：可复现且可部署的基础设施的改动
 
@@ -181,6 +186,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V8-07 选集与参考版本证据 | 记录manifest摘要并检查参考快照，阻止静默任务漂移 | M3 | [suites.py](../kb_workflows/suites.py) |
 | V11-05 Verifier配置与精度设置恢复 | 可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计 | M2 | [harbor.py](../kb_workflows/harbor.py), [generation.py](../kb_workflows/generation.py), [validation.py](../src/validation.py) |
 | V12-06 生产题全流程与来源恢复 | 选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹 | M4 | [engine.py](../kb_workflows/engine.py), [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py) |
+| V13-06 研究CLI与静态图导出 | 提供计划/选集/预算分析入口、可选Matplotlib静态图；分析实现单独指纹，残缺选集必须显式标记，文档与功能清单同步 | M1, M4 | [analyze_budget_curves.py](../scripts/analyze_budget_curves.py), [analyze_selection.py](../scripts/analyze_selection.py), [pyproject.toml](../pyproject.toml) |
 | V9-06 逐项证据等级 | 实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级 | M2, M3 | [evidence.py](../kb_workflows/evidence.py) |
 | V10-05 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母 | M3, M4 | [final_verification.py](../kb_workflows/final_verification.py) |
 <!-- changes:end -->
@@ -194,7 +200,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | --- | --- | --- | --- |
 | R-01 生产难题与反向轨道 | 代码已实现 | M1 | 已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13 |
 | R-02 多dtype任务族与显存缩放 | 代码已实现 | M1 | 已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证 |
-| R-03 选集区分度重新验证 | 待实现 | M1 | 原7模型数据缺失；归档输出分别涉及104和105题，不能据此确认精确排名复现 |
+| R-03 选集区分度重新验证 | 代码已实现 | M1 | 已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验 |
 | R-04 FP64数值契约与精度门 | 部分实现 | M2 | 17道旧题附加FP64参考自资格及新41题参考误差门已接入；6道数值设计有FP64算术参考与逐题预算，原250题原尺寸独立oracle校准与完整覆盖仍需实现 |
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成 |
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现 |
@@ -210,7 +216,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-16 完整性能归因 | 部分实现 | M3 | 已实现设备busy并集、保守来源份额、缺计数器时AE/O及launch_only诊断；实际Nsight/Neuron计数器采集、二进制来源与正式归因评分门待实现 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 待实现 | M4 | 现有墙钟和候选上限已实现；模型token及纯GPU时间未硬限，费用为调用间估算 |
-| R-19 得分预算曲线与通用agent基线 | 待实现 | M4 | 当前协议和轨迹已记录；多预算点、多会话及同预算真实模型实验待完成 |
+| R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |
 | R-20 RL训练与奖励验证 | 待实现 | M4 | Harbor reward接入不等于完成训练；需红队、排序稳定性与持出集实验 |
 | R-21 Trainium/NKI与设备通用接口 | 待实现 | M5 | caps/calibrate/flush/time/attribute是目标设计；当前计算后端仍为NVIDIA CUDA |
 | R-22 工具能力收据与可选分层 | 代码已实现 | M5 | 已实现逐项状态收据、缺项null、等级判定与评分门；L1/L2缺少的设备工具证据不会降格冒充通过，GPU验收仍独立记录 |

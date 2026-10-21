@@ -107,6 +107,7 @@ python -m scripts.check_motivations
 | [交替与最终计时](docs/PAIRED_TIMING.md) | 扩展基线、平衡配对、噪声控制、独立重测与恢复 |
 | [Headroom评分](docs/HEADROOM_SCORING.md) | 设备校准、可信工作量证书、独立见证与时间线诊断 |
 | [Production-41](docs/PRODUCTION_TASKS.md) | Level 5生产题族、逐角色dtype、显存计划和独立反向轨道 |
+| [研究工作流](docs/STUDIES.md) | 当前证据导出、选集区分度、多会话计划与得分—预算曲线 |
 | [严格验证](docs/STRICT_VALIDATION.md) | FP64附加契约、输入/状态检查、证据等级与聚合消融 |
 | [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |
 | [输入盲化](docs/INPUT_BLIND_GENERATION.md) | 生成材料如何去掉测试输入 |

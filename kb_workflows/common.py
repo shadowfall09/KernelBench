@@ -88,6 +88,7 @@ def evaluator_digest():
         "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
         "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
         "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
+        "kb_workflows/harbor_budget.py",
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",

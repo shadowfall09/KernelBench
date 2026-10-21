@@ -1161,6 +1161,97 @@
       "reason": "选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹"
     },
     {
+      "id": "V13-01",
+      "title": "研究结果的当前证据导出",
+      "primary": "M1",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/study_data.py"
+      ],
+      "reason": "重新核对当前源码与计分资格后导出固定槽位，合并互不重叠层级并拒绝复制运行冒充独立会话；不调用生成或评测"
+    },
+    {
+      "id": "V13-02",
+      "title": "选集区分度与统计不确定性",
+      "primary": "M1",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/study_statistics.py",
+        "scripts/analyze_selection.py"
+      ],
+      "reason": "支持并列秩Spearman、Kendall tau-b、差值/排名反转、任务/会话/样本bootstrap与显式二元power假设；常量相关为null，不假称旧排名已复现"
+    },
+    {
+      "id": "V13-03",
+      "title": "多预算多会话与通用agent计划",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/study_plan.py",
+        "scripts/plan_study.py"
+      ],
+      "reason": "生成原生one-shot/反馈及Harbor coding-agent网格，保留真实候选限制；默认不执行，显式执行时经过原生配置校验与resume"
+    },
+    {
+      "id": "V13-04",
+      "title": "得分预算曲线与共同区间AUC",
+      "primary": "M4",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/budget_curves.py"
+      ],
+      "reason": "独立预算点保留失败分母与非单调结果，区间覆盖任务/会话/样本；未知成本不免费，AUC不外推或取最好历史"
+    },
+    {
+      "id": "V13-05",
+      "title": "缓存与外部agent用量核算",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agent_models.py",
+        "kb_workflows/harbor_budget.py",
+        "kb_workflows/experiment.py"
+      ],
+      "reason": "补总token和样本执行时间，区分Claude与Harbor cache口径；多步缺项保持未知，外部agent收据绑定结果文件，不冒充GPU账单"
+    },
+    {
+      "id": "V13-06",
+      "title": "研究CLI与静态图导出",
+      "primary": "M5",
+      "secondary": [
+        "M1",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/analyze_budget_curves.py",
+        "scripts/analyze_selection.py",
+        "pyproject.toml"
+      ],
+      "reason": "提供计划/选集/预算分析入口、可选Matplotlib静态图；分析实现单独指纹，残缺选集必须显式标记，文档与功能清单同步"
+    },
+    {
       "id": "R-01",
       "title": "生产难题与反向轨道",
       "primary": "M1",
@@ -1193,12 +1284,14 @@
       "title": "选集区分度重新验证",
       "primary": "M1",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/study_statistics.py",
+        "kb_workflows/study_data.py",
+        "scripts/analyze_selection.py"
       ],
-      "reason": "原7模型数据缺失；归档输出分别涉及104和105题，不能据此确认精确排名复现"
+      "reason": "已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验"
     },
     {
       "id": "R-04",
@@ -1398,12 +1491,14 @@
       "title": "得分预算曲线与通用agent基线",
       "primary": "M4",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/study_plan.py",
+        "kb_workflows/budget_curves.py",
+        "scripts/plan_study.py"
       ],
-      "reason": "当前协议和轨迹已记录；多预算点、多会话及同预算真实模型实验待完成"
+      "reason": "已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18"
     },
     {
       "id": "R-20",

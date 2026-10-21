@@ -453,6 +453,30 @@ KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 
 
 参考和原生/Harbor流程均已实现；GPU编译、计时、厂商最强baseline、原生FP4吞吐和可达性实验未运行，不能据此声称实机性能或完整L0资格。之前stash保持不变。
 
+## 第十三版：选集分析与预算研究工作流
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add evidence-bound selection studies and budget curves |
+| 日期 | 2026-10-21 |
+| 基础提交 | `caa7796` |
+| 状态 | 已提交；只运行CPU/模拟回归，不启动实验 |
+
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V13-01 | 研究结果的当前证据导出 | 重新核对当前源码与计分资格后导出固定槽位，合并互不重叠层级并拒绝复制运行冒充独立会话；不调用生成或评测 | `kb_workflows/study_data.py` | [M1](MOTIVATION.md#m1) |
+| V13-02 | 选集区分度与统计不确定性 | 支持并列秩Spearman、Kendall tau-b、差值/排名反转、任务/会话/样本bootstrap与显式二元power假设；常量相关为null，不假称旧排名已复现 | `kb_workflows/study_statistics.py` | [M1](MOTIVATION.md#m1) |
+| V13-03 | 多预算多会话与通用agent计划 | 生成原生one-shot/反馈及Harbor coding-agent网格，保留真实候选限制；默认不执行，显式执行时经过原生配置校验与resume | `kb_workflows/study_plan.py` | [M4](MOTIVATION.md#m4) |
+| V13-04 | 得分预算曲线与共同区间AUC | 独立预算点保留失败分母与非单调结果，区间覆盖任务/会话/样本；未知成本不免费，AUC不外推或取最好历史 | `kb_workflows/budget_curves.py` | [M4](MOTIVATION.md#m4) |
+| V13-05 | 缓存与外部agent用量核算 | 补总token和样本执行时间，区分Claude与Harbor cache口径；多步缺项保持未知，外部agent收据绑定结果文件，不冒充GPU账单 | `kb_workflows/agent_models.py` | [M4](MOTIVATION.md#m4) |
+| V13-06 | 研究CLI与静态图导出 | 提供计划/选集/预算分析入口、可选Matplotlib静态图；分析实现单独指纹，残缺选集必须显式标记，文档与功能清单同步 | `scripts/analyze_budget_curves.py` | [M5](MOTIVATION.md#m5) |
+
+新增 `scripts.plan_study`、`scripts.analyze_selection` 和 `scripts.analyze_budget_curves`。计划默认不执行，分析只重算当前文件证据；研究用的任务/样本分母、方法/预算差异、遗漏选集与未知资源均显式保存。完整格式、假设和使用范围见[研究工作流](STUDIES.md)。
+
+验证：Python 3.12.12 / Torch 2.12.0 下644项CPU/模拟回归通过，本版新增30项；覆盖实际计分重算、来源失效、并列与全失败排名、分母/重复会话拒绝、曲线回落与AUC区间、真实CLI解析24个模拟job、Harbor/cache用量及Matplotlib静态导出。Ruff、动机表、文档链接和离线wheel轻量导入检查通过。
+
+本版没有运行模型/GPU/Trainium或训练实验，也没有补造原7模型数据或声称精确排名重现。token/设备时间硬上限仍未实现，估算费用和agent墙钟不等于GPU账单；之前stash保持不变。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

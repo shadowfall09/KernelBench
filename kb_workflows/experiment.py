@@ -39,7 +39,8 @@ def write_budget_report(config, summary):
     if any(len(values) > 1 for values in attempts.values()):
         active_protocol = {**active_protocol, "base_mode": active_protocol["mode"], "mode": "repeated-attempts",
                            "attempt_counts": {key: len(values) for key, values in attempts.items()}}
-    fields = ("model_calls", "candidate_submissions", "development_evaluations", "profile_requests", "input_tokens", "output_tokens", "estimated_cost_usd")
+    fields = ("model_calls", "candidate_submissions", "development_evaluations", "profile_requests", "input_tokens", "output_tokens",
+              "total_tokens", "estimated_cost_usd", "generation_wall_seconds", "development_request_wall_seconds")
     totals = {}
     for field in fields:
         values = [item.get(field) if isinstance(item, dict) else None for item in receipts]
@@ -48,6 +49,8 @@ def write_budget_report(config, summary):
         totals = {key: None for key in totals}
     report = {"protocol": active_protocol, "suite": selection_receipt(config), "declared_slots": len(slots), "all_slots_have_receipts": all(isinstance(v, dict) for v in receipts),
               "complete_resource_receipts": all(value is not None for value in totals.values()),
+              "external_receipts_valid": bool(receipts) and all(isinstance(item, dict) and item.get("resource_receipt_verified") is True
+                                                                for item in receipts) if config.generation == "harbor" else None,
               "unknown_fields": [key for key, value in totals.items() if value is None],
               "attempt_history": history,
               "totals": totals, "slots": {f"{pid}_{sid}": summary.get(f"{pid}_{sid}", {}).get("budget")
