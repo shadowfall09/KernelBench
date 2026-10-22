@@ -53,7 +53,8 @@ def components(row, standard, baseline, *, raw_clip):
             "qualification_accepted": eligible, "certificate_bonus": 0.0}
 
 
-def evaluate_group(plan, task_key, completions, *, directory, split="train", purpose=None, dispatch=None, analyzer=None):
+def evaluate_group(plan, task_key, completions, *, directory, split="train", purpose=None, dispatch=None, analyzer=None,
+                   certificate_collector=None):
     """Execution entrypoint; callers must explicitly choose to run a training/evaluation job."""
     from .engine import paired_payload, task_payload
     from .final_verification import freeze, payload_for
@@ -61,7 +62,7 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
 
     training = validate_plan(plan)
     purpose = purpose or ("training" if split == "train" else "heldout")
-    if purpose not in {"training", "heldout", "audit"} or purpose == "training" and split != "train":
+    if purpose not in {"training", "heldout", "audit", "certificate"} or purpose == "training" and split != "train":
         raise ValueError("Invalid reward evaluation purpose")
     if task_key not in plan["splits"].get(split, []) or not isinstance(completions, list) or not completions:
         raise ValueError("Reward task must belong to its explicit split")
@@ -73,6 +74,13 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
     directory.mkdir(parents=True, exist_ok=True)
     config = task_config(plan, task_key, directory=directory, samples=len(completions))
     atomic_json(directory / "run_config.json", config.to_dict())
+    external_inputs = {}
+    for name in ("problem_specs", "device_calibration", "task_dimensions"):
+        filename = getattr(config, name)
+        data = read_json(Path(filename)) if filename else {}
+        atomic_json(directory / f"input_{name}.json", data)
+        if filename:
+            external_inputs[name] = {"path": filename, "sha256": document_digest(data)}
     baseline_path = ROOT / "results/timing" / config.hardware / f"{config.baseline}.json"
     reference = select_reference(config)
     baseline_entry = read_json(baseline_path, {}).get(f"level{config.level}", {}).get(reference.name, {})
@@ -85,6 +93,7 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
     request = {"protocol": PROTOCOL, "plan_sha256": plan["plan_sha256"], "task_key": task_key, "split": split, "purpose": purpose,
                "evaluator_sha256": evaluator_digest(), "reference_sha256": plan["tasks"][task_key]["reference_sha256"],
                "hidden_source_sha256": plan["tasks"][task_key]["hidden_source_sha256"],
+               "external_inputs": external_inputs,
                "source_sha256": checksums, "declared_samples": len(sources), "static_errors": list(errors)}
     atomic_json(directory / "reward_request.json", request)
     for sid, source in enumerate(sources):
@@ -178,6 +187,27 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
         value["reward"] = value[training.reward_mode] if same_device else 0.0
         if not same_device:
             value["device_group_status"] = "missing_or_different_physical_device_receipt"
+    certificates, certificate_seconds = {}, 0.0
+    if training.certificate_bonus:
+        from .scaling_certificate import collect, read_contracts
+
+        contract = read_contracts(training.scaling_contracts)["tasks"].get(task_key)
+        for sid, value in enumerate(values):
+            if not contract or not same_device or not value["qualification_accepted"] or value["qualified"] < training.certificate_min_score:
+                continue
+            started = time.monotonic()
+            try:
+                receipt = (certificate_collector or collect)(plan, task_key, sources[sid], contract, directory=directory / "certificates" / str(sid),
+                                  anchor_metadata=records["standard"][f"{pid}_{sid}"]["metadata"], dispatch=dispatch)
+                certificates[str(sid)] = {"path": f"certificates/{sid}/certificate.json", "receipt_sha256": receipt["receipt_sha256"],
+                                          "passed": receipt["fit"]["passed"]}
+                if receipt["fit"]["passed"]:
+                    value["certificate_bonus"] = min(training.certificate_bonus, 1 - value["qualified"])
+                    value["reward"] = value["qualified"] + value["certificate_bonus"]
+            except (ValueError, OSError, KeyError, RuntimeError) as exc:
+                certificates[str(sid)] = {"passed": False, "error": str(exc)}
+            finally:
+                certificate_seconds += time.monotonic() - started
     for sid, value in enumerate(values):
         failed = {"static_source"} if errors[sid] else set()
         for phase in ("small", "standard", "hidden"):
@@ -188,10 +218,13 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
               "interleaving": {"scope": "fresh_processes_interleaved_by_repeat; not_simultaneous_resident_models",
                                "orders": orders, "order_seed": order_seed, "common_seeds": True,
                                "same_physical_device_verified": same_device, "drift_eliminated": False},
+              "scaling_certificates": certificates,
               "source_files": {name: document_digest(read_json(directory / name, {})) for name in
                     ("run_config.json", "small_results.json", "eval_results.json", "eval_results_hidden.json",
-                     "final_manifest.json", "final_results.json", "paired_results.json", "paper_analysis.json", "reward_schedule.json", "reward_baseline.json")},
-              "request_wall_seconds": sum(row["request_wall_seconds"] for row in schedule), "gpu_execution_seconds": None,
+                     "final_manifest.json", "final_results.json", "paired_results.json", "paper_analysis.json", "reward_schedule.json", "reward_baseline.json",
+                     "input_problem_specs.json", "input_device_calibration.json", "input_task_dimensions.json")},
+              "request_wall_seconds": sum(row["request_wall_seconds"] for row in schedule) + certificate_seconds,
+              "certificate_request_wall_seconds": certificate_seconds, "gpu_execution_seconds": None,
               "candidate_count": len(sources), "development_feedback_contains_hidden_results": False}
     validate_plan(plan)
     current_baseline = read_json(baseline_path, {}).get(f"level{config.level}", {}).get(reference.name, {})
@@ -272,6 +305,21 @@ def validate_reward(path):
         raise ValueError("Reward receipt is missing or changed")
     if any(document_digest(read_json(path.parent / name, {})) != digest for name, digest in receipt["source_files"].items()):
         raise ValueError("Underlying native reward evidence changed")
+    for item in receipt.get("external_inputs", {}).values():
+        if document_digest(read_json(Path(item["path"]))) != item["sha256"]:
+            raise ValueError("Reward verifier input files changed")
+    for sid, item in receipt.get("scaling_certificates", {}).items():
+        if item.get("path"):
+            from .scaling_certificate import validate as validate_scaling
+
+            relative = Path(item["path"])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("Scaling receipt path escapes the reward group")
+            certificate = validate_scaling(path.parent / relative)
+            if (certificate["receipt_sha256"] != item["receipt_sha256"] or certificate["fit"]["passed"] != item["passed"]
+                    or certificate["candidate_sha256"] != receipt["source_sha256"][int(sid)]
+                    or certificate["parent_plan_sha256"] != receipt["plan_sha256"]):
+                raise ValueError("Scaling bonus has different candidate/plan evidence")
     for sid, checksum in enumerate(receipt["source_sha256"]):
         level, pid = map(int, receipt["task_key"].split("/"))
         source = path.parent / kernel_name(level, pid, sid)

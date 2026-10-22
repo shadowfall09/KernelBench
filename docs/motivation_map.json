@@ -1331,7 +1331,7 @@
         "kb_workflows/strict_validation.py",
         "kb_workflows/production.py"
       ],
-      "reason": "已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现"
+      "reason": "已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立"
     },
     {
       "id": "R-07",
@@ -1507,15 +1507,18 @@
       "title": "RL训练与奖励验证",
       "primary": "M4",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/rl_training.py",
         "kb_workflows/rl_rewards.py",
         "kb_workflows/rl_audit.py",
-        "docs/RL_WORKFLOW.md"
+        "docs/RL_WORKFLOW.md",
+        "kb_workflows/scaling_certificate.py",
+        "kb_workflows/rl_lineage.py",
+        "kb_workflows/rl_effectiveness.py"
       ],
-      "reason": "已实现本地TRL GRPO、原生标准工具与终局奖励、交替重测、生成前预算与恢复、红队/稳定性/公共最终差审计和持出计划；候选算法证书加分及绑定训练来源的完整效果对照报告仍待补全，真实训练与模型/设备实验按用户要求不运行"
+      "reason": "已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果"
     },
     {
       "id": "R-21",
@@ -1910,6 +1913,101 @@
         "scripts/rl_workflow.py"
       ],
       "reason": "持出checkpoint资产冻结并复用原生one-shot/反馈任务及独立会话；提供默认非执行CLI，模型改变在运行前拒绝"
+    },
+    {
+      "id": "V16-01",
+      "title": "显式尺寸实例与证据绑定",
+      "primary": "M1",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/production.py",
+        "kb_workflows/engine.py"
+      ],
+      "reason": "Production-41已知正整数维度与整除/显存门；内容绑定基线、冻结、评分与比较，隐藏实例独立"
+    },
+    {
+      "id": "V16-02",
+      "title": "多尺寸算法证书",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/scaling_certificate.py",
+        "docs/SCALING_CERTIFICATES.md"
+      ],
+      "reason": "至少5尺寸且跨度16倍，固定源码/设备/变体和形状规律，重做原生资格与配对测量，斜率须匹配当前D/SOL审查且显著低于参考"
+    },
+    {
+      "id": "V16-03",
+      "title": "有界证书奖励",
+      "primary": "M4",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_rewards.py",
+        "kb_workflows/rl_plan.py"
+      ],
+      "reason": "默认关闭；高资格候选才可请求证书，加分后封顶1，失败或恒定倍率优化无算法加分，证书墙钟记入训练预算"
+    },
+    {
+      "id": "V16-04",
+      "title": "训练来源与父进程凭据",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_lineage.py",
+        "kb_workflows/rl_training.py"
+      ],
+      "reason": "绑定最终权重、计划、全部奖励/证书文件和当前优化路径；恢复保留丢弃更新的成本，nonce与锁拒绝旧完成文件和并发监督"
+    },
+    {
+      "id": "V16-05",
+      "title": "预注册奖励对照与持出评测",
+      "primary": "M4",
+      "secondary": [
+        "M1",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_effectiveness.py",
+        "kb_workflows/study_plan.py",
+        "scripts/rl_workflow.py"
+      ],
+      "reason": "执行前冻结两奖励组与全部种子、优化器/数据/预算及评测会话；当前lineage/权重不符或缺作业不能缩小研究，默认不执行"
+    },
+    {
+      "id": "V16-06",
+      "title": "按训练种子的效果分析",
+      "primary": "M3",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/rl_effectiveness.py",
+        "tests/test_rl_workflow.py"
+      ],
+      "reason": "重算持出资格分，报告配对训练种子效应、分层区间与双侧检验；失败检查未知槽位给上下界，模拟数据不能支持正式效果"
     }
   ]
 }

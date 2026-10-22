@@ -49,6 +49,13 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         options["precision"] = spec["fixed_activation_dtype"] or config.precision
         options["production"] = {"protocol": PROTOCOL, "task_sha256": fingerprint(spec),
                                  "profile": config.task_profile, "memory_bytes": config.task_memory_mb * 1024**2}
+        if config.task_dimensions:
+            from .production import instance_plan, read_dimensions
+
+            options["production"]["dimensions_override"] = read_dimensions(config.task_dimensions)
+            instance_plan(pid, precision=options["precision"], profile=config.task_profile,
+                          memory_bytes=config.task_memory_mb * 1024**2,
+                          dimensions_override=options["production"]["dimensions_override"])
     payload = {
         "task": task,
         "level": config.level,

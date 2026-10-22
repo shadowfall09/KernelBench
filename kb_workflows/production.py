@@ -6,8 +6,9 @@ import math
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
+from pathlib import Path
 
-from .common import fingerprint
+from .common import fingerprint, read_json
 from .production_specs import comparison_contract, task
 
 PROTOCOL = "production_families_v1"
@@ -70,7 +71,16 @@ def estimated_peak(spec, dims, primary):
     return max(1, storage * 12 + temporary)  # Clones, oracle, gradients and selected-reference temporaries.
 
 
-def instance_plan(pid, *, precision="fp32", profile="standard", memory_bytes=512 * 1024**2, total_memory_bytes=None):
+def read_dimensions(path):
+    values = read_json(Path(path))
+    if (not isinstance(values, dict) or not values or set(values) - set(dimensions("standard"))
+            or any(type(value) is not int or value <= 0 for value in values.values())):
+        raise ValueError("Explicit dimensions require known positive integer production dimension names")
+    return values
+
+
+def instance_plan(pid, *, precision="fp32", profile="standard", memory_bytes=512 * 1024**2, total_memory_bytes=None,
+                  dimensions_override=None):
     spec = task(pid)
     if precision not in {"fp32", "bf16", "fp16"} or type(memory_bytes) is not int or memory_bytes < 1024:
         raise ValueError("Invalid production dtype or memory budget")
@@ -89,12 +99,21 @@ def instance_plan(pid, *, precision="fp32", profile="standard", memory_bytes=512
                      12: {"M": 16, "K": 32768, "N": 64}}
         for name, value in overrides.get(spec["base_id"], {}).items():
             dims[name] = value * multiplier if name in {"M", "N", "K"} else value
+    if dimensions_override is not None:
+        if (not isinstance(dimensions_override, dict) or not dimensions_override or set(dimensions_override) - set(dims)
+                or any(type(value) is not int or value <= 0 for value in dimensions_override.values())):
+            raise ValueError("Invalid explicit production dimensions")
+        dims.update(dimensions_override)
+        if dims["H"] % dims["Hkv"] or dims["D"] % 2 or dims["K"] % dims["G"] or dims["Top"] > dims["E"]:
+            raise ValueError("Explicit dimensions violate head/rotary/group/expert divisibility")
     requested = dict(dims)
     while True:
         dims["P"] = dims["B"] * dims["Pages"] + 1
         peak = estimated_peak(spec, dims, primary)
         if peak <= budget:
             break
+        if dimensions_override is not None:
+            raise ValueError("Explicit dimensions exceed the memory envelope; refusing silent resizing")
         reduced = False
         for name, floor, multiple in (("M", 1, 1), ("N", 2, 1), ("S", 2, 1), ("K", dims["G"], dims["G"]),
                                       ("V", 2, 1), ("D", 2, 2), ("R", 1, 1), ("L", 2, 1), ("Pages", 1, 1)):
@@ -119,6 +138,8 @@ def instance_plan(pid, *, precision="fp32", profile="standard", memory_bytes=512
               "representation": "E2M1_software_quantization" if pid == 17 else
                   ("float8_e4m3fn_storage" if pid == 21 else "explicit_role_storage"),
               "native_fp4_required": False, "native_low_precision_execution_certified": False}
+    if dimensions_override is not None:
+        result["dimensions_override"] = dict(dimensions_override)
     result["instance_sha256"] = fingerprint(result)
     return result
 
@@ -139,7 +160,8 @@ def make_inputs(pid, *, case=None, precision=None, profile=None, memory_bytes=No
     settings = SETTINGS.get()
     plan = instance_plan(pid, precision=precision or settings.get("precision", "fp32"),
         profile=case or profile or settings.get("profile", "standard"), memory_bytes=memory_bytes if memory_bytes is not None else settings.get("memory_bytes", 512 * 1024**2),
-        total_memory_bytes=settings.get("total_memory_bytes"))
+        total_memory_bytes=settings.get("total_memory_bytes"),
+        dimensions_override=settings.get("dimensions_override") if case is None else None)
     dims = plan["dimensions"]
     generator = torch.Generator().manual_seed(seed) if seed is not None else None
     types = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16, "fp8_e4m3fn": torch.float8_e4m3fn,
@@ -228,6 +250,8 @@ def task_input_policy(function):
         options = payload["eval_config"]["production"]
         expected = {"protocol": PROTOCOL, "task_sha256": fingerprint(task(payload["problem_id"])),
                     "profile": options["profile"], "memory_bytes": options["memory_bytes"]}
+        if "dimensions_override" in options:
+            expected["dimensions_override"] = options["dimensions_override"]
         if options != expected:
             raise ValueError("Production task contract changed")
         if options["profile"] not in {"small", "standard", "large"}:
@@ -235,6 +259,8 @@ def task_input_policy(function):
         capacity = torch.cuda.get_device_properties(0).total_memory
         settings = {"precision": payload["eval_config"]["precision"], "profile": options["profile"],
                     "memory_bytes": options["memory_bytes"], "total_memory_bytes": capacity}
+        if "dimensions_override" in options:
+            settings["dimensions_override"] = options["dimensions_override"]
         plan = instance_plan(payload["problem_id"], **settings)
         from .numerical import PrecisionContract, precision_gate
 

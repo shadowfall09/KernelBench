@@ -97,7 +97,7 @@ def compare_runs(directories):
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
         contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))
-                        for option in ("problem_specs", "device_calibration") if getattr(config, option)})
+                        for option in ("problem_specs", "device_calibration", "task_dimensions") if getattr(config, option)})
         contract.update(task_profile=config.task_profile, task_memory_mb=config.task_memory_mb)
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})

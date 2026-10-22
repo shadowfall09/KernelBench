@@ -297,6 +297,9 @@ def generation_signature(config, pid, sid):
             "small_model": config.small_model,
             "bedrock": config.bedrock,
             "precision": config.precision,
+            "production_instance": {"profile": config.task_profile, "memory_mb": config.task_memory_mb,
+                                    "dimensions": read_json(Path(config.task_dimensions)) if config.task_dimensions else None}
+                if config.level == 5 else None,
             "experiment": protocol(config),
             "evaluator_sha256": evaluator_digest(),
         }

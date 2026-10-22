@@ -188,7 +188,7 @@ def apply_score_gate(results, run_dir):
             if capped:
                 required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
-            for option in ("problem_specs", "device_calibration"):
+            for option in ("problem_specs", "device_calibration", "task_dimensions"):
                 declared = config.get(option)
                 if declared:
                     path = Path(declared)

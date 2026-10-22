@@ -29,6 +29,7 @@ class RunConfig:
     task_profile: str = "standard"
     task_track: str = "all"
     task_memory_mb: int = 512
+    task_dimensions: str = ""
     start: int = 1
     end: int | None = None
     run_name: str = ""
@@ -111,6 +112,13 @@ class RunConfig:
             raise ValueError("production41 contains only the scored role")
         if self.task_profile not in {"small", "standard", "large"}:
             raise ValueError("Unknown production task profile")
+        if self.task_dimensions:
+            if self.suite != "production41":
+                raise ValueError("Explicit task dimensions require production41")
+            from .production import read_dimensions
+
+            self.task_dimensions = str(Path(self.task_dimensions).expanduser().resolve())
+            read_dimensions(self.task_dimensions)
         if self.task_track not in {"all", "design", "numerical", "implementation", "backward"}:
             raise ValueError("Unknown production task track")
         if self.suite != "production41" and self.task_track != "all":
@@ -325,6 +333,7 @@ def parser():
         "suite",
         "suite_role",
         "task_profile",
+        "task_dimensions",
         "task_track",
         "run_name",
         "runs_dir",
@@ -396,7 +405,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "task_dimensions"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value

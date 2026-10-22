@@ -116,6 +116,18 @@ def execute_plan(path, *, execute=False, runner=None, keep_going=False):
         if any(job["config"].get("agent_backend") != "local-transformers" or job["config"].get("model") not in
                {identity["path"] for identity in identities.values()} for job in plan["jobs"]):
             raise ValueError("Held-out jobs do not match their frozen checkpoints")
+    if "training_lineages" in plan:
+        from .rl_lineage import validate as validate_lineage
+
+        for item in plan["training_lineages"].values():
+            verified = validate_lineage(item["checkpoint"], allow_injected=plan.get("audit_only", False),
+                                        require_supervisor=not plan.get("audit_only", False))
+            if verified["receipt"]["receipt_sha256"] != item["sha256"]:
+                raise ValueError("Held-out policy training evidence changed")
+        if "reward_experiment" in plan:
+            from .rl_effectiveness import validate_experiment
+
+            validate_experiment(plan["reward_experiment"])
     if not execute:
         return {"experiments_started": False, "job_count": len(plan["jobs"]), "plan_sha256": plan["plan_sha256"]}
     if runner is None:

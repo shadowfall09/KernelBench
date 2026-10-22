@@ -36,6 +36,9 @@ class TrainingConfig:
     use_cpu: bool = True
     family_disjoint: bool = True
     raw_speedup_clip: float = 4.0
+    certificate_bonus: float = 0.0
+    certificate_min_score: float = 0.5
+    scaling_contracts: str = ""
 
     def validate(self):
         for name in ("group_size", "max_steps", "max_prompt_tokens", "max_completion_tokens", "save_steps"):
@@ -51,6 +54,16 @@ class TrainingConfig:
             raise ValueError("Training booleans must be explicit booleans")
         if self.mode not in {"one-shot", "feedback"} or self.reward_mode not in {"qualified", "raw_speedup"}:
             raise ValueError("Unknown episode or reward mode")
+        if any(type(getattr(self, name)) not in (int, float) or not math.isfinite(getattr(self, name))
+               or not 0 <= getattr(self, name) <= 1 for name in ("certificate_bonus", "certificate_min_score")):
+            raise ValueError("Certificate bonus and score threshold must lie in [0,1]")
+        if self.certificate_bonus and (self.reward_mode != "qualified" or not self.scaling_contracts):
+            raise ValueError("Certificate bonuses require qualified rewards and reviewed scaling contracts")
+        if self.scaling_contracts:
+            from .scaling_certificate import read_contracts
+
+            self.scaling_contracts = str(Path(self.scaling_contracts).expanduser().resolve())
+            read_contracts(self.scaling_contracts)
         self.checkpoint = str(Path(self.checkpoint).expanduser().resolve())
         if not Path(self.checkpoint).is_dir():
             raise ValueError("Training requires an existing offline checkpoint directory")
@@ -60,7 +73,8 @@ class TrainingConfig:
 def implementation_digest():
     directory = Path(__file__).parent
     return fingerprint({name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
-                        for name in ("rl_plan.py", "rl_rewards.py", "rl_training.py", "rl_audit.py", "rl_evaluation.py")})
+                        for name in ("rl_plan.py", "rl_rewards.py", "rl_training.py", "rl_audit.py", "rl_evaluation.py",
+                                     "rl_lineage.py", "rl_effectiveness.py", "scaling_certificate.py")})
 
 
 def task_config(plan, key, *, directory, samples=1):
@@ -71,6 +85,11 @@ def task_config(plan, key, *, directory, samples=1):
                    run_name=Path(directory).name, runs_dir=str(Path(directory).resolve().parent), stage="evaluate", resume=False,
                    generation_mode=plan["training"]["mode"], optimization_rounds=options["optimization_rounds"])
     return RunConfig(**options).validate()
+
+
+def verifier_inputs(options):
+    return {name: fingerprint({"document": read_json(Path(options[name]))}) for name in
+            ("problem_specs", "device_calibration", "task_dimensions") if options.get(name)}
 
 
 def _task(row, base):
@@ -114,15 +133,25 @@ def make_plan(specification, *, directory, base_directory=None):
         raise ValueError("An explicit local checkpoint is required")
     checkpoint = Path(settings["checkpoint"]).expanduser()
     settings["checkpoint"] = str(checkpoint if checkpoint.is_absolute() else root / checkpoint)
+    if settings.get("scaling_contracts"):
+        source = Path(settings["scaling_contracts"]).expanduser()
+        settings["scaling_contracts"] = str(source if source.is_absolute() else root / source)
     training = TrainingConfig(**settings).validate()
     options = specification.get("verifier_config", {})
     if isinstance(options, str):
         path = Path(options)
         options = file_options(path if path.is_absolute() else root / path, parser())
+    else:
+        options = dict(options)
+        for name in ("problem_specs", "device_calibration", "task_dimensions"):
+            if options.get(name) and not Path(options[name]).is_absolute():
+                options[name] = str((root / options[name]).resolve())
     defaults = dict(generation="local", evaluation="local", strict_validation=True, evidence_level="L0",
                     paired_timing=True, final_repeats=3, parallel=1)
     base = RunConfig(**{**defaults, **options}).validate()
     base.require_gpu_target()
+    if training.certificate_bonus and base.score_mode != "headroom":
+        raise ValueError("A design certificate bonus requires reviewed Headroom D/SOL bounds")
     if (base.evaluation not in {"local", "docker"} or len(base.gpus.split(",")) != 1 or base.parallel != 1
             or not base.hidden_tests or not base.paired_timing or base.final_repeats < 2 or not base.score_gate_required):
         raise ValueError("RL rewards require serial one-device local/Docker verification, hidden checks, paired timing and final repeats >=2")
@@ -151,6 +180,8 @@ def make_plan(specification, *, directory, base_directory=None):
             "output_directory": str(directory), "initial_checkpoint_sha256": checkpoint_digest(training.checkpoint),
             "evaluator_sha256": evaluator_digest(), "rl_implementation_sha256": implementation_digest(),
             "trainer": f"trl=={TRL_VERSION}", "experiments_started": False,
+            "verifier_inputs": verifier_inputs(base.to_dict()),
+            "scaling_contracts_sha256": fingerprint({"document": read_json(Path(training.scaling_contracts))}) if training.scaling_contracts else None,
             "split_scope": "explicit_task_and_reference_identity; family_labels_are_reviewed_not_semantic_proof",
             "declared_generated_output_upper_bound": training.max_steps * training.group_size * training.max_completion_tokens
                 * (1 + base.optimization_rounds if training.mode == "feedback" else 1),
@@ -168,6 +199,11 @@ def validate_plan(plan):
             or plan.get("evaluator_sha256") != evaluator_digest() or plan.get("rl_implementation_sha256") != implementation_digest()):
         raise ValueError("RL plan changed or implementation/evaluator is stale")
     training = TrainingConfig(**plan["training"]).validate()
+    if verifier_inputs(plan["verifier_config"]) != plan.get("verifier_inputs"):
+        raise ValueError("Frozen verifier input files changed")
+    scaling_sha = fingerprint({"document": read_json(Path(training.scaling_contracts))}) if training.scaling_contracts else None
+    if scaling_sha != plan.get("scaling_contracts_sha256"):
+        raise ValueError("Reviewed scaling contracts changed")
     if checkpoint_digest(training.checkpoint) != plan["initial_checkpoint_sha256"]:
         raise ValueError("Initial checkpoint assets changed")
     for key, row in plan["tasks"].items():

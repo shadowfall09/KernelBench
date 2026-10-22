@@ -42,7 +42,7 @@
 
 当前原生流程使用 mini-swe-agent 2.4.6，区分 one-shot 与 feedback。默认每样本最多 5 次候选、2400 秒，可配置；开发检查只看公开实例，控制器保留开发正确且最快的候选，再冻结源码执行正式标准和隐藏验证。开发 profiler 单独运行。Claude Code/LiteLLM 使用相同协议；Harbor 标为 external，当前 coding-agent skill 会话标为 interactive。
 
-保存轨迹、每轮源码、生成回执和重试历史；可观测 token 与费用如实记录，未知为 null。费用限制仍是调用间估算。第十四版增加离线本地模型的精确总token预留、支持的API输出上限，以及local/Docker开发worker占用额度；未知或超额用量停止并拒绝计分，恢复不能重置额度。worker墙钟包含清理，不冒充纯GPU时间硬限。完整边界见[资源预算](RESOURCE_BUDGETS.md)。第十三版的得分—预算曲线和多会话计划已扩展三种新额度，保留真实回落、共同区间AUC及未知成本，默认不执行实验。第十五版新增TRL GRPO训练入口、标准开发工具、同题交替终局奖励、预算恢复、红队/稳定性审计和持出评测计划；候选证书奖励和完整训练效果对照报告仍待完成。实际模型比较和RL奖励效果均未测量，详见[RL工作流](RL_WORKFLOW.md)。
+保存轨迹、每轮源码、生成回执和重试历史；可观测 token 与费用如实记录，未知为 null。费用限制仍是调用间估算。第十四版增加离线本地模型的精确总token预留、支持的API输出上限，以及local/Docker开发worker占用额度；未知或超额用量停止并拒绝计分，恢复不能重置额度。worker墙钟包含清理，不冒充纯GPU时间硬限。完整边界见[资源预算](RESOURCE_BUDGETS.md)。第十三版的得分—预算曲线和多会话计划已扩展三种新额度，保留真实回落、共同区间AUC及未知成本，默认不执行实验。第十五版新增TRL GRPO训练入口、标准开发工具、同题交替终局奖励、预算恢复、红队/稳定性审计和持出评测计划；第十六版补全审查绑定的多尺寸算法证书加分、训练权重与奖励来源追踪、预注册种子对照和持出效果分析。模拟训练不能进入正式结论，实际模型比较和RL奖励效果均未测量，详见[RL工作流](RL_WORKFLOW.md)。
 
 <a id="m5"></a>
 
@@ -73,6 +73,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V12-03 逐输入角色的dtype契约 | 保留FP32缩放、bool mask与离散索引，支持FP8存储/packed INT4及E2M1软件量化；有效精度写入任务而非统一强转 | M2 | [production.py](../kb_workflows/production.py), [eval.py](../src/eval.py) |
 | V13-01 研究结果的当前证据导出 | 重新核对当前源码与计分资格后导出固定槽位，合并互不重叠层级并拒绝复制运行冒充独立会话；不调用生成或评测 | M5 | [study_data.py](../kb_workflows/study_data.py) |
 | V13-02 选集区分度与统计不确定性 | 支持并列秩Spearman、Kendall tau-b、差值/排名反转、任务/会话/样本bootstrap与显式二元power假设；常量相关为null，不假称旧排名已复现 | M3 | [study_statistics.py](../kb_workflows/study_statistics.py), [analyze_selection.py](../scripts/analyze_selection.py) |
+| V16-01 显式尺寸实例与证据绑定 | Production-41已知正整数维度与整除/显存门；内容绑定基线、冻结、评分与比较，隐藏实例独立 | M2, M3 | [production.py](../kb_workflows/production.py), [engine.py](../kb_workflows/engine.py) |
 
 ### M2：正确性与执行可信度的改动
 
@@ -134,6 +135,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V10-04 附加证据与旧评分门 | 最终和交替测量必须匹配当前源码/基线/配置，收据文件及冻结内容参与旧评分资格复核 | M5 | [common.py](../kb_workflows/common.py) |
 | V14-04 预算恢复与计分资格 | 限额槽位只允许一次可审计尝试，匹配完成记录可resume；重算账本、绑定历史与汇总，修改预算证据使新旧计分门均失效 | M4, M5 | [generation.py](../kb_workflows/generation.py), [paper_analysis.py](../kb_workflows/paper_analysis.py), [common.py](../kb_workflows/common.py) |
 | V15-04 同题交替终局奖励 | 同题共享repeat种子并交替启动独立标准/隐藏/配对计时任务，核对设备UUID；严格资格分与弱raw-speedup消融分开，失败槽位为零 | M2, M4 | [rl_rewards.py](../kb_workflows/rl_rewards.py) |
+| V16-02 多尺寸算法证书 | 至少5尺寸且跨度16倍，固定源码/设备/变体和形状规律，重做原生资格与配对测量，斜率须匹配当前D/SOL审查且显著低于参考 | M2, M4 | [scaling_certificate.py](../kb_workflows/scaling_certificate.py), [SCALING_CERTIFICATES.md](../docs/SCALING_CERTIFICATES.md) |
+| V16-06 按训练种子的效果分析 | 重算持出资格分，报告配对训练种子效应、分层区间与双侧检验；失败检查未知槽位给上下界，模拟数据不能支持正式效果 | M4 | [rl_effectiveness.py](../kb_workflows/rl_effectiveness.py), [test_rl_workflow.py](../tests/test_rl_workflow.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -158,6 +161,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V15-02 原生GRPO与标准开发工具 | 固定TRL 1.8.0及DAPO损失变体，接入one-shot/反馈工具、原生最佳候选选择和离线模型；持出题不进入训练callback | M2 | [rl_training.py](../kb_workflows/rl_training.py) |
 | V15-06 奖励重评分与可靠性审计 | 预声明源码案例与重复计划，重算ICC/奖励排序/攻击接受率和公共最终差；缺数据与基础设施故障不能冒充抵御攻击，统计依赖假设显式保留 | M2, M3 | [rl_evaluation.py](../kb_workflows/rl_evaluation.py), [rl_audit.py](../kb_workflows/rl_audit.py) |
 | V15-07 持出评测计划与CLI | 持出checkpoint资产冻结并复用原生one-shot/反馈任务及独立会话；提供默认非执行CLI，模型改变在运行前拒绝 | M1, M5 | [rl_evaluation.py](../kb_workflows/rl_evaluation.py), [study_plan.py](../kb_workflows/study_plan.py), [rl_workflow.py](../scripts/rl_workflow.py) |
+| V16-03 有界证书奖励 | 默认关闭；高资格候选才可请求证书，加分后封顶1，失败或恒定倍率优化无算法加分，证书墙钟记入训练预算 | M2, M3 | [rl_rewards.py](../kb_workflows/rl_rewards.py), [rl_plan.py](../kb_workflows/rl_plan.py) |
+| V16-05 预注册奖励对照与持出评测 | 执行前冻结两奖励组与全部种子、优化器/数据/预算及评测会话；当前lineage/权重不符或缺作业不能缩小研究，默认不执行 | M1, M5 | [rl_effectiveness.py](../kb_workflows/rl_effectiveness.py), [study_plan.py](../kb_workflows/study_plan.py), [rl_workflow.py](../scripts/rl_workflow.py) |
 
 ### M5：可复现且可部署的基础设施的改动
 
@@ -201,6 +206,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V9-06 逐项证据等级 | 实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级 | M2, M3 | [evidence.py](../kb_workflows/evidence.py) |
 | V10-05 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母 | M3, M4 | [final_verification.py](../kb_workflows/final_verification.py) |
 | V15-05 训练预算与checkpoint恢复 | 生成前持久化预留group，中断仍扣额度；checkpoint绑定文件、step及奖励前缀；父进程监督总墙钟含清理，缺账本拒绝重置 | M4 | [rl_training.py](../kb_workflows/rl_training.py) |
+| V16-04 训练来源与父进程凭据 | 绑定最终权重、计划、全部奖励/证书文件和当前优化路径；恢复保留丢弃更新的成本，nonce与锁拒绝旧完成文件和并发监督 | M4 | [rl_lineage.py](../kb_workflows/rl_lineage.py), [rl_training.py](../kb_workflows/rl_training.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -215,7 +221,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-03 选集区分度重新验证 | 代码已实现 | M1 | 已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验 |
 | R-04 FP64数值契约与精度门 | 部分实现 | M2 | 17道旧题附加FP64参考自资格及新41题参考误差门已接入；6道数值设计有FP64算术参考与逐题预算，原250题原尺寸独立oracle校准与完整覆盖仍需实现 |
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成 |
-| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现 |
+| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成 |
 | R-08 自写内核执行归因与库轨道 | 待实现 | M2 | Torch算子汇总不证明来源；20%和95%阈值未校准，不作为默认资格 |
 | R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成 |
@@ -229,7 +235,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |
-| R-20 RL训练与奖励验证 | 部分实现 | M4 | 已实现本地TRL GRPO、原生标准工具与终局奖励、交替重测、生成前预算与恢复、红队/稳定性/公共最终差审计和持出计划；候选算法证书加分及绑定训练来源的完整效果对照报告仍待补全，真实训练与模型/设备实验按用户要求不运行 |
+| R-20 RL训练与奖励验证 | 代码已实现 | M4 | 已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果 |
 | R-21 Trainium/NKI与设备通用接口 | 待实现 | M5 | caps/calibrate/flush/time/attribute是目标设计；当前计算后端仍为NVIDIA CUDA |
 | R-22 工具能力收据与可选分层 | 代码已实现 | M5 | 已实现逐项状态收据、缺项null、等级判定与评分门；L1/L2缺少的设备工具证据不会降格冒充通过，GPU验收仍独立记录 |
 | R-23 实机隔离与重评分实验 | 待实现 | M5 | Harbor独立verifier配置已接入；GPU、容器网络、沙箱边界、升级后regrade尚待实测 |

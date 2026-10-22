@@ -112,6 +112,9 @@ def write_task(directory, config, pid, sid=0, device=None):
     if config.device_calibration:
         shutil.copy2(config.device_calibration, tests / "device_calibration.json")
         child.device_calibration = "/tests/device_calibration.json"
+    if config.task_dimensions:
+        shutil.copy2(config.task_dimensions, tests / "task_dimensions.json")
+        child.task_dimensions = "/tests/task_dimensions.json"
     atomic_json(tests / "config.json", {"protocol": "kernelbench-pro-harbor-v1", "sample_id": sid,
                                        "evaluator_sha256": evaluator_digest(), "config": child.to_dict(),
                                        "reward": config.harbor_reward})

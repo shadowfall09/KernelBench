@@ -71,11 +71,13 @@ python -m scripts.rl_workflow train --plan rl_study/plan.json
 
 `qualified`奖励直接使用当前原生评分：任何必需检查或证据不合格都为零。`raw_speedup`是明确的弱奖励消融，使用标准正确时的`min(基线均值/候选均值, raw_speedup_clip)/raw_speedup_clip`，默认clip为4；它不等于完整资格分。消融会继续测量小实例失败但能通过旧标准检查的源码，便于记录奖励漏洞。两个奖励值、失败检查、源码、种子、调度顺序、请求墙钟、基线快照及原生结果一起保存，不能以响应格式或代码长度替代性能奖励。
 
-当前候选算法证书加分保持0，尚未接入完整证书奖励。Headroom可选证书仍按既有原生评分规则核对，不能把问题边界证书写成候选算法证明。
+可选算法证书奖励默认关闭。启用`certificate_bonus`需要Headroom评分及事先审查的D/SOL缩放契约；只有已通过完整资格、达到`certificate_min_score`的候选才扫描尺寸。至少5个尺寸、跨度至少16倍，保持源码、参考变体、物理设备、dtype和声明的形状关系不变；每个尺寸重新验证并采集独立配对重复。候选斜率区间须符合审查的算法指数，并显著低于参考指数。恒定倍数加速不能获得算法设计加分；证书失败只取消加分，原资格失败仍为零，总奖励上限为1。它是有限尺寸区间的经验支持，不能证明普遍渐近复杂度。配置与证据格式见[算法证书](SCALING_CERTIFICATES.md)。
 
 ## 预算与恢复
 
 每个优化step在生成前持久化预留一个group。中断发生在模型响应、奖励或优化步骤之间时，该group仍占用总额度；不能靠删除结果或退回旧checkpoint重置预算。checkpoint绑定模型/优化器等文件、trainer step和当时的奖励日志前缀；恢复会复核已有奖励证据，保留checkpoint之后的中断成本。缺失账本或变更的checkpoint拒绝恢复。
+
+最终策略保存`final_lineage.json`：绑定初始/最终权重、计划、软件版本、奖励及其底层文件、算法证书、全部已消费group和实际进入当前权重的优化路径。退回checkpoint后的旧更新继续算成本，但不进入恢复后策略的优化路径。父进程使用独立nonce关联本次worker、墙钟账本和lineage，并用锁防止同目录并发监督；旧的完成文件或只返回零退出码的worker不能证明当前完成。这些是评测器维护的内容绑定，不是硬件签名或OS隔离证明。
 
 训练CLI由父进程监管总墙钟，预留5秒用于清理嵌套子进程；请求和清理耗时均记账。丢失的父进程预留整笔扣除。驱动/内核的物理抢占和GPU账单仍未认证。TRL有自己的生成路径，本版不把原生`agent_token_limit`等选项套用到训练后声称硬限，而会拒绝这些配置。
 
@@ -102,6 +104,22 @@ python -m scripts.rl_workflow train --plan rl_study/plan.json
 
 红队案例必须声明预期失败检查，并有该检查确实失败的证据；缺GPU、缺基线或工具不可用不能算“成功抵御攻击”。公共/最终奖励差可从同一源码的两份当前原生运行离线重算，必须仅在是否启用隐藏检查上不同；失败样本和配对bootstrap保留。
 
-`heldout-plan`为命名的本地checkpoint生成原生one-shot/反馈评测计划，模型资产内容冻结，使用独立任务/会话目录。它不把heldout数据传给GRPO。checkpoint名称只作声明，尚未自动验证完整训练来源或生成“此奖励改善训练”的结论；已有研究分析入口可读这些原生结果。
+`heldout-plan`为命名的本地checkpoint生成原生one-shot/反馈评测计划，模型资产内容冻结，使用独立任务/会话目录。任意命名checkpoint只作来源声明；要比较训练效果，使用下面绑定lineage的预注册入口。
 
-R-20目前为部分实现：训练、奖励、恢复、重评分与审计入口已落地；候选算法证书加分及绑定训练来源的完整效果对照报告仍待补全。预注册阈值是分析目标，当前没有实测结果。候选Python仍由现有独立进程执行，完整OS隔离继续归R-23。
+## 绑定训练来源的奖励对照
+
+对照规格声明`base`（上面的训练规格）、`seeds`（如`[11,22,33,44,55,66]`）、`evaluation_sessions`和`evaluation_samples`。系统在执行前生成全部`qualified`与`raw_speedup`种子组合，两组固定优化器、任务划分、初始权重与声明预算；弱奖励组关闭证书加分，差异仅为奖励构造与种子。成本包含中断group，额外证书请求也记墙钟；相同声明额度不表示实际GPU busy时间完全相同。
+
+```bash
+python -m scripts.rl_workflow experiment-plan --spec reward_experiment.json --output-dir reward_study
+python -m scripts.rl_workflow experiment-train --experiment reward_study/experiment.json
+python -m scripts.rl_workflow experiment-evaluation-plan --experiment reward_study/experiment.json --output-dir reward_heldout
+python -m scripts.plan_study --plan reward_heldout/plan.json
+python -m scripts.rl_workflow experiment-analyze --plan reward_heldout/plan.json --output reward_effect.json
+```
+
+训练与持出runner仍默认不执行。未训练时评测计划返回`not_ready`；缺少预注册作业的执行记录时分析返回`not_measured`，不能删掉缺失种子后缩小研究。全部策略必须匹配预声明训练计划、当前奖励/源码/模型资产、软件版本及父进程墙钟收据。模拟训练只能在显式`--audit-only`中检查管线，不能进入正式效果结论。
+
+分析从原生持出结果重新计分，保留全部候选槽位和失败零分，以训练种子为独立重复，按层重采样任务、独立重采样各组评测会话/槽位。同时报告配对差、95%区间和双侧符号随机化检验；检验依赖零假设下的组标签可交换性或符号对称性。两个完全正向种子仍有`p=0.5`，不会因退化的正区间而声称显著。训练中触发失败检查的比例单列，未知槽位给上下界，不假设没有违规。正式效果支持还要求全部当前推理与训练证据合格。
+
+R-20的软件入口已补全；预注册阈值和效果支持条件均为待实际数据检验的规则，当前没有实测结果。候选Python仍由现有独立进程执行，完整OS隔离继续归R-23。

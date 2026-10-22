@@ -120,7 +120,7 @@ def analyze_paper(config):
     digest = evaluator_digest()
     groups, bounded_groups, track_groups, rows, scored, certificate_coverage = {}, {}, {}, [], {}, {}
     external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
-                      for option in ("problem_specs", "device_calibration") if getattr(config, option)}
+                      for option in ("problem_specs", "device_calibration", "task_dimensions") if getattr(config, option)}
     auxiliary_files = {}
     for name in ((["final_manifest.json", "final_results.json"] if config.final_repeats else [])
                  + (["paired_results.json"] if config.paired_timing else [])

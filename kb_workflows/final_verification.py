@@ -7,6 +7,7 @@ import random
 import re
 import secrets
 import uuid
+from pathlib import Path
 from statistics import mean
 
 from .common import atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
@@ -15,11 +16,14 @@ PROTOCOL = "frozen_final_remeasurement_v1"
 
 
 def _options(config):
-    return {name: getattr(config, name) for name in (
+    options = {name: getattr(config, name) for name in (
         "level", "suite", "suite_role", "task_profile", "task_track", "task_memory_mb", "start", "end", "num_samples", "precision", "fp32_tolerance",
         "num_correct_trials", "num_perf_trials", "hidden_tests", "strict_validation", "evidence_level",
         "baseline", "baseline_suite", "baseline_portfolio", "cold_calls", "gpu_arch", "hardware",
         "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout")}
+    if config.task_dimensions:
+        options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})
+    return options
 
 
 def _slots(config):

@@ -11,7 +11,7 @@ import sys
 import time
 import uuid
 from contextlib import contextmanager
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from .common import ROOT, atomic_json, fingerprint, read_json
@@ -53,6 +53,9 @@ class Journal:
         if self.document.get("protocol") != JOURNAL_PROTOCOL or self.document.get("plan_sha256") != plan["plan_sha256"]:
             raise ValueError("Training journal belongs to another plan")
         self.pending = None
+        applied = [row for row in self.document["groups"] if type(row.get("optimizer_step_after")) is int]
+        self.active_group_ids = ([row["id"] for row in applied] if
+                                 [row["optimizer_step_after"] for row in applied] == list(range(1, len(applied) + 1)) else [])
         if not self.path.exists():
             atomic_json(self.path, self.document)
 
@@ -63,6 +66,7 @@ class Journal:
             raise BudgetExhausted("Declared rollout group budget exhausted, including interrupted groups")
         self.pending = {"id": uuid.uuid4().hex, "optimizer_step_before": step, "status": "generation_started",
                         "started_at": time.time(), "group_size": self.training.group_size, "usage_complete": False}
+        self.pending["started_monotonic"] = time.monotonic()
         self.document["groups"].append(self.pending)
         atomic_json(self.path, self.document)
         return self.pending
@@ -79,9 +83,14 @@ class Journal:
         self.pending = None
 
     def optimizer_applied(self, step):
-        if self.document["groups"]:
-            self.document["groups"][-1]["optimizer_step_after"] = step
-            atomic_json(self.path, self.document)
+        if (not self.document["groups"] or self.pending is not None or type(step) is not int
+                or step != len(self.active_group_ids) + 1 or self.document["groups"][-1].get("status") != "rewarded"
+                or self.document["groups"][-1].get("optimizer_step_before") != step - 1):
+            raise ValueError("Optimizer update lacks its complete rewarded predecessor")
+        row = self.document["groups"][-1]
+        row["optimizer_step_after"] = step
+        self.active_group_ids.append(row["id"])
+        atomic_json(self.path, self.document)
 
 
 class DevelopmentEnvironment:
@@ -147,6 +156,10 @@ class DevelopmentEnvironment:
             source, selected = "", "no_correct_candidate"
         else:
             source, selected = terminal_text, "terminal_without_development"
+            try:
+                self._controller.remaining()
+            except BudgetExhausted:
+                source, selected = "", "terminal_after_episode_deadline"
         code, _ = parse_source(source)
         atomic_json(self._directory / "episode.json", {"task_key": self._task_key, "rounds": self._controller.rounds,
                     "closed": True, "hidden_feedback": False, "selected": selected,
@@ -190,6 +203,8 @@ class RewardFunction:
         if self.journal.pending is None:
             raise ValueError("Generation was not reserved before the reward callback")
         texts = [completion_text(item) for item in completions]
+        if training.mode == "one-shot" and time.monotonic() - self.journal.pending["started_monotonic"] > self.plan["verifier_config"]["agent_timeout"]:
+            texts = [""] * len(texts)
         directories = []
         if training.mode == "feedback":
             if not isinstance(environments, list) or len(environments) != len(texts):
@@ -209,6 +224,7 @@ def checkpoint_record(plan, journal, directory, step):
     directory = Path(directory)
     record = {"plan_sha256": plan["plan_sha256"], "step": step, "journal_prefix": fingerprint(journal.document),
               "consumed_groups": len(journal.document["groups"]),
+              "active_group_ids": list(journal.active_group_ids),
               "artifact_sha256": checkpoint_digest(directory, exclude=(CHECKPOINT_FILE,))}
     record["receipt_sha256"] = fingerprint(record)
     atomic_json(directory / CHECKPOINT_FILE, record)
@@ -228,6 +244,11 @@ def validate_checkpoint(plan, journal, directory):
     prefix = {**journal.document, "groups": journal.document["groups"][:record["consumed_groups"]]}
     if fingerprint(prefix) != record["journal_prefix"]:
         raise ValueError("Reward history before the checkpoint changed")
+    indexed = {row["id"]: row for row in prefix["groups"]}
+    active = record.get("active_group_ids", [])
+    if (len(active) != record["step"] or len(set(active)) != len(active)
+            or any(key not in indexed or indexed[key].get("optimizer_step_after") != i + 1 for i, key in enumerate(active))):
+        raise ValueError("Checkpoint lacks a consistent active optimizer path")
     for row in journal.document["groups"]:
         if row.get("reward_path") and validate_reward(row["reward_path"])["receipt_sha256"] != row.get("reward_sha256"):
             raise ValueError("Training reward history changed")
@@ -293,7 +314,7 @@ def native_backend(plan, journal, reward):
                        **({"environment_factory": lambda: DevelopmentEnvironment(plan)} if tools else {}))
 
 
-def run_worker(plan, *, resume=None, backend_factory=None, group_evaluator=None):
+def run_worker(plan, *, resume=None, backend_factory=None, group_evaluator=None, supervisor_nonce=None):
     training = validate_plan(plan)
     if int(os.environ.get("WORLD_SIZE", "1")) != 1:
         raise ValueError("Distributed rollout groups cannot certify this serial device schedule; launch one training process")
@@ -309,11 +330,20 @@ def run_worker(plan, *, resume=None, backend_factory=None, group_evaluator=None)
             raise ValueError("Existing training attempts require an explicit receipt-bound checkpoint")
         if resume:
             resume = str(validate_checkpoint(plan, journal, resume))
+            journal.active_group_ids = list(read_json(Path(resume) / CHECKPOINT_FILE)["active_group_ids"])
         if len(journal.document["groups"]) >= training.max_steps:
             raise BudgetExhausted("All rollout groups were already consumed, including interrupted attempts")
         reward = RewardFunction(plan, journal, group_evaluator=group_evaluator)
         started = time.monotonic()
-        result = {"plan_sha256": plan["plan_sha256"], "training_started": True, "status": "error"}
+        result = {"plan_sha256": plan["plan_sha256"], "training_started": True, "status": "error",
+                  "attempt_id": uuid.uuid4().hex, "supervisor_nonce": supervisor_nonce,
+                  "execution_kind": "native_trl" if backend_factory is None and group_evaluator is None else "injected_backend_or_verifier"}
+        result["software_versions"] = {}
+        for name in ("torch", "transformers", "trl", "datasets", "accelerate"):
+            try:
+                result["software_versions"][name] = version(name)
+            except PackageNotFoundError:
+                result["software_versions"][name] = None
         atomic_json(root / "training_result.json", result)
         with offline_environment():
             backend = (backend_factory or native_backend)(plan, journal, reward)
@@ -321,7 +351,7 @@ def run_worker(plan, *, resume=None, backend_factory=None, group_evaluator=None)
                 outcome = backend.train(resume_from_checkpoint=resume)
                 result.update(status="completed", global_step=outcome.global_step)
             except BudgetExhausted as exc:
-                result.update(status="rollout_budget_exhausted", error=str(exc))
+                result.update(status="rollout_budget_exhausted", error=str(exc), global_step=len(journal.active_group_ids))
             finally:
                 result.update(request_wall_seconds=time.monotonic() - started,
                               consumed_groups=len(journal.document["groups"]), max_groups=training.max_steps,
@@ -332,11 +362,16 @@ def run_worker(plan, *, resume=None, backend_factory=None, group_evaluator=None)
             if getattr(backend, "processing_class", None):
                 backend.processing_class.save_pretrained(str(final))
             result.update(final_model=str(final), final_model_sha256=checkpoint_digest(final))
+            from .rl_lineage import emit
+
+            lineage_path, lineage = emit(plan, journal, result, attempt_id=result["attempt_id"],
+                                         execution_kind=result["execution_kind"], supervisor_nonce=supervisor_nonce)
+            result.update(lineage_path=str(lineage_path), lineage_sha256=lineage["receipt_sha256"])
             atomic_json(root / "training_result.json", result)
         return result
 
 
-def execute_plan(path, *, execute=False, resume=None, worker_runner=None):
+def _execute_plan(path, *, execute=False, resume=None, worker_runner=None):
     plan = read_plan(path)
     if not execute:
         return {"training_started": False, "plan_sha256": plan["plan_sha256"], "tasks": plan["splits"],
@@ -369,7 +404,8 @@ def execute_plan(path, *, execute=False, resume=None, worker_runner=None):
         else:
             from .generation import terminate_agent_tree
 
-            command = [sys.executable, "-m", "kb_workflows.rl_training", "--plan", str(Path(path).resolve()), "--worker"]
+            command = [sys.executable, "-m", "kb_workflows.rl_training", "--plan", str(Path(path).resolve()),
+                       "--worker", "--supervisor-nonce", nonce]
             if resume:
                 command += ["--resume-checkpoint", str(Path(resume).resolve())]
             with (root / "training.log").open("a") as log:
@@ -383,8 +419,41 @@ def execute_plan(path, *, execute=False, resume=None, worker_runner=None):
     finally:
         ledger.settle(nonce, time.monotonic() - started)
         atomic_json(wall_path, {"plan_sha256": plan["plan_sha256"], "ledger": ledger.snapshot()})
-    return {"training_started": True, "exit_code": code, "result": read_json(root / "training_result.json", {}),
+    from .rl_lineage import supervisor
+    from .rl_lineage import validate as validate_lineage
+
+    worker = read_json(root / "training_result.json", {})
+    matched = worker.get("supervisor_nonce") == nonce and worker.get("plan_sha256") == plan["plan_sha256"]
+    if not matched:
+        worker = {}
+    supervised = supervisor(plan, nonce, ledger.snapshot(), code, worker)
+    completion_verified, error = False, None
+    if worker.get("lineage_path") and worker.get("final_model"):
+        try:
+            validated = validate_lineage(worker["final_model"], receipt_path=worker["lineage_path"], allow_injected=True)
+            completion_verified = validated["receipt"]["receipt_sha256"] == worker.get("lineage_sha256")
+        except (ValueError, OSError, KeyError) as exc:
+            error = str(exc)
+    elif code == 0:
+        error = "Worker exited without a current policy-lineage receipt"
+    return {"training_started": True, "exit_code": code if code else (0 if completion_verified else 1),
+            "worker_exit_code": code, "result": worker, "completion_verified": completion_verified, "error": error,
+            "supervisor_nonce": nonce, "supervisor_sha256": supervised["receipt_sha256"],
             "wall_budget": ledger.snapshot(), "physical_preemption_certified": False}
+
+
+def execute_plan(path, *, execute=False, resume=None, worker_runner=None):
+    if not execute:
+        return _execute_plan(path, execute=False, resume=resume, worker_runner=worker_runner)
+    plan = read_plan(path)
+    root = Path(plan["output_directory"])
+    root.mkdir(parents=True, exist_ok=True)
+    with (root / "supervisor.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError("Another supervisor owns this training budget") from exc
+        return _execute_plan(path, execute=True, resume=resume, worker_runner=worker_runner)
 
 
 def main(argv=None):
@@ -393,9 +462,10 @@ def main(argv=None):
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--resume-checkpoint", type=Path)
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--supervisor-nonce", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.worker:
-        result = run_worker(read_plan(args.plan), resume=args.resume_checkpoint)
+        result = run_worker(read_plan(args.plan), resume=args.resume_checkpoint, supervisor_nonce=args.supervisor_nonce)
         code = 0 if result["status"] == "completed" else 1
     else:
         result = execute_plan(args.plan, execute=args.execute, resume=args.resume_checkpoint)

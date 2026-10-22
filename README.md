@@ -109,7 +109,7 @@ python -m scripts.check_motivations
 | [Production-41](docs/PRODUCTION_TASKS.md) | Level 5生产题族、逐角色dtype、显存计划和独立反向轨道 |
 | [研究工作流](docs/STUDIES.md) | 当前证据导出、选集区分度、多会话计划与得分—预算曲线 |
 | [资源预算](docs/RESOURCE_BUDGETS.md) | 精确本地token、API输出预留、开发worker占用与恢复证据 |
-| [RL工作流](docs/RL_WORKFLOW.md) | GRPO计划、标准开发工具、终局奖励、恢复、审计与持出评测 |
+| [RL工作流](docs/RL_WORKFLOW.md) | GRPO计划、算法证书奖励、训练来源、恢复、审计与持出效果对照 |
 | [严格验证](docs/STRICT_VALIDATION.md) | FP64附加契约、输入/状态检查、证据等级与聚合消融 |
 | [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |
 | [输入盲化](docs/INPUT_BLIND_GENERATION.md) | 生成材料如何去掉测试输入 |

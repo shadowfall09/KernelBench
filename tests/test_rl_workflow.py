@@ -14,6 +14,7 @@ import pytest
 from kb_workflows import engine, paper_analysis, rl_audit, rl_evaluation, rl_plan, rl_rewards, rl_training
 from kb_workflows.baseline_variants import VARIANTS, select_baseline
 from kb_workflows.common import ROOT, atomic_json, fingerprint, kernel_name, read_json, select_problems
+from kb_workflows.config import RunConfig
 from kb_workflows.evidence import LEVELS, check, from_result
 from kb_workflows.measurement import timing_stats
 from kb_workflows.paired_statistics import paired_summary
@@ -365,7 +366,8 @@ def test_training_wall_supervisor_does_not_start_by_default_and_retains_attempts
     assert not rl_training.execute_plan(path, worker_runner=lambda *args: calls.append(args))["training_started"]
     assert not calls
     result = rl_training.execute_plan(path, execute=True, worker_runner=lambda *args: calls.append(args) or 0)
-    assert result["exit_code"] == 0 and len(calls) == 1
+    assert result["exit_code"] == 1 and result["worker_exit_code"] == 0 and len(calls) == 1
+    assert not result["completion_verified"] and "current policy-lineage" in result["error"]
     assert len(result["wall_budget"]["entries"]) == 1 and result["wall_budget"]["compliant"]
 
 
@@ -508,6 +510,176 @@ def test_another_task_baseline_update_does_not_invalidate_this_training_history(
     data["level1"][other]["mean"] = 20
     atomic_json(path, data)
     assert rl_rewards.validate_reward(directory / "reward.json")["rewards"] == [1, 1]
+
+
+def fake_supervised_training(plan, native_verifier, *, plan_path=None, resume=None):
+    """Exercise the supervisor/worker protocol without loading or updating a model."""
+    path = plan_path or Path(plan["output_directory"]).parent / "training-plan.json"
+    rl_plan.write_plan(plan, path)
+    def runner(current, checkpoint):
+        wall = read_json(Path(current["output_directory"]) / "training_wall_budget.json")
+        nonce = next(iter(wall["ledger"]["pending"]))
+        def group(*args, **kwargs):
+            return rl_rewards.evaluate_group(*args, **kwargs, dispatch=native_verifier[0])
+        def factory(current, journal, reward):
+            class FakeBackend:
+                def train(self, **kwargs):
+                    step = len(journal.active_group_ids)
+                    journal.reserve(step)
+                    row = rl_plan.dataset_rows(current)[0]
+                    size = current["training"]["group_size"]
+                    reward(prompts=[row["prompt"]] * size, completions=[SOURCE + f"\n# seed {current['training']['seed']}\n"] * size,
+                           completion_ids=[[1, 2]] * size, task_key=[row["task_key"]] * size, prompt_sha256=[row["prompt_sha256"]] * size)
+                    journal.optimizer_applied(step + 1)
+                    return SimpleNamespace(global_step=step + 1)
+                def save_model(self, directory):
+                    directory = Path(directory)
+                    directory.mkdir(parents=True, exist_ok=True)
+                    (directory / "model.safetensors").write_text(f"SIMULATED {current['training']['reward_mode']} {current['training']['seed']} {len(journal.active_group_ids)}")
+            return FakeBackend()
+        result = rl_training.run_worker(current, resume=checkpoint, backend_factory=factory, group_evaluator=group, supervisor_nonce=nonce)
+        return 0 if result["status"] == "completed" else 1
+    return rl_training.execute_plan(path, execute=True, resume=resume, worker_runner=runner)
+
+
+def test_policy_lineage_links_native_reward_artifacts_and_supervisor_without_claiming_native_training(plan, native_verifier):
+    from kb_workflows import rl_lineage
+
+    result = fake_supervised_training(plan, native_verifier)
+    assert result["exit_code"] == 0 and result["completion_verified"]
+    checkpoint = Path(result["result"]["final_model"])
+    with pytest.raises(ValueError, match="Injected"):
+        rl_lineage.validate(checkpoint)
+    validated = rl_lineage.validate(checkpoint, allow_injected=True)
+    assert validated["supervised"] and not validated["formal_comparison_eligible"]
+    assert validated["receipt"]["global_step"] == len(validated["receipt"]["active_group_ids"]) == 1
+    assert validated["receipt"]["consumed_groups"] == 1
+    group = validated["journal"]["groups"][0]
+    Path(group["reward_path"]).write_text("{}")
+    with pytest.raises(ValueError, match="evidence changed"):
+        rl_lineage.validate(checkpoint, allow_injected=True)
+
+
+def test_old_training_result_does_not_satisfy_a_new_supervisor_attempt(plan, native_verifier, tmp_path):
+    first = fake_supervised_training(plan, native_verifier)
+    path = tmp_path / "plan.json"
+    rl_plan.write_plan(plan, path)
+    second = rl_training.execute_plan(path, execute=True, worker_runner=lambda *args: 0)
+    assert first["completion_verified"] and not second["completion_verified"]
+    assert second["exit_code"] == 1 and second["result"] == {}
+    assert second["supervisor_nonce"] != first["supervisor_nonce"]
+
+
+def test_resume_keeps_discarded_optimizer_costs_but_restores_the_checkpoint_policy_path(plan, native_verifier):
+    from kb_workflows import rl_lineage
+
+    first = fake_supervised_training(plan, native_verifier)
+    journal = rl_training.Journal(plan)
+    checkpoint = Path(plan["output_directory"]) / "trainer/checkpoint-1"
+    checkpoint.mkdir(parents=True)
+    atomic_json(checkpoint / "trainer_state.json", {"global_step": 1})
+    (checkpoint / "model.safetensors").write_text("SIMULATED")
+    rl_training.checkpoint_record(plan, journal, checkpoint, 1)
+    discarded = journal.reserve(1)
+    directory = journal.root / "rewards" / discarded["id"]
+    evaluated(plan, native_verifier, directory)
+    journal.settle(directory / "reward.json", completion_tokens=[2, 2], episode_directories=[])
+    journal.optimizer_applied(2)
+    result = fake_supervised_training(plan, native_verifier, resume=checkpoint)
+    lineage = rl_lineage.validate(result["result"]["final_model"], allow_injected=True)
+    assert lineage["receipt"]["global_step"] == 2 and lineage["receipt"]["consumed_groups"] == 3
+    assert discarded["id"] not in lineage["receipt"]["active_group_ids"]
+    assert first["result"]["lineage_sha256"] != result["result"]["lineage_sha256"]
+
+
+def test_training_effect_uses_training_seeds_and_does_not_promote_a_tiny_positive_ci():
+    from kb_workflows.rl_effectiveness import paired_effect, sign_flip
+
+    assert sign_flip([1] * 2)["p_two_sided"] == 0.5
+    assert sign_flip([1] * 6)["p_two_sided"] == pytest.approx(1 / 32)
+    def data(count):
+        return {arm: {str(seed): {"s0": {"1/26": [value, value]}} for seed in range(count)}
+                for arm, value in (("qualified", 0.75), ("raw_speedup", 0.25))}
+    small = paired_effect(data(2), {"1/26": "I"}, trials=200)
+    assert small["ci95"][0] > 0 and not small["positive_effect_supported"]
+    assert paired_effect(data(6), {"1/26": "I"}, trials=200)["positive_effect_supported"]
+    missing = data(2)
+    del missing["raw_speedup"]["1"]
+    with pytest.raises(ValueError, match="retained"):
+        paired_effect(missing, {"1/26": "I"}, trials=200)
+    missing = data(2)
+    missing["raw_speedup"]["1"]["s1"] = {"1/26": [0.2, 0.2]}
+    with pytest.raises(ValueError, match="same declared evaluation sessions"):
+        paired_effect(missing, {"1/26": "I"}, trials=200)
+    missing = data(2)
+    missing["raw_speedup"]["1"]["s0"]["1/26"].pop()
+    with pytest.raises(ValueError, match="same declared candidate slots"):
+        paired_effect(missing, {"1/26": "I"}, trials=200)
+
+
+def test_reward_experiment_is_preregistered_and_unrun_trials_are_not_zero_scores(specification, tmp_path):
+    from kb_workflows import rl_effectiveness
+
+    experiment = rl_effectiveness.make_experiment({"base": specification, "seeds": [11, 22], "evaluation_sessions": 1}, directory=tmp_path / "experiment")
+    assert len(experiment["jobs"]) == 4 and not experiment["experiments_started"]
+    assert not rl_effectiveness.execute_training(experiment)["experiments_started"]
+    plan = rl_effectiveness.evaluation_plan(experiment, directory=tmp_path / "evaluation")
+    assert plan["status"] == "not_ready" and len(plan["missing_trials"]) == 4
+    changed = copy.deepcopy(experiment)
+    changed["jobs"].pop()
+    changed["experiment_sha256"] = fingerprint({key: value for key, value in changed.items() if key != "experiment_sha256"})
+    with pytest.raises(ValueError, match="lost or duplicated"):
+        rl_effectiveness.validate_experiment(changed)
+
+
+def test_lineage_bound_heldout_effect_report_runs_only_analysis_on_simulated_evidence(specification, native_verifier, tmp_path, monkeypatch):
+    import hashlib
+
+    from kb_workflows import rl_effectiveness, study_plan
+    from kb_workflows.experiment import protocol, write_budget_report
+    from kb_workflows.local_model import checkpoint_digest
+
+    experiment = rl_effectiveness.make_experiment({"base": specification, "seeds": [11, 22], "evaluation_sessions": 1}, directory=tmp_path / "experiment")
+    rl_effectiveness.write_experiment(experiment, tmp_path / "experiment/experiment.json")
+    def executor(path, **kwargs):
+        return fake_supervised_training(rl_plan.read_plan(path), native_verifier, plan_path=path)
+    executed = rl_effectiveness.execute_training(experiment, execute=True, executor=executor)
+    assert len(executed["trials"]) == 4 and all(row["result"]["completion_verified"] for row in executed["trials"])
+    assert rl_effectiveness.evaluation_plan(experiment, directory=tmp_path / "evaluation")["status"] == "not_ready"
+    evaluation = rl_effectiveness.evaluation_plan(experiment, directory=tmp_path / "evaluation", audit_only=True)
+    study_plan.write_plan(evaluation, tmp_path / "evaluation")
+    assert rl_effectiveness.analyze(evaluation, trials=200)["status"] == "not_measured"
+    executions = []
+    for job in evaluation["jobs"]:
+        directory = Path(job["path"])
+        config = RunConfig(**job["config"])
+        arm = next(item["arm"] for item in evaluation["training_lineages"].values() if item["checkpoint"] == config.model)
+        text = SOURCE + ("\n# WRONG\n" if arm == "raw_speedup" else "\n# valid\n")
+        rl_rewards.evaluate_group(experiment["jobs"][0]["plan"], "1/26", [text], directory=directory, split="heldout", dispatch=native_verifier[0])
+        atomic_json(directory / "run_config.json", config.to_dict())
+        kernel = directory / kernel_name(1, 26)
+        receipt = {"protocol": protocol(config), "model_calls": 1, "candidate_submissions": 1, "input_tokens": 3,
+                   "output_tokens": 3, "total_tokens": 6, "generation_wall_seconds": 1, "development_request_wall_seconds": 0,
+                   "estimated_cost_usd": None, "models": [config.model], "local_checkpoint_sha256": [checkpoint_digest(config.model)]}
+        summary = {"26_0": {"status": "success", "kernel_sha256": hashlib.sha256(kernel.read_bytes()).hexdigest(), "budget": receipt}}
+        atomic_json(directory / "generation_attempts.json", {"slots": {"26_0": [{"status": "success", "budget": receipt}]}})
+        atomic_json(directory / "generation_summary.json", summary)
+        write_budget_report(config, summary)
+        executions.append({"path": str(directory), "session": job["session"], "config_sha256": job["config_sha256"], "exit_code": 0})
+    atomic_json(tmp_path / "evaluation/execution.json", {"plan_sha256": evaluation["plan_sha256"], "jobs": executions})
+    from kb_workflows import study_data
+    monkeypatch.setattr(study_data, "ROOT", rl_rewards.ROOT)
+    monkeypatch.setattr(engine, "evaluate_tasks", lambda *a, **k: pytest.fail("Analysis launched a workload"))
+    report = rl_effectiveness.analyze(evaluation, trials=200)
+    assert report["status"] == "analyzed" and report["effect"]["qualified_minus_raw"] == 1
+    assert not report["formal_comparison_eligible"] and not report["heldout_improvement_supported"]
+    assert len(report["training_blocked_checks"]["qualified"]) == 2
+    budget_path = Path(evaluation["jobs"][0]["path"]) / "generation_budget.json"
+    budget = read_json(budget_path)
+    budget["slots"]["26_0"]["local_checkpoint_sha256"] = None
+    atomic_json(budget_path, budget)
+    with pytest.raises(ValueError, match="different local model weights"):
+        rl_effectiveness.analyze(evaluation, trials=200)
 
 
 def test_reordered_regrade_cases_cannot_reuse_old_sample_assignments(plan, native_verifier, tmp_path):
