@@ -520,7 +520,8 @@ def test_changed_measurement_code_invalidates_resume_digest(tmp_path, monkeypatc
     source_root = common.ROOT
     for name in ("src", "kb_workflows"):
         shutil.copytree(source_root / name, tmp_path / name, ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copyfile(source_root / "requirements.txt", tmp_path / "requirements.txt")
+    for name in ("requirements.txt", "requirements-neuron-worker.txt"):
+        shutil.copyfile(source_root / name, tmp_path / name)
     monkeypatch.setattr(common, "ROOT", tmp_path)
     before = common.evaluator_digest()
     path = tmp_path / "kb_workflows/measurement.py"

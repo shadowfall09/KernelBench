@@ -9,6 +9,10 @@ EXTENDED_VARIANTS = (*VARIANTS, "compile_default_cuda_graph", "compile_max_autot
 
 
 def variants_for(config, pid):
+    if getattr(config, "device_backend", "cuda") == "neuron":
+        from .neuron_worker import library_supported
+
+        return ("neuron_eager", "neuron_compile", "neuron_library") if library_supported(config.level, pid) else ("neuron_eager", "neuron_compile")
     if config.baseline_portfolio == "standard":
         return VARIANTS
     from .baseline_rewrites import rewrite_for

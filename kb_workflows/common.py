@@ -83,13 +83,14 @@ def fingerprint(payload: dict):
 def evaluator_digest():
     digest = hashlib.sha256()
     for name in (
-        "src/eval.py", "src/utils.py", "src/validation.py", "src/reliability.py", "requirements.txt",
+        "src/eval.py", "src/utils.py", "src/validation.py", "src/reliability.py", "requirements.txt", "requirements-neuron-worker.txt",
         "kb_workflows/evaluate_task.py", "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py",
         "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
         "kb_workflows/transports.py", "kb_workflows/paper_analysis.py",
         "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
         "kb_workflows/harbor_budget.py",
         "kb_workflows/resource_budgets.py", "kb_workflows/local_model.py",
+        "kb_workflows/devices.py", "kb_workflows/neuron_device.py", "kb_workflows/neuron_worker.py", "kb_workflows/neuron_profile.py",
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",

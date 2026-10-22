@@ -89,6 +89,7 @@ def write_task(directory, config, pid, sid=0, device=None):
     for name in ("src", "kb_workflows", "scripts", "KernelBench"):
         shutil.copytree(ROOT / name, repo / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     shutil.copy2(ROOT / "requirements.txt", repo / "requirements.txt")
+    shutil.copy2(ROOT / "requirements-neuron-worker.txt", repo / "requirements-neuron-worker.txt")
     shutil.copy2(ROOT / "LICENSE", repo / "LICENSE")
     hidden_target = repo / "hidden_tests" / f"level{config.level}" / hidden.name
     hidden_target.parent.mkdir(parents=True)

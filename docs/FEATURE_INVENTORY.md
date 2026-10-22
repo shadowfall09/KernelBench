@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第十六版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第十七版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -546,6 +546,31 @@ R-20推进为部分实现；候选算法证书加分和绑定训练来源的完�
 验证：Python 3.12.12 / Torch 2.12.0下743项CPU/模拟回归通过，本版新增19项。覆盖完整模拟尺寸扫描、恒定倍率反例、基线互不覆盖、证据变更失效、旧完成文件、恢复后优化路径、全部种子/会话/槽位保留及持出权重来源；模拟训练只生成模拟权重，不加载真实模型。Ruff、动机表、19份Markdown本地链接、177包依赖兼容性及离线wheel轻量导入检查通过。
 
 R-20的软件范围已补全，23项合计11项代码已实现、8项部分实现、4项待实现；其余设计继续推进。没有运行真实模型、GPU、Trainium、校准或训练实验，此前stash保持原样。
+
+## 第十七版：原生Neuron/NKI与设备适配接口
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add native Neuron evaluation through shared device adapters |
+| 日期 | 2026-10-22 |
+| 基础提交 | `e743d71` |
+| 状态 | 软件实现与CPU/模拟回归；未运行设备、校准、模型或训练实验 |
+
+| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V17-01 | 通用设备适配协议 | 同一caps/calibrate/flush/time/attribute接口，CUDA与Neuron两种实现，导入与预览不加载SDK | `kb_workflows/devices.py` | [M5](MOTIVATION.md#m5) |
+| V17-02 | Neuron配置与任务执行 | device节、独立worker解释器、core分配与LNC=1，接入原生标准/隐藏/最终及开发任务，拒绝CUDA环境混用 | `kb_workflows/neuron_worker.py` | [M5](MOTIVATION.md#m5) |
+| V17-03 | Neuron基线与配对重测 | eager/compile与4题源码绑定的框架库变体，复用最快正确基线、平衡配对与冻结重测；平台独立分组 | `kb_workflows/baseline_variants.py` | [M3](MOTIVATION.md#m3) |
+| V17-04 | CPU FP64与输入角色保护 | 独立oracle留在CPU，逐次验证与双向调用保持模型状态/RNG；冻结NKI源码与环境，禁止FP8存储降级和CPU代理计分 | `kb_workflows/neuron_worker.py` | [M2](MOTIVATION.md#m2) |
+| V17-05 | Neuron校准与物理身份 | 序列号/core/驱动/SDK身份，原始copy与分dtype GEMM及启动代理；同步墙钟口径和未知cache明确保留 | `kb_workflows/neuron_device.py` | [M3](MOTIVATION.md#m3) |
+| V17-06 | 设备轨迹与每引擎诊断 | 收集框架trace/NEFF/NTFF及哈希，显式单位/窗口分析tensor/vector/scalar/DMA活动并集；不冒充工作计数器或host墙钟 | `kb_workflows/neuron_profile.py` | [M3](MOTIVATION.md#m3) |
+| V17-07 | NKI提示与coding skill | 保留ModelNew接口，提示现代NKI及native注册；skill复用设备配置和vendor解释器，客户端/验证器环境分开 | `kb_workflows/generation.py` | [M4](MOTIVATION.md#m4) |
+
+使用方法见[Neuron/NKI说明](NEURON.md)。Production-41中40个可传输存储接口通过CPU前端回归，FP8存储题21显式拒绝；这不等于40题已在Neuron上运行或支持全部算子。原生后端是TorchNeuron 2.14的Beta接口，旧XLA产品、LNC=2和CUDA容器不是这一实现的运行环境。
+
+验证：Python 3.12.12 / Torch 2.12.0下823项CPU/模拟回归通过，本版新增80项。覆盖设备配置/分配、40题前端、4题库等价改写、CPU FP64、小实例资格、状态/RNG进度、模拟校准与profile、首次执行篡改、源码检查及Harbor完整摘要；原生SDK调用用模拟对象替代。Ruff、动机表、20份Markdown本地链接、skill校验、177包依赖兼容性及离线wheel轻量导入检查通过。没有安装或运行Neuron SDK及实机实验。
+
+R-21的软件范围已接入；23项当前为12项代码已实现、8项部分实现、3项待实现。来源归因、硬件计数器和正式归因门继续归R-16，隔离容器仍归R-23。此前stash没有恢复。
 
 ## 维护方式
 

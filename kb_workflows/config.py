@@ -30,6 +30,8 @@ class RunConfig:
     task_track: str = "all"
     task_memory_mb: int = 512
     task_dimensions: str = ""
+    device_backend: str = "cuda"
+    device_python: str = ""
     start: int = 1
     end: int | None = None
     run_name: str = ""
@@ -220,10 +222,24 @@ class RunConfig:
         devices = self.gpus.split(",")
         if any(not d.isdigit() for d in devices) or len(set(devices)) != len(devices):
             raise ValueError("--gpus must contain distinct numeric device IDs")
+        if self.device_backend not in {"cuda", "neuron"}:
+            raise ValueError("Unknown device backend")
+        if self.device_python:
+            self.device_python = str(Path(self.device_python).expanduser().resolve())
         profiles = gpu_profiles()
         target = self.hardware or self.gpu
         preset = profiles.get(target, {})
-        if target and not self.gpu_arch and not preset:
+        if self.device_backend == "neuron":
+            from .devices import NEURON_TARGETS
+
+            if target not in NEURON_TARGETS or self.gpu_arch not in {"", NEURON_TARGETS.get(target)}:
+                raise ValueError("Neuron requires Trainium2/trn2 or Trainium3/trn3")
+            self.gpu_arch = NEURON_TARGETS[target]
+            if self.gpu or self.evaluation not in {"local", "queue"} or self.generation != "local" or self.stage == "export-harbor":
+                raise ValueError("Neuron uses local/queue verification and native generation; CUDA Docker/Modal/Harbor images are not Neuron environments")
+            if not self.baseline_suite or self.baseline_portfolio != "standard" or self.compile_backend or self.enable_ncu:
+                raise ValueError("Neuron requires its standard eager/compile portfolio; CUDA compilation and Nsight options do not apply")
+        elif target and not self.gpu_arch and not preset:
             raise ValueError(f"Unknown GPU {target!r}; set gpu.hardware and gpu.architecture in --config, or --gpu-arch")
         self.gpu_arch = self.gpu_arch or preset.get("gpu_arch", "")
         if self.gpu_arch:
@@ -309,6 +325,7 @@ def parser():
             aliases.append("--num-parallel")
         p.add_argument(*aliases, dest=name, type=int, default=argparse.SUPPRESS)
     choices = {
+        "device_backend": ("cuda", "neuron"),
         "score_mode": ("bounded_gain", "headroom"),
         "baseline_portfolio": ("standard", "extended"),
         "evidence_level": ("current", "L0", "L1", "L2"),
@@ -334,6 +351,8 @@ def parser():
         "suite_role",
         "task_profile",
         "task_dimensions",
+        "device_backend",
+        "device_python",
         "task_track",
         "run_name",
         "runs_dir",
@@ -384,7 +403,7 @@ def parser():
 def file_options(path, argument_parser):
     path = Path(path).expanduser().resolve()
     document = read_toml(path)
-    if unknown := set(document) - {"run", "gpu"}:
+    if unknown := set(document) - {"run", "gpu", "device"}:
         raise ValueError(f"Unknown config sections: {', '.join(sorted(unknown))}")
     run = document.get("run", {})
     if not isinstance(run, dict):
@@ -409,7 +428,17 @@ def file_options(path, argument_parser):
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value
-    options.update(gpu_options(document.get("gpu", {})))
+    if document.get("gpu") and document.get("device"):
+        raise ValueError("Use either [gpu] or [device] for one device target")
+    if "device" in document:
+        from .devices import device_options
+
+        options.update(device_options(document["device"], directory=path.parent))
+    else:
+        options.update(gpu_options(document.get("gpu", {})))
+    if options.get("device_backend") == "neuron":
+        options.setdefault("generation", "local")
+        options.setdefault("enable_ncu", False)
     if options.get("agent_backend") == "local-transformers" and options.get("model"):
         checkpoint = Path(options["model"]).expanduser()
         options["model"] = str((checkpoint if checkpoint.is_absolute() else path.parent / checkpoint).resolve())

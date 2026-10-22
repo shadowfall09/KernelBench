@@ -1,6 +1,6 @@
 # KernelBench Pro：Motivation 与实现对照
 
-本文是项目动机和范围的统一入口；[论文](../research/headroom/PAPER.md)沿用同样的五条主线，[功能清单](FEATURE_INVENTORY.md)保留逐版历史。实现、研究设计和实验结果分别记录。当前计算后端是 NVIDIA CUDA；Trainium/NKI 属于后续设计。
+本文是项目动机和范围的统一入口；[论文](../research/headroom/PAPER.md)沿用同样的五条主线，[功能清单](FEATURE_INVENTORY.md)保留逐版历史。实现、研究设计和实验结果分别记录。现有CUDA工作流与新增原生Neuron/NKI轨道共享设备接口；Neuron仅完成软件与CPU/模拟回归，实机兼容性和性能未验证。
 
 <a id="m1"></a>
 
@@ -52,7 +52,7 @@
 
 当前有统一 TOML/CLI、显式 GPU 目标、local/Docker/Modal/HTTP 队列、Slurm、Harbor 任务导出与独立 verifier 配置；运行采用独立任务、超时清理和内容恢复。Python 3.12 与依赖版本固定，项目命名、文档、来源和版权集中维护。不同执行后端不等于不同计算平台：现有 GPU 配置仍描述 NVIDIA CUDA。
 
-CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等于部署成功。真实 CUDA、容器/云端、Harbor 隔离与 regrade 未进行实机验证。已新增CUDA校准接口，Trainium/NKI与完整通用设备层仍需实现；逐项证据收据和等级门已实现，L1/L2设备证据尚未采集；“缺工具可选”不能关闭已有正确性门或把未知字段写成通过。
+CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等于部署成功。真实 CUDA、容器/云端、Harbor 隔离与 regrade 未进行实机验证。第十七版补通用设备接口、原生TorchNeuron/NKI执行、该平台基线与校准、源码/物理身份绑定及每引擎诊断；SDK部署与算子覆盖仍未做实机验证，CPU fallback与模拟计时不能建立正式设备资格。逐项证据收据和等级门已实现，L1/L2的来源/计数器证据尚未采集；“缺工具可选”不能关闭已有正确性门或把未知字段写成通过。限制和配置见[Neuron说明](NEURON.md)。
 
 当前任务范围是完成23项设计所需的实现、配置、runner和必要回归，**不运行科研实验**。实际GPU、Trainium、真实模型和训练结果保持未运行；它们不作为本轮代码交付的前置条件。
 
@@ -103,6 +103,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V9-04 模式状态与同对象缓存检查 | 审计train/eval、同名buffer、参数原地更新与同对象输入修改后的响应 | — | [strict_validation.py](../kb_workflows/strict_validation.py) |
 | V9-05 进程设置审计 | 记录并恢复候选导入和执行修改的后端、默认dtype、线程和环境变量；收据不含环境变量值 | M5 | [strict_validation.py](../kb_workflows/strict_validation.py) |
 | V15-03 分阶段小实例资格任务 | qualify_small在原尺寸分配前运行审查契约；源码与小实例失败先停止昂贵阶段，基线过期则在模型加载前停止 | M4 | [evaluate_task.py](../kb_workflows/evaluate_task.py), [rl_rewards.py](../kb_workflows/rl_rewards.py) |
+| V17-04 CPU FP64与输入角色保护 | 独立oracle留在CPU，逐次验证保持输入角色、模型调用状态及Neuron RNG；审计冻结NKI文件和环境，禁止FP8存储降级与模拟设备计分 | M3 | [neuron_worker.py](../kb_workflows/neuron_worker.py), [strict_validation.py](../kb_workflows/strict_validation.py), [measurement.py](../kb_workflows/measurement.py), [reliability.py](../src/reliability.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -137,6 +138,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V15-04 同题交替终局奖励 | 同题共享repeat种子并交替启动独立标准/隐藏/配对计时任务，核对设备UUID；严格资格分与弱raw-speedup消融分开，失败槽位为零 | M2, M4 | [rl_rewards.py](../kb_workflows/rl_rewards.py) |
 | V16-02 多尺寸算法证书 | 至少5尺寸且跨度16倍，固定源码/设备/变体和形状规律，重做原生资格与配对测量，斜率须匹配当前D/SOL审查且显著低于参考 | M2, M4 | [scaling_certificate.py](../kb_workflows/scaling_certificate.py), [SCALING_CERTIFICATES.md](../docs/SCALING_CERTIFICATES.md) |
 | V16-06 按训练种子的效果分析 | 重算持出资格分，报告配对训练种子效应、分层区间与双侧检验；失败检查未知槽位给上下界，模拟数据不能支持正式效果 | M4 | [rl_effectiveness.py](../kb_workflows/rl_effectiveness.py), [test_rl_workflow.py](../tests/test_rl_workflow.py) |
+| V17-03 Neuron基线与配对重测 | eager/compile及4题源码绑定的框架库改写，最快正确基线、平衡配对与冻结重测复用；平台单独分组 | M2, M5 | [neuron_worker.py](../kb_workflows/neuron_worker.py), [baseline_variants.py](../kb_workflows/baseline_variants.py) |
+| V17-05 Neuron校准与物理身份 | 绑定序列号/core/驱动/SDK并保留原始copy、分dtype GEMM和启动代理，明确同步墙钟口径、无FP64速率和未知缓存驱逐 | M5 | [neuron_device.py](../kb_workflows/neuron_device.py), [calibration.py](../kb_workflows/calibration.py) |
+| V17-06 设备轨迹与每引擎诊断 | 收集框架trace/NEFF/NTFF与哈希；显式单位/窗口的tensor/vector/scalar/DMA并集，不把指令数冒充kernel数或capture跨度冒充host墙钟 | M5 | [neuron_profile.py](../kb_workflows/neuron_profile.py), [neuron_device.py](../kb_workflows/neuron_device.py), [analyze_device_trace.py](../scripts/analyze_device_trace.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -163,6 +167,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V15-07 持出评测计划与CLI | 持出checkpoint资产冻结并复用原生one-shot/反馈任务及独立会话；提供默认非执行CLI，模型改变在运行前拒绝 | M1, M5 | [rl_evaluation.py](../kb_workflows/rl_evaluation.py), [study_plan.py](../kb_workflows/study_plan.py), [rl_workflow.py](../scripts/rl_workflow.py) |
 | V16-03 有界证书奖励 | 默认关闭；高资格候选才可请求证书，加分后封顶1，失败或恒定倍率优化无算法加分，证书墙钟记入训练预算 | M2, M3 | [rl_rewards.py](../kb_workflows/rl_rewards.py), [rl_plan.py](../kb_workflows/rl_plan.py) |
 | V16-05 预注册奖励对照与持出评测 | 执行前冻结两奖励组与全部种子、优化器/数据/预算及评测会话；当前lineage/权重不符或缺作业不能缩小研究，默认不执行 | M1, M5 | [rl_effectiveness.py](../kb_workflows/rl_effectiveness.py), [study_plan.py](../kb_workflows/study_plan.py), [rl_workflow.py](../scripts/rl_workflow.py) |
+| V17-07 NKI提示与coding skill | 保留ModelNew接口并提示现代NKI/native注册，skill复用设备配置与vendor解释器；客户端模型环境与可信验证环境分开 | M5 | [generation.py](../kb_workflows/generation.py), [SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md), [trainium2.toml](../configs/trainium2.toml) |
 
 ### M5：可复现且可部署的基础设施的改动
 
@@ -207,6 +212,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V10-05 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母 | M3, M4 | [final_verification.py](../kb_workflows/final_verification.py) |
 | V15-05 训练预算与checkpoint恢复 | 生成前持久化预留group，中断仍扣额度；checkpoint绑定文件、step及奖励前缀；父进程监督总墙钟含清理，缺账本拒绝重置 | M4 | [rl_training.py](../kb_workflows/rl_training.py) |
 | V16-04 训练来源与父进程凭据 | 绑定最终权重、计划、全部奖励/证书文件和当前优化路径；恢复保留丢弃更新的成本，nonce与锁拒绝旧完成文件和并发监督 | M4 | [rl_lineage.py](../kb_workflows/rl_lineage.py), [rl_training.py](../kb_workflows/rl_training.py) |
+| V17-01 通用设备适配协议 | 定义caps/calibrate/flush/time/attribute，CUDA与Neuron两实现，导入及配置预览不加载SDK | M3 | [devices.py](../kb_workflows/devices.py), [calibration.py](../kb_workflows/calibration.py) |
+| V17-02 Neuron配置与任务执行 | device节、独立vendor解释器、物理core分配及LNC=1，接入标准/隐藏/最终与开发任务，拒绝CUDA镜像和旧XLA混用 | M2, M4 | [config.py](../kb_workflows/config.py), [neuron_worker.py](../kb_workflows/neuron_worker.py), [transports.py](../kb_workflows/transports.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -224,21 +231,21 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成 |
 | R-08 自写内核执行归因与库轨道 | 待实现 | M2 | Torch算子汇总不证明来源；20%和95%阈值未校准，不作为默认资格 |
-| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成 |
-| R-10 内存与竞态工具 | 待实现 | M2 | compute-sanitizer及题目允许非确定性的规则需GPU复现，重复一致不证明无竞态 |
+| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计 |
+| R-10 内存与竞态工具 | 待实现 | M2 | compute-sanitizer runner与题目允许非确定性的策略仍待实现；重复一致不证明无竞态，真实GPU复现按用户范围不运行 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |
 | R-12 独立最终重测 | 代码已实现 | M3 | 已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行 |
 | R-13 扩展基线组合 | 部分实现 | M3 | 已有compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖仍需实现，真实GPU部署和实验按用户要求不运行 |
 | R-14 设备实测上限与边界证书 | 代码已实现 | M3 | 已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理 |
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
-| R-16 完整性能归因 | 部分实现 | M3 | 已实现设备busy并集、保守来源份额、缺计数器时AE/O及launch_only诊断；实际Nsight/Neuron计数器采集、二进制来源与正式归因评分门待实现 |
+| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA设备busy并集、Neuron框架/NEFF/NTFF收集及每引擎指令并集、缺计数器时AE/O及launch_only诊断；硬件工作计数器采集、二进制来源与正式归因评分门待实现，没有运行设备实验 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |
 | R-20 RL训练与奖励验证 | 代码已实现 | M4 | 已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果 |
-| R-21 Trainium/NKI与设备通用接口 | 待实现 | M5 | caps/calibrate/flush/time/attribute是目标设计；当前计算后端仍为NVIDIA CUDA |
+| R-21 Trainium/NKI与设备通用接口 | 代码已实现 | M5 | 已实现五方法设备接口、原生TorchNeuron/NKI worker、平台基线/校准、core与物理/软件身份、CPU FP64与原生最终/配对重测、每引擎轨迹诊断；40个存储接口仅CPU前端回归，FP8存储明确拒绝，SDK部署、算子覆盖和设备实验未验证 |
 | R-22 工具能力收据与可选分层 | 代码已实现 | M5 | 已实现逐项状态收据、缺项null、等级判定与评分门；L1/L2缺少的设备工具证据不会降格冒充通过，GPU验收仍独立记录 |
-| R-23 实机隔离与重评分实验 | 待实现 | M5 | Harbor独立verifier配置已接入；GPU、容器网络、沙箱边界、升级后regrade尚待实测 |
+| R-23 实机隔离与重评分实验 | 待实现 | M5 | Harbor独立verifier配置已接入；容器网络/权限策略、设备隔离与升级regrade工作流仍待实现，真实部署和隔离实验按用户范围不运行 |
 <!-- roadmap:end -->
 
 ## 维护约定

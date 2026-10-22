@@ -149,7 +149,7 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
                  values={"issues": issues, "parameter_count": len(parameters)})
 
 
-def run_checks(reference, candidate, contract, *, hidden, seed, device, dtype, set_seed):
+def run_checks(reference, candidate, contract, *, hidden, seed, device, dtype, set_seed, oracle_on_cpu=False):
     numerical, signals, sensitivity, all_cases = [], [], [], []
     policy = PrecisionContract(**contract["precision"][str(dtype).removeprefix("torch.")])
     changes, exceptions = [], []
@@ -158,15 +158,21 @@ def run_checks(reference, candidate, contract, *, hidden, seed, device, dtype, s
         for label, args in cases(contract, hidden=hidden, seed=seed, device=device, dtype=dtype):
             try:
                 ref, cand = copy.deepcopy(reference), copy.deepcopy(candidate)
-                oracle = copy.deepcopy(reference).to(dtype=torch.float64)
+                oracle = copy.deepcopy(reference).to(dtype=torch.float64, **({"device": "cpu"} if oracle_on_cpu else {}))
                 set_seed(seed)
-                truth = clone_tensors(oracle(*to_oracle(args)))
+                oracle_args = [value.detach().cpu() if isinstance(value, torch.Tensor) else value for value in args] if oracle_on_cpu else args
+                truth = clone_tensors(oracle(*to_oracle(oracle_args)))
                 set_seed(seed)
                 expected = clone_tensors(ref(*clone_tensors(args)))
                 set_seed(seed)
                 with environment_guard(changes):
                     actual = clone_tensors(cand(*clone_tensors(args)))
                     synchronize(device)
+                if oracle_on_cpu:
+                    from .neuron_worker import map_tensors
+
+                    expected = map_tensors(expected, lambda value: value.detach().cpu())
+                    actual = map_tensors(actual, lambda value: value.detach().cpu())
                 numerical.append({"case": label, **precision_gate(expected, actual, truth, policy)})
                 signals.append({"case": label, **signal_audit(expected, absolute_tolerance=policy.element_atol)})
                 # A same-object change catches identity caches. Reference sensitivity decides applicability.

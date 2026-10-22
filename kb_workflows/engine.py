@@ -19,6 +19,7 @@ def settings(config, hidden=False):
         "num_perf_trials": config.num_perf_trials,
         "timeout": config.timeout,
         "gpu_arch": config.gpu_arch,
+        "device_backend": config.device_backend,
         "gpu": config.gpu,
         "hardware": config.hardware,
         "evaluation_backend": config.evaluation,
@@ -64,6 +65,8 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         "ref_arch_src": path.read_text(),
         "eval_config": options,
     }
+    if config.device_python and config.evaluation == "local":
+        payload["worker_python"] = config.device_python
     if task in {"evaluate", "profile", "paired_timing", "qualify_small"}:
         payload["kernel_src"] = (config.run_dir / kernel_name(config.level, pid, sid)).read_text()
     else:
@@ -81,7 +84,7 @@ def evaluate_tasks(config, payloads):
     """Keep each local GPU serial while allowing other GPUs/transports to progress."""
     if not payloads:
         return
-    devices = resolve_devices(config.gpus) if config.evaluation in {"local", "docker"} else ["0"]
+    devices = resolve_devices(config.gpus, backend=config.device_backend) if config.evaluation in {"local", "docker"} else ["0"]
     locks = [threading.Lock() for _ in devices]
     workers = (
         len(devices)

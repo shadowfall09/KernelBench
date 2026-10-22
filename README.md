@@ -27,7 +27,7 @@ LICENSE file in the root directory of this source tree.
 项目按五条 motivation 组织：题目区分度、正确性与执行可信度、性能指标、Agent 回路和基础设施。
 [动机与逐项对照](docs/MOTIVATION.md)覆盖每版改动和未完成设计；
 [统一研究稿](research/headroom/PAPER.md)说明 Headroom 目标与当前实现的差额。
-当前计算后端为 NVIDIA CUDA；Trainium/NKI和实测下界评分仍属研究设计。
+当前提供 NVIDIA CUDA 和[原生Neuron/NKI设备工作流](docs/NEURON.md)；后者为软件接入及CPU/模拟验证，实机部署与性能未验证。可选Headroom评分要求真实设备校准和可信规格，缺证据不计分。
 显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/STRICT_VALIDATION.md)。
 
 ## 安装

@@ -32,7 +32,8 @@ def probe_record(work, samples_ms, *, unit, parameters):
         raise ValueError("Calibration needs positive work and at least five positive timing samples")
     return {"work_per_call": work, "samples_ms": samples_ms, "unit": unit, "parameters": parameters,
             "rate": work / (statistics.median(samples_ms) / 1000),
-            "rate_policy": "work_over_median_device_event_time"}
+            "rate_policy": "work_over_median_synchronized_wall_time" if parameters.get("time_method", "").startswith("synchronized_wall")
+                else "work_over_median_device_event_time"}
 
 
 def seal(device, probes, launch_samples_ms, *, settings, digest=None):
@@ -96,6 +97,11 @@ class CUDADevice:
         from .measurement import device_fingerprint
 
         return device_fingerprint(self.device)
+
+    def attribute(self, trace, **settings):
+        from .performance import timeline
+
+        return timeline(trace, device=self.device.index or 0, **settings)
 
     def flush(self, bytes_=None):
         import torch

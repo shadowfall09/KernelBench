@@ -148,7 +148,7 @@ def test_native_generation_runs_every_selected_sample_only(tmp_path, monkeypatch
         return {"status": "success"}
 
     monkeypatch.setattr(generation, "run_agent", generate)
-    monkeypatch.setattr(generation, "resolve_devices", lambda devices: ["simulated-device"])
+    monkeypatch.setattr(generation, "resolve_devices", lambda devices, **kwargs: ["simulated-device"])
     assert generation.generate_run(cfg)
     assert Counter(seen) == {pid: 2 for pid in [2, 3, 6, 8, 9, 10]}
     assert len(read_json(cfg.run_dir / "generation_summary.json")) == 12
@@ -202,10 +202,10 @@ def test_audit_and_selection_artifacts_match_provenance_and_totals():
 def test_every_change_has_a_current_motivation_and_real_local_evidence():
     report = validate()
     assert report["historical_changes"] == 67
-    assert report["implemented_changes"] == 122
-    assert report["planned_designs"] == 4
+    assert report["implemented_changes"] == 129
+    assert report["planned_designs"] == 3
     assert report["in_progress_designs"] == 8
-    assert report["completed_designs"] == 11
+    assert report["completed_designs"] == 12
 
 
 def test_motivation_validation_detects_inventory_drift(tmp_path):

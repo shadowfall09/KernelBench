@@ -17,6 +17,7 @@ def protocol(config):
         "mode": "external" if external else config.generation_mode,
         "scaffold": f"harbor/{config.harbor_agent}" if external else "mini-swe-agent==2.4.6",
         "model_backend": "harbor" if external else config.agent_backend,
+        "device_backend": config.device_backend,
         "model": config.model,
         "samples_per_problem": config.num_samples,
         "candidate_limit_per_sample": None if external else (1 if config.generation_mode == "one-shot" else config.optimization_rounds),

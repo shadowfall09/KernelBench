@@ -1,5 +1,7 @@
 # GPU 配置
 
+CUDA沿用本文的`[gpu]`预设。通用`[device]`配置及Trainium2/3的原生NKI工作流见[Neuron说明](NEURON.md)；两种配置节不能同时声明一个目标，CUDA设备镜像不会被当作Neuron环境。
+
 批量入口通过 TOML 的 `[gpu]` 配置目标设备，通过 `[run]` 配置题目与工作流。配置解析只依赖 Python 3.12 标准库，预览和 Harbor 任务导出不需要导入 Torch、探测 GPU 或调用云服务。
 
 ```toml

@@ -35,6 +35,7 @@ def make_image(agent=False):
     for name in ("src", "KernelBench", "hidden_tests", "scripts", "kb_workflows"):
         image = image.add_local_dir(ROOT / name, f"/app/KernelBench/{name}", ignore=["**/__pycache__/**"])
     image = image.add_local_file(ROOT / "requirements.txt", "/app/KernelBench/requirements.txt")
+    image = image.add_local_file(ROOT / "requirements-neuron-worker.txt", "/app/KernelBench/requirements-neuron-worker.txt")
     return image
 
 

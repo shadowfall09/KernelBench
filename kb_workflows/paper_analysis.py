@@ -69,6 +69,8 @@ def bootstrap_ci(problem_scores, trials=1000):
 
 def measurement_evidence(result, candidate=False):
     metadata = result.get("metadata", {}) if candidate else result
+    if metadata.get("simulated_execution") is True or result.get("metadata", {}).get("simulated_execution") is True:
+        return "simulated_device_execution_cannot_qualify"
     stats = result.get("runtime_stats", {}) if candidate else result
     receipt = metadata.get("timing_receipt", {})
     if not all(receipt.get(key) is True for key in

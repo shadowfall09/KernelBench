@@ -55,7 +55,7 @@ def stress_cases(inputs, seed):
 
 
 def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
-                       set_seed, metadata, label, record_first_call=False, clock=None):
+                       set_seed, metadata, label, record_first_call=False, clock=None, verify_pair=None):
     """Compare C→R and R→C pairs, advancing both models equally, with RNG replay.
 
     Snapshot each output before the other implementation can reuse its storage.
@@ -90,5 +90,7 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
         if issue:
             receipt.update(failure_kind="output_mismatch", issue=issue)
             return f"{label}/{order}: {issue}"
+        if verify_pair:
+            verify_pair(inputs, outputs)
     receipt["passed"] = True
     return None

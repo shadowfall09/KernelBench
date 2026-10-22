@@ -19,7 +19,7 @@ def _options(config):
     options = {name: getattr(config, name) for name in (
         "level", "suite", "suite_role", "task_profile", "task_track", "task_memory_mb", "start", "end", "num_samples", "precision", "fp32_tolerance",
         "num_correct_trials", "num_perf_trials", "hidden_tests", "strict_validation", "evidence_level",
-        "baseline", "baseline_suite", "baseline_portfolio", "cold_calls", "gpu_arch", "hardware",
+        "baseline", "baseline_suite", "baseline_portfolio", "cold_calls", "gpu_arch", "hardware", "device_backend", "device_python",
         "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout")}
     if config.task_dimensions:
         options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})

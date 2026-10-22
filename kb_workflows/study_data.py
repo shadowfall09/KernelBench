@@ -23,7 +23,7 @@ def study_digest():
 
 
 def evaluation_contract(config):
-    fields = ("hardware", "gpu_arch", "precision", "fp32_tolerance", "baseline", "baseline_suite", "baseline_portfolio",
+    fields = ("hardware", "gpu_arch", "device_backend", "precision", "fp32_tolerance", "baseline", "baseline_suite", "baseline_portfolio",
               "hidden_tests", "num_correct_trials", "num_perf_trials", "strict_validation", "evidence_level",
               "cold_calls", "paired_timing", "paired_trials", "final_repeats", "score_mode", "suite", "suite_role",
               "task_track", "task_profile", "task_memory_mb", "num_samples", "evaluation", "timeout")

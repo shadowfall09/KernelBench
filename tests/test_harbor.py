@@ -147,7 +147,7 @@ def test_harbor_generation_imports_submission_and_resumes(config, monkeypatch):
         return SimpleNamespace(wait=lambda **kw: 0, poll=lambda: 0, returncode=0)
 
     monkeypatch.setattr(harbor.subprocess, "Popen", popen)
-    monkeypatch.setattr(generation, "resolve_devices", lambda value: ["GPU-allocated"])
+    monkeypatch.setattr(generation, "resolve_devices", lambda value, **kwargs: ["GPU-allocated"])
     assert generation.generate_run(config)
     assert (config.run_dir / kernel_name(1, 90)).read_text() == "class ModelNew: pass\n"
     config.resume = True

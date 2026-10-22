@@ -14,7 +14,7 @@ from .strict_validation import environment_guard
 
 
 def collect_pairs(reference, candidate, control, input_factory, oracle, *, device, trials, seed,
-                  reset=None, set_seed=None, tolerance=1e-3, warmup=3, clock=CLOCK):
+                  reset=None, set_seed=None, tolerance=1e-3, warmup=3, clock=CLOCK, verifier=None):
     import torch
 
     if type(trials) is not int or trials < 10:
@@ -60,6 +60,8 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                 issue = compare_outputs(expected, output, tolerance)
                 if issue:
                     raise ValueError(f"Paired trial {trial}/{name}: {issue}")
+                if verifier:
+                    verifier(args, output)
                 samples[name] = elapsed
                 del output, consumed, fresh
             if trial >= warmup:

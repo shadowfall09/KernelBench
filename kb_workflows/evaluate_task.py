@@ -281,7 +281,11 @@ def qualify_small(payload):
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
-        if payload.get("task") == "qualify_small":
+        if payload.get("eval_config", {}).get("device_backend", "cuda") == "neuron":
+            from .neuron_worker import evaluate as evaluate_neuron
+
+            result = evaluate_neuron(payload)
+        elif payload.get("task") == "qualify_small":
             result = qualify_small(payload)
         elif payload.get("task") == "paired_timing":
             from .paired_task import evaluate_paired

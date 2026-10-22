@@ -1,0 +1,26 @@
+[device]
+backend = "neuron"
+hardware = "Trainium2"
+target = "trn2"
+devices = [0]
+# Set python to the absolute path of the vendor Python 3.12 environment.
+# python = "/path/to/neuron-venv/bin/python"
+
+[run]
+run_name = "trainium2_feedback"
+generation = "local"
+evaluation = "local"
+generation_mode = "feedback"
+agent_backend = "claude-code"
+optimization_rounds = 5
+agent_timeout = 2400
+enable_ncu = false
+agent_profile = true
+paired_timing = true
+final_repeats = 3
+level = 5
+suite = "production41"
+task_track = "implementation"
+start = 19
+end = 20
+num_samples = 1

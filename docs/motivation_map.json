@@ -1367,9 +1367,10 @@
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py"
+        "kb_workflows/numerical.py",
+        "kb_workflows/neuron_worker.py"
       ],
-      "reason": "已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成"
+      "reason": "已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计"
     },
     {
       "id": "R-10",
@@ -1381,7 +1382,7 @@
       "evidence": [
         "research/headroom/PAPER.md"
       ],
-      "reason": "compute-sanitizer及题目允许非确定性的规则需GPU复现，重复一致不证明无竞态"
+      "reason": "compute-sanitizer runner与题目允许非确定性的策略仍待实现；重复一致不证明无竞态，真实GPU复现按用户范围不运行"
     },
     {
       "id": "R-11",
@@ -1458,9 +1459,11 @@
       "source": "paper_design",
       "evidence": [
         "kb_workflows/performance.py",
-        "kb_workflows/profile_task.py"
+        "kb_workflows/profile_task.py",
+        "kb_workflows/neuron_device.py",
+        "kb_workflows/neuron_profile.py"
       ],
-      "reason": "已实现设备busy并集、保守来源份额、缺计数器时AE/O及launch_only诊断；实际Nsight/Neuron计数器采集、二进制来源与正式归因评分门待实现"
+      "reason": "已实现CUDA设备busy并集、Neuron框架/NEFF/NTFF收集及每引擎指令并集、缺计数器时AE/O及launch_only诊断；硬件工作计数器采集、二进制来源与正式归因评分门待实现，没有运行设备实验"
     },
     {
       "id": "R-17",
@@ -1525,12 +1528,16 @@
       "title": "Trainium/NKI与设备通用接口",
       "primary": "M5",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/devices.py",
+        "kb_workflows/neuron_device.py",
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/neuron_profile.py",
+        "docs/NEURON.md"
       ],
-      "reason": "caps/calibrate/flush/time/attribute是目标设计；当前计算后端仍为NVIDIA CUDA"
+      "reason": "已实现五方法设备接口、原生TorchNeuron/NKI worker、平台基线/校准、core与物理/软件身份、CPU FP64与原生最终/配对重测、每引擎轨迹诊断；40个存储接口仅CPU前端回归，FP8存储明确拒绝，SDK部署、算子覆盖和设备实验未验证"
     },
     {
       "id": "R-22",
@@ -1554,7 +1561,7 @@
       "evidence": [
         "research/headroom/PAPER.md"
       ],
-      "reason": "Harbor独立verifier配置已接入；GPU、容器网络、沙箱边界、升级后regrade尚待实测"
+      "reason": "Harbor独立verifier配置已接入；容器网络/权限策略、设备隔离与升级regrade工作流仍待实现，真实部署和隔离实验按用户范围不运行"
     },
     {
       "id": "V9-01",
@@ -2008,6 +2015,118 @@
         "tests/test_rl_workflow.py"
       ],
       "reason": "重算持出资格分，报告配对训练种子效应、分层区间与双侧检验；失败检查未知槽位给上下界，模拟数据不能支持正式效果"
+    },
+    {
+      "id": "V17-01",
+      "title": "通用设备适配协议",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/devices.py",
+        "kb_workflows/calibration.py"
+      ],
+      "reason": "定义caps/calibrate/flush/time/attribute，CUDA与Neuron两实现，导入及配置预览不加载SDK"
+    },
+    {
+      "id": "V17-02",
+      "title": "Neuron配置与任务执行",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/config.py",
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/transports.py"
+      ],
+      "reason": "device节、独立vendor解释器、物理core分配及LNC=1，接入标准/隐藏/最终与开发任务，拒绝CUDA镜像和旧XLA混用"
+    },
+    {
+      "id": "V17-03",
+      "title": "Neuron基线与配对重测",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/baseline_variants.py"
+      ],
+      "reason": "eager/compile及4题源码绑定的框架库改写，最快正确基线、平衡配对与冻结重测复用；平台单独分组"
+    },
+    {
+      "id": "V17-04",
+      "title": "CPU FP64与输入角色保护",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/strict_validation.py",
+        "kb_workflows/measurement.py",
+        "src/reliability.py"
+      ],
+      "reason": "独立oracle留在CPU，逐次验证保持输入角色、模型调用状态及Neuron RNG；审计冻结NKI文件和环境，禁止FP8存储降级与模拟设备计分"
+    },
+    {
+      "id": "V17-05",
+      "title": "Neuron校准与物理身份",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/neuron_device.py",
+        "kb_workflows/calibration.py"
+      ],
+      "reason": "绑定序列号/core/驱动/SDK并保留原始copy、分dtype GEMM和启动代理，明确同步墙钟口径、无FP64速率和未知缓存驱逐"
+    },
+    {
+      "id": "V17-06",
+      "title": "设备轨迹与每引擎诊断",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/neuron_profile.py",
+        "kb_workflows/neuron_device.py",
+        "scripts/analyze_device_trace.py"
+      ],
+      "reason": "收集框架trace/NEFF/NTFF与哈希；显式单位/窗口的tensor/vector/scalar/DMA并集，不把指令数冒充kernel数或capture跨度冒充host墙钟"
+    },
+    {
+      "id": "V17-07",
+      "title": "NKI提示与coding skill",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/generation.py",
+        ".claude/skills/kernelbench-pro/SKILL.md",
+        "configs/trainium2.toml"
+      ],
+      "reason": "保留ModelNew接口并提示现代NKI/native注册，skill复用设备配置与vendor解释器；客户端模型环境与可信验证环境分开"
     }
   ]
 }

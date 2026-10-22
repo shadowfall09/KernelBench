@@ -17,8 +17,18 @@ from .common import ROOT, failure
 from .resource_budgets import record_device_lease
 
 
-def resolve_devices(gpus):
+def resolve_devices(gpus, *, backend="cuda"):
     requested = gpus.split(",")
+    if backend == "neuron":
+        from .neuron_device import core_ids
+
+        visible = os.environ.get("NEURON_RT_VISIBLE_CORES")
+        if visible is None:
+            return requested
+        allocated = core_ids(visible)
+        if any(int(index) >= len(allocated) for index in requested):
+            raise ValueError("Requested device is outside NEURON_RT_VISIBLE_CORES")
+        return [str(allocated[int(index)]) for index in requested]
     visible = os.environ.get("CUDA_VISIBLE_DEVICES")
     if visible is None:
         return requested
@@ -53,12 +63,17 @@ def local_evaluate(payload, device="0", log_path=None):
             "CUDA_VISIBLE_DEVICES": str(device),
             "PYTHONPATH": str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", ""),
         }
+        if payload["eval_config"].get("device_backend", "cuda") == "neuron":
+            environment["CUDA_VISIBLE_DEVICES"] = ""
+            environment.update(NEURON_RT_VISIBLE_CORES=str(device), NEURON_LOGICAL_NC_CONFIG="1",
+                               TORCH_NEURONX_DISABLE_FALLBACK_EXECUTION="1")
+        interpreter = payload.get("worker_python") or sys.executable
         if log_path is not None:
             Path(log_path).parent.mkdir(parents=True, exist_ok=True)
         actual_log = Path(log_path) if log_path is not None else directory / "evaluator.log"
         with open(actual_log, "w") as log:
             process = subprocess.Popen(
-                [sys.executable, "-m", "kb_workflows.evaluate_task", str(source), str(target)],
+                [interpreter, "-m", "kb_workflows.evaluate_task", str(source), str(target)],
                 cwd=ROOT,
                 env=environment,
                 stdout=log,

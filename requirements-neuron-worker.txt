@@ -1,0 +1,9 @@
+# Install into a separate Python 3.12 vendor environment; never into the CUDA env.
+# The driver/runtime/tools must already be installed on the Trainium host.
+--extra-index-url https://pip.repos.neuron.amazonaws.com
+torch==2.14.0
+torch-neuronx>=2.14.3,<2.15
+nki>=0.6,<0.8
+neuronx-cc>=2,<3
+numpy
+packaging

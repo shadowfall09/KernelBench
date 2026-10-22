@@ -5,7 +5,7 @@ description: Generate, optimize, or evaluate GPU kernels with KernelBench Pro us
 
 # KernelBench Pro
 
-Work from the checkout root with Python 3.12. Read `docs/AGENT_LOOPS.md` for the chosen mode and `docs/GPU_CONFIG.md` when selecting hardware. Reuse the user's configured GPU, backend, model and budgets. Local GPU work runs inside an existing Slurm allocation; configuration preview does not need a GPU.
+Work from the checkout root with Python 3.12. Read `docs/AGENT_LOOPS.md` for the chosen mode and `docs/GPU_CONFIG.md` when selecting hardware. For a Neuron target, read `docs/NEURON.md` and start from `configs/trainium2.toml`. Reuse the user's configured device, backend, model and budgets. Local GPU work runs inside an existing Slurm allocation; configuration preview does not need a device.
 
 ## Run an automated experiment
 
@@ -25,6 +25,8 @@ python -m kb_workflows.agent_task prepare --config configs/a6000-feedback.toml \
 Choose the task and verifier backend from the user's request. For Docker verification, build the current project image first; queue and Modal verification use their configured credentials/services. The command prints the task directory, public reference, output path and feedback command.
 
 Read only the supplied `model.py` for the task and implement `ModelNew` at the printed candidate path. Use `python verify.py` from the task directory for development feedback. Inspect correctness before speed; use profiler events to form a concrete bottleneck hypothesis, change the implementation, and resubmit within the configured candidate/time budget. Keep notes on changes that helped or regressed. The bridge retains the best development-correct source at finalization.
+
+When `device_backend=neuron`, keep the `torch.nn.Module` interface and use native NKI kernels registered through `torch_neuronx.nki_op`; the verifier supplies `neuron` tensors. Use the configured vendor interpreter for device verification. CPU or NumPy proxy execution, legacy XLA packages, CUDA images and simulated timings do not establish Neuron performance. Preserve role dtypes and keep unsupported FP8 storage explicit.
 
 For one-shot, produce one implementation and finalize without calling `verify.py`; execution feedback is disabled. A live coding session has unobserved model/tool calls, so it is recorded as `interactive`, not as a measured one-shot experiment.
 

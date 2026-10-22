@@ -26,6 +26,10 @@ def fresh_seed():
 def synchronize(device):
     if torch.device(device).type == "cuda":
         _SYNC(device)
+    elif str(device).split(":")[0] == "neuron":
+        from .devices import torch_adapter
+
+        torch_adapter(device).synchronize()
 
 
 def consume_output(output):
@@ -65,6 +69,7 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
             verification_args = clone_tensors(fresh) if verifier else None
             rng = torch.get_rng_state() if verifier else None
             cuda_rng = torch.cuda.get_rng_state(device) if verifier and torch.device(device).type == "cuda" else None
+            neuron_rng = torch.neuron.get_rng_state(device) if verifier and str(device).split(":")[0] == "neuron" else None
             with preserve_backend_settings():
                 synchronize(device)
                 start = CLOCK()
@@ -75,13 +80,18 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
             if verifier:
                 after_rng = torch.get_rng_state()
                 after_cuda_rng = torch.cuda.get_rng_state(device) if cuda_rng is not None else None
+                after_neuron_rng = torch.neuron.get_rng_state(device) if neuron_rng is not None else None
                 torch.set_rng_state(rng)
                 if cuda_rng is not None:
                     torch.cuda.set_rng_state(cuda_rng, device)
+                if neuron_rng is not None:
+                    torch.neuron.set_rng_state(neuron_rng, device)
                 verifier(verification_args, output)
                 torch.set_rng_state(after_rng)
                 if after_cuda_rng is not None:
                     torch.cuda.set_rng_state(after_cuda_rng, device)
+                if after_neuron_rng is not None:
+                    torch.neuron.set_rng_state(after_neuron_rng, device)
             if trial == 0 and receipt is not None:
                 receipt["first_timed_call_ms"] = elapsed
                 receipt["output_bytes"] = tensor_bytes(output)
@@ -119,6 +129,10 @@ def input_signature(args):
 
 
 def device_fingerprint(device):
+    if str(device).split(":")[0] == "neuron":
+        from .devices import torch_adapter
+
+        return torch_adapter(device).caps()
     info = {"torch_version": torch.__version__, "cuda_version": torch.version.cuda, "hip_version": torch.version.hip}
     if not torch.cuda.is_available():
         return {**info, "available": False}

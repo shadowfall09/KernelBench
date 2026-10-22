@@ -74,8 +74,10 @@ def build_prompt(config, pid):
         contract = (f"\nTrack: {spec['track']}; activation family: {spec['fixed_activation_dtype'] or config.precision}. "
                     "Input dtypes follow the public per-role contract; keep scale factors FP32 and indices/masks discrete. "
                     "Packed FP4 references specify software E2M1 semantics, not mandatory native FP4 instructions.\n")
+    implementation = ("real NKI kernels using import nki and native torch_neuronx.nki_op registration, taking neuron tensors; keep the ModelNew torch.nn.Module interface"
+                      if config.device_backend == "neuron" else "real CUDA/Triton kernels")
     return f"""Implement ModelNew for KernelBench Pro level {config.level}, problem {pid}.
-The public reference is supplied below; implement real CUDA/Triton kernels.
+The public reference is supplied below; implement {implementation}.
 Target hardware: {config.hardware or config.gpu}; architecture: {config.gpu_arch}; requested precision family: {config.precision}.{contract}
 Return one complete Python source block. The controller writes it to runs/agent/{filename}.
 Keep the model's algorithm, input-dependent behavior, shapes and parameters correct.
@@ -159,7 +161,8 @@ def run_agent(directory, config, pid, device=None):
                 **agent_environment(config),
                 "PYTHONPATH": str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", ""),
                 "MSWEA_SILENT_STARTUP": "1",
-                **({"CUDA_VISIBLE_DEVICES": str(device)} if device is not None else {}),
+                **(({"NEURON_RT_VISIBLE_CORES": str(device), "NEURON_LOGICAL_NC_CONFIG": "1"} if config.device_backend == "neuron"
+                    else {"CUDA_VISIBLE_DEVICES": str(device)}) if device is not None else {}),
             },
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -334,7 +337,7 @@ def generate_run(config):
             tasks.append((pid, sid))
     local_gpu = ((config.generation in {"local", "docker"} and config.evaluation in {"local", "docker"})
                  or (config.generation == "harbor" and config.harbor_environment == "docker"))
-    devices = resolve_devices(config.gpus) if local_gpu else ["0"]
+    devices = resolve_devices(config.gpus, backend=config.device_backend) if local_gpu else ["0"]
     # Generation with a local GPU must not run two agents concurrently on that GPU.
     import threading
 
