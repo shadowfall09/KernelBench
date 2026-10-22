@@ -24,6 +24,14 @@ work certificates and a `device_calibration` receipt. It uses steady-state gains
 the SOL target denominator and reports amortized bounded gain separately. Calibration is
 an explicit opt-in command, never an automatic phase. See [headroom scoring](HEADROOM_SCORING.md).
 
+## Optional memory and consistency checks
+
+`sanitizer_tools = "all"` enables four independent CUDA correctness-tool workers;
+`determinism_checks = true` adds seeded model snapshots with task-reviewed atomic
+variation policies. Both are disabled by default, share the original request
+timeout, and never replace uninstrumented timing samples. Missing tools or logs
+remain unknown. See [tool checks](TOOL_CHECKS.md) and `configs/a6000-safety.toml`.
+
 ## Production families
 
 Select `suite = "production41"`, `level = 5` and

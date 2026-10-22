@@ -61,6 +61,12 @@ class RunConfig:
     agent_profile: bool = True
     resume: bool = False
     enable_ncu: bool = True
+    sanitizer_tools: str = "none"
+    sanitizer_command: str = "compute-sanitizer"
+    sanitizer_timeout: int = 600
+    determinism_checks: bool = False
+    determinism_repeats: int = 5
+    determinism_policy_file: str = ""
     precision: str = "fp32"
     fp32_tolerance: float = float(os.environ.get("KB_FP32_TOL", "1e-3"))
     num_correct_trials: int = 5
@@ -138,6 +144,7 @@ class RunConfig:
             "cold_calls",
             "harbor_memory_mb",
             "task_memory_mb",
+            "sanitizer_timeout",
         ):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
@@ -191,6 +198,21 @@ class RunConfig:
             raise ValueError("Unknown evidence level")
         if self.evidence_level != "current":
             self.strict_validation = True
+        from .tool_checks import select_tools
+
+        tools = select_tools(self.sanitizer_tools)
+        self.sanitizer_tools = ",".join(tools) if tools else "none"
+        if not isinstance(self.sanitizer_command, str) or not self.sanitizer_command.strip():
+            raise ValueError("sanitizer-command must name one executable")
+        if tools and self.device_backend != "cuda":
+            raise ValueError("Compute Sanitizer requires CUDA; Neuron has no equivalent tool suite")
+        if type(self.determinism_checks) is not bool or type(self.determinism_repeats) is not int or not 3 <= self.determinism_repeats <= 100:
+            raise ValueError("Determinism checks require an explicit boolean and 3 to 100 repeats")
+        if self.determinism_policy_file:
+            from .determinism import read_policies
+
+            self.determinism_policy_file = str(Path(self.determinism_policy_file).expanduser().resolve())
+            read_policies(self.determinism_policy_file)
         if self.problem_specs:
             self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
             if not Path(self.problem_specs).is_file():
@@ -319,6 +341,8 @@ def parser():
         "agent_token_limit",
         "agent_output_token_limit",
         "agent_max_output_tokens",
+        "sanitizer_timeout",
+        "determinism_repeats",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
@@ -353,6 +377,9 @@ def parser():
         "task_dimensions",
         "device_backend",
         "device_python",
+        "sanitizer_tools",
+        "sanitizer_command",
+        "determinism_policy_file",
         "task_track",
         "run_name",
         "runs_dir",
@@ -391,7 +418,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile"):
+    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)
@@ -424,7 +451,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "task_dimensions"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value

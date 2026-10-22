@@ -278,27 +278,46 @@ def qualify_small(payload):
     return result
 
 
+def dispatch(payload):
+    if payload.get("eval_config", {}).get("device_backend", "cuda") == "neuron":
+        from .neuron_worker import evaluate as evaluate_neuron
+
+        return evaluate_neuron(payload)
+    if payload.get("task") == "qualify_small":
+        return qualify_small(payload)
+    if payload.get("task") == "paired_timing":
+        from .paired_task import evaluate_paired
+
+        return evaluate_paired(payload)
+    if payload.get("task") == "profile":
+        from .profile_task import profile
+
+        return profile(payload)
+    if payload.get("task", "evaluate") in {"evaluate", "baseline"}:
+        return baseline(payload) if payload.get("task") == "baseline" else evaluate(payload)
+    raise ValueError("Unknown evaluation task")
+
+
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
-        if payload.get("eval_config", {}).get("device_backend", "cuda") == "neuron":
-            from .neuron_worker import evaluate as evaluate_neuron
+        from .tool_checks import enabled
 
-            result = evaluate_neuron(payload)
-        elif payload.get("task") == "qualify_small":
-            result = qualify_small(payload)
-        elif payload.get("task") == "paired_timing":
-            from .paired_task import evaluate_paired
+        native_worker = sys.argv[3:] == ["--native-worker"]
+        settings = payload["eval_config"]
+        if native_worker and settings.get("diagnostic_stage") == "control" and settings.get("determinism_checks"):
+            from .determinism import audit, validate_inline
 
-            result = evaluate_paired(payload)
-        elif payload.get("task") == "profile":
-            from .profile_task import profile
+            validate_inline(settings["determinism_policy"], payload["ref_arch_src"])
+            with audit(settings["determinism_policy"], settings["determinism_repeats"]) as collector:
+                result = dispatch(payload)
+            result.setdefault("metadata", {})["repeat_audit"] = collector.document()
+        elif enabled(payload) and not native_worker:
+            from .tool_runner import evaluate as evaluate_with_tools
 
-            result = profile(payload)
-        elif payload.get("task", "evaluate") in {"evaluate", "baseline"}:
-            result = baseline(payload) if payload.get("task") == "baseline" else evaluate(payload)
+            result = evaluate_with_tools(payload)
         else:
-            raise ValueError("Unknown evaluation task")
+            result = dispatch(payload)
     except Exception as exc:
         result = failure(str(exc), error_name=type(exc).__name__)
     atomic_json(Path(sys.argv[2]), result)

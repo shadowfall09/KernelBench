@@ -25,6 +25,8 @@ LiteLLM在请求前检查模型支持的`max_completion_tokens`/`max_tokens`参�
 
 已知设备占用未超额时，预算耗尽仍可保留此前开发通过的最佳候选。缺失收据、无法完成清理或实际超额会拒绝计分资格。进程终止不能保证任意驱动或内核被立即抢占；收据明确写`physical_preemption_certified=false`，没有实现纯GPU busy时间的物理硬限。远端Modal/队列/Harbor尚无对应可信取消与计量契约，开启本版预留会在配置校验时拒绝。
 
+可选[内存工具与重复检查](TOOL_CHECKS.md)在同一次验证请求的超时和设备worker墙钟内执行；插桩、版本查询及无插桩复核没有独立额度。它们的耗时不进入性能分数，但计入实际开发资源占用。
+
 ## 离线本地模型
 
 安装可选依赖：`pip install '.[local-model]'`。配置中的checkpoint必须事先存在；适配器不下载模型、禁用远端Python代码并只加载safetensors权重。下面是配置示意，需填写本地路径和实际GPU目标：

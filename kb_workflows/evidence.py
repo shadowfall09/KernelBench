@@ -7,7 +7,7 @@ LEVELS = {
     "L0": ("correctness", "precision_contract", "reference_signal", "input_families",
            "input_sensitivity", "environment_integrity", "mode_state"),
     "L1": ("paired_timing", "noise_floor", "kernel_origin", "device_calibration", "bound_certificate"),
-    "L2": ("hardware_counters", "memory_safety", "algorithm_certificate"),
+    "L2": ("hardware_counters", "memory_safety", "repeat_consistency", "algorithm_certificate"),
 }
 STATES = {"passed", "failed", "not_measured", "not_applicable"}
 

@@ -139,6 +139,16 @@ def prepare_job(config, pid, sid):
             job["queue_url"] = job["queue_url"].replace("localhost", "host.docker.internal")
     if config.generation == "modal":
         job["runs_dir"] = "/work/runs"
+    if config.determinism_policy_file:
+        from .determinism import POLICY_PROTOCOL, read_policies
+
+        # Only the selected public numerical contract enters the development job.
+        key = f"{config.level}/{pid}"
+        policies = read_policies(config.determinism_policy_file)["tasks"]
+        atomic_json(directory / "determinism_policy.json", {"protocol": POLICY_PROTOCOL,
+                    "tasks": {key: policies[key]} if key in policies else {}})
+        job["determinism_policy_file"] = ("/work/determinism_policy.json" if config.generation in {"docker", "modal"}
+                                          else str(directory / "determinism_policy.json"))
     atomic_json(directory / "job_config.json", job)
     (directory / "verify.py").write_text(
         "from pathlib import Path\nfrom kb_workflows.agent_task import verify_directory\n"

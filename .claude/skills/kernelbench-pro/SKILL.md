@@ -42,6 +42,7 @@ Then run the native `evaluate` and `analyze` stages with the original parent run
 
 - Do not inspect hidden tests, recover stripped inputs, change tolerances, or modify the evaluator/reference to improve a result. Preserve output structure, shape, dtype, parameters and input-dependent behavior.
 - Development feedback uses standard tests only. Final hidden checks do not enter the automated conversation or candidate selection.
+- When configured, preserve sanitizer and repeat checks. Read `docs/TOOL_CHECKS.md`; do not disable tools, edit task atomics policies or treat missing diagnostics as passing. Instrumented times never enter performance scores.
 - Profiler durations diagnose execution; final performance comes from the native synchronized-wall benchmark and matching baseline.
 - Read `paper_analysis.json`, `generation_budget.json` and `phase_budget.json` when reporting results. Missing costs/tokens/GPU billing remain unknown. Generated source, development correctness and final verified speedup are separate claims.
 - Compare matching settings with `python -m kb_workflows.experiment RUN_A RUN_B`. Keep one-shot, feedback, external Harbor and interactive sessions separate. Report independent sample count and per-sample limits alongside outcomes.

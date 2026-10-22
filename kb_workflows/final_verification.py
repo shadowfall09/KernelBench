@@ -11,6 +11,7 @@ from pathlib import Path
 from statistics import mean
 
 from .common import atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
+from .tool_checks import reusable
 
 PROTOCOL = "frozen_final_remeasurement_v1"
 
@@ -20,9 +21,12 @@ def _options(config):
         "level", "suite", "suite_role", "task_profile", "task_track", "task_memory_mb", "start", "end", "num_samples", "precision", "fp32_tolerance",
         "num_correct_trials", "num_perf_trials", "hidden_tests", "strict_validation", "evidence_level",
         "baseline", "baseline_suite", "baseline_portfolio", "cold_calls", "gpu_arch", "hardware", "device_backend", "device_python",
-        "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout")}
+        "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout",
+        "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")}
     if config.task_dimensions:
         options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})
+    if config.determinism_policy_file:
+        options["determinism_policy_sha256"] = fingerprint(read_json(Path(config.determinism_policy_file)))
     return options
 
 
@@ -131,7 +135,7 @@ def run(config):
             for hidden in (False, True) if config.hidden_tests else (False,):
                 label = f"{key}:{repeat}:{'hidden' if hidden else 'standard'}"
                 payload = payload_for(config, entry["problem_id"], entry["sample_id"], repeat, hidden=hidden)
-                if config.resume and results.get(label, {}).get("metadata", {}).get("workflow_signature") == fingerprint(payload):
+                if config.resume and reusable(results.get(label, {}), payload):
                     continue
                 tasks.append(("final-" + label, payload))
     for label, result in evaluate_tasks(config, tasks):

@@ -61,6 +61,9 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     Snapshot each output before the other implementation can reuse its storage.
     Pairing two reference calls also supports stateful modules such as BatchNorm.
     """
+    from kb_workflows.determinism import observe
+
+    observe(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     receipt = {"label": label, "seed": seed, "passed": False, "orders": []}
     metadata.setdefault("reliability_checks", []).append(receipt)
     metadata["reliability_protocol"] = PROTOCOL

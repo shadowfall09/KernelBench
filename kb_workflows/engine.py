@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, kernel_name, read_json, select_problems
 from .suites import selection_receipt
+from .tool_checks import reusable
 from .transports import docker_evaluate, local_evaluate, queue_evaluate, resolve_devices
 
 
@@ -36,12 +37,21 @@ def settings(config, hidden=False):
         "strict_validation": config.strict_validation,
         "evidence_level": config.evidence_level,
         "evaluator_sha256": evaluator_digest(),
+        "sanitizer_tools": config.sanitizer_tools,
+        "sanitizer_command": config.sanitizer_command,
+        "sanitizer_timeout": config.sanitizer_timeout,
+        "determinism_checks": config.determinism_checks,
+        "determinism_repeats": config.determinism_repeats,
     }
 
 
 def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
     path = select_problems(config.level, problem_ids=[pid])[pid]
     options = settings(config, hidden)
+    if config.determinism_checks:
+        from .determinism import policy_for
+
+        options["determinism_policy"] = policy_for(config.determinism_policy_file, config.level, pid, path.read_text())
     if config.level == 5:
         from .production import PROTOCOL
         from .production_specs import task as production_task
@@ -137,9 +147,8 @@ def evaluate_run(config):
                     results[key] = {"sample_id": sid, **failure("Kernel file missing")}
                     continue
                 payload = task_payload(config, pid, sid, hidden)
-                signature = fingerprint(payload)
                 existing = results.get(key, {})
-                if config.resume and existing.get("metadata", {}).get("workflow_signature") == signature:
+                if config.resume and reusable(existing, payload):
                     print(f"[{label}] {key}: matching cached result", flush=True)
                     continue
                 tasks.append((f"{label}-{key}", payload))
@@ -353,7 +362,7 @@ def run_paired(config):
                 except (ValueError, OSError, KeyError):
                     results[key] = failure("Paired timing source or baseline unavailable")
                     continue
-                if config.resume and results.get(key, {}).get("metadata", {}).get("workflow_signature") == fingerprint(payload):
+                if config.resume and reusable(results.get(key, {}), payload):
                     continue
                 tasks.append(("paired-" + key, payload))
     for key, result in evaluate_tasks(config, tasks):

@@ -1,0 +1,17 @@
+[gpu]
+profile = "RTX_A6000"
+devices = [0]
+
+[run]
+run_name = "a6000_safety"
+stage = "evaluate"
+generation = "local"
+evaluation = "local"
+level = 1
+start = 1
+end = 3
+sanitizer_tools = "all"
+sanitizer_timeout = 300
+determinism_checks = true
+determinism_repeats = 5
+timeout = 1800

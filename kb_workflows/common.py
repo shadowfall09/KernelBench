@@ -94,6 +94,7 @@ def evaluator_digest():
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
+        "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
         "kb_workflows/verification_contracts.json",
         "kb_workflows/aggregation.py",
         "kb_workflows/contract_specs.py",
@@ -189,7 +190,7 @@ def apply_score_gate(results, run_dir):
             if capped:
                 required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
-            for option in ("problem_specs", "device_calibration", "task_dimensions"):
+            for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file"):
                 declared = config.get(option)
                 if declared:
                     path = Path(declared)

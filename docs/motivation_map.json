@@ -1377,12 +1377,15 @@
       "title": "内存与竞态工具",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/tool_runner.py",
+        "kb_workflows/tool_checks.py",
+        "kb_workflows/determinism.py",
+        "tests/test_tool_checks.py"
       ],
-      "reason": "compute-sanitizer runner与题目允许非确定性的策略仍待实现；重复一致不证明无竞态，真实GPU复现按用户范围不运行"
+      "reason": "已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态"
     },
     {
       "id": "R-11",
@@ -2127,6 +2130,100 @@
         "configs/trainium2.toml"
       ],
       "reason": "保留ModelNew接口并提示现代NKI/native注册，skill复用设备配置与vendor解释器；客户端模型环境与可信验证环境分开"
+    },
+    {
+      "id": "V18-01",
+      "title": "四工具独立诊断流程",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/tool_runner.py",
+        "kb_workflows/evaluate_task.py"
+      ],
+      "reason": "分别运行memcheck/racecheck/synccheck/initcheck，要求完成摘要与正调用覆盖，缺工具/日志或超时保持未知，工具范围含参考及框架"
+    },
+    {
+      "id": "V18-02",
+      "title": "模型快照与逐位重复验证",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/determinism.py",
+        "src/reliability.py"
+      ],
+      "reason": "逐实例复制模型和输入并重放RNG，不推进原模型；每次保留原生精度门，记录输出位摘要，缺实例或快照不给通过"
+    },
+    {
+      "id": "V18-03",
+      "title": "审核绑定的原子操作策略",
+      "primary": "M2",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/determinism.py",
+        "kb_workflows/generation.py",
+        "kb_workflows/harbor.py"
+      ],
+      "reason": "默认逐位一致，有限波动须有参考源码摘要、审核理由及非零界限；不放宽离散值、非有限值或原生精度"
+    },
+    {
+      "id": "V18-04",
+      "title": "原始工具证据与负结果恢复",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/tool_checks.py",
+        "kb_workflows/engine.py",
+        "kb_workflows/final_verification.py"
+      ],
+      "reason": "绑定工具版本/二进制、逐进程日志、阶段nonce/源码/物理设备；重算派生结果，已记录失败可恢复，篡改收据失效"
+    },
+    {
+      "id": "V18-05",
+      "title": "诊断与性能采样分离",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/tool_runner.py",
+        "kb_workflows/tool_checks.py",
+        "kb_workflows/evidence.py"
+      ],
+      "reason": "保留首次无插桩原生/配对样本与冷启动，诊断共用原请求预算；四工具全通过才给内存工具证据，L2另需重复一致性"
+    },
+    {
+      "id": "V18-06",
+      "title": "统一配置与跨流程指纹",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/config.py",
+        "kb_workflows/experiment.py",
+        "kb_workflows/rl_plan.py",
+        "configs/a6000-safety.toml"
+      ],
+      "reason": "配置可选工具/重复预算和题目策略；所有transport复用CLI，策略内容进入生成、最终冻结、比较、RL和旧评分指纹，Neuron拒绝CUDA工具"
     }
   ]
 }

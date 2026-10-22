@@ -91,6 +91,8 @@ def measurement_evidence(result, candidate=False):
 
 
 def current_result(result, payload):
+    from .tool_checks import issue
+
     metadata = result.get("metadata", {})
     if metadata.get("workflow_signature") != fingerprint(payload):
         return "stale_or_incompatible_workflow"
@@ -100,6 +102,8 @@ def current_result(result, payload):
         return "reference_mismatch"
     if metadata.get("kernel_sha256") != fingerprint({"source": payload["kernel_src"]}):
         return "kernel_source_changed_or_missing"
+    if reason := issue(result, payload):
+        return reason
     return None
 
 
@@ -122,7 +126,7 @@ def analyze_paper(config):
     digest = evaluator_digest()
     groups, bounded_groups, track_groups, rows, scored, certificate_coverage = {}, {}, {}, [], {}, {}
     external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
-                      for option in ("problem_specs", "device_calibration", "task_dimensions") if getattr(config, option)}
+                      for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file") if getattr(config, option)}
     auxiliary_files = {}
     for name in ((["final_manifest.json", "final_results.json"] if config.final_repeats else [])
                  + (["paired_results.json"] if config.paired_timing else [])

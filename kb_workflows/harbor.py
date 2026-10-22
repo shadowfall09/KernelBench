@@ -116,6 +116,14 @@ def write_task(directory, config, pid, sid=0, device=None):
     if config.task_dimensions:
         shutil.copy2(config.task_dimensions, tests / "task_dimensions.json")
         child.task_dimensions = "/tests/task_dimensions.json"
+    if config.determinism_policy_file:
+        from .determinism import POLICY_PROTOCOL, read_policies
+
+        policies = read_policies(config.determinism_policy_file)["tasks"]
+        key = f"{config.level}/{pid}"
+        atomic_json(tests / "determinism_policies.json", {"protocol": POLICY_PROTOCOL,
+                    "tasks": {key: policies[key]} if key in policies else {}})
+        child.determinism_policy_file = "/tests/determinism_policies.json"
     atomic_json(tests / "config.json", {"protocol": "kernelbench-pro-harbor-v1", "sample_id": sid,
                                        "evaluator_sha256": evaluator_digest(), "config": child.to_dict(),
                                        "reward": config.harbor_reward})

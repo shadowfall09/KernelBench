@@ -20,6 +20,7 @@ LICENSE file in the root directory of this source tree.
 - 默认比较四种基线，可配置扩展compile/Graph组合和可信框架改写；支持交替计时、噪声控制与冻结后独立重测。
 - 使用同步墙钟计时，逐次更换输入并校验输出，记录稳态耗时和冷启动成本。
 - 严格检查输出结构、shape、dtype、整数、bool 和非有限值；隐藏测试使用三个种子，29 道 Level 1 题另有数值压力测试。
+- 可选四种Compute Sanitizer工具与题目级重复一致性检查，检查耗时与性能采样分开。
 - 评分包含失败和缺失样本，恢复时核对源码、配置和测量证据。
 
 默认批量流程支持 Level 1–3。`KernelBench/level4/` 保留实验题目，不属于默认批量评测范围。
@@ -104,6 +105,7 @@ python -m scripts.check_motivations
 | [Agent loops](docs/AGENT_LOOPS.md) | one-shot、mini-swe-agent 循环、预算、交互 skill 与比较 |
 | [Harbor 接入](docs/HARBOR.md) | 统一生成后端、任务导出与 reward |
 | [批量工作流](docs/BATCH_WORKFLOWS.md) | 各后端、恢复、基线与评分配置 |
+| [内存工具与重复检查](docs/TOOL_CHECKS.md) | 可选Sanitizer、审核原子操作策略、证据与恢复 |
 | [交替与最终计时](docs/PAIRED_TIMING.md) | 扩展基线、平衡配对、噪声控制、独立重测与恢复 |
 | [Headroom评分](docs/HEADROOM_SCORING.md) | 设备校准、可信工作量证书、独立见证与时间线诊断 |
 | [Production-41](docs/PRODUCTION_TASKS.md) | Level 5生产题族、逐角色dtype、显存计划和独立反向轨道 |

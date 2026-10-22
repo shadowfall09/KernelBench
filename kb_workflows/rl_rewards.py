@@ -75,7 +75,7 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
     config = task_config(plan, task_key, directory=directory, samples=len(completions))
     atomic_json(directory / "run_config.json", config.to_dict())
     external_inputs = {}
-    for name in ("problem_specs", "device_calibration", "task_dimensions"):
+    for name in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file"):
         filename = getattr(config, name)
         data = read_json(Path(filename)) if filename else {}
         atomic_json(directory / f"input_{name}.json", data)
@@ -222,7 +222,7 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
               "source_files": {name: document_digest(read_json(directory / name, {})) for name in
                     ("run_config.json", "small_results.json", "eval_results.json", "eval_results_hidden.json",
                      "final_manifest.json", "final_results.json", "paired_results.json", "paper_analysis.json", "reward_schedule.json", "reward_baseline.json",
-                     "input_problem_specs.json", "input_device_calibration.json", "input_task_dimensions.json")},
+                     "input_problem_specs.json", "input_device_calibration.json", "input_task_dimensions.json", "input_determinism_policy_file.json")},
               "request_wall_seconds": sum(row["request_wall_seconds"] for row in schedule) + certificate_seconds,
               "certificate_request_wall_seconds": certificate_seconds, "gpu_execution_seconds": None,
               "candidate_count": len(sources), "development_feedback_contains_hidden_results": False}
