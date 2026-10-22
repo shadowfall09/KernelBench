@@ -1,6 +1,6 @@
 # 设备执行来源诊断
 
-R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUDA Graph replay以及有原生调用/节点证据的复制与memset。仍是独立进程诊断：CPP等其他编译器、现代CUDA library loader、Graph参数更新后的重新绑定、Neuron来源和正式轨道资格尚需完成。诊断结果不能写入正式`kernel_origin`证据，也不能替换原生墙钟、冷启动、配对或最终重复测量。
+R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUDA Graph replay以及有原生调用/节点证据的复制与memset。现增加Triton实际前端依赖/编译产物冻结和CUDA C++ object观察。仍是独立进程诊断：未关联的CUDA Runtime注册路径、其他编译器/loader、Graph参数更新后的重新绑定、Neuron来源和正式轨道资格尚需完成。诊断结果不能写入正式`kernel_origin`证据，也不能替换原生墙钟、冷启动、配对或最终重复测量。
 
 ## 源码、产物与实际执行
 
@@ -8,13 +8,25 @@ R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUD
 
 对于Triton 3.7.0，编译产物关联同时要求：
 
-1. `ASTSource`的Python函数代码对象属于本次冻结候选，实际JIT文本与该文件中的函数一致。
-2. `CompiledKernel._init_handles`完成后取得真实CUmodule、CUfunction和编译器输出cubin摘要。
+1. `ASTSource`的Python函数代码对象属于本次冻结候选，实际JIT文本与执行候选前保存的函数文本一致；不信任运行时inspect/linecache。
+2. 记录实际AST→IR调用与JIT依赖，冻结CUDA后端刚生成的cubin及CompiledKernel初始source/metadata；`_init_handles`后还须保持一致并取得真实CUmodule/CUfunction。
 3. CUPTI模块加载回调在生命周期内复制完整二进制字节并取摘要，包括NUL和非UTF-8字节；通过对应成功的driver module-load返回值绑定CUmodule。
 4. 成功的`cuModuleGetFunction`把CUfunction绑定到该次模块加载；句柄卸载或复用不会继承上一代身份。
 5. 直接launch或Graph节点必须绑定到这个函数代次；设备活动还须匹配成功launch的context、correlation及调用窗口。运行时包装器的correlation只在关联唯一时使用。
 
 内核名称、导入路径、候选自报的`custom`标签或外部origin map不参与上述关联。回调内只读取生命周期有效的数据，并使用官方样例中的CUPTI Graph ID查询；不调用CUDA runtime/driver查询或同步API。当前模块关联适配`cuModuleLoad*`/`cuModuleGetFunction`；没有把未适配的`cuLibrary*`或其他编译器偷偷当作支持。
+
+## 编译输入、依赖与产物
+
+Triton 3.7适配器在真实`ASTSource.make_ir`、解析器和CodeGenerator调用位置记录输入，避免把缓存key或外层函数当作完整来源。每个实际JIT callee均须来自本次提交，或来自执行候选前已固定RECORD/文件SHA的语言primitive；必须观察到匹配的真实AST。普通Python编译期调用只接受明确允许的内建对象与已核对字节码、callable闭包的语言primitive，不凭`__triton_builtin__`或模块名授予身份。未审核helper/自定义IR builder继续未知。候选数值constexpr生成器的通用来源仍未实现。
+
+诊断使用新的私有TRITON_CACHE_DIR，结束后恢复环境；缓存命中、绕过已观察解析器或缺少本次编译记录不能继承证据。另在CUDA后端cubin返回和真实CompiledKernel构造时冻结字节/source/metadata。之后替换`kernel`、source或metadata，IR override、编译stage hook或装载字节不符均不给自写信用。metadata按结构处理真实GPUTarget dataclass，避免把repr或不可序列化对象当摘要。CPU测试实际执行Triton前端到MLIR及真实构造器，未执行ptxas、nvcc、GPU编译后端或kernel。
+
+Torch 2.12.0的`load_inline`/`load`有可选编译观察器。只有实际loader调用点的代码对象属于冻结提交、CUDA文本对应提交中的完整字符串字面量、源依赖与编译选项处于当前审核范围，才建立候选构建记录。观察真实Ninja文件、CUDA source→object映射及完成的构建；固定nvcc/C++/Ninja工具和编译环境摘要，前后核对source、规则及工具。Torch编译适配器自身源码须匹配安装包RECORD。动态文本生成、外部实现header、编译wrapper、设备链接或未支持选项保留未知，不改变原生loader行为。
+
+提取对象是完成构建的CUDA object，而不是将最终.so里的所有cubin归给候选。每个object仍须通过有界CUDA ELF提取与身份核对，且CUPTI实际模块字节相同、CUfunction及launch已完成关联，才可建立来源。仅有load_inline、.so路径、声明的kernel或编译成功不够；尚未关联的CUDA Runtime注册/隐式loader不自动通过。注入的编译器或提取runner标为模拟，不能建立实测来源。
+
+这些是受信诊断worker中的编译输入/产物凭据，不是任意Python/编译器/native-memory攻击的安全认证，也不证明输出因果依赖或算法有效工作量。
 
 ## 可信库产物
 
@@ -38,13 +50,13 @@ R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUD
 
 `track_verdicts.custom`要求来源完整且每次保守自写占比达到阈值；`track_verdicts.library`允许已建立来源的库、框架和运行时工作，不要求自写占比。库优化不是错误答案，custom门失败也不修改原生正确性。缺活动、丢失记录、未平衡回调、source/hook/模式变化、SDK错误或任一未知活动使相关轨道保持`not_measured`。诊断不能建立正式轨道资格；`formal_qualification_implemented`仍为false。
 
-原始模块/函数/Graph/launch/activity、库提取记录及摘要一并保存。离线`summarize()`重算关联和区间，拒绝重复、冲突或失效代次。来源协议升级为`kernelbench_pro_cuda_origin_v2`，要求实际training后置观察；旧v1诊断不能冒充当前收据。默认0.95仅是论文设计中的可配置诊断阈值；历史20%与95%未做设备校准，不设为所有旧运行的默认资格门槛。
+原始模块/函数/Graph/launch/activity、库提取记录及摘要一并保存。离线`summarize()`重算关联和区间，拒绝重复、冲突或失效代次。来源协议升级为`kernelbench_pro_cuda_origin_v3`，要求training后置观察、Triton实际前端/产物凭据或完整CUDA object编译凭据；旧v1/v2诊断不能冒充当前收据。默认0.95仅是论文设计中的可配置诊断阈值；历史20%与95%未做设备校准，不设为所有旧运行的默认资格门槛。
 
-以上不能证明输出因果依赖、算法有效工作量、完整依赖闭包或未插桩时执行相同路径，也不提供Python/驱动安全认证。R-08继续标为部分实现。
+以上不能证明输出因果依赖、算法有效工作量、任意动态编译器的依赖闭包或未插桩时执行相同路径，也不提供Python/驱动安全认证。R-08继续标为部分实现。
 
 ## 使用入口
 
-已有软件环境需要额外的`cupti-python==13.3.0`和`triton==3.7.0`，可选依赖为`kernelbench-pro[origin]`；库匹配还需当前CUDA工具链的cuobjdump。适配器要求64位Linux，供应商运行库和驱动仍须兼容；缺包、ABI或运行时不兼容不会自动换成名称推断。普通配置预览、模块导入、批量验证均不加载CUPTI。Docker/Modal/queue worker需事先包含可选工具；受限Docker策略仍由原有transport执行。
+已有软件环境需要额外的`cupti-python==13.3.0`和`triton==3.7.0`，可选依赖为`kernelbench-pro[origin]`；CUDA C++观察器要求Torch 2.12.0和正常的nvcc/C++/Ninja工具链，库/object匹配还需cuobjdump。适配器要求64位Linux，供应商运行库和驱动仍须兼容；缺包、ABI或运行时不兼容不会自动换成名称推断。普通配置预览、模块导入、批量验证均不加载CUPTI。Docker/Modal/queue worker需事先包含可选工具；受限Docker策略仍由原有transport执行。
 
 下面命令默认只预览，读取已保存候选并检查任务/样本范围，不申请设备、不创建结果目录：
 
@@ -57,6 +69,6 @@ python -m scripts.audit_kernel_origin --config configs/a6000-feedback.toml \
 
 当前实现工作没有执行设备诊断、cuobjdump、CUPTI、容器或模型实验。CPU/模拟回归覆盖真实Triton源码检查、已安装包RECORD静态读取、C ABI布局、句柄复用、Graph克隆/销毁/更新失效、原生内存活动、库产物错绑、非UTF-8日志、并发并集、模式与容差修改、缺工具/丢记录和默认零设备预览。
 
-代码入口：[冻结源码](../kb_workflows/submission_source.py)、[CUDA采集器](../kb_workflows/cuda_origin.py)、[库产物清单](../kb_workflows/origin_binaries.py)、[Graph关联](../kb_workflows/origin_graphs.py)、[离线重放](../kb_workflows/kernel_origin.py)、[诊断worker](../kb_workflows/origin_task.py)、[CLI](../scripts/audit_kernel_origin.py)。
+代码入口：[冻结源码](../kb_workflows/submission_source.py)、[CUDA采集器](../kb_workflows/cuda_origin.py)、[库产物清单](../kb_workflows/origin_binaries.py)、[Triton编译来源](../kb_workflows/triton_origin.py)、[CUDA C++观察器](../kb_workflows/cpp_origin.py)、[Graph关联](../kb_workflows/origin_graphs.py)、[离线重放](../kb_workflows/kernel_origin.py)、[诊断worker](../kb_workflows/origin_task.py)、[CLI](../scripts/audit_kernel_origin.py)。
 
-接口依据为[NVIDIA CUPTI Python 13.3绑定](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html)、[CUPTI回调与Graph说明](https://docs.nvidia.com/cupti/main/main.html)、[cuobjdump](https://docs.nvidia.com/cuda/cuda-binary-utilities/index.html#cuobjdump)、[Triton 3.7编译器](https://github.com/triton-lang/triton/blob/v3.7.0/python/triton/compiler/compiler.py)及[JIT源码](https://github.com/triton-lang/triton/blob/v3.7.0/python/triton/runtime/jit.py)。CUPTI官方wheel类型声明、已安装供应商头文件与Graph样例已静态核对；未导入或执行CUPTI二进制。
+接口依据为[NVIDIA CUPTI Python 13.3绑定](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html)、[CUPTI回调与Graph说明](https://docs.nvidia.com/cupti/main/main.html)、[cuobjdump](https://docs.nvidia.com/cuda/cuda-binary-utilities/index.html#cuobjdump)、[Triton 3.7编译器](https://github.com/triton-lang/triton/blob/v3.7.0/python/triton/compiler/compiler.py)、[JIT源码](https://github.com/triton-lang/triton/blob/v3.7.0/python/triton/runtime/jit.py)及[PyTorch 2.12扩展加载器](https://github.com/pytorch/pytorch/blob/v2.12.0/torch/utils/cpp_extension.py)。CUPTI官方wheel类型声明、已安装供应商头文件与Graph样例已静态核对；未导入或执行CUPTI二进制。

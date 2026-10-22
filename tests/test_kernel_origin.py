@@ -23,6 +23,19 @@ SOURCE = "def kernel(x):\n    return x + 1\n"
 BINARY = b"\x7fELF\x00\xfffrozen-cubin"
 
 
+def frontend_receipt(source=SOURCE):
+    import ast
+
+    from kb_workflows.triton_origin import PROTOCOL, ast_digest
+
+    root = {"role": "candidate", "source_sha256": sha256(source.encode()), "jit_source_sha256": sha256(source.encode()),
+            "ast_sha256": ast_digest(ast.parse(source)), "function": "kernel"}
+    document = {"protocol": PROTOCOL, "root": root, "calls": [], "parsed_sources": [root], "complete": True,
+                "language_manifest": {"sources": []}, "language_manifest_sha256": fingerprint({"sources": []})}
+    document["receipt_sha256"] = fingerprint(document)
+    return document
+
+
 def raw_capture():
     """Synthetic parser fixture, not a hardware observation or qualification."""
     return {"protocol": kernel_origin.PROTOCOL, "candidate_sha256": sha256(SOURCE.encode()),
@@ -30,6 +43,9 @@ def raw_capture():
             "functions": [{"id": 1, "handle": 200, "context": 1, "module": 1}],
             "proofs": [{"id": 1, "function": 1, "compiler": "triton-3.7.0", "source_sha256": sha256(SOURCE.encode()),
                         "binary_sha256": sha256(BINARY), "jit_source_sha256": sha256(SOURCE.encode()),
+                        "frontend": frontend_receipt(),
+                        "emission": {"protocol": "kernelbench_pro_triton_emission_v1", "backend": "cuda", "binary_sha256": sha256(BINARY), "metadata_sha256": "1" * 64,
+                                     "frontend_receipt_sha256": frontend_receipt()["receipt_sha256"]},
                         "compiler_metadata_sha256": "1" * 64}],
             "launches": [{"context_id": 9, "correlation": 10, "function": 1, "call": 1, "exit_success": True}],
             "windows": [{"id": 1, "start_ns": 100, "end_ns": 300, "device": 0, "seed": 42,
@@ -253,6 +269,10 @@ def observe_load(capture, module_handle=100, function_handle=200, *, correlation
 def test_cpu_callback_chain_copies_full_binary_and_joins_real_function_handle(tmp_path):
     sdk, _ = fake_sdk()
     capture = cuda_origin.Capture(SOURCE, bindings=sdk)
+    capture.frontend = NS(compiled_frontend_for=lambda source: frontend_receipt(), compiled_for=lambda kernel: {
+        "protocol": "kernelbench_pro_triton_emission_v1", "backend": "cuda", "binary_sha256": sha256(BINARY),
+        "frontend_receipt_sha256": frontend_receipt()["receipt_sha256"],
+        "metadata_sha256": fingerprint(dict(kernel.metadata._asdict()))})
     registry, context = capture.registry, {}
     with record_sources(registry):
         execute(SOURCE, context, tmp_path)
@@ -274,6 +294,10 @@ def test_cpu_callback_chain_copies_full_binary_and_joins_real_function_handle(tm
 def test_compiler_hook_refuses_unobserved_or_mismatched_actual_load(tmp_path, mismatch):
     sdk, _ = fake_sdk()
     capture = cuda_origin.Capture(SOURCE, bindings=sdk)
+    capture.frontend = NS(compiled_frontend_for=lambda source: frontend_receipt(), compiled_for=lambda kernel: {
+        "protocol": "kernelbench_pro_triton_emission_v1", "backend": "cuda", "binary_sha256": sha256(BINARY),
+        "frontend_receipt_sha256": frontend_receipt()["receipt_sha256"],
+        "metadata_sha256": fingerprint(dict(kernel.metadata._asdict()))})
     context = {}
     with record_sources(capture.registry):
         execute(SOURCE, context, tmp_path)

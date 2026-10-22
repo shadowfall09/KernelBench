@@ -1359,9 +1359,12 @@
         "kb_workflows/kernel_origin.py",
         "docs/KERNEL_ORIGIN.md",
         "kb_workflows/origin_binaries.py",
-        "kb_workflows/origin_graphs.py"
+        "kb_workflows/origin_graphs.py",
+        "kb_workflows/triton_origin.py",
+        "kb_workflows/cpp_origin.py",
+        "tests/test_compiler_origins.py"
       ],
-      "reason": "已实现CUDA/Triton源码与实际launch、受信wheel cubin、不可变Graph replay、原生内存活动和独立轨道诊断；CPP/其他loader、Graph参数更新重绑定、依赖闭包、Neuron与正式资格门继续实现，未知不通过"
+      "reason": "已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过"
     },
     {
       "id": "R-09",
@@ -2534,6 +2537,100 @@
         "tests/test_kernel_origin.py"
       ],
       "reason": "队列接收origin_audit并强制候选源码，验证器摘要包含新增入口；CPU请求校验覆盖预览生成的实际payload，不运行设备"
+    },
+    {
+      "id": "V22-01",
+      "title": "执行前冻结JIT文本与源码字面量",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/submission_source.py",
+        "tests/test_compiler_origins.py"
+      ],
+      "reason": "在执行候选前固定函数文本和保留代码对象，不依赖运行时inspect/linecache；记录完整字符串字面量供CUDA编译输入核对"
+    },
+    {
+      "id": "V22-02",
+      "title": "实际前端依赖与审核语言primitive",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/triton_origin.py",
+        "tests/test_compiler_origins.py"
+      ],
+      "reason": "观察真实AST解析和CodeGenerator调用，逐callee核对候选/语言源码与字节码和callable闭包；外层wrapper或builtin标签不代表完整来源"
+    },
+    {
+      "id": "V22-03",
+      "title": "编译器产物及初始依赖冻结",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/triton_origin.py",
+        "kb_workflows/cuda_origin.py",
+        "tests/test_compiler_origins.py"
+      ],
+      "reason": "在CUDA后端输出与真实构造器边界固定cubin、source、metadata和原始依赖收据；替换产物或事后洗白依赖无效，缓存/IR override缺证据不通过"
+    },
+    {
+      "id": "V22-04",
+      "title": "CUDA C++真实构建观察",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/cpp_origin.py",
+        "tests/test_compiler_origins.py"
+      ],
+      "reason": "核对Torch适配器RECORD、实际loader调用点、CUDA字面量、Ninja/source/object和工具/环境；未知header、编译wrapper或未完成构建不赋予来源"
+    },
+    {
+      "id": "V22-05",
+      "title": "CUDA object回溯实际模块函数",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/cpp_origin.py",
+        "kb_workflows/kernel_origin.py",
+        "kb_workflows/origin_task.py"
+      ],
+      "reason": "只提取已核对CUDA object的cubin，再匹配实际模块和函数/launch；不是整个.so都算自写，未关联Runtime注册及模拟构建不能建立实测来源"
+    },
+    {
+      "id": "V22-06",
+      "title": "来源协议v3与实际SDK结构兼容",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/kernel_origin.py",
+        "kb_workflows/triton_origin.py",
+        "tests/test_compiler_origins.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1"
     }
   ]
 }

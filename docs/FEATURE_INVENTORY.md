@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第二十一版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第二十二版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -678,6 +678,32 @@ R-10的软件范围已接入；23项当前为13项代码已实现、8项部分�
 CPP/其他loader、Graph更新后重新绑定、完整依赖闭包、Neuron和正式轨道资格继续实现；23项仍为14项代码已实现、9项部分实现。以前搁置的stash没有恢复。
 
 验证：Python 3.12.12 / Torch 2.12.0下1,077项CPU/模拟回归通过，本版新增63项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性和离线wheel的26个轻量模块导入均通过。已静态读取当前环境32个受信库的RECORD条目，未导入Torch/CUPTI；Graph参数与本机供应商头文件的C ABI核对仅执行CPU代码，没有调用CUDA API。没有运行GPU、Trainium、模型、容器或训练实验。
+
+## 第二十二版：编译输入、依赖与产物来源
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Bind kernel provenance to observed compiler inputs and outputs |
+| 日期 | 2026-10-22 |
+| 基础提交 | `5ee0468` |
+| 状态 | 软件与CPU/模拟回归；未运行GPU、nvcc、ptxas或cuobjdump实验 |
+
+本版继续R-08，把实际编译输入和产物对应起来，避免只核对外层函数或装载后的可变对象。支持范围与尚未完成的路径见[设备来源诊断](KERNEL_ORIGIN.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V22-01 | 执行前冻结JIT文本与源码字面量 | 在执行候选前固定函数文本和保留代码对象，不依赖运行时inspect/linecache；记录完整字符串字面量供CUDA编译输入核对 | `kb_workflows/submission_source.py` | [M2](MOTIVATION.md#m2) |
+| V22-02 | 实际前端依赖与审核语言primitive | 观察真实AST解析和CodeGenerator调用，逐callee核对候选/语言源码与字节码和callable闭包；外层wrapper或builtin标签不代表完整来源 | `kb_workflows/triton_origin.py` | [M2](MOTIVATION.md#m2) |
+| V22-03 | 编译器产物及初始依赖冻结 | 在CUDA后端输出与真实构造器边界固定cubin、source、metadata和原始依赖收据；替换产物或事后洗白依赖无效，缓存/IR override缺证据不通过 | `kb_workflows/triton_origin.py` | [M2](MOTIVATION.md#m2) |
+| V22-04 | CUDA C++真实构建观察 | 核对Torch适配器RECORD、实际loader调用点、CUDA字面量、Ninja/source/object和工具/环境；未知header、编译wrapper或未完成构建不赋予来源 | `kb_workflows/cpp_origin.py` | [M5](MOTIVATION.md#m5) |
+| V22-05 | CUDA object回溯实际模块函数 | 只提取已核对CUDA object的cubin，再匹配实际模块和函数/launch；不是整个.so都算自写，未关联Runtime注册及模拟构建不能建立实测来源 | `kb_workflows/cpp_origin.py` | [M2](MOTIVATION.md#m2) |
+| V22-06 | 来源协议v3与实际SDK结构兼容 | 新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1 | `kb_workflows/kernel_origin.py` | [M5](MOTIVATION.md#m5) |
+
+Triton使用私有新缓存，必须观察到实际AST和编译器产物；初始依赖随构造器冻结，之后重新生成干净AST不能替换原始来源。真实GPUTarget作为dataclass按字段取摘要，避免正常metadata序列化失败。C++观察器接受当前审核范围内的完整CUDA字面量与构建路径，只授予已匹配CUDA模块/函数的object来源；opaque Runtime注册、动态生成文本和其他未适配输入仍为未知。
+
+当前凭据依赖受信worker/SDK，不提供任意解释器、native-memory攻击或输出因果关系的认证；两个轨道仍为诊断，不授予正式L1，不替换计时。23项仍为14项代码已实现、9项部分实现，其他范围继续实现。此前stash保持原样。
+
+验证：Python 3.12.12 / Torch 2.12.0下1,117项CPU/模拟回归通过，本版新增40项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性和离线wheel的28个轻量模块导入均通过。实际Triton前端到MLIR、真实CompiledKernel构造器与GPUTarget结构均有CPU回归；工具/设备启动在这些检查中禁止。其他编译/提取分支使用显式模拟。没有运行GPU、Trainium、模型、容器、nvcc、ptxas、cuobjdump或训练实验。
 
 ## 维护方式
 

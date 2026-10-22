@@ -10,10 +10,12 @@ import math
 import re
 
 from .common import fingerprint
+from .cpp_origin import Extensions
 from .origin_binaries import binary_owners
 from .performance import interval_union
+from .triton_origin import EMISSION_PROTOCOL, Frontend
 
-PROTOCOL = "kernelbench_pro_cuda_origin_v2"
+PROTOCOL = "kernelbench_pro_cuda_origin_v3"
 MAX_RECORDS = 200_000
 KINDS = {"kernel", "memcpy", "memset"}
 
@@ -96,11 +98,25 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
     for row in proofs.values():
         fn = functions.get(row.get("function"), {})
         mod = modules.get(fn.get("module"), {})
-        if (row.get("compiler") != "triton-3.7.0" or not _sha(row.get("source_sha256"))
-                or not _sha(row.get("jit_source_sha256")) or not _sha(row.get("compiler_metadata_sha256"))
-                or row.get("source_sha256") != raw.get("candidate_sha256")
+        if (not _sha(row.get("source_sha256")) or row.get("source_sha256") != raw.get("candidate_sha256")
                 or not mod or row.get("binary_sha256") != mod.get("binary_sha256")):
             raise ValueError("Compiler proof does not match frozen source and actual loaded bytes")
+        if row.get("compiler") == "triton-3.7.0":
+            emission = row.get("emission", {})
+            frontend = row.get("frontend", {})
+            if (not isinstance(emission, dict) or not isinstance(frontend, dict)
+                    or not _sha(row.get("jit_source_sha256")) or not _sha(row.get("compiler_metadata_sha256"))
+                    or emission.get("protocol") != EMISSION_PROTOCOL or emission.get("backend") != "cuda"
+                    or emission.get("binary_sha256") != row["binary_sha256"]
+                    or emission.get("metadata_sha256") != row["compiler_metadata_sha256"]
+                    or emission.get("frontend_receipt_sha256") != frontend.get("receipt_sha256")
+                    or not Frontend.validate(row.get("frontend"), source_sha256=row["source_sha256"], jit_source_sha256=row["jit_source_sha256"])):
+                raise ValueError("Compiler proof has no complete frozen frontend dependency/AST receipt")
+        elif row.get("compiler") == "torch-cpp-extension-2.12.0":
+            if not Extensions.validate(row.get("cpp_build"), candidate_sha256=raw["candidate_sha256"], binary_sha256=mod["binary_sha256"]):
+                raise ValueError("CUDA extension has no complete source/object compilation receipt")
+        else:
+            raise ValueError("Compiler proof uses an unsupported adapter")
         if row["function"] in proven:
             raise ValueError("Ambiguous compiler ownership for a function generation")
         proven[row["function"]] = row

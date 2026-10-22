@@ -10,15 +10,17 @@ from __future__ import annotations
 
 import ctypes as C
 import importlib.metadata
+import os
 import platform
+import tempfile
 import threading
 from contextlib import contextmanager
 
-from .common import fingerprint
 from .kernel_origin import MAX_RECORDS, PROTOCOL
 from .origin_graphs import Graphs
 from .origin_graphs import abi_supported as graph_abi_supported
 from .submission_source import SourceRegistry, record_sources, sha256
+from .triton_origin import metadata_fingerprint
 
 MAX_CUBIN_BYTES = 128 * 1024**2
 
@@ -78,6 +80,8 @@ class Capture:
         self._wrapped_handle_init = None
         self._compiled_class = None
         self._proof_functions = set()
+        self.frontend = None
+        self.extensions = None
 
     def error(self, message):
         if len(self.raw["errors"]) < 100:
@@ -252,7 +256,9 @@ class Capture:
 
     def bind_triton(self, compiled):
         owner = self.registry.jit_source(getattr(getattr(compiled, "src", None), "fn", None))
-        if owner is None:
+        closure = self.frontend.compiled_frontend_for(compiled) if self.frontend is not None else None
+        emission = self.frontend.compiled_for(compiled) if self.frontend is not None else None
+        if owner is None or closure is None or emission is None:
             return
         binary = compiled.kernel
         if not isinstance(binary, bytes) or not binary:
@@ -272,14 +278,30 @@ class Capture:
             self._proof_functions.add(function["id"])
             self.append("proofs", {"function": function["id"], "compiler": "triton-3.7.0",
                 "source_sha256": owner["source_sha256"], "jit_source_sha256": owner["jit_source_sha256"],
+                "frontend": closure,
+                "emission": emission,
                 "binary_sha256": module["binary_sha256"],
-                "compiler_metadata_sha256": fingerprint(dict(compiled.metadata._asdict()))})
+                "compiler_metadata_sha256": metadata_fingerprint(compiled.metadata)})
 
     def install_triton(self):
         if importlib.metadata.version("triton") != "3.7.0":
             raise RuntimeError("Origin compiler adapter requires Triton 3.7.0")
         from triton.compiler.compiler import CompiledKernel
 
+        from .triton_origin import Frontend
+
+        self.frontend = Frontend(self.registry)
+        self.frontend.install()
+        from .cpp_origin import Extensions
+
+        try:
+            self.extensions = Extensions(self.registry)
+            self.extensions.install()
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            if self.extensions is not None:
+                self.extensions.restore()
+            self.extensions = None
+            self.raw["cpp_adapter"] = {"status": "not_measured", "reason": str(exc)}
         self._compiled_class = CompiledKernel
         original = CompiledKernel._init_handles
         self._original_handle_init = original
@@ -294,6 +316,21 @@ class Capture:
 
         self._wrapped_handle_init = instrumented
         CompiledKernel._init_handles = instrumented
+
+    def bind_extensions(self, documents):
+        from .cpp_origin import Extensions
+
+        self.raw["cpp_builds"] = documents
+        for function in self.raw["functions"]:
+            if function["id"] in self._proof_functions:
+                continue
+            module = self.raw["modules"][function["module"] - 1]
+            matches = [row for row in documents if Extensions.validate(row,
+                candidate_sha256=self.raw["candidate_sha256"], binary_sha256=module["binary_sha256"])]
+            if matches:
+                self._proof_functions.add(function["id"])
+                self.append("proofs", {"function": function["id"], "compiler": "torch-cpp-extension-2.12.0",
+                    "source_sha256": self.raw["candidate_sha256"], "binary_sha256": module["binary_sha256"], "cpp_build": matches[0]})
 
     def start(self):
         if not abi_supported():
@@ -367,15 +404,28 @@ class Capture:
             if self._compiled_class is not None:
                 self.raw["hooks_intact"] = self._compiled_class._init_handles is self._wrapped_handle_init
                 self._compiled_class._init_handles = self._original_handle_init
+            if self.frontend is not None:
+                self.raw["hooks_intact"] = self.raw["hooks_intact"] and self.frontend.intact()
+                self.frontend.restore()
+            if self.extensions is not None:
+                self.raw["hooks_intact"] = self.raw["hooks_intact"] and self.extensions.intact()
+                self.extensions.restore()
             self.raw["source_intact"] = bool(self.registry.sources) and self.registry.intact()
 
     @contextmanager
     def recording(self):
-        try:
-            self.start()
-            self.install_triton()
-            with record_sources(self.registry):
-                yield self
-        finally:
-            if self.cupti is not None:
-                self.stop()
+        previous = os.environ.get("TRITON_CACHE_DIR")
+        with tempfile.TemporaryDirectory(prefix="kb-origin-frontend-") as cache:
+            os.environ["TRITON_CACHE_DIR"] = cache
+            try:
+                self.start()
+                self.install_triton()
+                with record_sources(self.registry):
+                    yield self
+            finally:
+                if self.cupti is not None:
+                    self.stop()
+                if previous is None:
+                    os.environ.pop("TRITON_CACHE_DIR", None)
+                else:
+                    os.environ["TRITON_CACHE_DIR"] = previous

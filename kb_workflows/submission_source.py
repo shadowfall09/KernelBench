@@ -29,21 +29,35 @@ class SourceRegistry:
     def __init__(self):
         self.sources = []
         self.codes = {}  # id -> retained object: code equality is insufficient.
+        self.jit_text = {}
+        self.literals = {}
 
     def register(self, source, path, code):
         item = {"source_sha256": sha256(source.encode()), "path": str(path)}
         self.sources.append(item)
+        lines = source.splitlines(keepends=True)
+        literals = self.literals.setdefault(item["source_sha256"], set())
 
         def visit(node):
             self.codes[id(node)] = (node, item)
+            # Compute the expected JIT text before executing candidate code.
+            # Runtime inspect/linecache functions are not source attestations.
+            block = "" if node.co_name.startswith("<") else textwrap.dedent("".join(inspect.getblock(lines[node.co_firstlineno - 1:])))
+            start = re.search(r"^def\s+\w+\s*\(", block, re.MULTILINE)
+            if start:
+                self.jit_text[id(node)] = block[start.start():]
             for child in node.co_consts:
                 if isinstance(child, types.CodeType):
                     visit(child)
+                elif isinstance(child, str):
+                    literals.add(child)
 
         visit(code)
 
     def source_for(self, function):
-        code = getattr(function, "__code__", None)
+        return self.source_for_code(getattr(function, "__code__", None))
+
+    def source_for_code(self, code):
         match = self.codes.get(id(code))
         return match[1] if match and match[0] is code else None
 
@@ -52,9 +66,8 @@ class SourceRegistry:
         owner = self.source_for(getattr(function, "fn", None))
         if not owner:
             return None
-        lines = textwrap.dedent(inspect.getsource(function.fn))
-        start = re.search(r"^def\s+\w+\s*\(", lines, re.MULTILINE)
-        if start is None or lines[start.start():] != function.src:
+        expected = self.jit_text.get(id(function.fn.__code__))
+        if expected is None or expected != function.src:
             return None
         if sha256(Path(owner["path"]).read_bytes()) != owner["source_sha256"]:
             return None

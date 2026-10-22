@@ -117,6 +117,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V21-01 受信安装包与实际库二进制 | 候选导入前固定RECORD与逐文件哈希，只提取实际加载且前后身份一致的DSO；CUDA ELF字节匹配实际模块，缺工具/篡改/冲突/模拟不能建立库来源 | M5 | [origin_binaries.py](../kb_workflows/origin_binaries.py), [test_origin_binaries.py](../tests/test_origin_binaries.py) |
 | V21-02 CUDA Graph节点与执行快照 | 关联实际创建/克隆/instantiate的节点与函数代次，每次replay保存快照；源模板销毁不抹除既有执行，未知更新或可执行对象销毁不沿用旧来源 | M3 | [origin_graphs.py](../kb_workflows/origin_graphs.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V21-05 诊断容差与实际模式后置检查 | 导入前冻结配置容差，核对执行前后training/grad并记录恢复进程设置；协议v2要求后置观察，模式或环境改变保持未知 | M5 | [origin_task.py](../kb_workflows/origin_task.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
+| V22-01 执行前冻结JIT文本与源码字面量 | 在执行候选前固定函数文本和保留代码对象，不依赖运行时inspect/linecache；记录完整字符串字面量供CUDA编译输入核对 | M5 | [submission_source.py](../kb_workflows/submission_source.py), [test_compiler_origins.py](../tests/test_compiler_origins.py) |
+| V22-02 实际前端依赖与审核语言primitive | 观察真实AST解析和CodeGenerator调用，逐callee核对候选/语言源码与字节码和callable闭包；外层wrapper或builtin标签不代表完整来源 | M5 | [triton_origin.py](../kb_workflows/triton_origin.py), [test_compiler_origins.py](../tests/test_compiler_origins.py) |
+| V22-03 编译器产物及初始依赖冻结 | 在CUDA后端输出与真实构造器边界固定cubin、source、metadata和原始依赖收据；替换产物或事后洗白依赖无效，缓存/IR override缺证据不通过 | M3 | [triton_origin.py](../kb_workflows/triton_origin.py), [cuda_origin.py](../kb_workflows/cuda_origin.py), [test_compiler_origins.py](../tests/test_compiler_origins.py) |
+| V22-05 CUDA object回溯实际模块函数 | 只提取已核对CUDA object的cubin，再匹配实际模块和函数/launch；不是整个.so都算自写，未关联Runtime注册及模拟构建不能建立实测来源 | M3 | [cpp_origin.py](../kb_workflows/cpp_origin.py), [kernel_origin.py](../kb_workflows/kernel_origin.py), [origin_task.py](../kb_workflows/origin_task.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -243,6 +247,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V20-04 独立来源诊断与默认预览 | 独立公开输入worker保留请求/源码/设备/模式和逐次输出验证，CLI默认零设备预览；结果与日志不覆盖原实验 | M4 | [origin_task.py](../kb_workflows/origin_task.py), [audit_kernel_origin.py](../scripts/audit_kernel_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V21-04 CUPTI活动关联与原始提取记录 | 补齐DRIVER/RUNTIME activity生成correlation，运行时父关联唯一时才使用；二进制工具/日志按原字节绑定，兼容非UTF-8记录 | M2 | [cuda_origin.py](../kb_workflows/cuda_origin.py), [origin_binaries.py](../kb_workflows/origin_binaries.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V21-06 来源任务进入队列验证入口 | 队列接收origin_audit并强制候选源码，验证器摘要包含新增入口；CPU请求校验覆盖预览生成的实际payload，不运行设备 | — | [queue_worker.py](../kb_workflows/queue_worker.py), [common.py](../kb_workflows/common.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
+| V22-04 CUDA C++真实构建观察 | 核对Torch适配器RECORD、实际loader调用点、CUDA字面量、Ninja/source/object和工具/环境；未知header、编译wrapper或未完成构建不赋予来源 | M2 | [cpp_origin.py](../kb_workflows/cpp_origin.py), [test_compiler_origins.py](../tests/test_compiler_origins.py) |
+| V22-06 来源协议v3与实际SDK结构兼容 | 新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [triton_origin.py](../kb_workflows/triton_origin.py), [test_compiler_origins.py](../tests/test_compiler_origins.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -259,7 +265,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成 |
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成 |
-| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton源码与实际launch、受信wheel cubin、不可变Graph replay、原生内存活动和独立轨道诊断；CPP/其他loader、Graph参数更新重绑定、依赖闭包、Neuron与正式资格门继续实现，未知不通过 |
+| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
 | R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计；来源诊断冻结配置容差并观察training/grad后置状态 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |

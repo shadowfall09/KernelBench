@@ -69,6 +69,8 @@ def audit(payload):
         oracle = move_model(Model(*clone_tensors(initial)), device, dtype)
         set_seed(seeds[0])
         changes = []
+        if getattr(capture, "extensions", None) is not None:
+            capture.extensions.prepare()
         with environment_guard(changes):
             ModelNew = load_custom_model(payload["kernel_src"], {}, str(build))
             model = move_model(ModelNew(*clone_tensors(initial)), device, dtype)
@@ -77,6 +79,7 @@ def audit(payload):
             "device_fingerprint": device_fingerprint(device), "precision": settings["precision"],
             "fp32_tolerance": settings["fp32_tolerance"], "torch_version": torch.__version__,
             "compiler": "triton-3.7.0", "collector": "cupti-python-13.3.0", "input_seeds": seeds,
+            "compiler_adapters": {"triton": "3.7.0", "cuda_extension": "2.12.0" if getattr(capture, "extensions", None) is not None else None},
             "scope": "public_input_constructor; separate_instrumented_process; no_hidden_or_native_case_coverage_claim"}
         with torch.no_grad():
             for seed in seeds:
@@ -109,6 +112,8 @@ def audit(payload):
         capture.raw["environment_changes"] = sorted(set(changes))
         if changes:
             capture.error("Candidate import/execution changed process settings")
+    if getattr(capture, "extensions", None) is not None:
+        capture.bind_extensions(capture.extensions.collect(timeout=min(30, max(1, settings.get("timeout", 300) / 8))))
     capture.raw["binary_inventory"] = catalog.collect(timeout=min(60, max(1, settings.get("timeout", 300) / 4)))
     try:
         summary = summarize(capture.raw, minimum_custom_fraction=threshold)
