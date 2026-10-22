@@ -54,6 +54,10 @@ def terminate(process):
 def local_evaluate(payload, device="0", log_path=None):
     """Isolate CUDA state and compilation per task; kill children on timeout."""
     timeout = payload["eval_config"]["timeout"]
+    from .isolation import enabled
+
+    if enabled(payload):
+        raise ValueError("A local process cannot establish the requested restricted Docker policy")
     with tempfile.TemporaryDirectory(prefix="kb-task-") as temporary:
         directory = Path(temporary)
         source, target = directory / "request.json", directory / "result.json"
@@ -127,6 +131,12 @@ def queue_evaluate(payload, config):
 
 @record_device_lease
 def docker_evaluate(payload, config, device="0", log_path=None):
+    from .isolation import enabled
+
+    if enabled(payload):
+        from .restricted_transport import evaluate
+
+        return evaluate(payload, config, device, log_path)
     name = "kb-eval-" + uuid.uuid4().hex[:12]
     with tempfile.TemporaryDirectory(prefix="kb-docker-eval-") as temporary:
         directory = Path(temporary)

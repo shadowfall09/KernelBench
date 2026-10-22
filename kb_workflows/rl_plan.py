@@ -89,7 +89,7 @@ def task_config(plan, key, *, directory, samples=1):
 
 def verifier_inputs(options):
     return {name: fingerprint({"document": read_json(Path(options[name]))}) for name in
-            ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file") if options.get(name)}
+            ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if options.get(name)}
 
 
 def _task(row, base):
@@ -143,12 +143,14 @@ def make_plan(specification, *, directory, base_directory=None):
         options = file_options(path if path.is_absolute() else root / path, parser())
     else:
         options = dict(options)
-        for name in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file"):
+        for name in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
             if options.get(name) and not Path(options[name]).is_absolute():
                 options[name] = str((root / options[name]).resolve())
     defaults = dict(generation="local", evaluation="local", strict_validation=True, evidence_level="L0",
                     paired_timing=True, final_repeats=3, parallel=1)
     base = RunConfig(**{**defaults, **options}).validate()
+    if base.regrade_manifest:
+        raise ValueError("RL verification cannot reuse an artifact-regrade population as new generated candidates")
     base.require_gpu_target()
     if training.certificate_bonus and base.score_mode != "headroom":
         raise ValueError("A design certificate bonus requires reviewed Headroom D/SOL bounds")

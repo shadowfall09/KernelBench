@@ -32,6 +32,16 @@ variation policies. Both are disabled by default, share the original request
 timeout, and never replace uninstrumented timing samples. Missing tools or logs
 remain unknown. See [tool checks](TOOL_CHECKS.md) and `configs/a6000-safety.toml`.
 
+## Restricted verifiers and artifact regrading
+
+`isolation_mode = "restricted"` selects the CUDA/Docker policy in
+`configs/a6000-restricted.toml`. The parent pins each worker image by ID,
+checks effective configuration and Linux limits, and verifies bounded result
+handoff and cleanup. Scored cohorts must use the same image identity.
+Source-only native/Harbor regrading uses current verifiers without another
+agent run; plan and run commands preview by default. See
+[isolation and regrading](ISOLATION_REGRADE.md) for platform scope and trust limits.
+
 ## Production families
 
 Select `suite = "production41"`, `level = 5` and

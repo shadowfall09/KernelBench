@@ -11,6 +11,12 @@ from .suites import selection_receipt
 
 
 def protocol(config):
+    if config.regrade_manifest:
+        from .regrade import protocol as regrade_protocol
+
+        return regrade_protocol(config)
+    from .isolation import options
+
     external = config.generation == "harbor"
     return {
         "version": "kernelbench-pro-agent-v1",
@@ -18,6 +24,8 @@ def protocol(config):
         "scaffold": f"harbor/{config.harbor_agent}" if external else "mini-swe-agent==2.4.6",
         "model_backend": "harbor" if external else config.agent_backend,
         "device_backend": config.device_backend,
+        "verifier_isolation": options(config),
+        "agent_network_hosts": config.harbor_agent_hosts if config.generation == "harbor" else None,
         "model": config.model,
         "samples_per_problem": config.num_samples,
         "candidate_limit_per_sample": None if external else (1 if config.generation_mode == "one-shot" else config.optimization_rounds),
@@ -79,6 +87,7 @@ def write_budget_report(config, summary):
 def compare_runs(directories):
     """Group reports only when the declared workload, hardware and resource limits match."""
     from .config import RunConfig
+    from .isolation import options
 
     groups = {}
     for directory in map(Path, directories):
@@ -98,12 +107,13 @@ def compare_runs(directories):
                     "num_perf_trials": config.num_perf_trials, "cold_calls": config.cold_calls,
                     "fp32_tolerance": config.fp32_tolerance}
         contract.update(strict_validation=config.strict_validation, evidence_level=config.evidence_level)
+        contract["verifier_isolation"] = options(config)
         contract["diagnostic_contract"] = {key: getattr(config, key) for key in (
             "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")}
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
         contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))
-                        for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file") if getattr(config, option)})
+                        for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)})
         contract.update(task_profile=config.task_profile, task_memory_mb=config.task_memory_mb)
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})

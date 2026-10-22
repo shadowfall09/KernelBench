@@ -17,7 +17,7 @@ from .generation import agent_environment, prompt_source
 from .suites import selection_receipt
 from .transports import terminate
 
-HARBOR_SOURCE = "6c9d3d6609854375005a7b5c8f1906371d64c6ff"
+HARBOR_SOURCE = "b53b8134e1241686dca7759af188f987ecc48e8b"
 CUDA_IMAGE = "nvidia/cuda:13.0.0-devel-ubuntu24.04"
 BASE_IMAGE = f"""FROM {CUDA_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends \\
@@ -45,15 +45,34 @@ def verification_timeout(config, pid):
     return count * config.timeout + 180
 
 
-def _compose(device):
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", device):
+def _compose(device=None, *, restrictions=None):
+    if device is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", device):
         raise ValueError("Harbor Docker device must be one numeric ID or GPU UUID")
-    return f"""services:
+    text = """services:
   main:
     build:
       context: .
     command: [sh, -c, "sleep infinity"]
-    deploy:
+"""
+    if restrictions:
+        text += f"""    network_mode: none
+    read_only: true
+    user: '65532:65532'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: {restrictions['pids']}
+    mem_limit: {restrictions['memory_mb']}m
+    memswap_limit: {restrictions['memory_mb']}m
+    cpus: {restrictions['cpus']}
+    ipc: private
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size={restrictions['tmp_mb']}m,mode=1777
+      - /app:rw,nosuid,nodev,size=64m,mode=1777
+      - /tests/repo/cache:rw,nosuid,nodev,size={restrictions['tmp_mb']}m,uid=65532,gid=65532,mode=0700
+      - /tests/repo/results:rw,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700
+"""
+    if device is not None:
+        text += f"""    deploy:
       resources:
         reservations:
           devices:
@@ -61,6 +80,7 @@ def _compose(device):
               device_ids: [{json.dumps(device)}]
               capabilities: [gpu]
 """
+    return text
 
 
 def write_task(directory, config, pid, sid=0, device=None):
@@ -95,15 +115,22 @@ def write_task(directory, config, pid, sid=0, device=None):
     hidden_target.parent.mkdir(parents=True)
     shutil.copy2(hidden, hidden_target)
     (tests / "Dockerfile").write_text(BASE_IMAGE + "COPY . /tests/\nENV PYTHONPATH=/tests/repo\n")
+    restricted = config.isolation_mode == "restricted"
+    from .isolation import allowed_hosts
+    from .isolation import options as isolation_options
+
     if device is not None:
-        for target in (environment, tests):
-            (target / "docker-compose.yaml").write_text(_compose(device))
+        (environment / "docker-compose.yaml").write_text(_compose(device))
+    if device is not None or restricted:
+        (tests / "docker-compose.yaml").write_text(_compose(device, restrictions=isolation_options(config) if restricted else None))
     child = replace(config, suite="production41" if config.level == 5 else "full", suite_role="scored", start=pid, end=pid, num_samples=1, run_name="harbor",
                     generation="local", evaluation="local", gpus="0", resume=False,
                     stage="evaluate", problem_specs="", hardware=config.hardware or config.gpu,
                     runs_dir="/logs/verifier/kernelbench-pro/runs", build_image=False,
                     profile="", bedrock=False, model="", small_model="", modal_secret="",
                     queue_url="http://127.0.0.1:8000", harbor_command="harbor")
+    # The outer Harbor Docker sandbox owns these restrictions, rather than a nested Docker daemon.
+    child.isolation_mode = "standard"
     # Reviewed models and calibration are verifier-only data, never agent inputs.
     if config.problem_specs:
         document = json.loads(Path(config.problem_specs).read_text())
@@ -126,6 +153,7 @@ def write_task(directory, config, pid, sid=0, device=None):
         child.determinism_policy_file = "/tests/determinism_policies.json"
     atomic_json(tests / "config.json", {"protocol": "kernelbench-pro-harbor-v1", "sample_id": sid,
                                        "evaluator_sha256": evaluator_digest(), "config": child.to_dict(),
+                                       "restricted_policy": isolation_options(config) if restricted else None,
                                        "reward": config.harbor_reward})
     (tests / "test.sh").write_text("""#!/bin/bash
 set -euo pipefail
@@ -175,15 +203,17 @@ tags = ["cuda", "kernelbench-pro", "{config.precision}"]
 
 [agent]
 timeout_sec = {float(config.agent_timeout)}
+{('network_mode = "allowlist"' + chr(10) + 'allowed_hosts = ' + json.dumps(allowed_hosts(config.harbor_agent_hosts))) if config.harbor_agent_hosts else ('network_mode = "no-network"' if restricted else '')}
 
 [environment]
 {resources}
 [verifier]
 timeout_sec = {float(budget)}
 environment_mode = "separate"
+network_mode = "no-network"
 
 [verifier.environment]
-{resources}""")
+{resources.replace('cpus = 4', 'cpus = ' + str(config.isolation_cpus)).replace('memory_mb = ' + str(config.harbor_memory_mb), 'memory_mb = ' + str(config.isolation_memory_mb)) if restricted else resources}""")
     return directory
 
 

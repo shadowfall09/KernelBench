@@ -53,7 +53,7 @@ RMS(candidate - oracle) <= norm_atol + norm_rtol * RMS(oracle)
 | L1 | L0 + 交替计时、噪声底、内核来源、设备校准、边界证书 | 缺少实际证据时拒绝该等级和相应评分资格 |
 | L2 | L1 + 硬件计数器、内存工具、重复一致性、算法证书 | 工具runner和重复策略已实现，未采集设备证据；缺项不通过 |
 
-每项记录`passed`、`failed`、`not_measured`或有理由的`not_applicable`，未知测量值为null。receipt同时记录请求等级、达到等级、缺项、standard/hidden范围；评分器重新根据逐项证据计算资格，不只信汇总布尔值。安全隔离认证仍为false。
+每项记录`passed`、`failed`、`not_measured`或有理由的`not_applicable`，未知测量值为null。receipt同时记录请求等级、达到等级、缺项、standard/hidden范围；评分器重新根据逐项证据计算资格，不只信汇总布尔值。安全隔离认证仍为false。可选[受限验证器](ISOLATION_REGRADE.md)记录Docker配置、Linux观察和清理，并进入评分/恢复，但不替代来源、计数器或真实隔离验收。
 
 原始正确性和计分资格有区别：原生输出正确但缺L1工具时可以保留诊断结果，评分资格则被拒绝。真正执行失败或严格必要项失败时，正确性也不能计作通过。`--no-hidden-tests`仍不代表已通过隐藏验证；报告明确记录是否启用。
 

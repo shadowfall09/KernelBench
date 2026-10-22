@@ -229,7 +229,7 @@ def validate(result, payload, *, allow_simulated=False):
     recorded = copy.deepcopy(result)
     if "sample_id" not in expected:
         recorded.pop("sample_id", None)  # Batch index is appended by the parent, never tool evidence.
-    for field in ("workflow_signature", "evaluation_config"):
+    for field in ("workflow_signature", "evaluation_config", "device_lease_receipt", "execution_envelope", "restricted_worker"):
         recorded["metadata"].pop(field, None)
     if recorded != expected or document.get("checks") != derive(document, payload):
         raise ValueError("Tool-check verdict differs from its raw evidence")
@@ -239,6 +239,10 @@ def validate(result, payload, *, allow_simulated=False):
 def reusable(result, payload):
     """A matching negative outcome can resume; a missing/changed receipt cannot."""
     if result.get("metadata", {}).get("workflow_signature") != fingerprint(payload):
+        return False
+    from .isolation import issue as isolation_issue
+
+    if isolation_issue(result, payload):
         return False
     if not enabled(payload) or (not result.get("metadata", {}).get("tool_checks") and result.get("correctness") is not True):
         return True

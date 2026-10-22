@@ -5,6 +5,7 @@ import shutil
 import sys
 import time
 from contextlib import nullcontext
+from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, read_json, select_problems
 from .config import parse_config
@@ -14,6 +15,14 @@ from .suites import selection_receipt
 def main(argv=None):
     try:
         config = parse_config(argv)
+        if config.regrade_manifest:
+            from .regrade import matches_config, validate
+
+            plan = read_json(Path(config.regrade_manifest))
+            validate(plan)
+            matches_config(config, plan)
+            if config.stage != "analyze":
+                raise ValueError("Use scripts.regrade_artifacts native-run for artifact verification; batch supports its analysis only")
         selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         strict_coverage = None
         if config.strict_validation:
@@ -76,7 +85,8 @@ def main(argv=None):
             from .modal_backend import modal_session
         context = modal_session(config) if cloud and config.stage != "analyze" else nullcontext()
         config.run_dir.mkdir(parents=True, exist_ok=True)
-        atomic_json(config.run_dir / "run_config.json", config.to_dict())
+        if not config.regrade_manifest:
+            atomic_json(config.run_dir / "run_config.json", config.to_dict())
         phases = {}
 
         def phase(name, function):

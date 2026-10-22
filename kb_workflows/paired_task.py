@@ -162,6 +162,7 @@ def evaluate_paired(payload):
 def validate_for_score(config, pid, sid, variant, baseline):
     from .common import evaluator_digest, read_json
     from .engine import paired_payload
+    from .isolation import runtime_issue
     from .paper_analysis import current_result, same_device_class
 
     results = read_json(config.run_dir / "paired_results.json", {})
@@ -176,6 +177,8 @@ def validate_for_score(config, pid, sid, variant, baseline):
             return "paired_source_or_manifest_changed", None
         if current_result(result, expected) or expected["eval_config"]["evaluator_sha256"] != evaluator_digest():
             return "paired_measurement_source_mismatch", None
+        if runtime_issue(baseline, result, expected["eval_config"]):
+            return "paired_measurement_runtime_mismatch", None
         metadata = result.get("metadata", {})
         record = metadata.get("paired_timing", {})
         if (not same_device_class(baseline.get("device_fingerprint", {}), metadata.get("device_fingerprint", {}))

@@ -95,6 +95,8 @@ def evaluator_digest():
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
+        "kb_workflows/isolation.py", "kb_workflows/isolated_worker.py", "kb_workflows/restricted_transport.py",
+        "kb_workflows/regrade.py", "kb_workflows/harbor_regrade.py", "scripts/regrade_artifacts.py",
         "kb_workflows/verification_contracts.json",
         "kb_workflows/aggregation.py",
         "kb_workflows/contract_specs.py",
@@ -190,12 +192,14 @@ def apply_score_gate(results, run_dir):
             if capped:
                 required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
-            for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file"):
+            for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
                 declared = config.get(option)
                 if declared:
                     path = Path(declared)
                     valid = (valid and path.is_file() and metadata.get("score_external_files", {}).get(option)
                              == fingerprint(read_json(path)))
+            if config.get("regrade_manifest"):
+                valid = valid and metadata.get("score_regrade_measurements_sha256") == fingerprint(read_json(run_dir / "regrade_measurements.json", {}))
             if valid and final_required:
                 final_entry = auxiliary["final_manifest.json"].get("slots", {}).get(key, {})
                 source_hash = hashlib.sha256(kernel.read_bytes()).hexdigest()

@@ -27,7 +27,11 @@ def valid_time(value):
 
 
 def compatible(baseline, candidate, current_digest):
+    from .isolation import runtime_issue
+
     metadata = candidate.get("metadata", {})
+    if reason := runtime_issue(baseline, candidate, metadata.get("evaluation_config", {})):
+        return reason
     if baseline.get("baseline_correctness") is not True or (baseline.get("baseline_suite") and not baseline.get("suite_complete")):
         return "baseline_not_validated_or_incomplete"
     if not same_device_class(baseline.get("device_fingerprint", {}), metadata.get("device_fingerprint", {})):
@@ -91,6 +95,7 @@ def measurement_evidence(result, candidate=False):
 
 
 def current_result(result, payload):
+    from .isolation import issue as isolation_issue
     from .tool_checks import issue
 
     metadata = result.get("metadata", {})
@@ -102,6 +107,8 @@ def current_result(result, payload):
         return "reference_mismatch"
     if metadata.get("kernel_sha256") != fingerprint({"source": payload["kernel_src"]}):
         return "kernel_source_changed_or_missing"
+    if reason := isolation_issue(result, payload):
+        return reason
     if reason := issue(result, payload):
         return reason
     return None
@@ -111,6 +118,7 @@ def analyze_paper(config):
     from .aggregation import sensitivity
     from .engine import task_payload
     from .experiment import existing_budget, protocol
+    from .regrade import issue as regrade_issue
     from .resource_budgets import active
     from .resource_budgets import score_issue as resource_score_issue
 
@@ -126,7 +134,7 @@ def analyze_paper(config):
     digest = evaluator_digest()
     groups, bounded_groups, track_groups, rows, scored, certificate_coverage = {}, {}, {}, [], {}, {}
     external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
-                      for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file") if getattr(config, option)}
+                      for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)}
     auxiliary_files = {}
     for name in ((["final_manifest.json", "final_results.json"] if config.final_repeats else [])
                  + (["paired_results.json"] if config.paired_timing else [])
@@ -171,6 +179,8 @@ def analyze_paper(config):
             if status == "verified":
                 status = resource_score_issue(config, pid, sid) or status
             if status == "verified":
+                status = regrade_issue(config) or status
+            if status == "verified":
                 if bound_issue is not None:
                     status = "headroom_certificate_missing_or_invalid"
                     row["headroom_error"] = bound_issue
@@ -180,12 +190,20 @@ def analyze_paper(config):
             if status == "verified" and config.hidden_tests:
                 try:
                     issue = current_result(secret, task_payload(config, pid, sid, hidden=True))
+                    if issue is None:
+                        from .isolation import runtime_issue
+
+                        issue = runtime_issue(raw, secret, payload["eval_config"])
                 except FileNotFoundError:
                     issue = "hidden_source_missing"
                 if issue:
                     status = "stale_or_unknown_hidden_check"
             if status == "verified":
                 status = compatible(baseline, raw, digest) or status
+            if status == "verified":
+                from .isolation import baseline_issue
+
+                status = baseline_issue(config, baseline, pid) or status
             if status == "verified":
                 expected_baseline = fingerprint(task_payload(config, pid, task="baseline"))
                 if baseline.get("metadata", {}).get("workflow_signature") != expected_baseline:
@@ -294,6 +312,7 @@ def analyze_paper(config):
                 score_problem_id=pid, score_run_config_sha256=fingerprint(read_json(config.run_dir / "run_config.json", {})),
                 score_auxiliary_files=auxiliary_files,
                 score_external_files=external_files,
+                score_regrade_measurements_sha256=fingerprint(read_json(config.run_dir / "regrade_measurements.json", {})) if config.regrade_manifest else None,
             )
             scored[key] = entry
         groups.setdefault(layer, []).append(slots)

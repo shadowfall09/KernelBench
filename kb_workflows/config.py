@@ -67,6 +67,13 @@ class RunConfig:
     determinism_checks: bool = False
     determinism_repeats: int = 5
     determinism_policy_file: str = ""
+    isolation_mode: str = "standard"
+    isolation_cpus: int = 4
+    isolation_memory_mb: int = 65536
+    isolation_pids: int = 512
+    isolation_tmp_mb: int = 16384
+    isolation_report_mb: int = 64
+    regrade_manifest: str = ""
     precision: str = "fp32"
     fp32_tolerance: float = float(os.environ.get("KB_FP32_TOL", "1e-3"))
     num_correct_trials: int = 5
@@ -107,6 +114,7 @@ class RunConfig:
     harbor_environment: str = "docker"
     harbor_reward: str = "correctness"
     harbor_memory_mb: int = 65536
+    harbor_agent_hosts: str = ""
     dry_run: bool = False
 
     def validate(self):
@@ -213,6 +221,24 @@ class RunConfig:
 
             self.determinism_policy_file = str(Path(self.determinism_policy_file).expanduser().resolve())
             read_policies(self.determinism_policy_file)
+        from .isolation import allowed_hosts, options, policy
+
+        policy(options(self))
+        hosts = allowed_hosts(self.harbor_agent_hosts)
+        self.harbor_agent_hosts = ",".join(hosts)
+        if self.isolation_mode == "restricted":
+            if self.evaluation != "docker" or self.device_backend != "cuda":
+                raise ValueError("Restricted verification requires evaluation=docker and CUDA")
+            if self.generation == "harbor" and self.harbor_environment != "docker":
+                raise ValueError("Restricted Harbor verification requires its Docker provider")
+            if self.generation == "harbor" and self.stage in {"all", "generate"} and not hosts:
+                raise ValueError("Restricted Harbor agent execution requires explicit --harbor-agent-hosts")
+            if self.generation in {"docker", "modal"} and self.stage in {"all", "generate"}:
+                raise ValueError("Restricted verification requires a separate verifier; use local or Harbor generation")
+        if self.regrade_manifest:
+            self.regrade_manifest = str(Path(self.regrade_manifest).expanduser().resolve())
+            if self.stage in {"all", "generate"}:
+                raise ValueError("Artifact regrading cannot start generation")
         if self.problem_specs:
             self.problem_specs = str(Path(self.problem_specs).expanduser().resolve())
             if not Path(self.problem_specs).is_file():
@@ -343,6 +369,11 @@ def parser():
         "agent_max_output_tokens",
         "sanitizer_timeout",
         "determinism_repeats",
+        "isolation_cpus",
+        "isolation_memory_mb",
+        "isolation_pids",
+        "isolation_tmp_mb",
+        "isolation_report_mb",
     ):
         aliases = [f"--{name.replace('_', '-')}"]
         if name == "parallel":
@@ -380,6 +411,8 @@ def parser():
         "sanitizer_tools",
         "sanitizer_command",
         "determinism_policy_file",
+        "isolation_mode",
+        "regrade_manifest",
         "task_track",
         "run_name",
         "runs_dir",
@@ -405,6 +438,7 @@ def parser():
         "pass_at_k",
         "problem_specs",
         "harbor_command",
+        "harbor_agent_hosts",
         "harbor_agent",
         "harbor_environment",
         "harbor_reward",
@@ -451,7 +485,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value

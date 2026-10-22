@@ -12,6 +12,8 @@ from .transports import docker_evaluate, local_evaluate, queue_evaluate, resolve
 
 
 def settings(config, hidden=False):
+    from .isolation import options
+
     # Changes to the actual evaluator invalidate resumed evaluations.
     return {
         "precision": config.precision,
@@ -42,6 +44,7 @@ def settings(config, hidden=False):
         "sanitizer_timeout": config.sanitizer_timeout,
         "determinism_checks": config.determinism_checks,
         "determinism_repeats": config.determinism_repeats,
+        "isolation": options(config),
     }
 
 
@@ -237,6 +240,8 @@ def write_validation_summary(config, standard=None, hidden=None):
 
 
 def record_baseline(config):
+    from .isolation import issue as isolation_issue
+
     if not config.hardware:
         raise ValueError("Specify --hardware when recording a baseline (use the actual verifier GPU name)")
     if config.baseline_suite:
@@ -249,7 +254,8 @@ def record_baseline(config):
     for pid, path in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track).items():
         payload = task_payload(config, pid, task="baseline")
         signature = fingerprint(payload)
-        if config.resume and (level.get(path.name) or {}).get("metadata", {}).get("workflow_signature") == signature:
+        if (config.resume and (level.get(path.name) or {}).get("metadata", {}).get("workflow_signature") == signature
+                and not isolation_issue(level[path.name], payload)):
             continue
         key = f"baseline-{pid}"
         names[key] = path.name
@@ -285,6 +291,7 @@ def analyze_run(config):
 
 def record_baseline_suite(config):
     from .baseline_variants import select_baseline, variants_for
+    from .isolation import baseline_issue
 
     target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
     results = read_json(target, {})
@@ -294,7 +301,8 @@ def record_baseline_suite(config):
         base = task_payload(config, pid, task="baseline")
         signature = fingerprint(base)
         previous = level.get(path.name, {})
-        if config.resume and previous.get("suite_complete") and previous.get("metadata", {}).get("workflow_signature") == signature:
+        if (config.resume and previous.get("suite_complete") and previous.get("metadata", {}).get("workflow_signature") == signature
+                and not baseline_issue(config, previous, pid)):
             continue
         signatures[path.name] = signature
         variants[path.name] = {}

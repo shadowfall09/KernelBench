@@ -26,6 +26,15 @@ def verify(manifest, candidate, logs):
         if mode not in {"correctness", "bounded_gain"}:
             raise ValueError("Unknown Harbor reward mode")
         config = RunConfig(**spec["config"]).validate()
+        if spec.get("restricted_policy"):
+            from .isolation import policy, proc_issues, proc_observation
+
+            restrictions = policy(spec["restricted_policy"])
+            observation = proc_observation()
+            if issues := proc_issues(observation, restrictions):
+                raise ValueError("Harbor verifier restrictions were not observed: " + ", ".join(issues))
+            report["execution_policy"] = {"status": "passed", "observation": observation,
+                "scope": "inside_Harbor_Linux_observations; no_independent_host_inspection", "security_isolation_certified": False}
         if not config.hidden_tests or config.num_samples != 1 or config.start != config.end or config.evaluation != "local":
             raise ValueError("Harbor verification requires one local sample and hidden tests")
         # Every invocation is a new evaluation, including regrades in one container.

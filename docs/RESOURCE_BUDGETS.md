@@ -27,6 +27,8 @@ LiteLLM在请求前检查模型支持的`max_completion_tokens`/`max_tokens`参�
 
 可选[内存工具与重复检查](TOOL_CHECKS.md)在同一次验证请求的超时和设备worker墙钟内执行；插桩、版本查询及无插桩复核没有独立额度。它们的耗时不进入性能分数，但计入实际开发资源占用。
 
+受限Docker仍按父进程完整transport墙钟结算，不把容器CPU/cgroup或设备可见性当成GPU busy硬限。[产物重评分](ISOLATION_REGRADE.md)只运行新验证阶段，旧生成成本保存在历史快照，模式单独标记为`artifact-regrade`；不会把旧费用/token重新认证成新预算证明。
+
 ## 离线本地模型
 
 安装可选依赖：`pip install '.[local-model]'`。配置中的checkpoint必须事先存在；适配器不下载模型、禁用远端Python代码并只加载safetensors权重。下面是配置示意，需填写本地路径和实际GPU目标：

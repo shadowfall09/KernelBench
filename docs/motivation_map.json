@@ -1559,12 +1559,17 @@
       "title": "实机隔离与重评分实验",
       "primary": "M5",
       "secondary": [],
-      "status": "planned",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/isolation.py",
+        "kb_workflows/restricted_transport.py",
+        "kb_workflows/regrade.py",
+        "kb_workflows/harbor_regrade.py",
+        "tests/test_isolation.py",
+        "tests/test_harbor_regrade.py"
       ],
-      "reason": "Harbor独立verifier配置已接入；容器网络/权限策略、设备隔离与升级regrade工作流仍待实现，真实部署和隔离实验按用户范围不运行"
+      "reason": "已实现CUDA/Docker受限策略与实际配置/进程观察、Harbor禁止联网/只读验证器/agent allowlist，以及完整槽位冻结的native和Harbor产物重评分；原始测量与历史来源分开绑定，默认不执行，不认证OS逃逸或GPU独占；真实部署、隔离和重评分实验按用户范围未运行"
     },
     {
       "id": "V9-01",
@@ -2224,6 +2229,136 @@
         "configs/a6000-safety.toml"
       ],
       "reason": "配置可选工具/重复预算和题目策略；所有transport复用CLI，策略内容进入生成、最终冻结、比较、RL和旧评分指纹，Neuron拒绝CUDA工具"
+    },
+    {
+      "id": "V19-01",
+      "title": "受限验证器配置与镜像固定",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/isolation.py",
+        "kb_workflows/restricted_transport.py",
+        "configs/a6000-restricted.toml"
+      ],
+      "reason": "显式CUDA/Docker受限策略，每请求把标签解析为不可变image ID；清空worker环境，使用非root、只读根和私有编译缓存，不把不支持的transport降格当作满足策略"
+    },
+    {
+      "id": "V19-02",
+      "title": "实际权限与资源观察",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/isolation.py",
+        "kb_workflows/isolated_worker.py"
+      ],
+      "reason": "核对前后Docker配置与Linux capability/no-new-privileges/seccomp、namespace和cgroup；单设备/主机资源有明确上限，缺观察不通过，不认证GPU独占或驱动逃逸安全"
+    },
+    {
+      "id": "V19-03",
+      "title": "结果交接与容器清理",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/restricted_transport.py",
+        "kb_workflows/isolation.py"
+      ],
+      "reason": "只读请求和独立结果目录，退出后只读有大小界限的普通JSON；拒绝symlink/FIFO/非有限值，确认删除自己创建的容器并处理create客户端超时"
+    },
+    {
+      "id": "V19-04",
+      "title": "隔离凭据进入评分与恢复",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/paper_analysis.py",
+        "kb_workflows/final_verification.py",
+        "kb_workflows/paired_task.py",
+        "kb_workflows/tool_checks.py"
+      ],
+      "reason": "重算配置/结果摘要和原生观察，基线变体与标准/隐藏/最终/配对数据不能混用image；模拟凭据拒绝正式资格，保留诊断与原始计时分离"
+    },
+    {
+      "id": "V19-05",
+      "title": "Harbor网络与只读验证器",
+      "primary": "M5",
+      "secondary": [
+        "M4",
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/harbor.py",
+        "kb_workflows/harbor_verifier.py",
+        "tests/test_isolation.py"
+      ],
+      "reason": "独立verifier禁止联网，受限Compose隔离可写路径并复用bundled tests；agent执行使用显式host allowlist，实际SDK schema已校验，容器部署未运行"
+    },
+    {
+      "id": "V19-06",
+      "title": "冻结候选的原生重评分",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/regrade.py",
+        "scripts/regrade_artifacts.py"
+      ],
+      "reason": "固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动"
+    },
+    {
+      "id": "V19-07",
+      "title": "重评分来源与测量凭据",
+      "primary": "M3",
+      "secondary": [
+        "M4",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/regrade.py",
+        "kb_workflows/experiment.py",
+        "kb_workflows/common.py"
+      ],
+      "reason": "单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格"
+    },
+    {
+      "id": "V19-08",
+      "title": "Harbor产物重评分与默认预览",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/harbor_regrade.py",
+        "scripts/regrade_artifacts.py",
+        "tests/test_harbor_regrade.py"
+      ],
+      "reason": "固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览"
     }
   ]
 }

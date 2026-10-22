@@ -56,6 +56,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 
 第十八版交付可选四工具流程与题目级快照重复策略，原始日志、工具/源码/设备身份、无插桩复核及派生判定进入评分和恢复；审核原子操作策略不放宽原生精度。未运行Sanitizer或设备实验，也不将工具通过等同无竞态证明，见[工具说明](TOOL_CHECKS.md)。
 
+第十九版交付受限验证器、Harbor网络/权限配置和已有产物重评分。原生Docker核对有效配置与Linux观察，Harbor使用独立只读verifier及显式agent host策略；native/Harbor重评分保留完整旧cohort和候选，默认只预览。容器部署、逃逸/GPU独占验收和实际regrade实验未运行，收据不提供安全认证，见[隔离与重评分](ISOLATION_REGRADE.md)。
+
 当前任务范围是完成23项设计所需的实现、配置、runner和必要回归，**不运行科研实验**。实际GPU、Trainium、真实模型和训练结果保持未运行；它们不作为本轮代码交付的前置条件。
 
 ## 逐项归档
@@ -109,6 +111,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V18-01 四工具独立诊断流程 | 分别运行memcheck/racecheck/synccheck/initcheck，要求完成摘要与正调用覆盖，缺工具/日志或超时保持未知，工具范围含参考及框架 | M5 | [tool_runner.py](../kb_workflows/tool_runner.py), [evaluate_task.py](../kb_workflows/evaluate_task.py) |
 | V18-02 模型快照与逐位重复验证 | 逐实例复制模型和输入并重放RNG，不推进原模型；每次保留原生精度门，记录输出位摘要，缺实例或快照不给通过 | — | [determinism.py](../kb_workflows/determinism.py), [reliability.py](../src/reliability.py) |
 | V18-03 审核绑定的原子操作策略 | 默认逐位一致，有限波动须有参考源码摘要、审核理由及非零界限；不放宽离散值、非有限值或原生精度 | M1 | [determinism.py](../kb_workflows/determinism.py), [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py) |
+| V19-04 隔离凭据进入评分与恢复 | 重算配置/结果摘要和原生观察，基线变体与标准/隐藏/最终/配对数据不能混用image；模拟凭据拒绝正式资格，保留诊断与原始计时分离 | M3, M5 | [paper_analysis.py](../kb_workflows/paper_analysis.py), [final_verification.py](../kb_workflows/final_verification.py), [paired_task.py](../kb_workflows/paired_task.py), [tool_checks.py](../kb_workflows/tool_checks.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -147,6 +150,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V17-05 Neuron校准与物理身份 | 绑定序列号/core/驱动/SDK并保留原始copy、分dtype GEMM和启动代理，明确同步墙钟口径、无FP64速率和未知缓存驱逐 | M5 | [neuron_device.py](../kb_workflows/neuron_device.py), [calibration.py](../kb_workflows/calibration.py) |
 | V17-06 设备轨迹与每引擎诊断 | 收集框架trace/NEFF/NTFF与哈希；显式单位/窗口的tensor/vector/scalar/DMA并集，不把指令数冒充kernel数或capture跨度冒充host墙钟 | M5 | [neuron_profile.py](../kb_workflows/neuron_profile.py), [neuron_device.py](../kb_workflows/neuron_device.py), [analyze_device_trace.py](../scripts/analyze_device_trace.py) |
 | V18-05 诊断与性能采样分离 | 保留首次无插桩原生/配对样本与冷启动，诊断共用原请求预算；四工具全通过才给内存工具证据，L2另需重复一致性 | M2, M4 | [tool_runner.py](../kb_workflows/tool_runner.py), [tool_checks.py](../kb_workflows/tool_checks.py), [evidence.py](../kb_workflows/evidence.py) |
+| V19-07 重评分来源与测量凭据 | 单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格 | M4, M5 | [regrade.py](../kb_workflows/regrade.py), [experiment.py](../kb_workflows/experiment.py), [common.py](../kb_workflows/common.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -222,6 +226,12 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V17-02 Neuron配置与任务执行 | device节、独立vendor解释器、物理core分配及LNC=1，接入标准/隐藏/最终与开发任务，拒绝CUDA镜像和旧XLA混用 | M2, M4 | [config.py](../kb_workflows/config.py), [neuron_worker.py](../kb_workflows/neuron_worker.py), [transports.py](../kb_workflows/transports.py) |
 | V18-04 原始工具证据与负结果恢复 | 绑定工具版本/二进制、逐进程日志、阶段nonce/源码/物理设备；重算派生结果，已记录失败可恢复，篡改收据失效 | M2 | [tool_checks.py](../kb_workflows/tool_checks.py), [engine.py](../kb_workflows/engine.py), [final_verification.py](../kb_workflows/final_verification.py) |
 | V18-06 统一配置与跨流程指纹 | 配置可选工具/重复预算和题目策略；所有transport复用CLI，策略内容进入生成、最终冻结、比较、RL和旧评分指纹，Neuron拒绝CUDA工具 | M4 | [config.py](../kb_workflows/config.py), [experiment.py](../kb_workflows/experiment.py), [rl_plan.py](../kb_workflows/rl_plan.py), [a6000-safety.toml](../configs/a6000-safety.toml) |
+| V19-01 受限验证器配置与镜像固定 | 显式CUDA/Docker受限策略，每请求把标签解析为不可变image ID；清空worker环境，使用非root、只读根和私有编译缓存，不把不支持的transport降格当作满足策略 | M2 | [isolation.py](../kb_workflows/isolation.py), [restricted_transport.py](../kb_workflows/restricted_transport.py), [a6000-restricted.toml](../configs/a6000-restricted.toml) |
+| V19-02 实际权限与资源观察 | 核对前后Docker配置与Linux capability/no-new-privileges/seccomp、namespace和cgroup；单设备/主机资源有明确上限，缺观察不通过，不认证GPU独占或驱动逃逸安全 | M2 | [isolation.py](../kb_workflows/isolation.py), [isolated_worker.py](../kb_workflows/isolated_worker.py) |
+| V19-03 结果交接与容器清理 | 只读请求和独立结果目录，退出后只读有大小界限的普通JSON；拒绝symlink/FIFO/非有限值，确认删除自己创建的容器并处理create客户端超时 | M2, M4 | [restricted_transport.py](../kb_workflows/restricted_transport.py), [isolation.py](../kb_workflows/isolation.py) |
+| V19-05 Harbor网络与只读验证器 | 独立verifier禁止联网，受限Compose隔离可写路径并复用bundled tests；agent执行使用显式host allowlist，实际SDK schema已校验，容器部署未运行 | M4, M2 | [harbor.py](../kb_workflows/harbor.py), [harbor_verifier.py](../kb_workflows/harbor_verifier.py), [test_isolation.py](../tests/test_isolation.py) |
+| V19-06 冻结候选的原生重评分 | 固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动 | M3 | [regrade.py](../kb_workflows/regrade.py), [regrade_artifacts.py](../scripts/regrade_artifacts.py) |
+| V19-08 Harbor产物重评分与默认预览 | 固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览 | M4 | [harbor_regrade.py](../kb_workflows/harbor_regrade.py), [regrade_artifacts.py](../scripts/regrade_artifacts.py), [test_harbor_regrade.py](../tests/test_harbor_regrade.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -253,7 +263,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-20 RL训练与奖励验证 | 代码已实现 | M4 | 已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果 |
 | R-21 Trainium/NKI与设备通用接口 | 代码已实现 | M5 | 已实现五方法设备接口、原生TorchNeuron/NKI worker、平台基线/校准、core与物理/软件身份、CPU FP64与原生最终/配对重测、每引擎轨迹诊断；40个存储接口仅CPU前端回归，FP8存储明确拒绝，SDK部署、算子覆盖和设备实验未验证 |
 | R-22 工具能力收据与可选分层 | 代码已实现 | M5 | 已实现逐项状态收据、缺项null、等级判定与评分门；L1/L2缺少的设备工具证据不会降格冒充通过，GPU验收仍独立记录 |
-| R-23 实机隔离与重评分实验 | 待实现 | M5 | Harbor独立verifier配置已接入；容器网络/权限策略、设备隔离与升级regrade工作流仍待实现，真实部署和隔离实验按用户范围不运行 |
+| R-23 实机隔离与重评分实验 | 代码已实现 | M5 | 已实现CUDA/Docker受限策略与实际配置/进程观察、Harbor禁止联网/只读验证器/agent allowlist，以及完整槽位冻结的native和Harbor产物重评分；原始测量与历史来源分开绑定，默认不执行，不认证OS逃逸或GPU独占；真实部署、隔离和重评分实验按用户范围未运行 |
 <!-- roadmap:end -->
 
 ## 维护约定

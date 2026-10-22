@@ -1,0 +1,23 @@
+[gpu]
+profile = "RTX_A6000"
+devices = [0]
+
+[run]
+run_name = "a6000_restricted"
+stage = "evaluate"
+generation = "local"
+evaluation = "docker"
+level = 1
+start = 1
+end = 3
+isolation_mode = "restricted"
+isolation_cpus = 4
+isolation_memory_mb = 65536
+isolation_pids = 512
+isolation_tmp_mb = 16384
+isolation_report_mb = 64
+sanitizer_tools = "all"
+sanitizer_timeout = 300
+determinism_checks = true
+determinism_repeats = 5
+timeout = 1800

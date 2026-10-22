@@ -13,7 +13,7 @@ harbor --version
 python scripts/run_batch.py --help
 ```
 
-可选 `harbor` extra 安装 Harbor 0.24.0 及其 Modal 支持；不使用 Harbor 时无需安装。当前适配依据 [Harbor 源码 6c9d3d6](https://github.com/harbor-framework/harbor/tree/6c9d3d6609854375005a7b5c8f1906371d64c6ff)，使用 schema 1.4、独立 verifier 和显式产物传递。自带其他 Harbor 版本时需核对这些接口。
+可选 `harbor` extra 安装 Harbor 0.24.0 及其 Modal 支持；不使用 Harbor 时无需安装。当前适配依据 [Harbor 0.24.0源码 b53b813](https://github.com/harbor-framework/harbor/tree/b53b8134e1241686dca7759af188f987ecc48e8b)，使用 schema 1.4、独立 verifier 和显式产物传递。自带其他 Harbor 版本时需核对这些接口。
 
 ## 同一入口运行完整流程
 
@@ -96,3 +96,9 @@ Python 3.12.12 / Torch 2.12.0 下，完整回归 **204 项通过**（原有 172 
 Harbor Docker 的 CPU 容器 smoke 尝试因宿主 NAT 网络创建失败而中断；即使命令退出码为 0，也没有产物或 reward，未将其记为通过。生成后端同样要求唯一非空提交，随后重新执行原生正式评测。
 
 当前验证宿主的驱动被 Torch CUDA 13 构建报告为过旧，因此尚未完成真实 GPU / Harbor agent 端到端验证；需要在兼容的已分配 GPU 上检查。
+
+## 验证器限制与重评分
+
+独立verifier显式使用`network_mode = "no-network"`。可选`isolation_mode = "restricted"`进一步生成非root、只读根文件系统、capability清空和资源上限；代码及隐藏测试在image中预置，SDK的bundled-tests模式避免启动后重新上传它们。`/app`仅用于候选交接，缓存与结果使用独立tmpfs。实际部署未运行。
+
+受限Harbor agent的执行阶段需要显式`harbor_agent_hosts`，使用SDK的allowlist策略；验证器保持禁止联网。安装与环境准备是单独阶段，allowlist不认证所选域名的业务用途。导出及产物重评分不启动agent。配置、观察收据、默认预览的native/Harbor重评分命令与限制见[隔离与重评分](ISOLATION_REGRADE.md)。

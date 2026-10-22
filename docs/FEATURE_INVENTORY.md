@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第十八版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第十九版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -597,6 +597,36 @@ memcheck启用分配padding并禁用框架CUDA缓存；racecheck保留warning，
 验证：Python 3.12.12 / Torch 2.12.0下875项CPU/模拟回归通过，本版新增52项。Ruff、动机覆盖、21份Markdown本地链接、skill校验、177包兼容性和离线wheel的15个轻量模块导入均通过。新增测试覆盖错误/警告、缺工具和日志、超时、设备/源码错绑、重封装后的缺项、逐位与有界原子策略、状态/RNG恢复、配对样本保留、CLI路由、策略指纹和Harbor导出。工具执行以模拟进程替代；真实子进程测试只运行CPU打印和受控超时。
 
 R-10的软件范围已接入；23项当前为13项代码已实现、8项部分实现、2项待实现。R-08来源归因与R-23隔离/重评分继续保留，其他部分实现项仍按动机表推进。此前stash没有恢复。
+
+## 第十九版：受限验证器与已有产物重评分
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add restricted verifier policies and frozen artifact regrading |
+| 日期 | 2026-10-22 |
+| 基础提交 | `2cbafd5` |
+| 状态 | 软件与CPU/模拟回归；未构建或运行真实容器、设备或模型实验 |
+
+本版交付R-23的软件范围，使用可选受限策略和默认只预览的产物重评分。配置、职责及实际SDK限制见[隔离与重评分](ISOLATION_REGRADE.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V19-01 | 受限验证器配置与镜像固定 | 显式CUDA/Docker受限策略，每请求把标签解析为不可变image ID；清空worker环境，使用非root、只读根和私有编译缓存，不把不支持的transport降格当作满足策略 | `kb_workflows/isolation.py` | [M5](MOTIVATION.md#m5) |
+| V19-02 | 实际权限与资源观察 | 核对前后Docker配置与Linux capability/no-new-privileges/seccomp、namespace和cgroup；单设备/主机资源有明确上限，缺观察不通过，不认证GPU独占或驱动逃逸安全 | `kb_workflows/isolation.py` | [M5](MOTIVATION.md#m5) |
+| V19-03 | 结果交接与容器清理 | 只读请求和独立结果目录，退出后只读有大小界限的普通JSON；拒绝symlink/FIFO/非有限值，确认删除自己创建的容器并处理create客户端超时 | `kb_workflows/restricted_transport.py` | [M5](MOTIVATION.md#m5) |
+| V19-04 | 隔离凭据进入评分与恢复 | 重算配置/结果摘要和原生观察，基线变体与标准/隐藏/最终/配对数据不能混用image；模拟凭据拒绝正式资格，保留诊断与原始计时分离 | `kb_workflows/paper_analysis.py` | [M2](MOTIVATION.md#m2) |
+| V19-05 | Harbor网络与只读验证器 | 独立verifier禁止联网，受限Compose隔离可写路径并复用bundled tests；agent执行使用显式host allowlist，实际SDK schema已校验，容器部署未运行 | `kb_workflows/harbor.py` | [M5](MOTIVATION.md#m5) |
+| V19-06 | 冻结候选的原生重评分 | 固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动 | `kb_workflows/regrade.py` | [M5](MOTIVATION.md#m5) |
+| V19-07 | 重评分来源与测量凭据 | 单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格 | `kb_workflows/regrade.py` | [M3](MOTIVATION.md#m3) |
+| V19-08 | Harbor产物重评分与默认预览 | 固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览 | `kb_workflows/harbor_regrade.py` | [M5](MOTIVATION.md#m5) |
+
+原生受限策略只支持CUDA/Docker，明确拒绝其他transport的静默降格；Harbor采用独立外层限制及容器内观察，不把它等同原生host inspect收据。Linux策略与配置观察不提供完整安全认证；GPU独占、busy时间物理硬限和供应商计数器继续按对应设计追踪。已有结果不能因增加字段或改label变成新runtime测量。
+
+原生regrade冻结当前参考/隐藏源码、候选、历史记录与轨迹、新审核输入和完整槽位；新基线独立保存，缺失候选计入分母。Harbor使用实际0.24 regrade接口，验证SDK隐式artifact目录与逐trial源码派生。两个入口默认不启动实验，真实执行需要显式选项。模拟执行只能供审计，历史生成费用不被重新认证。
+
+验证：Python 3.12.12 / Torch 2.12.0下935项CPU/模拟回归通过，本版新增60项。Ruff、动机覆盖、22份Markdown本地链接、skill校验、177包兼容性和离线wheel的24个轻量模块导入均通过；安装的Harbor恢复源码与官方v0.24.0字节一致。回归覆盖权限/网络/cgroup、设备及挂载错绑、FIFO/symlink/报告界限、超时/清理、候选/历史/SDK/结果篡改、缺失槽位、零生成预览与实际Harbor Task/CLI/artifact覆盖契约。没有运行Docker、GPU、Trainium、模型或训练实验。
+
+23项当前为14项代码已实现、8项部分实现、1项待实现；来源归因R-08与其余部分实现项继续推进。此前stash保持原样，没有恢复。
 
 ## 维护方式
 

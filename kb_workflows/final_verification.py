@@ -17,12 +17,15 @@ PROTOCOL = "frozen_final_remeasurement_v1"
 
 
 def _options(config):
+    from .isolation import options as isolation_options
+
     options = {name: getattr(config, name) for name in (
         "level", "suite", "suite_role", "task_profile", "task_track", "task_memory_mb", "start", "end", "num_samples", "precision", "fp32_tolerance",
         "num_correct_trials", "num_perf_trials", "hidden_tests", "strict_validation", "evidence_level",
         "baseline", "baseline_suite", "baseline_portfolio", "cold_calls", "gpu_arch", "hardware", "device_backend", "device_python",
         "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout",
         "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")}
+    options["isolation"] = isolation_options(config)
     if config.task_dimensions:
         options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})
     if config.determinism_policy_file:
@@ -147,6 +150,7 @@ def run(config):
 
 def validate(config, pid, sid, baseline):
     from .evidence import score_issue
+    from .isolation import runtime_issue
     from .paper_analysis import compatible, current_result, measurement_evidence
 
     if not config.final_repeats:
@@ -165,6 +169,8 @@ def validate(config, pid, sid, baseline):
                 return "final_manifest_changed_or_missing", []
             if current_result(result, payload) or score_issue(result, payload["eval_config"], "hidden" if hidden else "standard"):
                 return "final_remeasurement_evidence_mismatch", []
+            if runtime_issue(baseline, result, payload["eval_config"]):
+                return "final_remeasurement_runtime_mismatch", []
             if not hidden:
                 if compatible(baseline, result, evaluator_digest()) or measurement_evidence(result, candidate=True):
                     return "final_remeasurement_measurement_mismatch", []
