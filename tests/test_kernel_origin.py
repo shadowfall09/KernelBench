@@ -33,7 +33,7 @@ def raw_capture():
                         "compiler_metadata_sha256": "1" * 64}],
             "launches": [{"context_id": 9, "correlation": 10, "function": 1, "call": 1, "exit_success": True}],
             "windows": [{"id": 1, "start_ns": 100, "end_ns": 300, "device": 0, "seed": 42,
-                         "input_signature": [], "no_grad": True, "training": True, "output_verified": True}],
+                         "input_signature": [], "no_grad": True, "training": True, "training_after": True, "output_verified": True}],
             "activities": [{"kind": "kernel", "start_ns": 120, "end_ns": 220, "device": 0, "context_id": 9,
                             "stream": 7, "correlation": 10, "graph_id": 0, "graph_node_id": 0, "name": "any name"}],
             "capture_complete": True, "source_intact": True, "hooks_intact": True, "dropped_records": 0,
@@ -123,7 +123,7 @@ def test_ambiguous_identity_records_are_rejected(label):
         kernel_origin.summarize(raw)
 
 
-@pytest.mark.parametrize("change", [{"output_verified": False}, {"no_grad": False}, {"training": None},
+@pytest.mark.parametrize("change", [{"output_verified": False}, {"no_grad": False}, {"training": None}, {"training_after": False},
                                     {"start_ns": 300}, {"seed": True}, {"input_signature": None}])
 def test_unverified_or_unbound_mode_and_input_windows_are_rejected(change):
     raw = raw_capture()
@@ -216,8 +216,8 @@ def fake_sdk():
         calls.append(("drops", context, stream))
         C.c_size_t.from_address(pointer).value = 0
 
-    sdk = NS(CallbackDomain=NS(DRIVER_API=1, RESOURCE=3), CallbackIdResource=NS(MODULE_LOADED=8),
-             ApiCallbackSite=NS(API_ENTER=0, API_EXIT=1), ActivityKind=NS(CONCURRENT_KERNEL=10, MEMCPY=1, MEMSET=2),
+    sdk = NS(CallbackDomain=NS(DRIVER_API=1, RUNTIME_API=2, RESOURCE=3), CallbackIdResource=NS(MODULE_LOADED=8),
+             ApiCallbackSite=NS(API_ENTER=0, API_EXIT=1), ActivityKind=NS(DRIVER=4, RUNTIME=5, CONCURRENT_KERNEL=10, MEMCPY=1, MEMSET=2),
              activity_register_callbacks=lambda *args: calls.append(("register",)),
              subscribe=lambda *args: 99, enable_domain=lambda *args: calls.append(("domain", *args)),
              activity_enable=lambda value: calls.append(("enable", value)),
@@ -301,7 +301,7 @@ def test_driver_launch_captures_scoped_function_generation_and_exit_status(api):
     capture.callback(None, 1, 0, data)
     data.callback_site = 1
     capture.callback(None, 1, 0, data)
-    assert capture.raw["launches"] == [{"context_id": 9, "correlation": 10, "function": 1, "call": 1,
+    assert capture.raw["launches"] == [{"context_id": 9, "correlation": 10, "runtime_correlation": None, "function": 1, "call": 1,
                                         "exit_success": True, "api": api}]
     assert capture.pending_launches == {}
 
@@ -351,7 +351,7 @@ def test_partial_start_and_failed_flush_still_disable_and_unsubscribe():
     sdk.activity_flush_all = fail
     capture.stop()
     assert calls[-1] == ("unsubscribe", 99)
-    assert sum(row[0] == "disable" for row in calls) == 3
+    assert sum(row[0] == "disable" for row in calls) == 5
     assert not capture.raw["capture_complete"] and capture.raw["errors"]
 
 
@@ -404,7 +404,7 @@ def test_start_failure_cleans_up_enabled_collection_and_subscriber(monkeypatch):
     with pytest.raises(RuntimeError, match="compiler hook"):
         with capture.recording():
             pytest.fail("failed start entered candidate")
-    assert ("unsubscribe", 99) in calls and sum(row[0] == "disable" for row in calls) == 3
+    assert ("unsubscribe", 99) in calls and sum(row[0] == "disable" for row in calls) == 5
 
 
 def test_submission_loader_handles_build_path_quotes_and_future_annotations(tmp_path):
@@ -516,12 +516,13 @@ def test_origin_worker_rejects_hidden_and_neuron_before_sdk_import():
 
 
 @pytest.mark.parametrize("wrong", [False, True])
-def test_origin_worker_checks_every_public_output_and_mode_on_cpu(tmp_path, monkeypatch, wrong):
+@pytest.mark.parametrize("mutation", [None, "mode", "grad", "env", "near_tolerance"])
+def test_origin_worker_checks_every_public_output_and_mode_on_cpu(tmp_path, monkeypatch, wrong, mutation):
     from contextlib import contextmanager
 
     import torch
 
-    from kb_workflows import evaluate_task, measurement, origin_task
+    from kb_workflows import evaluate_task, measurement, origin_binaries, origin_task
     from src import eval as native
 
     class Model(torch.nn.Module):
@@ -541,9 +542,17 @@ def test_origin_worker_checks_every_public_output_and_mode_on_cpu(tmp_path, monk
                 yield self
             self.raw.update(capture_complete=True, source_intact=self.registry.intact(), hooks_intact=True)
 
+    action = {None: "", "near_tolerance": "", "mode": "        self.eval()\n",
+              "grad": "        torch.set_grad_enabled(True)\n",
+              "env": "        import os\n        os.environ['KB_FP32_TOL'] = '1.0'\n"}[mutation]
+    offset = 2 if wrong else (1.0005 if mutation == "near_tolerance" else 1)
     source = ("import torch\nclass ModelNew(torch.nn.Module):\n"
-              f"    def forward(self, x):\n        return x + {2 if wrong else 1}\n")
+              f"    def forward(self, x):\n{action}        return x + {offset}\n")
     monkeypatch.setattr(cuda_origin, "Capture", FakeCapture)
+    monkeypatch.setenv("KB_FP32_TOL", "1e-3")
+    monkeypatch.setenv("TORCH_EXTENSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("TORCH_USE_CUDA_DSA", "1")
+    monkeypatch.setattr(origin_binaries, "Catalog", lambda: NS(collect=lambda **kwargs: {"simulated": True}))
     monkeypatch.setattr(origin_task, "ROOT", tmp_path)
     monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: "reference")
     monkeypatch.setattr(evaluate_task, "configure_tf32", lambda *args: None)
@@ -554,12 +563,319 @@ def test_origin_worker_checks_every_public_output_and_mode_on_cpu(tmp_path, monk
     monkeypatch.setattr(measurement, "synchronize", lambda device: None)
     monkeypatch.setattr(measurement, "device_fingerprint", lambda device: {"available": False, "simulated": True})
     result = origin_task.audit({"level": 1, "problem_id": 2, "kernel_src": source,
-        "eval_config": {"precision": "fp32", "fp32_tolerance": 1e-3, "origin_seeds": [42, 43, 44]}})
+        "eval_config": {"precision": "fp32", "fp32_tolerance": 1e-4, "origin_seeds": [42, 43, 44]}})
     windows = result["raw"]["windows"]
     assert len(windows) == 3 and [row["seed"] for row in windows] == [42, 43, 44]
-    assert all(row["no_grad"] is True and row["training"] is True for row in windows)
+    assert all(row["no_grad"] is (mutation != "grad") for row in windows)
+    if mutation == "mode":
+        assert [row["training"] for row in windows] == [True, False, False]
+        assert all(row["training_after"] is False for row in windows)
+    else:
+        assert all(row["training"] is True and row["training_after"] is True for row in windows)
     assert all(row["input_signature"][0]["shape"] == [4] for row in windows)
-    assert all(row["output_verified"] is (not wrong) for row in windows)
-    assert len(result["raw"]["errors"]) == (3 if wrong else 0)
+    failed_accuracy = wrong or mutation == "near_tolerance"
+    assert all(row["output_verified"] is (not failed_accuracy) for row in windows)
+    assert len(result["raw"]["errors"]) == (3 if failed_accuracy else 0) + (1 if mutation in {"env", "grad"} else 0)
+    assert ("env.KB_FP32_TOL" in result["raw"]["environment_changes"]) is (mutation == "env")
     assert result["summary"]["status"] == "not_measured" and result["scored_wall_times_replaced"] is False
     assert "evidence_receipt" not in result
+
+
+def graph_capture():
+    sdk, calls = fake_sdk()
+    resources = {"GRAPHNODE_CREATED": 13, "GRAPHNODE_CLONED": 20,
+                 "GRAPH_NODE_UPDATED": 22, "GRAPH_NODE_SET_PARAMS": 23}
+    for name, value in resources.items():
+        setattr(sdk.CallbackIdResource, name, value)
+    descriptors = {}
+    sdk.GraphData = NS(from_ptr=lambda pointer, **kwargs: descriptors[pointer])
+    sdk.get_graph_node_id = lambda node: node + 1000
+    sdk.get_graph_id = lambda graph: graph + 10000
+    sdk.get_graph_exec_id = lambda executable: executable + 20000
+    capture = cuda_origin.Capture(SOURCE, bindings=sdk)
+    observe_load(capture)
+    return capture, descriptors, calls
+
+
+def driver_data(name, params, correlation, *, entering=True, return_code=0):
+    result = C.c_int(return_code)
+    return NS(function_name=name, function_params=C.addressof(params), context=123, context_uid=9,
+              correlation_id=correlation, callback_site=0 if entering else 1,
+              function_return_value=C.addressof(result), _keepalive=(result, params))
+
+
+def graph_resource(capture, descriptors, *, cloned=False, graph=77, node=88, original=0, node_type=0):
+    pointer = len(descriptors) + 1
+    descriptors[pointer] = NS(graph=graph, node=node, node_type=node_type, original_node=original)
+    kind = capture.cupti.CallbackIdResource.GRAPHNODE_CLONED if cloned else capture.cupti.CallbackIdResource.GRAPHNODE_CREATED
+    capture.callback(None, 3, kind, NS(resource_descriptor=pointer, context=123))
+
+
+def build_graph(capture, descriptors, *, clone=False, memory_kind=None):
+    from kb_workflows.origin_graphs import Instantiate
+
+    api, params = ("cuLaunchKernel", cuda_origin.LaunchKernel(function=200)) if memory_kind is None else (
+        "cuMemcpyDtoDAsync" if memory_kind == "memcpy" else "cuMemsetD8Async", C.c_void_p())
+    data = driver_data(api, params, 20)
+    capture.callback(None, 1, 0, data)
+    graph_resource(capture, descriptors, node_type={None: 0, "memcpy": 1, "memset": 2}[memory_kind])
+    assert capture.raw["graph_nodes"][-1]["creation_success"] is False
+    data.callback_site = 1
+    capture.callback(None, 1, 0, data)
+    executable = C.c_void_p(99)
+    data = driver_data("cuGraphInstantiate_v2", Instantiate(C.pointer(executable), 77), 30)
+    capture.callback(None, 1, 0, data)
+    if clone:
+        graph_resource(capture, descriptors, cloned=True, graph=78, node=89, original=88)
+    data.callback_site = 1
+    capture.callback(None, 1, 0, data)
+
+
+def replay_graph(capture, *, correlation=50, runtime_correlation=None, return_code=0):
+    runtime = None
+    if runtime_correlation is not None:
+        runtime = driver_data("cudaGraphLaunch", C.c_void_p(99), runtime_correlation)
+        capture.callback(None, 2, 0, runtime)
+    capture.active_calls[__import__("threading").get_ident()] = 1
+    data = driver_data("cuGraphLaunch", C.c_void_p(99), correlation, return_code=return_code)
+    capture.callback(None, 1, 0, data)
+    data.callback_site = 1
+    capture.callback(None, 1, 0, data)
+    capture.active_calls.clear()
+    if runtime is not None:
+        runtime.callback_site = 1
+        capture.callback(None, 2, 0, runtime)
+
+
+def graph_fixture(capture, *, node=1088, correlation=50):
+    """Serialized synthetic parser fixture, not a real device receipt."""
+    original = raw_capture()
+    raw = copy.deepcopy(capture.raw)
+    raw.update(windows=original["windows"], proofs=original["proofs"], capture_complete=True,
+               hooks_intact=True, source_intact=True, simulated=False)
+    raw["activities"] = [{**original["activities"][0], "correlation": correlation,
+                           "graph_id": 20099, "graph_node_id": node}]
+    return raw
+
+
+@pytest.mark.parametrize("clone", [False, True])
+def test_graph_replay_joins_created_or_cloned_node_to_the_actual_function(clone):
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors, clone=clone)
+    replay_graph(capture)
+    raw = graph_fixture(capture, node=1089 if clone else 1088)
+    assert raw["errors"] == [] and capture.graphs.balanced()
+    result = kernel_origin.summarize(raw)
+    assert result["status"] == "passed" and result["graph_attribution_implemented"] is True
+    assert kernel_origin.summarize(json.loads(json.dumps(raw)))["raw_sha256"] == result["raw_sha256"]
+    assert result["formal_qualification_implemented"] is False
+
+
+def test_graph_runtime_parent_correlation_matches_driver_snapshot():
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    replay_graph(capture, runtime_correlation=500)
+    raw = graph_fixture(capture, correlation=500)
+    assert capture.runtime_calls[__import__("threading").get_ident()] == []
+    assert kernel_origin.summarize(raw)["status"] == "passed"
+
+
+def test_ambiguous_runtime_parent_launch_cannot_assign_one_function_or_graph():
+    raw = raw_capture()
+    raw["launches"][0]["runtime_correlation"] = 500
+    raw["launches"].append({**raw["launches"][0], "correlation": 11})
+    raw["activities"][0]["correlation"] = 500
+    assert kernel_origin.summarize(raw)["status"] == "not_measured"
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    replay_graph(capture, runtime_correlation=500)
+    replay_graph(capture, correlation=51, runtime_correlation=500)
+    assert kernel_origin.summarize(graph_fixture(capture, correlation=500))["status"] == "not_measured"
+
+
+def test_destroying_graph_template_does_not_erase_instantiated_execution_origin():
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    data = driver_data("cuGraphDestroy", C.c_void_p(77), 35)
+    capture.callback(None, 1, 0, data)
+    data.callback_site = 1
+    capture.callback(None, 1, 0, data)
+    assert not capture.graphs.nodes and capture.graphs.executables
+    replay_graph(capture)
+    assert kernel_origin.summarize(graph_fixture(capture))["status"] == "passed"
+
+
+@pytest.mark.parametrize("operation", ["cuGraphExecDestroy", "cuGraphExecKernelNodeSetParams", "cuGraphKernelNodeSetParams", "cuGraphExecUpdate"])
+def test_destroyed_or_updated_executable_does_not_reuse_previous_function_origin(operation):
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    replay_graph(capture, correlation=49)
+    before = copy.deepcopy(capture.raw["graph_launches"][0])
+    data = driver_data(operation, C.c_void_p(99), 40)
+    capture.callback(None, 1, 0, data)
+    data.callback_site = 1
+    capture.callback(None, 1, 0, data)
+    replay_graph(capture)
+    assert capture.raw["graph_launches"][0] == before
+    assert kernel_origin.summarize(graph_fixture(capture))["status"] == "not_measured"
+
+
+def test_unknown_graph_cloning_source_never_inherits_an_arbitrary_function():
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    graph_resource(capture, descriptors, cloned=True, graph=78, node=89, original=999)
+    assert capture.raw["graph_nodes"][-1]["function"] is None
+    assert capture.raw["graph_nodes"][-1]["creation_success"] is False
+
+
+@pytest.mark.parametrize("change", [{"graph_id": 999}, {"graph_node_id": 999}, {"context_id": 999}, {"correlation": 999}])
+def test_graph_activity_requires_this_observed_graph_node_context_and_launch(change):
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    replay_graph(capture)
+    raw = graph_fixture(capture)
+    raw["activities"][0].update(change)
+    assert kernel_origin.summarize(raw)["status"] == "not_measured"
+
+
+def test_failed_graph_launch_or_unfinished_node_creation_is_unknown():
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors)
+    replay_graph(capture, return_code=1)
+    assert kernel_origin.summarize(graph_fixture(capture))["status"] == "not_measured"
+    capture.raw["graph_launches"][0]["exit_success"] = True
+    raw = graph_fixture(capture)
+    raw["graph_nodes"][0]["creation_success"] = False
+    assert kernel_origin.summarize(raw)["status"] == "not_measured"
+
+
+def test_graph_clone_and_snapshot_tampering_cannot_rebind_a_function_generation():
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors, clone=True)
+    replay_graph(capture)
+    raw = graph_fixture(capture, node=1089)
+    raw["graph_nodes"][1]["original"] = 2
+    with pytest.raises(ValueError, match="clone"):
+        kernel_origin.summarize(raw)
+    raw = graph_fixture(capture, node=1089)
+    raw["graph_launches"][0]["nodes"]["1089"] = 1
+    with pytest.raises(ValueError, match="snapshot"):
+        kernel_origin.summarize(raw)
+
+
+def test_runtime_and_driver_activity_are_enabled_for_vendor_correlation_ids():
+    sdk, calls = fake_sdk()
+    capture = cuda_origin.Capture(SOURCE, bindings=sdk)
+    capture.start()
+    capture.stop()
+    enabled = {row[1] for row in calls if row[0] == "enable"}
+    assert sdk.ActivityKind.DRIVER in enabled and sdk.ActivityKind.RUNTIME in enabled
+    assert ("domain", 1, 99, sdk.CallbackDomain.RUNTIME_API) in calls
+
+
+def library_receipt(binary=BINARY, *, distribution="nvidia-cublas", origin="library"):
+    """Synthetic serialized schema for pure replay tests; no installed DSO read."""
+    import base64
+
+    from kb_workflows.origin_binaries import PROTOCOL
+
+    source = {"id": 1, "distribution": distribution, "origin": origin, "version": "1.0",
+              "file_sha256": "2" * 64, "record_sha256": "3" * 64, "file_bytes": 100,
+              "relative_path": "package/lib.so", "path": "/synthetic/package/lib.so"}
+    frozen = {"protocol": PROTOCOL, "sources": [source], "manifest_sha256": fingerprint({"sources": [source]})}
+    document = {"protocol": PROTOCOL, "manifest": frozen, "tool": {"sha256": "4" * 64}, "simulated": False,
+                "sources": [{"source": 1, "status": "measured", "extraction": {"exit_code": 0, "timed_out": False,
+                             "log_base64": base64.b64encode(b"extracted").decode(), "log_sha256": sha256(b"extracted")}}],
+                "cubins": [{"source": 1, "binary_sha256": sha256(binary), "binary_bytes": len(binary)}], "errors": []}
+    document["receipt_sha256"] = fingerprint(document)
+    return document
+
+
+@pytest.mark.parametrize("distribution,origin", [("nvidia-cublas", "library"), ("torch", "framework")])
+def test_loaded_binary_ownership_separates_custom_and_library_track_verdicts(distribution, origin):
+    raw = raw_capture()
+    raw["binary_inventory"] = library_receipt(distribution=distribution, origin=origin)
+    result = kernel_origin.summarize(raw)
+    assert result["status"] == "failed" and result["track_verdicts"] == {"custom": "failed", "library": "passed"}
+    assert result["calls"][0]["by_origin_union_ns"][origin] == 100
+    assert result["calls"][0]["custom_exclusive_fraction_lower_bound"] == 0
+    assert result["calls"][0]["unknown_activity_count"] == 0
+    assert not result["formal_qualification_implemented"]
+
+
+def test_mixed_real_binary_identities_apply_the_custom_fraction_to_interval_union():
+    raw = raw_capture()
+    other = b"second source-bound cubin"
+    raw["binary_inventory"] = library_receipt(other)
+    raw["modules"].append({**raw["modules"][0], "id": 2, "handle": 101, "binary_sha256": sha256(other), "binary_bytes": len(other)})
+    raw["functions"].append({**raw["functions"][0], "id": 2, "module": 2, "handle": 201})
+    raw["launches"].append({**raw["launches"][0], "correlation": 11, "function": 2})
+    raw["activities"][0]["end_ns"] = 210
+    raw["activities"].append({**raw["activities"][0], "start_ns": 210, "end_ns": 220, "correlation": 11})
+    result = kernel_origin.summarize(raw)
+    assert result["status"] == "failed" and result["track_verdicts"]["library"] == "passed"
+    assert result["calls"][0]["custom_exclusive_fraction_lower_bound"] == 0.9
+    assert kernel_origin.summarize(raw, minimum_custom_fraction=0.85)["status"] == "passed"
+    raw["activities"][1].update(start_ns=170, end_ns=270)
+    result = kernel_origin.summarize(raw)["calls"][0]
+    assert result["device_busy_ns"] == 150
+    assert result["by_origin_union_ns"] == {"custom": 90, "library": 100, "framework": 0, "runtime": 0, "unknown": 0}
+    assert result["custom_exclusive_ns"] == 50
+
+
+def test_unverified_wheel_or_simulated_extraction_does_not_assign_library_ownership():
+    for change in ({"simulated": True}, {"receipt_sha256": "0" * 64}):
+        raw = raw_capture()
+        raw["proofs"] = []
+        raw["binary_inventory"] = library_receipt()
+        raw["binary_inventory"].update(change)
+        assert kernel_origin.summarize(raw)["track_verdicts"] == {"custom": "not_measured", "library": "not_measured"}
+
+
+@pytest.mark.parametrize("api,domain,kind", [("cudaMemcpyAsync", 2, "memcpy"), ("cuMemcpyDtoDAsync", 1, "memcpy"),
+                                          ("cudaMemsetAsync", 2, "memset"), ("cuMemsetD32Async", 1, "memset")])
+def test_native_memory_api_activity_receives_runtime_credit_and_no_custom_credit(api, domain, kind):
+    sdk, _ = fake_sdk()
+    capture = cuda_origin.Capture(SOURCE, bindings=sdk)
+    capture.active_calls[__import__("threading").get_ident()] = 1
+    data = driver_data(api, C.c_void_p(), 60)
+    capture.callback(None, domain, 0, data)
+    data.callback_site = 1
+    capture.callback(None, domain, 0, data)
+    raw = raw_capture()
+    raw["memory_calls"] = capture.raw["memory_calls"]
+    raw["activities"][0].update(kind=kind, correlation=60)
+    assert capture.raw["errors"] == []
+    result = kernel_origin.summarize(raw)
+    assert result["track_verdicts"] == {"custom": "failed", "library": "passed"}
+    assert result["calls"][0]["by_origin_union_ns"]["runtime"] == 100
+    raw["memory_calls"][0]["exit_success"] = False
+    assert kernel_origin.summarize(raw)["status"] == "not_measured"
+    raw["memory_calls"][0].update(exit_success=True, call=2)
+    assert kernel_origin.summarize(raw)["status"] == "not_measured"
+
+
+@pytest.mark.parametrize("kind", ["memcpy", "memset"])
+def test_graph_memory_node_retains_native_kind_and_never_counts_as_custom(kind):
+    capture, descriptors, _ = graph_capture()
+    build_graph(capture, descriptors, memory_kind=kind)
+    replay_graph(capture)
+    raw = graph_fixture(capture)
+    raw["activities"][0]["kind"] = kind
+    assert raw["graph_nodes"][0]["kind"] == kind
+    assert raw["graph_nodes"][0]["creation_success"] is True
+    result = kernel_origin.summarize(raw)
+    assert result["track_verdicts"] == {"custom": "failed", "library": "passed"}
+    assert result["calls"][0]["by_origin_union_ns"]["runtime"] == 100
+
+
+def test_queue_accepts_source_bound_origin_requests_and_requires_a_candidate(tmp_path):
+    from kb_workflows.queue_worker import validate_payload
+    from scripts.audit_kernel_origin import prepare
+
+    config, _ = make_config(tmp_path)
+    payload = prepare(config, 2, 0, seeds=[42], minimum_custom_fraction=0.95)
+    validate_payload(payload)
+    payload.pop("kernel_src")
+    with pytest.raises(ValueError):
+        validate_payload(payload)

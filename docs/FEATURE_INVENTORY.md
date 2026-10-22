@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第二十版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第二十一版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -652,6 +652,32 @@ R-10的软件范围已接入；23项当前为13项代码已实现、8项部分�
 验证：Python 3.12.12 / Torch 2.12.0下1,014项CPU/模拟回归通过，本版新增79项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性、离线wheel的23个轻量模块导入及本机供应商头文件C ABI核对均通过；ABI探针仅执行CPU代码，没有调用CUDA API。没有安装或加载CUPTI，没有运行GPU、Trainium、模型、容器或训练实验。
 
 23项当前为14项代码已实现、9项部分实现、0项尚未开始；R-08及其余部分实现项仍需继续完成，不代表23项全部完成。此前stash保持原样。
+
+## 第二十一版：可信库产物与CUDA Graph来源
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add wheel binary provenance and CUDA Graph origin diagnostics |
+| 日期 | 2026-10-22 |
+| 基础提交 | `143f158` |
+| 状态 | 软件与CPU/模拟回归；未运行CUPTI、cuobjdump、设备或模型实验 |
+
+本版继续R-08，补齐部分库/框架二进制、不可变Graph replay和原生内存操作关联。完整边界与命令见[设备来源诊断](KERNEL_ORIGIN.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V21-01 | 受信安装包与实际库二进制 | 候选导入前固定RECORD与逐文件哈希，只提取实际加载且前后身份一致的DSO；CUDA ELF字节匹配实际模块，缺工具/篡改/冲突/模拟不能建立库来源 | `kb_workflows/origin_binaries.py` | [M2](MOTIVATION.md#m2) |
+| V21-02 | CUDA Graph节点与执行快照 | 关联实际创建/克隆/instantiate的节点与函数代次，每次replay保存快照；源模板销毁不抹除既有执行，未知更新或可执行对象销毁不沿用旧来源 | `kb_workflows/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
+| V21-03 | 原生内存操作与双轨道诊断 | 成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放 | `kb_workflows/kernel_origin.py` | [M3](MOTIVATION.md#m3) |
+| V21-04 | CUPTI活动关联与原始提取记录 | 补齐DRIVER/RUNTIME activity生成correlation，运行时父关联唯一时才使用；二进制工具/日志按原字节绑定，兼容非UTF-8记录 | `kb_workflows/cuda_origin.py` | [M5](MOTIVATION.md#m5) |
+| V21-05 | 诊断容差与实际模式后置检查 | 导入前冻结配置容差，核对执行前后training/grad并记录恢复进程设置；协议v2要求后置观察，模式或环境改变保持未知 | `kb_workflows/origin_task.py` | [M2](MOTIVATION.md#m2) |
+| V21-06 | 来源任务进入队列验证入口 | 队列接收origin_audit并强制候选源码，验证器摘要包含新增入口；CPU请求校验覆盖预览生成的实际payload，不运行设备 | `kb_workflows/queue_worker.py` | [M5](MOTIVATION.md#m5) |
+
+库来源不是包名/路径推断：实际模块字节还必须匹配已验证DSO的CUDA ELF。库/框架同时有冲突身份时保留未知，不回退为自写。普通copy/set只有匹配成功原生API或Graph节点才记为runtime。custom门失败不修改数学正确性，库轨道允许已归因的非自写工作；两个结论目前都只是诊断，仍不授予L1或正式评分资格。
+
+CPP/其他loader、Graph更新后重新绑定、完整依赖闭包、Neuron和正式轨道资格继续实现；23项仍为14项代码已实现、9项部分实现。以前搁置的stash没有恢复。
+
+验证：Python 3.12.12 / Torch 2.12.0下1,077项CPU/模拟回归通过，本版新增63项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性和离线wheel的26个轻量模块导入均通过。已静态读取当前环境32个受信库的RECORD条目，未导入Torch/CUPTI；Graph参数与本机供应商头文件的C ABI核对仅执行CPU代码，没有调用CUDA API。没有运行GPU、Trainium、模型、容器或训练实验。
 
 ## 维护方式
 

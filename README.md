@@ -108,7 +108,7 @@ python -m scripts.check_motivations
 | [批量工作流](docs/BATCH_WORKFLOWS.md) | 各后端、恢复、基线与评分配置 |
 | [隔离与重评分](docs/ISOLATION_REGRADE.md) | 受限验证器、Harbor网络配置、冻结产物与重评分计划 |
 | [内存工具与重复检查](docs/TOOL_CHECKS.md) | 可选Sanitizer、审核原子操作策略、证据与恢复 |
-| [设备来源诊断](docs/KERNEL_ORIGIN.md) | CUDA源码/产物/句柄/launch关联、默认预览与未知范围 |
+| [设备来源诊断](docs/KERNEL_ORIGIN.md) | CUDA源码/产物、可信库、Graph与轨道诊断，默认只预览 |
 | [交替与最终计时](docs/PAIRED_TIMING.md) | 扩展基线、平衡配对、噪声控制、独立重测与恢复 |
 | [Headroom评分](docs/HEADROOM_SCORING.md) | 设备校准、可信工作量证书、独立见证与时间线诊断 |
 | [Production-41](docs/PRODUCTION_TASKS.md) | Level 5生产题族、逐角色dtype、显存计划和独立反向轨道 |

@@ -1357,9 +1357,11 @@
         "kb_workflows/submission_source.py",
         "kb_workflows/cuda_origin.py",
         "kb_workflows/kernel_origin.py",
-        "docs/KERNEL_ORIGIN.md"
+        "docs/KERNEL_ORIGIN.md",
+        "kb_workflows/origin_binaries.py",
+        "kb_workflows/origin_graphs.py"
       ],
-      "reason": "已实现CUDA/Triton直接launch的源码、cubin、模块/函数代次、driver correlation与设备活动关联，以及独立公开输入诊断和区间并集重放；库/Graph/Neuron来源、依赖闭包与正式轨道资格仍待接入，未知不通过"
+      "reason": "已实现CUDA/Triton源码与实际launch、受信wheel cubin、不可变Graph replay、原生内存活动和独立轨道诊断；CPP/其他loader、Graph参数更新重绑定、依赖闭包、Neuron与正式资格门继续实现，未知不通过"
     },
     {
       "id": "R-09",
@@ -1373,7 +1375,7 @@
         "kb_workflows/numerical.py",
         "kb_workflows/neuron_worker.py"
       ],
-      "reason": "已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计"
+      "reason": "已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计；来源诊断冻结配置容差并观察training/grad后置状态"
     },
     {
       "id": "R-10",
@@ -1467,9 +1469,10 @@
         "kb_workflows/performance.py",
         "kb_workflows/profile_task.py",
         "kb_workflows/neuron_device.py",
-        "kb_workflows/neuron_profile.py"
+        "kb_workflows/neuron_profile.py",
+        "kb_workflows/kernel_origin.py"
       ],
-      "reason": "已实现CUDA设备busy并集、Neuron框架/NEFF/NTFF收集及每引擎指令并集、缺计数器时AE/O及launch_only诊断；硬件工作计数器采集、二进制来源与正式归因评分门待实现，没有运行设备实验"
+      "reason": "已实现CUDA busy并集与部分源码/库/Graph来源诊断、Neuron框架/NEFF/NTFF及每引擎指令并集、缺计数器时AE/O与launch_only；硬件工作计数器、完整来源与正式归因门待实现，没有运行设备实验"
     },
     {
       "id": "R-17",
@@ -2440,6 +2443,97 @@
         "kb_workflows/kernel_origin.py"
       ],
       "reason": "R-08转为部分实现；库/Graph/Neuron和正式轨道门槛未完成，95%仅可配置诊断，不授予L1，不替换原生计时或声称算法/安全证明"
+    },
+    {
+      "id": "V21-01",
+      "title": "受信安装包与实际库二进制",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/origin_binaries.py",
+        "tests/test_origin_binaries.py"
+      ],
+      "reason": "候选导入前固定RECORD与逐文件哈希，只提取实际加载且前后身份一致的DSO；CUDA ELF字节匹配实际模块，缺工具/篡改/冲突/模拟不能建立库来源"
+    },
+    {
+      "id": "V21-02",
+      "title": "CUDA Graph节点与执行快照",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/origin_graphs.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "关联实际创建/克隆/instantiate的节点与函数代次，每次replay保存快照；源模板销毁不抹除既有执行，未知更新或可执行对象销毁不沿用旧来源"
+    },
+    {
+      "id": "V21-03",
+      "title": "原生内存操作与双轨道诊断",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/kernel_origin.py",
+        "kb_workflows/cuda_origin.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放"
+    },
+    {
+      "id": "V21-04",
+      "title": "CUPTI活动关联与原始提取记录",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/cuda_origin.py",
+        "kb_workflows/origin_binaries.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "补齐DRIVER/RUNTIME activity生成correlation，运行时父关联唯一时才使用；二进制工具/日志按原字节绑定，兼容非UTF-8记录"
+    },
+    {
+      "id": "V21-05",
+      "title": "诊断容差与实际模式后置检查",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/origin_task.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "导入前冻结配置容差，核对执行前后training/grad并记录恢复进程设置；协议v2要求后置观察，模式或环境改变保持未知"
+    },
+    {
+      "id": "V21-06",
+      "title": "来源任务进入队列验证入口",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/queue_worker.py",
+        "kb_workflows/common.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "队列接收origin_audit并强制候选源码，验证器摘要包含新增入口；CPU请求校验覆盖预览生成的实际payload，不运行设备"
     }
   ]
 }

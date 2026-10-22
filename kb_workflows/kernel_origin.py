@@ -10,9 +10,10 @@ import math
 import re
 
 from .common import fingerprint
+from .origin_binaries import binary_owners
 from .performance import interval_union
 
-PROTOCOL = "kernelbench_pro_cuda_origin_v1"
+PROTOCOL = "kernelbench_pro_cuda_origin_v2"
 MAX_RECORDS = 200_000
 KINDS = {"kernel", "memcpy", "memset"}
 
@@ -37,14 +38,40 @@ def _index(rows, label):
     return indexed
 
 
+def _launch_index(rows):
+    if not isinstance(rows, list) or len(rows) > MAX_RECORDS:
+        raise ValueError("Invalid or excessive launch records")
+    indexed = {}
+    aliases = {}
+    for row in rows:
+        if (not isinstance(row, dict) or not _integer(row.get("context_id"), positive=True)
+                or not _integer(row.get("correlation"), positive=True)
+                or (row.get("runtime_correlation") is not None and not _integer(row["runtime_correlation"], positive=True))):
+            raise ValueError("Invalid driver launch identity")
+        key = (row["context_id"], row["correlation"])
+        if key in indexed:
+            raise ValueError("Ambiguous driver launch correlation")
+        indexed[key] = row
+        if row.get("runtime_correlation") is not None:
+            alias = (row["context_id"], row["runtime_correlation"])
+            aliases.setdefault(alias, []).append(row)
+    for key, values in aliases.items():
+        if len(values) == 1 and (key not in indexed or indexed[key] is values[0]):
+            indexed[key] = values[0]
+        else:
+            # A runtime wrapper may launch several functions. It does not give
+            # any one function exclusive ownership of its correlation ID.
+            indexed.pop(key, None)
+    return indexed
+
+
 def summarize(raw, *, minimum_custom_fraction=0.95):
     """Conservative exclusive custom busy-time fraction for every captured call.
 
-    Graph replays currently have no supported node -> function collector, so they
-    stay unknown. Copy/set traffic has no source-derived arithmetic identity and
-    receives no custom credit. A complete capture with unknown activity is still
-    incomplete attribution. All arithmetic uses interval unions, not summed
-    overlapping durations.
+    Direct and graph calls require observed API/node provenance. Copy/set traffic
+    receives runtime credit only from a matching successful native API or node,
+    never custom credit. Unknown activity keeps attribution incomplete. All
+    arithmetic uses interval unions, not summed overlapping durations.
     """
     if (type(minimum_custom_fraction) not in (int, float) or not math.isfinite(minimum_custom_fraction)
             or not 0 < minimum_custom_fraction <= 1):
@@ -77,15 +104,34 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
         if row["function"] in proven:
             raise ValueError("Ambiguous compiler ownership for a function generation")
         proven[row["function"]] = row
-    launches = {}
-    for row in raw.get("launches", []):
-        if (not isinstance(row, dict) or not _integer(row.get("context_id"), positive=True)
-                or not _integer(row.get("correlation"), positive=True)):
-            raise ValueError("Invalid driver launch identity")
-        key = (row["context_id"], row["correlation"])
-        if key in launches:
-            raise ValueError("Ambiguous driver launch correlation")
-        launches[key] = row
+    launches = _launch_index(raw.get("launches", []))
+    graph_nodes = _index(raw.get("graph_nodes", []), "graph node")
+    graph_launches = _launch_index(raw.get("graph_launches", []))
+    memory_calls = _launch_index(raw.get("memory_calls", []))
+    for node in graph_nodes.values():
+        if (not _integer(node.get("node_id"), positive=True) or not _integer(node.get("graph_id"), positive=True)
+                or node.get("kind") not in {"kernel", "memcpy", "memset", "other"}
+                or node.get("creation") not in {"driver_kernel", "driver_memory", "clone"}
+                or type(node.get("creation_success")) is not bool
+                or (node.get("function") is not None and (node["function"] not in functions or node["kind"] != "kernel"))
+                or (node.get("creation") == "clone" and node.get("original") is None and node.get("function") is not None)):
+            raise ValueError("Invalid graph node/function provenance")
+        if node.get("original") is not None:
+            original = graph_nodes.get(node["original"])
+            if (original is None or original["id"] >= node["id"] or node.get("creation") != "clone"
+                    or original.get("function") != node.get("function")
+                    or original.get("kind") != node.get("kind")
+                    or (node["creation_success"] and original.get("creation_success") is not True)):
+                raise ValueError("Graph clone does not retain a valid earlier function generation")
+    for launch in graph_launches.values():
+        if (not isinstance(launch.get("nodes"), dict) or len(launch["nodes"]) > MAX_RECORDS
+                or not isinstance(launch.get("graph_ids"), list)
+                or any(not _integer(value, positive=True) for value in launch["graph_ids"])):
+            raise ValueError("Invalid executable graph snapshot")
+        for uid, record in launch["nodes"].items():
+            if (not isinstance(uid, str) or not uid.isdecimal() or str(int(uid)) != uid
+                    or record not in graph_nodes or graph_nodes[record]["node_id"] != int(uid)):
+                raise ValueError("Graph launch snapshot has a mismatched node generation")
     activities = raw.get("activities")
     if not isinstance(activities, list) or len(activities) > MAX_RECORDS or len(launches) > MAX_RECORDS:
         raise ValueError("Missing or excessive activity/launch records")
@@ -99,6 +145,7 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
         if (any(not _integer(row.get(key)) for key in ("start_ns", "end_ns", "device", "seed"))
                 or row["end_ns"] <= row["start_ns"] or not isinstance(row.get("input_signature"), list)
                 or row.get("no_grad") is not True or type(row.get("training")) is not bool
+                or type(row.get("training_after")) is not bool or row["training_after"] != row["training"]
                 or row.get("output_verified") is not True
                 or (idx and ordered[idx - 1]["end_ns"] > row["start_ns"])):
             raise ValueError("Invalid, overlapping, unverified or mode-unbound candidate call")
@@ -106,6 +153,7 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
                   and raw.get("hooks_intact") is True and raw.get("dropped_records") == 0
                   and type(raw.get("dropped_records")) is int and raw.get("errors") == []
                   and _sha(raw.get("candidate_sha256")) and raw.get("simulated") is False)
+    library_owners = binary_owners(raw.get("binary_inventory"))
     calls = []
     for window in ordered:
         rows = []
@@ -118,11 +166,31 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
                 continue
             launch = launches.get((activity["context_id"], activity["correlation"]), {})
             origin = "unknown"
-            proof = proven.get(launch.get("function"))
-            if (activity["kind"] == "kernel" and not activity["graph_id"] and not activity["graph_node_id"]
-                    and launch.get("call") == window["id"] and proof is not None
+            function_id = launch.get("function")
+            node = {}
+            if activity["graph_id"] or activity["graph_node_id"]:
+                launch = graph_launches.get((activity["context_id"], activity["correlation"]), {})
+                node = graph_nodes.get(launch.get("nodes", {}).get(str(activity["graph_node_id"])), {})
+                function_id = (node.get("function") if activity["graph_id"] in launch.get("graph_ids", [])
+                               and node.get("kind") == "kernel" and node.get("creation_success") is True else None)
+            elif activity["kind"] in {"memcpy", "memset"}:
+                launch = memory_calls.get((activity["context_id"], activity["correlation"]), {})
+            proof = proven.get(function_id)
+            function = functions.get(function_id, {})
+            module = modules.get(function.get("module"), {})
+            if (activity["kind"] == "kernel" and launch.get("call") == window["id"] and launch.get("exit_success") is True):
+                # Frozen installed-image ownership takes precedence over a
+                # copied candidate root emitting identical library bytes.
+                origin = library_owners.get(module.get("binary_sha256"), "custom" if proof else "unknown")
+            elif (activity["kind"] in {"memcpy", "memset"} and launch.get("call") == window["id"]
                     and launch.get("exit_success") is True):
-                origin = "custom"
+                if activity["graph_id"] or activity["graph_node_id"]:
+                    memory_ok = (activity["graph_id"] in launch.get("graph_ids", [])
+                                 and node.get("kind") == activity["kind"] and node.get("creation_success") is True)
+                else:
+                    memory_ok = launch.get("kind") == activity["kind"]
+                if memory_ok:
+                    origin = "runtime"
             rows.append({**activity, "start_ns": start, "end_ns": end, "origin": origin})
         busy = interval_union([(row["start_ns"], row["end_ns"]) for row in rows])
         other = interval_union([(row["start_ns"], row["end_ns"]) for row in rows if row["origin"] != "custom"])
@@ -134,15 +202,21 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
         # Even a conservative lower bound below the policy is inconclusive when
         # some attribution is unknown; it must not be presented as a measured fail.
         calls.append({"id": window["id"], "seed": window["seed"], "status": status,
+                      "track_verdicts": {"custom": status, "library": "passed" if complete else "not_measured"},
                       "device_busy_ns": busy, "custom_exclusive_ns": custom_exclusive,
                       "custom_exclusive_fraction_lower_bound": share, "unknown_activity_count": unknowns,
                       "activity_count": len(rows), "kernel_count": sum(row["kind"] == "kernel" for row in rows),
+                      "by_origin_union_ns": {kind: interval_union([(row["start_ns"], row["end_ns"]) for row in rows
+                                                                  if row["origin"] == kind])
+                                             for kind in ("custom", "library", "framework", "runtime", "unknown")},
                       "activities": rows})
     overall = "failed" if any(row["status"] == "failed" for row in calls) else (
         "passed" if all(row["status"] == "passed" for row in calls) else "not_measured")
     return {"protocol": PROTOCOL, "raw_sha256": fingerprint(raw), "status": overall,
+            "track_verdicts": {"custom": overall, "library": "passed" if all(row["track_verdicts"]["library"] == "passed" for row in calls) else "not_measured"},
             "minimum_custom_fraction": minimum_custom_fraction, "calls": calls,
             "timings_are_diagnostic": True, "formal_qualification_implemented": False,
-            "library_and_framework_attribution_implemented": False,
+            "library_and_framework_attribution_implemented": True,
+            "graph_attribution_implemented": True,
             "output_causal_use_proven": False, "uninstrumented_path_equivalence_proven": False,
             "security_isolation_certified": False}

@@ -16,6 +16,8 @@ from contextlib import contextmanager
 
 from .common import fingerprint
 from .kernel_origin import MAX_RECORDS, PROTOCOL
+from .origin_graphs import Graphs
+from .origin_graphs import abi_supported as graph_abi_supported
 from .submission_source import SourceRegistry, record_sources, sha256
 
 MAX_CUBIN_BYTES = 128 * 1024**2
@@ -51,7 +53,7 @@ class LaunchKernelEx(C.Structure):
 def abi_supported():
     return (platform.system() == "Linux" and C.sizeof(C.c_void_p) == 8
             and C.sizeof(ModuleResource) == 24 and ModuleResource.cubin.offset == 16
-            and C.sizeof(LaunchKernel) == 64 and LaunchKernel.stream.offset == 40)
+            and C.sizeof(LaunchKernel) == 64 and LaunchKernel.stream.offset == 40 and graph_abi_supported())
 
 
 class Capture:
@@ -60,11 +62,15 @@ class Capture:
         self.cupti = bindings
         self.raw = {"protocol": PROTOCOL, "candidate_sha256": sha256(candidate_source.encode()),
                     "modules": [], "functions": [], "proofs": [], "launches": [], "activities": [], "windows": [],
+                    "graph_nodes": [], "graph_launches": [], "memory_calls": [],
                     "capture_complete": False, "source_intact": False, "hooks_intact": False,
                     "dropped_records": 0, "errors": [], "simulated": bindings is not None}
         self.lock = threading.RLock()
         self.loads, self.module_map, self.function_map = {}, {}, {}
         self.pending_launches, self.active_calls = {}, {}
+        self.runtime_calls = {}
+        self.pending_memory = {}
+        self.graphs = Graphs(self)
         self.contexts = {}
         self.enabled = []
         self.subscriber = None
@@ -82,7 +88,7 @@ class Capture:
         if len(rows) >= MAX_RECORDS:
             self.error(f"{label} record limit exceeded")
             return None
-        if label in {"modules", "functions", "proofs", "windows"}:
+        if label in {"modules", "functions", "proofs", "windows", "graph_nodes"}:
             item = {**item, "id": len(rows) + 1}
         rows.append(item)
         return item
@@ -119,12 +125,52 @@ class Capture:
         try:
             with self.lock:
                 if int(domain) == int(self.cupti.CallbackDomain.DRIVER_API):
+                    self.graphs.driver(data)
                     self.driver_callback(data)
-                elif (int(domain) == int(self.cupti.CallbackDomain.RESOURCE)
-                      and int(callback_id) == int(self.cupti.CallbackIdResource.MODULE_LOADED)):
-                    self.module_loaded(data)
+                elif int(domain) == int(self.cupti.CallbackDomain.RUNTIME_API):
+                    self.runtime_callback(data)
+                elif int(domain) == int(self.cupti.CallbackDomain.RESOURCE):
+                    if int(callback_id) == int(self.cupti.CallbackIdResource.MODULE_LOADED):
+                        self.module_loaded(data)
+                    else:
+                        self.graphs.resource(int(callback_id), data)
         except Exception as exc:
             self.error("Driver/resource callback: " + type(exc).__name__)
+
+    def runtime_parent(self, tid):
+        stack = self.runtime_calls.get(tid, [])
+        return stack[-1] if stack else None
+
+    def runtime_callback(self, data):
+        tid = threading.get_ident()
+        stack = self.runtime_calls.setdefault(tid, [])
+        correlation = int(data.correlation_id)
+        self.memory_callback(data, runtime=True)
+        if int(data.callback_site) == int(self.cupti.ApiCallbackSite.API_ENTER):
+            stack.append(correlation)
+        elif not stack or stack.pop() != correlation:
+            self.error("Unbalanced runtime API callbacks")
+
+    def memory_callback(self, data, *, runtime=False):
+        name = str(data.function_name)
+        prefix = "cuda" if runtime else "cu"
+        kind = "memcpy" if name.startswith(prefix + "Memcpy") else (
+            "memset" if name.startswith(prefix + "Memset") else None)
+        if kind is None:
+            return
+        key = (runtime, int(data.correlation_id))
+        entering = int(data.callback_site) == int(self.cupti.ApiCallbackSite.API_ENTER)
+        if entering:
+            call = self.active_calls.get(threading.get_ident())
+            if call is not None and int(data.context_uid) > 0:
+                row = self.append("memory_calls", {"context_id": int(data.context_uid), "correlation": key[1],
+                    "call": call, "kind": kind, "api": name, "exit_success": False})
+                if row is not None:
+                    self.pending_memory[key] = row
+        else:
+            row = self.pending_memory.pop(key, None)
+            if row is not None:
+                row["exit_success"] = bool(data.function_return_value) and C.c_int.from_address(int(data.function_return_value)).value == 0
 
     def module_loaded(self, data):
         descriptor = int(data.resource_descriptor)
@@ -144,6 +190,7 @@ class Capture:
             "binary_sha256": binary_sha, "binary_bytes": int(item.size), "context": int(data.context)})
 
     def driver_callback(self, data):
+        self.memory_callback(data)
         name = str(data.function_name)
         tid = threading.get_ident()
         entering = int(data.callback_site) == int(self.cupti.ApiCallbackSite.API_ENTER)
@@ -164,6 +211,7 @@ class Capture:
                 handle = struct.from_address(params).function
                 function = self.function_map.get((context, handle))
                 launch = self.append("launches", {"context_id": uid, "correlation": key[1],
+                    "runtime_correlation": self.runtime_parent(tid),
                     "function": function["id"] if function else None, "call": self.active_calls.get(tid),
                     "exit_success": False, "api": name})
                 if launch is not None:
@@ -260,7 +308,9 @@ class Capture:
         self.subscriber = self.cupti.subscribe(self.callback, None)
         self.cupti.enable_domain(1, self.subscriber, self.cupti.CallbackDomain.DRIVER_API)
         self.cupti.enable_domain(1, self.subscriber, self.cupti.CallbackDomain.RESOURCE)
-        for label in ("CONCURRENT_KERNEL", "MEMCPY", "MEMSET"):
+        self.cupti.enable_domain(1, self.subscriber, self.cupti.CallbackDomain.RUNTIME_API)
+        # Correlation IDs require API activity, not only API callbacks.
+        for label in ("DRIVER", "RUNTIME", "CONCURRENT_KERNEL", "MEMCPY", "MEMSET"):
             kind = getattr(self.cupti.ActivityKind, label)
             self.cupti.activity_enable(kind)
             self.enabled.append(kind)
@@ -299,7 +349,8 @@ class Capture:
                 self.cupti.activity_get_num_dropped_records(context, stream, C.addressof(dropped))
                 self.raw["dropped_records"] += dropped.value
             self.raw["capture_complete"] = (not self.pending_launches and not self.active_calls
-                                            and not any(self.loads.values()))
+                                            and not any(self.loads.values()) and not any(self.runtime_calls.values())
+                                            and not self.pending_memory and self.graphs.balanced())
         except Exception as exc:
             self.error("Flush/drop accounting: " + type(exc).__name__)
         finally:
