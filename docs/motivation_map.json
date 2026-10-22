@@ -1351,12 +1351,15 @@
       "title": "自写内核执行归因与库轨道",
       "primary": "M2",
       "secondary": [],
-      "status": "planned",
+      "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "research/headroom/PAPER.md"
+        "kb_workflows/submission_source.py",
+        "kb_workflows/cuda_origin.py",
+        "kb_workflows/kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "Torch算子汇总不证明来源；20%和95%阈值未校准，不作为默认资格"
+      "reason": "已实现CUDA/Triton直接launch的源码、cubin、模块/函数代次、driver correlation与设备活动关联，以及独立公开输入诊断和区间并集重放；库/Graph/Neuron来源、依赖闭包与正式轨道资格仍待接入，未知不通过"
     },
     {
       "id": "R-09",
@@ -2359,6 +2362,84 @@
         "tests/test_harbor_regrade.py"
       ],
       "reason": "固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览"
+    },
+    {
+      "id": "V20-01",
+      "title": "冻结候选源码与JIT身份",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/submission_source.py",
+        "src/eval.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "用实际内容哈希文件和保留代码对象加载候选，支持Triton源码检查与future导入；相同文件名或重新编译的相等对象不继承身份"
+    },
+    {
+      "id": "V20-02",
+      "title": "CUDA编译产物与实际launch关联",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/cuda_origin.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "可选CUPTI/Triton适配器关联实际cubin、模块/函数代次和成功launch；复制完整二进制摘要，卸载及句柄复用不继承来源"
+    },
+    {
+      "id": "V20-03",
+      "title": "来源时间并集与未知重放",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/kernel_origin.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "逐调用重算保守自写时间占比，重叠活动只计一次，未知/Graph/内存活动不获自写信用；丢记录、错绑和模式变化不通过"
+    },
+    {
+      "id": "V20-04",
+      "title": "独立来源诊断与默认预览",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/origin_task.py",
+        "scripts/audit_kernel_origin.py",
+        "tests/test_kernel_origin.py"
+      ],
+      "reason": "独立公开输入worker保留请求/源码/设备/模式和逐次输出验证，CLI默认零设备预览；结果与日志不覆盖原实验"
+    },
+    {
+      "id": "V20-05",
+      "title": "来源诊断与正式资格边界",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "docs/KERNEL_ORIGIN.md",
+        "research/headroom/PAPER.md",
+        "kb_workflows/kernel_origin.py"
+      ],
+      "reason": "R-08转为部分实现；库/Graph/Neuron和正式轨道门槛未完成，95%仅可配置诊断，不授予L1，不替换原生计时或声称算法/安全证明"
     }
   ]
 }

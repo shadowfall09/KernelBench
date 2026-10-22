@@ -199,14 +199,15 @@ def load_custom_model(
     """
     if build_directory:
         context["BUILD_DIRECTORY"] = build_directory
-        # Add import at the start of the source code
-        model_custom_src = (
-            "import os\n" f"os.environ['TORCH_EXTENSIONS_DIR'] = '{build_directory}'\n"
-        ) + model_custom_src
+        os.environ["TORCH_EXTENSIONS_DIR"] = str(build_directory)
 
     try:
-        compile(model_custom_src, "<string>", "exec")
-        exec(model_custom_src, context)
+        if build_directory:
+            from kb_workflows.submission_source import execute
+
+            execute(model_custom_src, context, build_directory)
+        else:
+            exec(compile(model_custom_src, "<string>", "exec"), context)
         # DANGER: need to delete refernece from global namespace
     except SyntaxError as e:
         print(f"Syntax Error in custom generated code or Compilation Error {e}")

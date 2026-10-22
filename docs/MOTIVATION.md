@@ -112,6 +112,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V18-02 模型快照与逐位重复验证 | 逐实例复制模型和输入并重放RNG，不推进原模型；每次保留原生精度门，记录输出位摘要，缺实例或快照不给通过 | — | [determinism.py](../kb_workflows/determinism.py), [reliability.py](../src/reliability.py) |
 | V18-03 审核绑定的原子操作策略 | 默认逐位一致，有限波动须有参考源码摘要、审核理由及非零界限；不放宽离散值、非有限值或原生精度 | M1 | [determinism.py](../kb_workflows/determinism.py), [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py) |
 | V19-04 隔离凭据进入评分与恢复 | 重算配置/结果摘要和原生观察，基线变体与标准/隐藏/最终/配对数据不能混用image；模拟凭据拒绝正式资格，保留诊断与原始计时分离 | M3, M5 | [paper_analysis.py](../kb_workflows/paper_analysis.py), [final_verification.py](../kb_workflows/final_verification.py), [paired_task.py](../kb_workflows/paired_task.py), [tool_checks.py](../kb_workflows/tool_checks.py) |
+| V20-02 CUDA编译产物与实际launch关联 | 可选CUPTI/Triton适配器关联实际cubin、模块/函数代次和成功launch；复制完整二进制摘要，卸载及句柄复用不继承来源 | M5 | [cuda_origin.py](../kb_workflows/cuda_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
+| V20-05 来源诊断与正式资格边界 | R-08转为部分实现；库/Graph/Neuron和正式轨道门槛未完成，95%仅可配置诊断，不授予L1，不替换原生计时或声称算法/安全证明 | M3 | [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md), [PAPER.md](../research/headroom/PAPER.md), [kernel_origin.py](../kb_workflows/kernel_origin.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -151,6 +153,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V17-06 设备轨迹与每引擎诊断 | 收集框架trace/NEFF/NTFF与哈希；显式单位/窗口的tensor/vector/scalar/DMA并集，不把指令数冒充kernel数或capture跨度冒充host墙钟 | M5 | [neuron_profile.py](../kb_workflows/neuron_profile.py), [neuron_device.py](../kb_workflows/neuron_device.py), [analyze_device_trace.py](../scripts/analyze_device_trace.py) |
 | V18-05 诊断与性能采样分离 | 保留首次无插桩原生/配对样本与冷启动，诊断共用原请求预算；四工具全通过才给内存工具证据，L2另需重复一致性 | M2, M4 | [tool_runner.py](../kb_workflows/tool_runner.py), [tool_checks.py](../kb_workflows/tool_checks.py), [evidence.py](../kb_workflows/evidence.py) |
 | V19-07 重评分来源与测量凭据 | 单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格 | M4, M5 | [regrade.py](../kb_workflows/regrade.py), [experiment.py](../kb_workflows/experiment.py), [common.py](../kb_workflows/common.py) |
+| V20-03 来源时间并集与未知重放 | 逐调用重算保守自写时间占比，重叠活动只计一次，未知/Graph/内存活动不获自写信用；丢记录、错绑和模式变化不通过 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -232,6 +235,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V19-05 Harbor网络与只读验证器 | 独立verifier禁止联网，受限Compose隔离可写路径并复用bundled tests；agent执行使用显式host allowlist，实际SDK schema已校验，容器部署未运行 | M4, M2 | [harbor.py](../kb_workflows/harbor.py), [harbor_verifier.py](../kb_workflows/harbor_verifier.py), [test_isolation.py](../tests/test_isolation.py) |
 | V19-06 冻结候选的原生重评分 | 固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动 | M3 | [regrade.py](../kb_workflows/regrade.py), [regrade_artifacts.py](../scripts/regrade_artifacts.py) |
 | V19-08 Harbor产物重评分与默认预览 | 固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览 | M4 | [harbor_regrade.py](../kb_workflows/harbor_regrade.py), [regrade_artifacts.py](../scripts/regrade_artifacts.py), [test_harbor_regrade.py](../tests/test_harbor_regrade.py) |
+| V20-01 冻结候选源码与JIT身份 | 用实际内容哈希文件和保留代码对象加载候选，支持Triton源码检查与future导入；相同文件名或重新编译的相等对象不继承身份 | M2 | [submission_source.py](../kb_workflows/submission_source.py), [eval.py](../src/eval.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
+| V20-04 独立来源诊断与默认预览 | 独立公开输入worker保留请求/源码/设备/模式和逐次输出验证，CLI默认零设备预览；结果与日志不覆盖原实验 | M4 | [origin_task.py](../kb_workflows/origin_task.py), [audit_kernel_origin.py](../scripts/audit_kernel_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -248,7 +253,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成 |
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成 |
-| R-08 自写内核执行归因与库轨道 | 待实现 | M2 | Torch算子汇总不证明来源；20%和95%阈值未校准，不作为默认资格 |
+| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton直接launch的源码、cubin、模块/函数代次、driver correlation与设备活动关联，以及独立公开输入诊断和区间并集重放；库/Graph/Neuron来源、依赖闭包与正式轨道资格仍待接入，未知不通过 |
 | R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |

@@ -1,0 +1,119 @@
+"""Frozen Python source identities, without importing a device SDK.
+
+This registry is an instrumentation aid inside a trusted worker, not a Python
+sandbox. A matching filename or a newly compiled equal code object is not a
+matching registered object.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import inspect
+import os
+import re
+import sys
+import textwrap
+import types
+from contextlib import contextmanager
+from contextvars import ContextVar
+from pathlib import Path
+
+_ACTIVE = ContextVar("kernelbench_submission_sources", default=None)
+
+
+def sha256(value):
+    return hashlib.sha256(value).hexdigest()
+
+
+class SourceRegistry:
+    def __init__(self):
+        self.sources = []
+        self.codes = {}  # id -> retained object: code equality is insufficient.
+
+    def register(self, source, path, code):
+        item = {"source_sha256": sha256(source.encode()), "path": str(path)}
+        self.sources.append(item)
+
+        def visit(node):
+            self.codes[id(node)] = (node, item)
+            for child in node.co_consts:
+                if isinstance(child, types.CodeType):
+                    visit(child)
+
+        visit(code)
+
+    def source_for(self, function):
+        code = getattr(function, "__code__", None)
+        match = self.codes.get(id(code))
+        return match[1] if match and match[0] is code else None
+
+    def jit_source(self, function):
+        """Check the actual JIT text as well as the original Python code object."""
+        owner = self.source_for(getattr(function, "fn", None))
+        if not owner:
+            return None
+        lines = textwrap.dedent(inspect.getsource(function.fn))
+        start = re.search(r"^def\s+\w+\s*\(", lines, re.MULTILINE)
+        if start is None or lines[start.start():] != function.src:
+            return None
+        if sha256(Path(owner["path"]).read_bytes()) != owner["source_sha256"]:
+            return None
+        return {**owner, "function": function.fn.__qualname__, "jit_source_sha256": sha256(function.src.encode())}
+
+    def intact(self):
+        try:
+            return all(sha256(Path(row["path"]).read_bytes()) == row["source_sha256"] for row in self.sources)
+        except OSError:
+            return False
+
+
+@contextmanager
+def record_sources(registry):
+    token = _ACTIVE.set(registry)
+    try:
+        yield registry
+    finally:
+        _ACTIVE.reset(token)
+
+
+def execute(source, context, build_directory):
+    """Keep source inspectable for Triton and return definitions in context."""
+    directory = Path(build_directory).resolve()
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / ("candidate_" + sha256(source.encode()) + ".py")
+    # O_EXCL + O_NOFOLLOW avoids silently executing through a reused symlink.
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as handle:
+            import stat
+
+            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode) or handle.read(len(source.encode()) + 1) != source.encode():
+                raise ValueError("Frozen candidate source path is not the expected regular file")
+    else:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(source.encode())
+    # Only the candidate's own future imports may change its language semantics.
+    code = compile(source, str(path), "exec", dont_inherit=True)
+    registry = _ACTIVE.get()
+    if registry is not None:
+        registry.register(source, path, code)
+    context["__name__"] = "kernelbench_candidate_" + sha256(str(path).encode())
+    context["__file__"] = str(path)
+    # inspect.getsource(classes), dataclasses and JIT imports consult sys.modules.
+    # Execute in the actual module namespace so imports defined earlier in the
+    # same source are already visible to decorators.
+    module = types.ModuleType(context["__name__"])
+    module.__dict__.update(context)
+    previous = sys.modules.get(context["__name__"])
+    sys.modules[context["__name__"]] = module
+    try:
+        exec(code, module.__dict__)
+    except BaseException:
+        if previous is None:
+            sys.modules.pop(context["__name__"], None)
+        else:
+            sys.modules[context["__name__"]] = previous
+        raise
+    context.update(module.__dict__)

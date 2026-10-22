@@ -522,6 +522,7 @@ def test_changed_measurement_code_invalidates_resume_digest(tmp_path, monkeypatc
         shutil.copytree(source_root / name, tmp_path / name, ignore=shutil.ignore_patterns("__pycache__"))
     (tmp_path / "scripts").mkdir()
     shutil.copyfile(source_root / "scripts/regrade_artifacts.py", tmp_path / "scripts/regrade_artifacts.py")
+    shutil.copyfile(source_root / "scripts/audit_kernel_origin.py", tmp_path / "scripts/audit_kernel_origin.py")
     for name in ("requirements.txt", "requirements-neuron-worker.txt"):
         shutil.copyfile(source_root / name, tmp_path / name)
     monkeypatch.setattr(common, "ROOT", tmp_path)

@@ -279,6 +279,10 @@ def qualify_small(payload):
 
 
 def dispatch(payload):
+    if payload.get("task") == "origin_audit":
+        from .origin_task import audit
+
+        return audit(payload)
     if payload.get("eval_config", {}).get("device_backend", "cuda") == "neuron":
         from .neuron_worker import evaluate as evaluate_neuron
 
