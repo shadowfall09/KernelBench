@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第二十七版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第二十八版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -837,6 +837,34 @@ Triton使用私有新缓存，必须观察到实际AST和编译器产物；初�
 BN/IN新增CPU FP32失格反例保留，不放宽预算。全非有限输出只能证明精确传播，误差为null且不提供参考信号。23项仍为14项代码已实现、9项部分实现；L2/L3等余项继续实现。旧stash保持原样。
 
 验证：Python 3.12.12 / Torch 2.12.0下1,894项CPU/模拟及meta回归通过，本版新增234项。包含100题真实初始化的meta形状检查、全部新增族的小尺寸CPU独立公式对照、三精度非有限传播、固定参考失格、私有种子/RNG隔离、原生隐藏与Neuron模拟入口、逐例布局/调用/内存收据删改、冻结/评分/恢复/RL和旧来源拒绝。Ruff、193项动机映射、29份Markdown本地链接、skill及177包依赖检查通过；离线wheel包含新模块和域清单，36个轻量模块导入无设备SDK。没有运行GPU、Trainium、预训练模型、容器或训练实验。
+
+## 第二十八版：原L2复合算子的独立数值参考
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add source-bound L2 composite FP64 arithmetic and replay receipts |
+| 日期 | 2026-10-23 |
+| 基础提交 | `1d5ae34` |
+| 状态 | 软件、CPU小配置与meta回归；未运行设备或真实模型实验 |
+
+本版继续R-04，将独立数值控制从原L1扩至原L2全部100题，合计200题。完整随机语义、资源和未完成范围见[复合数值参考](COMPOSITE_NUMERICS.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V28-01 | 全部L2来源绑定的复合程序 | 100题冻结参考SHA、图节点、构造属性、状态形状与随机节点；构造变化或未知算术不回退到参考forward | `kb_workflows/composite_oracles.py` | [M2](MOTIVATION.md#m2) |
+| V28-02 | 复合层独立FP64算式 | Linear/卷积/池化/归一化/激活显式CPU公式，保留GELU近似、inplace别名及原dtype常量舍入，不调用融合数值forward | `kb_workflows/composite_math.py` | [M2](MOTIVATION.md#m2) |
+| V28-03 | 原生随机掩码条件下的数值参考 | Dropout保持实际模式，以原dtype/shape/stride/device和seed重放掩码；FP64算式独立计算数值，外部RNG恢复 | `kb_workflows/composite_oracles.py` | [M2](MOTIVATION.md#m2) |
+| V28-04 | 复合收据与缺项拒绝 | 逐例复核冻结程序、节点、采样模式/概率/布局/计数/摘要，缺失随机证据或图身份不匹配不能取得数值资格 | `kb_workflows/composite_specs.py` | [M5](MOTIVATION.md#m5) |
+| V28-05 | meta状态副本与分配前准入 | 不先复制真实GPU权重，先汇总meta输入/状态/节点元素估算主机包络，超限不执行FP64或采样也不缩题 | `kb_workflows/composite_oracles.py` | [M5](MOTIVATION.md#m5) |
+| V28-06 | 独立数值入口扩至L1及L2 | numerical_validation支持原200题实际标准/隐藏输入，Source/程序/额度贯穿现有请求与部署；L3仍拒绝泛化fallback | `kb_workflows/config.py` | [M5](MOTIVATION.md#m5) |
+| V28-07 | 零信号复合参考问题保留 | 83题min后clamp在固定参数下恒零，数值相等不能恢复reference_signal；源文件与总体不变，不放宽误差 | `kb_workflows/operator_oracles.json` | [M2](MOTIVATION.md#m2) |
+| V28-08 | 全L2数学与名义形状回归 | 100题小配置CPU数值与原构造/名义shape的meta检查，禁用融合forward、两类低精度、随机收据及准入反例 | `tests/_composite_cases.py` | [M5](MOTIVATION.md#m5) |
+
+冻结程序绑定真实初始化构造和状态形状，FP64数值解释不调用原融合层forward；FX的Python符号执行与meta层forward明确单列。Dropout复用原生随机掩码，其真实设备重放未做实验验证，不声称独立于框架随机原语。原L2第83题恒零参考保持信号失格。正式任务不使用CPU单测的小配置。
+
+原性能样本、计时尺寸及旧题源文件不被替换。L3、L2/L3配方、逐设备阈值与更完整计时/来源资格继续实现，23项仍为14项代码已实现、9项部分实现；旧stash未恢复或修改。
+
+验证：Python 3.12.12 / Torch 2.12.0下2,149项CPU/模拟/meta回归通过，本版新增255项。覆盖全部100题小配置独立数值与真实初始化/名义shape元数据、20道代表题禁用原数值forward、FP16/BF16、随机收据删改、inplace别名、原dtype常量舍入、正式构造拒绝小配置、主机准入和SDK轻量预览。6条warning保留，包括原2/28非仿射IN的通道提示与环境driver提示。Ruff、201项动机映射、30份Markdown本地链接、skill与177包依赖检查通过；离线wheel包含新程序/数据，37个轻量入口无设备SDK导入。未运行GPU、Trainium、预训练模型、容器或训练实验。
 
 ## 维护方式
 

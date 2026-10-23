@@ -141,6 +141,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V27-03 显式非有限域与空数值测量 | 五种激活追加NaN/Inf及全NaN，传播严格匹配；全非有限叶子的RMS/误差为null，不能贡献参考信号 | — | [numerical.py](../kb_workflows/numerical.py), [numerical_audit.py](../kb_workflows/numerical_audit.py), [operator_oracles.json](../kb_workflows/operator_oracles.json) |
 | V27-04 转换后保留正stride布局 | 修正dtype/device转换可能压紧切片的问题，将真实正stride与离散dtype送入候选及隔离副本 | — | [eval.py](../src/eval.py), [validation.py](../src/validation.py), [test_operator_inputs.py](../tests/test_operator_inputs.py) |
 | V27-07 参考近常量失格证据保留 | BN/IN固定CPU FP32反例超过既定FP64预算，保留已知问题与失败；来源变化的旧结果在分析时明确失效 | — | [operator_oracles.json](../kb_workflows/operator_oracles.json), [paper_analysis.py](../kb_workflows/paper_analysis.py), [test_operator_inputs.py](../tests/test_operator_inputs.py) |
+| V28-01 全部L2来源绑定的复合程序 | 100题冻结参考SHA、图节点、构造属性、状态形状与随机节点；构造变化或未知算术不回退到参考forward | — | [composite_oracles.py](../kb_workflows/composite_oracles.py), [composite_programs.json](../kb_workflows/composite_programs.json), [composite_specs.py](../kb_workflows/composite_specs.py) |
+| V28-02 复合层独立FP64算式 | Linear/卷积/池化/归一化/激活显式CPU公式，保留GELU近似、inplace别名及原dtype常量舍入，不调用融合数值forward | — | [composite_math.py](../kb_workflows/composite_math.py), [operator_oracles.py](../kb_workflows/operator_oracles.py), [test_composite_oracles.py](../tests/test_composite_oracles.py) |
+| V28-03 原生随机掩码条件下的数值参考 | Dropout保持实际模式，以原dtype/shape/stride/device和seed重放掩码；FP64算式独立计算数值，外部RNG恢复 | — | [composite_oracles.py](../kb_workflows/composite_oracles.py), [numerical_audit.py](../kb_workflows/numerical_audit.py) |
+| V28-07 零信号复合参考问题保留 | 83题min后clamp在固定参数下恒零，数值相等不能恢复reference_signal；源文件与总体不变，不放宽误差 | — | [operator_oracles.json](../kb_workflows/operator_oracles.json), [test_composite_oracles.py](../tests/test_composite_oracles.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -282,6 +286,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V27-05 原生隐藏执行与覆盖复核 | CUDA及Neuron共同追加案例，逐例记录有效输入/种子/双向调用；评分恢复拒绝漏例、改布局、重复标签或缺记录 | — | [operator_input_policy.py](../kb_workflows/operator_input_policy.py), [reliability.py](../src/reliability.py), [neuron_worker.py](../kb_workflows/neuron_worker.py), [tool_checks.py](../kb_workflows/tool_checks.py) |
 | V27-06 输入内存准入与全流程冻结 | 默认256MiB输入估计在分配前检查，超限不缩尺寸；计划和额度贯穿队列、生成、Harbor、最终冻结及研究比较 | — | [config.py](../kb_workflows/config.py), [engine.py](../kb_workflows/engine.py), [cli.py](../kb_workflows/cli.py), [harbor.py](../kb_workflows/harbor.py) |
 | V27-08 全L1元数据与原生入口回归 | 真实100题初始化meta检查及CPU算式、私有seed、NaN信号、Neuron模拟、评分/RL/恢复收据回归，不运行设备实验 | — | [test_operator_inputs.py](../tests/test_operator_inputs.py), [_operator_evidence.py](../tests/_operator_evidence.py), [OPERATOR_INPUTS.md](../docs/OPERATOR_INPUTS.md) |
+| V28-04 复合收据与缺项拒绝 | 逐例复核冻结程序、节点、采样模式/概率/布局/计数/摘要，缺失随机证据或图身份不匹配不能取得数值资格 | — | [composite_specs.py](../kb_workflows/composite_specs.py), [numerical_audit.py](../kb_workflows/numerical_audit.py), [test_composite_oracles.py](../tests/test_composite_oracles.py) |
+| V28-05 meta状态副本与分配前准入 | 不先复制真实GPU权重，先汇总meta输入/状态/节点元素估算主机包络，超限不执行FP64或采样也不缩题 | — | [composite_oracles.py](../kb_workflows/composite_oracles.py), [numerical_audit.py](../kb_workflows/numerical_audit.py) |
+| V28-06 独立数值入口扩至L1及L2 | numerical_validation支持原200题实际标准/隐藏输入，Source/程序/额度贯穿现有请求与部署；L3仍拒绝泛化fallback | — | [config.py](../kb_workflows/config.py), [operator_specs.py](../kb_workflows/operator_specs.py), [common.py](../kb_workflows/common.py), [pyproject.toml](../pyproject.toml) |
+| V28-08 全L2数学与名义形状回归 | 100题小配置CPU数值与原构造/名义shape的meta检查，禁用融合forward、两类低精度、随机收据及准入反例 | — | [_composite_cases.py](../tests/_composite_cases.py), [test_composite_oracles.py](../tests/test_composite_oracles.py), [COMPOSITE_NUMERICS.md](../docs/COMPOSITE_NUMERICS.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -294,8 +302,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-01 生产难题与反向轨道 | 代码已实现 | M1 | 已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13 |
 | R-02 多dtype任务族与显存缩放 | 代码已实现 | M1 | 已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证 |
 | R-03 选集区分度重新验证 | 代码已实现 | M1 | 已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验 |
-| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成；全非有限传播精确匹配但无有限误差/信号，BN/IN近常量CPU FP32失格证据保留 |
-| R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现实际输入信号审计及原L1的参考专用名义值分布选择、固定强数值预算、逐输出FP64检查与新基线/恢复契约；隐藏分布保留。L2/L3全题适配与逐设备阈值校准仍缺；按用户要求不跑设备/模型实验 |
+| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，原L1全部100题显式公式与原L2全部100题来源/构造绑定的复合FP64算术覆盖实际原生输入；随机掩码条件下数值参考不切换eval。参考失格、空/全非有限null和L2恒零信号证据保留；L3、全题/设备阈值校准及更完整计时数值资格仍待完成 |
+| R-05 参考退化审计与输入校准 | 部分实现 | M2 | 参考信号审计已覆盖L1/L2实际原生输入；原L1有参考专用名义值分布选择、固定强预算及新基线/恢复契约。L2恒零公式保留信号失败；L2/L3输入配方、全题适配和逐设备阈值校准仍缺，按用户要求不跑设备/模型实验 |
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 原L1全部100题追加真实初始化下的算子专用形状/stride/值族，每种子632例，保留旧分布与扫描修订；新41题已有角色/边界。追加NaN/Inf仅限明确五题；L2/L3的150题、旧分布语义迁移与更完整输入族仍待实现 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |

@@ -192,7 +192,7 @@ def test_configuration_payload_and_sdk_light_previews(tmp_path):
         with pytest.raises(ValueError, match="memory envelope"):
             RunConfig(oracle_memory_mb=invalid).validate()
     with pytest.raises(ValueError, match="level 1"):
-        RunConfig(level=2, numerical_validation=True).validate()
+        RunConfig(level=3, numerical_validation=True).validate()
     script = f'''import sys
 sys.path.insert(0,{str(ROOT)!r})
 from kb_workflows.cli import main

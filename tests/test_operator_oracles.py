@@ -171,7 +171,7 @@ def test_oracle_manifest_rejects_source_drift_and_unknown_tasks():
     with pytest.raises(ValueError, match="reference changed"):
         spec_for(1, 2, source + "# change")
     with pytest.raises(ValueError, match="No independent"):
-        spec_for(2, 2, source)
+        spec_for(3, 2, source)
     json.dumps(spec_for(1, 2, source), allow_nan=False)
 
 

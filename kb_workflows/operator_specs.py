@@ -17,4 +17,8 @@ def spec_for(level, pid, source):
         raise ValueError("No independent operator oracle adapter for this task")
     if result["reference_sha256"] != hashlib.sha256(source.encode()).hexdigest():
         raise ValueError("Independent operator oracle reference changed; review the formula and domain")
+    if result.get("family") == "composite":
+        from .composite_specs import program_for
+
+        program_for(result)
     return {**{key: document[key] for key in ("oracle", "precision", "scope", "native_input_roles_preserved")}, **result}

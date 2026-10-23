@@ -66,3 +66,5 @@ python -m scripts.check_motivations
 Production-41代码已接入独立Level 5，四轨包含12/6/12/11题；角色、显存计划、反向与数值门见[生产题说明](../../docs/PRODUCTION_TASKS.md)。本轮不运行设备、模型或训练实验；原105选集的排名结论仍未重做。
 
 原L1新增[算子专用隐藏输入](../../docs/OPERATOR_INPUTS.md)：真实初始化下的100题形状/布局/边界实例和覆盖收据已接入，不改变名义计时。CPU近常量参考失格保留；这不等于完成L2/L3或实机验证。
+
+原L2的100题现有[来源绑定的复合FP64算式](../../docs/COMPOSITE_NUMERICS.md)，与原L1合计200题。算式、原构造meta和原生控制路径已作CPU/模拟检查；L3及设备实验没有因此完成。

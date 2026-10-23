@@ -1,6 +1,6 @@
 # 原生输入的独立数值复核
 
-`numerical_validation`增加原生输入上的CPU FP64/complex128数值门，当前有原L1全部100题的独立算式适配器。默认关闭，不替换原生正确性或性能协议，不自动授予完整L0。
+`numerical_validation`增加原生输入上的CPU FP64/complex128数值门，当前覆盖原L1全部100题显式公式和原L2全部100题来源绑定的复合算式。默认关闭，不替换原生正确性或性能协议，不自动授予完整L0。
 
 ```toml
 [run]
@@ -18,7 +18,7 @@ python scripts/run_batch.py --config configs/a6000-feedback.toml \
   --numerical-validation --oracle-memory-mb 4096 --dry-run
 ```
 
-`--dry-run`不加载Torch，不分配题目输入、不运行设备；输出`numerical_coverage`及已记录的参考问题。源码SHA与[适配器清单](../kb_workflows/operator_oracles.json)不一致时，预检和worker都拒绝套用旧公式。L2/L3及生产任务尚未接入这条独立算式路径，选择它们时不允许用通用`.double()`替代后声称全覆盖。
+`--dry-run`不加载Torch，不分配题目输入、不运行设备；输出`numerical_coverage`及已记录的参考问题。源码SHA与[适配器清单](../kb_workflows/operator_oracles.json)不一致时，预检和worker都拒绝套用旧公式。L2复合算式路径已接入，见[复合数值参考](COMPOSITE_NUMERICS.md)；L3及生产任务尚未接入这条路径，选择它们时不允许用通用`.double()`替代后声称全覆盖。
 
 ## 实际检查什么
 
@@ -62,6 +62,8 @@ python scripts/run_batch.py --config configs/a6000-feedback.toml \
 
 另有固定CPU反例表明，BF16 triplet loss在接近抵消的结果上，参考也可能超出公布预算；与参考相同的候选不会因此自动获得资格。测试保留此反例，而不是放宽误差门。
 
-合法空Tensor及精确传播匹配的全非有限Tensor保留结构/dtype契约，有限误差测量为`null`，均不作为有效参考信号；非空参考仍须提供信息量。当前新增路径覆盖L1的实际实例，原17题小实例严格契约继续保留；L1可选参考输入校准和强数值新基线已实现；L2/L3独立适配、全题输入校准和逐设备阈值校准仍未完成。本文的CPU/模拟回归不能替代设备或模型实验。没有运行GPU、Trainium、真实模型、容器或训练实验。
+合法空Tensor及精确传播匹配的全非有限Tensor保留结构/dtype契约，有限误差测量为`null`，均不作为有效参考信号；非空参考仍须提供信息量。当前新增路径覆盖L1的显式公式及L2的来源绑定复合算式，原17题小实例严格契约继续保留；L1可选输入校准和强数值新基线已实现。L3、全题配方及设备阈值校准仍未完成。本文的CPU/模拟回归不能替代设备或模型实验。没有运行GPU、Trainium、真实模型、容器或训练实验。
 
 原L1现有[算子专用隐藏输入](OPERATOR_INPUTS.md)也进入这条实际输入复核。新近常量CPU FP32 BN/IN反例保留参考失格；五题声明非有限域，其他算子不使用通用NaN注入。
+
+原L2全部100题现有[复合FP64算式与冻结图](COMPOSITE_NUMERICS.md)，复用实际输入诊断控制。L1仍使用显式独立公式；符号图的Python/meta调用与数值计算分开记录。

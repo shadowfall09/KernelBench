@@ -231,8 +231,8 @@ class RunConfig:
             self.input_calibration = str(Path(self.input_calibration).expanduser().resolve())
             read_bundle(self.input_calibration)
             self.numerical_validation = True
-        if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level != 1):
-            raise ValueError("Independent numerical validation currently requires an explicit boolean and level 1")
+        if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level not in {1, 2}):
+            raise ValueError("Independent numerical validation currently requires an explicit boolean and level 1 or 2")
         if type(self.input_family_memory_mb) is not int or not 1 <= self.input_family_memory_mb <= 1048576:
             raise ValueError("Input-family memory envelope must be an integer from 1 to 1048576 MiB")
         if type(self.oracle_memory_mb) is not int or not 1 <= self.oracle_memory_mb <= 1048576:
