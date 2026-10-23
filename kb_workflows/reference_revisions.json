@@ -1,0 +1,104 @@
+{
+  "protocol": "kernelbench_pro_reference_revisions_v1",
+  "revisions": [
+    {
+      "id": "l1-89-scan-hidden-cases-v2",
+      "level": 1,
+      "problem_id": 89,
+      "revision": 2,
+      "reference_before_sha256": "2fb0fb197070475cba3a73b0a151e722663d690c25971305b2b62af1088f37de",
+      "reference_sha256": "2fb0fb197070475cba3a73b0a151e722663d690c25971305b2b62af1088f37de",
+      "hidden_before_sha256": "b5b918e9db18bbe65dc20fa9849d49b255dbc1a67d2cc9d8eb3fef1bbc5547eb",
+      "hidden_sha256": "4003b24dc4e2a9238ac3a1e9d0e22e1f171bbda679acfa62917a2906b3e22db3",
+      "last_legacy_commit": "6f2758c050c241196806ae7112b7d9f768b70a24",
+      "reason": "Add reviewed legal scan shape/layout cases; product inputs remain near unit magnitude and mask roles remain boolean. Reference algorithm unchanged.",
+      "input_policy": "Legacy nominal dimensions and 4 original hidden distributions retained; axis-1 odd/strided/rank-3/singleton/empty-axis scan cases.",
+      "evidence": [
+        "tests/test_reference_revisions.py",
+        "tests/test_scan_cases.py"
+      ],
+      "hidden_dependencies": {
+        "kb_workflows/scan_cases.py": "728a5169b674eaf6fe1fed545b4be05a129fb6f1f58171bde96eba792b988fe3"
+      }
+    },
+    {
+      "id": "l1-90-scan-hidden-cases-v2",
+      "level": 1,
+      "problem_id": 90,
+      "revision": 2,
+      "reference_before_sha256": "029c4a283aae03fa1b8b39f06190d0a89e2c553253b4c91e0d29043526b5c9ff",
+      "reference_sha256": "029c4a283aae03fa1b8b39f06190d0a89e2c553253b4c91e0d29043526b5c9ff",
+      "hidden_before_sha256": "916f8e270361625c0e4621e44b2114afed819c279c614773f7e747aca88e88a0",
+      "hidden_sha256": "0681f816bbd651fecd02b079a24366c0c95bcde7ee3c44e89f3d8576f0595d44",
+      "last_legacy_commit": "6f2758c050c241196806ae7112b7d9f768b70a24",
+      "reason": "Add reviewed legal scan shape/layout cases; product inputs remain near unit magnitude and mask roles remain boolean. Reference algorithm unchanged.",
+      "input_policy": "Legacy nominal dimensions and 3 original hidden distributions retained; axis-1 odd/strided/rank-3/singleton/empty-axis scan cases.",
+      "evidence": [
+        "tests/test_reference_revisions.py",
+        "tests/test_scan_cases.py"
+      ],
+      "hidden_dependencies": {
+        "kb_workflows/scan_cases.py": "728a5169b674eaf6fe1fed545b4be05a129fb6f1f58171bde96eba792b988fe3"
+      }
+    },
+    {
+      "id": "l1-91-scan-hidden-cases-v2",
+      "level": 1,
+      "problem_id": 91,
+      "revision": 2,
+      "reference_before_sha256": "e9d0f300c234f1abbab58930c10a32b4e718c0ecefe26a83195c2145fbe74af0",
+      "reference_sha256": "e9d0f300c234f1abbab58930c10a32b4e718c0ecefe26a83195c2145fbe74af0",
+      "hidden_before_sha256": "895359858613ed65066e33a67bb4c161833256871ba99ddbb552d516feb881db",
+      "hidden_sha256": "f90fba9bb66d9157a35979d97ca46b9c915a7eb0fb15a2ab448a17bddc653a7d",
+      "last_legacy_commit": "6f2758c050c241196806ae7112b7d9f768b70a24",
+      "reason": "Add reviewed legal scan shape/layout cases; product inputs remain near unit magnitude and mask roles remain boolean. Reference algorithm unchanged.",
+      "input_policy": "Legacy nominal dimensions and 4 original hidden distributions retained; axis-1 odd/strided/rank-3/singleton/empty-axis scan cases.",
+      "evidence": [
+        "tests/test_reference_revisions.py",
+        "tests/test_scan_cases.py"
+      ],
+      "hidden_dependencies": {
+        "kb_workflows/scan_cases.py": "728a5169b674eaf6fe1fed545b4be05a129fb6f1f58171bde96eba792b988fe3"
+      }
+    },
+    {
+      "id": "l1-92-exclusive-scan-axis-v2",
+      "level": 1,
+      "problem_id": 92,
+      "revision": 2,
+      "reference_before_sha256": "ef79ef0e6387a1b04cde4c3815f4bda5464e79263dcadfeda0e648ec82759260",
+      "reference_sha256": "a28412433ca97d2afad29401e70fa6b4c61716c20a251180d810658669e41e52",
+      "hidden_before_sha256": "4803901c025a25c6deee0a5d1d30de9a2e39e0f9041cc1321a32982eeba7a62a",
+      "hidden_sha256": "7b1880845064a26b77fd07ea5f3b82fdf4c24a1abe3ad2be9b8c9243d7d95dcd",
+      "last_legacy_commit": "6f2758c050c241196806ae7112b7d9f768b70a24",
+      "reason": "Exclusive scan must retain input shape and shift along the declared axis, including negative axes and empty scans. The legacy dim=1 implementation sliced axis 0.",
+      "input_policy": "Legacy nominal dimensions and 4 original hidden distributions retained; axis-1 odd/strided/rank-3/singleton/empty-axis scan cases.",
+      "evidence": [
+        "tests/test_reference_revisions.py"
+      ],
+      "hidden_dependencies": {
+        "kb_workflows/scan_cases.py": "728a5169b674eaf6fe1fed545b4be05a129fb6f1f58171bde96eba792b988fe3"
+      }
+    },
+    {
+      "id": "l1-93-scan-hidden-cases-v2",
+      "level": 1,
+      "problem_id": 93,
+      "revision": 2,
+      "reference_before_sha256": "65a573b890e9d6a63c44073eb641d560387e7d8771b36b93813615e05a90087e",
+      "reference_sha256": "65a573b890e9d6a63c44073eb641d560387e7d8771b36b93813615e05a90087e",
+      "hidden_before_sha256": "99e780da9cba2554cbc83076c78dbca2c7a85d5fea93c0bb8deb9417694c6657",
+      "hidden_sha256": "aee4b0cd943dc72481370dfc899db1e0d496b1b55c711877d75da7bc6427e60d",
+      "last_legacy_commit": "6f2758c050c241196806ae7112b7d9f768b70a24",
+      "reason": "Add reviewed legal scan shape/layout cases; product inputs remain near unit magnitude and mask roles remain boolean. Reference algorithm unchanged.",
+      "input_policy": "Legacy nominal dimensions and 4 original hidden distributions retained; axis-1 odd/strided/rank-3/singleton/empty-axis scan cases.",
+      "evidence": [
+        "tests/test_reference_revisions.py",
+        "tests/test_scan_cases.py"
+      ],
+      "hidden_dependencies": {
+        "kb_workflows/scan_cases.py": "728a5169b674eaf6fe1fed545b4be05a129fb6f1f58171bde96eba792b988fe3"
+      }
+    }
+  ]
+}

@@ -25,11 +25,10 @@ Usage:
     python scripts/generate_hidden_inputs.py --validate [--level 1|2|3] [--pid N]
 """
 
+import argparse
 import gc
 import json
 import os
-import sys
-import argparse
 import traceback
 
 import torch
@@ -203,6 +202,7 @@ def generate_hidden_file_content(
     rel_path = os.path.join("..", "..", "KernelBench", f"level{level}", prob_fname)
 
     # Build the generated file content
+    reviewed_scan = level == 1 and pid in (89, 90, 91, 92, 93)
     lines = [
         '"""',
         f"Hidden test inputs for problem {pid}: {prob_fname}",
@@ -246,7 +246,8 @@ def generate_hidden_file_content(
         "",
         "",
         "def get_hidden_inputs():",
-        f'    """Returns {len(valid_dists)} input configs for hidden correctness testing."""',
+        (f'    """Returns {len(valid_dists)} legacy configs plus reviewed scan cases."""' if reviewed_scan
+         else f'    """Returns {len(valid_dists)} input configs for hidden correctness testing."""'),
         "    configs = []",
     ]
 
@@ -257,6 +258,12 @@ def generate_hidden_file_content(
         else:
             lines.append(f"    configs.append(_scale(_get_inputs(), {factor}))")
 
+    if reviewed_scan:
+        lines += [
+            "    from kb_workflows.scan_cases import cases",
+            "",
+            f'    configs.extend(row["inputs"] for row in cases({pid}, seed=torch.initial_seed()))',
+        ]
     lines += [
         "    return configs",
         "",

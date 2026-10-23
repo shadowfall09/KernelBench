@@ -62,6 +62,14 @@ def precision_gate(reference, candidate, oracle, contract, *, _self_check=False)
             if ref.is_complex():
                 visit(torch.view_as_real(ref), torch.view_as_real(cand), torch.view_as_real(truth), path + ".complex")
                 return
+            if ref.numel() == 0:
+                # A valid empty output has a structure/dtype contract, but no
+                # measured numerical errors or signal. Do not invent zero RMS.
+                empty = {"passed": True, "rms_error": None, "max_abs_error": None, "elements_failed": 0}
+                rows.append({"path": path, "kind": "empty_tensor", "elements": 0, "shape": list(ref.shape),
+                             "dtype": str(ref.dtype), "oracle_rms": None, "norm_limit": None,
+                             "reference": dict(empty), "candidate": dict(empty)})
+                return
             masks = (torch.isnan, torch.isposinf, torch.isneginf)
             if any(not torch.equal(mask(ref), mask(truth)) or not torch.equal(mask(cand), mask(truth)) for mask in masks):
                 issues.append(f"{path}: non-finite positions differ from oracle")

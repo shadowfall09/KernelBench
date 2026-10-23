@@ -130,6 +130,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V24-03 数值语义与低精度自资格反例 | 归一化/attention/loss采用显式FP64公式并保留状态、标签、epsilon和精确激活语义；固定BF16抵消反例不能因候选等于参考而通过 | — | [operator_oracles.py](../kb_workflows/operator_oracles.py), [test_operator_oracles.py](../tests/test_operator_oracles.py) |
 | V24-05 参考结构与离散自资格修正 | 参考资格独立计算，oracle shape/结构/离散dtype不符时不能因没有数值叶子而通过；92题exclusive scan参考缺陷明确保留失败 | — | [numerical.py](../kb_workflows/numerical.py), [test_operator_oracles.py](../tests/test_operator_oracles.py) |
 | V24-06 数值与信号证据重算 | 核对逐原生实例、冻结规格/误差/内存政策、RMS限值、元素计数和信号叶子；源码漂移/缺项/模拟不能获得设备资格，配置贯穿Harbor及评分恢复 | M5, M3 | [numerical_audit.py](../kb_workflows/numerical_audit.py), [tool_checks.py](../kb_workflows/tool_checks.py), [cli.py](../kb_workflows/cli.py), [test_numerical_audit.py](../tests/test_numerical_audit.py) |
+| V25-01 Exclusive scan参考有版本修正 | 沿声明轴补零/累加/裁剪，保留负轴、singleton与空轴shape；独立移位公式和旧错误反例同时核对，不改变名义计时尺寸 | M5 | [92_cumsum_exclusive.py](../KernelBench/level1/92_cumsum_exclusive.py), [operator_oracles.py](../kb_workflows/operator_oracles.py), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
+| V25-02 扫描输入族与原分布保留 | 五题追加奇数/非连续/rank-3/单元素/空轴，保留原3或4分布；乘积保持信号、mask保持bool，生成器不丢新增入口 | M1 | [scan_cases.py](../kb_workflows/scan_cases.py), [89_hidden.py](../hidden_tests/level1/89_hidden.py), [90_hidden.py](../hidden_tests/level1/90_hidden.py), [91_hidden.py](../hidden_tests/level1/91_hidden.py), [92_hidden.py](../hidden_tests/level1/92_hidden.py), [93_hidden.py](../hidden_tests/level1/93_hidden.py), [test_scan_cases.py](../tests/test_scan_cases.py) |
+| V25-05 空输出数值契约 | 合法空Tensor按结构/dtype检查，RMS及误差保留null，不编造测得零误差；空输出不能单独提供参考信号 | — | [numerical.py](../kb_workflows/numerical.py), [numerical_audit.py](../kb_workflows/numerical_audit.py), [test_numerical_audit.py](../tests/test_numerical_audit.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -171,6 +174,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V19-07 重评分来源与测量凭据 | 单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格 | M4, M5 | [regrade.py](../kb_workflows/regrade.py), [experiment.py](../kb_workflows/experiment.py), [common.py](../kb_workflows/common.py) |
 | V20-03 来源时间并集与未知重放 | 逐调用重算保守自写时间占比，重叠活动只计一次，未知/Graph/内存活动不获自写信用；丢记录、错绑和模式变化不通过 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V21-03 原生内存操作与双轨道诊断 | 成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [cuda_origin.py](../kb_workflows/cuda_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
+| V25-06 诊断设置贯穿冻结与比较 | 统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告 | M2, M5 | [tool_checks.py](../kb_workflows/tool_checks.py), [experiment.py](../kb_workflows/experiment.py), [final_verification.py](../kb_workflows/final_verification.py), [study_data.py](../kb_workflows/study_data.py), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -260,6 +264,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V22-06 来源协议v3与实际SDK结构兼容 | 新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [triton_origin.py](../kb_workflows/triton_origin.py), [test_compiler_origins.py](../tests/test_compiler_origins.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 | V23-04 原生逐实例状态复核 | 可选state_validation经过统一后端与Harbor，独立复核覆盖实际标准/隐藏输入，共享原请求预算，诊断不替换性能样本 | M2, M3 | [state_audit.py](../kb_workflows/state_audit.py), [evaluate_task.py](../kb_workflows/evaluate_task.py), [tool_checks.py](../kb_workflows/tool_checks.py), [test_state_audit.py](../tests/test_state_audit.py) |
 | V24-04 实际输入复核与内存准入 | 可选numerical_validation覆盖实际原生标准/隐藏输入，分配前核对主机内存估计包络；不缩小原尺寸，独立复核不替换性能样本 | M2, M3 | [numerical_audit.py](../kb_workflows/numerical_audit.py), [config.py](../kb_workflows/config.py), [evaluate_task.py](../kb_workflows/evaluate_task.py), [test_numerical_audit.py](../tests/test_numerical_audit.py) |
+| V25-03 任务修订与共享依赖绑定 | 记录参考/隐藏前后哈希、连续版本链和共享生成器；worker/队列执行前核对，新结果记录修订，评分恢复拒绝无当前修订的正结果 | M2 | [reference_revisions.py](../kb_workflows/reference_revisions.py), [reference_revisions.json](../kb_workflows/reference_revisions.json), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
+| V25-04 选集运行快照升级与历史档案 | KernelBench-105清单v2保留250题身份/105主选/5探针/140扩展及seed，显式基底加修订；原研究CSV不重写为新结果 | M1, M3 | [suites.py](../kb_workflows/suites.py), [kernelbench105.json](../kb_workflows/suites/kernelbench105.json), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
+| V25-07 修订任务跨入口回归 | CPU核对轴/空边界/精度提升、实际隐藏入口、队列与全部dispatch阶段、Harbor私有文件及旧证据拒绝，不运行设备实验 | M2 | [test_reference_revisions.py](../tests/test_reference_revisions.py), [test_scan_cases.py](../tests/test_scan_cases.py), [generate_hidden_inputs.py](../scripts/generate_hidden_inputs.py), [REFERENCE_REVISIONS.md](../docs/REFERENCE_REVISIONS.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -272,9 +279,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-01 生产难题与反向轨道 | 代码已实现 | M1 | 已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13 |
 | R-02 多dtype任务族与显存缩放 | 代码已实现 | M1 | 已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证 |
 | R-03 选集区分度重新验证 | 代码已实现 | M1 | 已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验 |
-| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，新增原L1全部100题的独立CPU FP64算式与实际原生输入复核，参考/候选同门自资格；检出92题轴裁剪缺陷及BF16抵消反例；L2/L3独立适配、全题校准与参考问题的有版本修正仍需完成 |
+| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成 |
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现附加实例及L1实际原生输入的逐叶信号诊断/收据重算，至少一例须有信息量；原计时输入不变，逐题自动校准、合法输入修复与相应新基线仍需完成 |
-| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立 |
+| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 覆盖17道旧题附加形状及新41题角色/边界实例；扫描89–93保留原分布并追加奇数、stride、rank-3、singleton、空轴与bool mask案例，cumprod保留有效信号；旧250题其余算子输入族与特殊值适配继续实现 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
 | R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计；来源诊断冻结配置容差并观察training/grad后置状态 |

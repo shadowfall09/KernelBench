@@ -34,6 +34,8 @@ python scripts/run_batch.py --config configs/a6000-feedback.toml \
 
 TOML 的 `[run]` 可写 `suite = "kernelbench105"`、`suite_role = "scored"`。选择结果贯穿基线、生成、验证、pass@k、性能评分、资源记录和 Harbor 导出。子任务展开为单题配置，不依赖宿主研究目录。suite receipt 记录清单摘要，按角色分组比较；probe/extended 的评分报告标记 `leaderboard_eligible = false`。参考源码与清单快照不符时拒绝运行，维护者需重新审阅并版本化清单。
 
+运行清单当前为version 2：保留原选题与角色，声明第92题exclusive scan参考修正，以及89–93五题的隐藏输入契约更新。原始研究CSV保持不变，当前修订、旧结果失效与来源绑定见[参考修订](../../docs/REFERENCE_REVISIONS.md)。
+
 此接入没有复现原稿声称的 τ=1.00：7 模型原始结果不在压缩包中，另有历史分析输出使用 104 题，不能混作 105 题结果。选集中仍有输出退化或低信号题；输入校准待完成。因此这是**可运行的研究选集**，还不是完成验证的 HEADROOM 发布版。层标签可以用于描述性统计，不作为设计证书或 headroom 分母。
 
 ## 保留的证据及局限

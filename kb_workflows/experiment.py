@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .common import atomic_json, fingerprint, kernel_name, read_json, select_problems
 from .suites import selection_receipt
+from .tool_checks import diagnostic_options
 
 
 def protocol(config):
@@ -40,8 +41,7 @@ def protocol(config):
         "local_model_temperature": config.agent_temperature if config.agent_backend == "local-transformers" else None,
         "development_feedback": "none" if config.generation_mode == "one-shot" else ("external" if external else "standard_only"),
         "profiling": config.agent_profile if not external and config.generation_mode == "feedback" else False,
-        "diagnostic_contract": {key: getattr(config, key) for key in ("sanitizer_tools", "sanitizer_command", "sanitizer_timeout",
-                                "determinism_checks", "determinism_repeats")},
+        "diagnostic_contract": diagnostic_options(config),
         "determinism_policy_sha256": fingerprint(read_json(Path(config.determinism_policy_file))) if config.determinism_policy_file else None,
         "held_out_feedback": False if not external else None,
         "selection": "single_candidate" if config.generation_mode == "one-shot" else ("external" if external else "best_correct_development_mean"),
@@ -108,8 +108,7 @@ def compare_runs(directories):
                     "fp32_tolerance": config.fp32_tolerance}
         contract.update(strict_validation=config.strict_validation, evidence_level=config.evidence_level)
         contract["verifier_isolation"] = options(config)
-        contract["diagnostic_contract"] = {key: getattr(config, key) for key in (
-            "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")}
+        contract["diagnostic_contract"] = diagnostic_options(config)
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
         contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))

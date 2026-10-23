@@ -1,9 +1,9 @@
 {
   "name": "kernelbench105",
-  "version": 1,
+  "version": 2,
   "selection_seed": 20261002,
   "source_archive_sha256": "4222a13cd2f19e0ecfbd017a7416125ac8cf4f49dbed95fa11108fe3a253dd85",
-  "reference_snapshot": "92c27f4c020a4860d5ca546b88a50b007f629e3f",
+  "reference_snapshot": "base_snapshot_plus_declared_reference_revisions",
   "labels": "provisional research taxonomy; no SOL or reachability certificate",
   "input_calibration": "not_implemented",
   "problems": [
@@ -895,7 +895,8 @@
       "role": "scored",
       "layer": "I",
       "cell": "L1/I-scan",
-      "reason": "cell size 2, keep 1"
+      "reason": "cell size 2, keep 1",
+      "reference_revision": "l1-89-scan-hidden-cases-v2"
     },
     {
       "level": 1,
@@ -905,7 +906,8 @@
       "role": "extended",
       "layer": "I",
       "cell": "L1/I-scan",
-      "reason": "cell size 2, keep 1"
+      "reason": "cell size 2, keep 1",
+      "reference_revision": "l1-90-scan-hidden-cases-v2"
     },
     {
       "level": 1,
@@ -915,17 +917,19 @@
       "role": "scored",
       "layer": "F",
       "cell": "L1/F-cumsum-variants",
-      "reason": "cell size 3, keep 2"
+      "reason": "cell size 3, keep 2",
+      "reference_revision": "l1-91-scan-hidden-cases-v2"
     },
     {
       "level": 1,
       "problem_id": 92,
       "reference": "92_cumsum_exclusive.py",
-      "reference_sha256": "ef79ef0e6387a1b04cde4c3815f4bda5464e79263dcadfeda0e648ec82759260",
+      "reference_sha256": "a28412433ca97d2afad29401e70fa6b4c61716c20a251180d810658669e41e52",
       "role": "extended",
       "layer": "F",
       "cell": "L1/F-cumsum-variants",
-      "reason": "cell size 3, keep 2"
+      "reason": "cell size 3, keep 2",
+      "reference_revision": "l1-92-exclusive-scan-axis-v2"
     },
     {
       "level": 1,
@@ -935,7 +939,8 @@
       "role": "scored",
       "layer": "F",
       "cell": "L1/F-cumsum-variants",
-      "reason": "cell size 3, keep 2"
+      "reason": "cell size 3, keep 2",
+      "reference_revision": "l1-93-scan-hidden-cases-v2"
     },
     {
       "level": 1,
@@ -2507,5 +2512,7 @@
       "cell": "design",
       "reason": "design-type: kept unconditionally"
     }
-  ]
+  ],
+  "selection_reference_snapshot": "92c27f4c020a4860d5ca546b88a50b007f629e3f",
+  "reference_revision_registry_sha256": "a065cd90b42183e645fdc706548e6e82e0090c27afbf11978cde0f30ad45b6d2"
 }

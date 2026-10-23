@@ -11,7 +11,7 @@ from pathlib import Path
 from statistics import mean
 
 from .common import atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
-from .tool_checks import reusable
+from .tool_checks import diagnostic_options, reusable
 
 PROTOCOL = "frozen_final_remeasurement_v1"
 
@@ -26,6 +26,7 @@ def _options(config):
         "paired_timing", "paired_trials", "final_repeats", "evaluation", "timeout",
         "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")}
     options["isolation"] = isolation_options(config)
+    options.update(diagnostic_options(config))
     if config.task_dimensions:
         options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})
     if config.determinism_policy_file:

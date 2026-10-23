@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, kernel_name, read_json, select_problems
 from .suites import selection_receipt
-from .tool_checks import reusable
+from .tool_checks import diagnostic_options, reusable
 from .transports import docker_evaluate, local_evaluate, queue_evaluate, resolve_devices
 
 
@@ -39,14 +39,7 @@ def settings(config, hidden=False):
         "strict_validation": config.strict_validation,
         "evidence_level": config.evidence_level,
         "evaluator_sha256": evaluator_digest(),
-        "sanitizer_tools": config.sanitizer_tools,
-        "sanitizer_command": config.sanitizer_command,
-        "sanitizer_timeout": config.sanitizer_timeout,
-        "determinism_checks": config.determinism_checks,
-        "state_validation": config.state_validation,
-        "numerical_validation": config.numerical_validation,
-        "oracle_memory_mb": config.oracle_memory_mb,
-        "determinism_repeats": config.determinism_repeats,
+        **diagnostic_options(config),
         "isolation": options(config),
     }
 
@@ -54,6 +47,10 @@ def settings(config, hidden=False):
 def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
     path = select_problems(config.level, problem_ids=[pid])[pid]
     options = settings(config, hidden)
+    from .reference_revisions import binding
+
+    if revision := binding(config.level, pid, path.read_text()):
+        options["reference_revision"] = revision
     if config.numerical_validation:
         from .operator_specs import spec_for
 

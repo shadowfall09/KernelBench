@@ -95,6 +95,16 @@ def verdicts(document, cases, payload):
                 or {leaf["path"].removesuffix(".complex") for leaf in gate["leaves"]} != floating_paths):
             return missing("Numerical and signal leaves have inconsistent output coverage")
         for leaf in gate["leaves"]:
+            if leaf.get("kind") == "empty_tensor":
+                if (leaf.get("elements") != 0 or not isinstance(leaf.get("shape"), list)
+                        or any(type(size) is not int or size < 0 for size in leaf["shape"])
+                        or math.prod(leaf["shape"]) != 0 or not isinstance(leaf.get("dtype"), str)
+                        or leaf.get("oracle_rms") is not None or leaf.get("norm_limit") is not None):
+                    return missing("Empty numerical leaf has no matching shape and null measurement contract")
+                for kind in ("reference", "candidate"):
+                    if leaf.get(kind) != {"passed": True, "rms_error": None, "max_abs_error": None, "elements_failed": 0}:
+                        return missing("Empty output cannot invent numerical error measurements")
+                continue
             if (not isinstance(leaf, dict) or type(leaf.get("elements")) is not int or leaf["elements"] <= 0
                     or type(leaf.get("oracle_rms")) not in (int, float) or not math.isfinite(leaf["oracle_rms"])
                     or leaf["oracle_rms"] < 0

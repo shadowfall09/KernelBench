@@ -83,7 +83,7 @@ def test_wrong_arithmetic_and_bfloat16_compute_fail_full_input_fp32_contract():
     assert document["cases"][0]["precision_gate"]["reference_qualified"]
 
 
-def test_original_exclusive_scan_defect_fails_reference_qualification():
+def test_repaired_exclusive_scan_passes_reference_qualification():
     request = payload(92)
     Model, _, _ = load_original_model_and_inputs(request["ref_arch_src"], {})
     model = Model(1)
@@ -91,9 +91,9 @@ def test_original_exclusive_scan_defect_fails_reference_qualification():
         collector.observe(model, copy.deepcopy(model), [torch.randn(3, 7)], seed=42, device="cpu", tolerance=1e-3,
                           set_seed=torch.manual_seed, label="exclusive")
     document = collector.document()
-    assert document["known_reference_issue"]
-    assert document["cases"][0]["precision_gate"]["reference_qualified"] is False
-    assert numerical_audit.verdicts(document, [{"label": "exclusive", "seed": 42}], request)["precision_contract"]["status"] == "failed"
+    assert document["known_reference_issue"] is None
+    assert document["cases"][0]["precision_gate"]["reference_qualified"] is True
+    assert numerical_audit.verdicts(document, [{"label": "exclusive", "seed": 42}], request)["precision_contract"]["status"] == "passed"
 
 
 def test_full_size_memory_admission_never_executes_or_silently_resizes(monkeypatch):
@@ -255,3 +255,35 @@ def test_harbor_exports_the_oracle_manifest_and_current_policy(tmp_path):
     exported = read_json(directory / "tests/config.json")["config"]
     assert exported["numerical_validation"] is True and exported["oracle_memory_mb"] == 32
     assert (directory / "tests/repo/kb_workflows/operator_oracles.json").is_file()
+
+
+def test_empty_tensor_errors_remain_null_and_do_not_replace_reference_signal():
+    request = payload()
+    Model, _, _ = load_original_model_and_inputs(request["ref_arch_src"], {})
+    model = Model()
+    with numerical_audit.audit(request) as collector:
+        for label, args in (("empty", [torch.empty(3, 0), torch.empty(0, 5)]),
+                            ("informative", [torch.ones(3, 7), torch.ones(7, 5)])):
+            collector.observe(model, copy.deepcopy(model), args, seed=42, device="cpu", tolerance=1e-3,
+                              set_seed=torch.manual_seed, label=label)
+    document = collector.document()
+    leaf = document["cases"][0]["precision_gate"]["leaves"][0]
+    # This matmul has a nonempty all-zero result, unlike a zero output dimension.
+    assert leaf["elements"] == 15
+    request = payload(92)
+    Model, _, _ = load_original_model_and_inputs(request["ref_arch_src"], {})
+    model = Model(1)
+    with numerical_audit.audit(request) as collector:
+        for label, args in (("empty", [torch.empty(3, 0)]), ("informative", [torch.ones(3, 7)])):
+            collector.observe(model, copy.deepcopy(model), args, seed=42, device="cpu", tolerance=1e-3,
+                              set_seed=torch.manual_seed, label=label)
+    document = collector.document()
+    cases = [{"label": "empty", "seed": 42}, {"label": "informative", "seed": 42}]
+    leaf = document["cases"][0]["precision_gate"]["leaves"][0]
+    assert leaf["kind"] == "empty_tensor" and leaf["elements"] == 0
+    assert leaf["oracle_rms"] is None and leaf["reference"]["rms_error"] is None
+    assert all(row["status"] == "passed" for row in numerical_audit.verdicts(document, cases, request).values())
+    assert document["cases"][0]["reference_signal"]["informative"] is False
+    changed = copy.deepcopy(document)
+    changed["cases"][0]["precision_gate"]["leaves"][0]["reference"]["rms_error"] = 0
+    assert numerical_audit.verdicts(changed, cases, request)["precision_contract"]["status"] == "not_measured"

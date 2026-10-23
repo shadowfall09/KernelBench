@@ -1306,9 +1306,11 @@
         "kb_workflows/operator_oracles.json",
         "kb_workflows/numerical_audit.py",
         "tests/test_operator_oracles.py",
-        "docs/NUMERICAL_VALIDATION.md"
+        "docs/NUMERICAL_VALIDATION.md",
+        "kb_workflows/reference_revisions.json",
+        "tests/test_reference_revisions.py"
       ],
-      "reason": "保留17题附加契约，新增原L1全部100题的独立CPU FP64算式与实际原生输入复核，参考/候选同门自资格；检出92题轴裁剪缺陷及BF16抵消反例；L2/L3独立适配、全题校准与参考问题的有版本修正仍需完成"
+      "reason": "保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成"
     },
     {
       "id": "R-05",
@@ -1334,9 +1336,12 @@
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
-        "kb_workflows/production.py"
+        "kb_workflows/production.py",
+        "kb_workflows/scan_cases.py",
+        "kb_workflows/reference_revisions.json",
+        "tests/test_scan_cases.py"
       ],
-      "reason": "已覆盖17道旧题附加形状及新41题合法输入/奇数尺寸/stride/分页与mask边界/近常量族；旧250题的全覆盖与特殊值适配仍需实现；新增显式尺寸覆盖与内容指纹，超显存不静默缩小，私有隐藏实例独立"
+      "reason": "覆盖17道旧题附加形状及新41题角色/边界实例；扫描89–93保留原分布并追加奇数、stride、rank-3、singleton、空轴与bool mask案例，cumprod保留有效信号；旧250题其余算子输入族与特殊值适配继续实现"
     },
     {
       "id": "R-07",
@@ -2808,6 +2813,125 @@
         "tests/test_numerical_audit.py"
       ],
       "reason": "核对逐原生实例、冻结规格/误差/内存政策、RMS限值、元素计数和信号叶子；源码漂移/缺项/模拟不能获得设备资格，配置贯穿Harbor及评分恢复"
+    },
+    {
+      "id": "V25-01",
+      "title": "Exclusive scan参考有版本修正",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "KernelBench/level1/92_cumsum_exclusive.py",
+        "kb_workflows/operator_oracles.py",
+        "tests/test_reference_revisions.py"
+      ],
+      "reason": "沿声明轴补零/累加/裁剪，保留负轴、singleton与空轴shape；独立移位公式和旧错误反例同时核对，不改变名义计时尺寸"
+    },
+    {
+      "id": "V25-02",
+      "title": "扫描输入族与原分布保留",
+      "primary": "M2",
+      "secondary": [
+        "M1"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/scan_cases.py",
+        "hidden_tests/level1/89_hidden.py",
+        "hidden_tests/level1/90_hidden.py",
+        "hidden_tests/level1/91_hidden.py",
+        "hidden_tests/level1/92_hidden.py",
+        "hidden_tests/level1/93_hidden.py",
+        "tests/test_scan_cases.py"
+      ],
+      "reason": "五题追加奇数/非连续/rank-3/单元素/空轴，保留原3或4分布；乘积保持信号、mask保持bool，生成器不丢新增入口"
+    },
+    {
+      "id": "V25-03",
+      "title": "任务修订与共享依赖绑定",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/reference_revisions.py",
+        "kb_workflows/reference_revisions.json",
+        "tests/test_reference_revisions.py"
+      ],
+      "reason": "记录参考/隐藏前后哈希、连续版本链和共享生成器；worker/队列执行前核对，新结果记录修订，评分恢复拒绝无当前修订的正结果"
+    },
+    {
+      "id": "V25-04",
+      "title": "选集运行快照升级与历史档案",
+      "primary": "M5",
+      "secondary": [
+        "M1",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/suites.py",
+        "kb_workflows/suites/kernelbench105.json",
+        "tests/test_reference_revisions.py"
+      ],
+      "reason": "KernelBench-105清单v2保留250题身份/105主选/5探针/140扩展及seed，显式基底加修订；原研究CSV不重写为新结果"
+    },
+    {
+      "id": "V25-05",
+      "title": "空输出数值契约",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/numerical.py",
+        "kb_workflows/numerical_audit.py",
+        "tests/test_numerical_audit.py"
+      ],
+      "reason": "合法空Tensor按结构/dtype检查，RMS及误差保留null，不编造测得零误差；空输出不能单独提供参考信号"
+    },
+    {
+      "id": "V25-06",
+      "title": "诊断设置贯穿冻结与比较",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/tool_checks.py",
+        "kb_workflows/experiment.py",
+        "kb_workflows/final_verification.py",
+        "kb_workflows/study_data.py",
+        "tests/test_reference_revisions.py"
+      ],
+      "reason": "统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告"
+    },
+    {
+      "id": "V25-07",
+      "title": "修订任务跨入口回归",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "tests/test_reference_revisions.py",
+        "tests/test_scan_cases.py",
+        "scripts/generate_hidden_inputs.py",
+        "docs/REFERENCE_REVISIONS.md"
+      ],
+      "reason": "CPU核对轴/空边界/精度提升、实际隐藏入口、队列与全部dispatch阶段、Harbor私有文件及旧证据拒绝，不运行设备实验"
     }
   ]
 }

@@ -73,8 +73,8 @@ def estimate_bytes(pid, model, inputs):
     elif pid == 97:
         shape = (*x.shape[:-1], inputs[2].shape[-1])
         padded += math.prod((*x.shape[:-1], inputs[1].shape[-2])) * 8 * 8
-    if any(size <= 0 for size in shape):
-        raise ValueError("Independent oracle has an empty or illegal output shape")
+    if any(size < 0 for size in shape):
+        raise ValueError("Independent oracle has an illegal output shape")
     inputs_bytes = sum(value.numel() * max(8, value.element_size()) for value in inputs if isinstance(value, torch.Tensor))
     state_bytes = sum(value.numel() * max(8, value.element_size()) for value in [*model.parameters(), *model.buffers()])
     return max(1, 4 * inputs_bytes + 4 * state_bytes + 32 * math.prod(shape) * 8 + 4 * padded)
@@ -301,8 +301,16 @@ def execute(pid, model, inputs):
         if pid == 91:
             return x.flip((dim,)).cumsum(dim).flip((dim,))
         if pid == 92:
-            # Exclusive means shift on dim, not the source's unconditional axis-0 slice.
-            return torch.cat((torch.zeros_like(x.narrow(dim, 0, 1)), x.narrow(dim, 0, x.shape[dim] - 1)), dim).cumsum(dim)
+            # Shift an inclusive FP64 sum, independently of the reference's
+            # prefix-and-trim implementation. Empty scan axes stay empty.
+            total = x.cumsum(dim)
+            result = torch.empty_like(total)
+            size = x.shape[dim]
+            if size:
+                result.select(dim, 0).zero_()
+                if size > 1:
+                    result.narrow(dim, 1, size - 1).copy_(total.narrow(dim, 0, size - 1))
+            return result
         return (x * args[1] if pid == 93 else x).cumsum(dim)
     if pid in {94, 96}:
         delta = (x - args[1]).abs()

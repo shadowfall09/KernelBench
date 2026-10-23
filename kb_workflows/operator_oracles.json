@@ -623,35 +623,44 @@
       "reference_sha256": "2fb0fb197070475cba3a73b0a151e722663d690c25971305b2b62af1088f37de",
       "family": "scan",
       "known_reference_issue": null,
-      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis.",
+      "reference_revision": "l1-89-scan-hidden-cases-v2"
     },
     "1/90": {
       "name": "cumprod",
       "reference_sha256": "029c4a283aae03fa1b8b39f06190d0a89e2c553253b4c91e0d29043526b5c9ff",
       "family": "scan",
       "known_reference_issue": null,
-      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis.",
+      "reference_revision": "l1-90-scan-hidden-cases-v2"
     },
     "1/91": {
       "name": "cumsum_reverse",
       "reference_sha256": "e9d0f300c234f1abbab58930c10a32b4e718c0ecefe26a83195c2145fbe74af0",
       "family": "scan",
       "known_reference_issue": null,
-      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis.",
+      "reference_revision": "l1-91-scan-hidden-cases-v2"
     },
     "1/92": {
       "name": "cumsum_exclusive",
-      "reference_sha256": "ef79ef0e6387a1b04cde4c3815f4bda5464e79263dcadfeda0e648ec82759260",
+      "reference_sha256": "a28412433ca97d2afad29401e70fa6b4c61716c20a251180d810658669e41e52",
       "family": "scan",
-      "known_reference_issue": "exclusive cumsum concatenates on dim but slices axis 0; the independent oracle retains the input shape",
-      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis.",
+      "reference_revision": "l1-92-exclusive-scan-axis-v2",
+      "resolved_reference_issue": {
+        "previous_sha256": "ef79ef0e6387a1b04cde4c3815f4bda5464e79263dcadfeda0e648ec82759260",
+        "reason": "Exclusive scan must retain input shape and shift along the declared axis, including negative axes and empty scans. The legacy dim=1 implementation sliced axis 0."
+      }
     },
     "1/93": {
       "name": "masked_cumsum",
       "reference_sha256": "65a573b890e9d6a63c44073eb641d560387e7d8771b36b93813615e05a90087e",
       "family": "scan",
       "known_reference_issue": null,
-      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis.",
+      "reference_revision": "l1-93-scan-hidden-cases-v2"
     },
     "1/94": {
       "name": "MSELoss",

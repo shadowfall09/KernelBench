@@ -14,6 +14,13 @@ PROTOCOL = "kernelbench_pro_tool_checks_v1"
 TOOLS = ("memcheck", "racecheck", "synccheck", "initcheck")
 ERROR_EXIT = 86
 MAX_LOG_BYTES = 16 * 1024**2
+DIAGNOSTIC_FIELDS = ("sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats",
+                     "state_validation", "numerical_validation", "oracle_memory_mb")
+
+
+def diagnostic_options(config):
+    """One policy surface for payloads, frozen repeats, studies and comparisons."""
+    return {name: getattr(config, name) for name in DIAGNOSTIC_FIELDS}
 
 
 def select_tools(value):
@@ -259,8 +266,9 @@ def reusable(result, payload):
     if result.get("metadata", {}).get("workflow_signature") != fingerprint(payload):
         return False
     from .isolation import issue as isolation_issue
+    from .reference_revisions import issue as revision_issue
 
-    if isolation_issue(result, payload):
+    if isolation_issue(result, payload) or revision_issue(result, payload):
         return False
     if not enabled(payload) or (not result.get("metadata", {}).get("tool_checks") and result.get("correctness") is not True):
         return True
@@ -272,6 +280,10 @@ def reusable(result, payload):
 
 
 def issue(result, payload):
+    from .reference_revisions import issue as revision_issue
+
+    if reason := revision_issue(result, payload):
+        return reason
     if not enabled(payload):
         return None
     if result.get("compiled") is not True or (result.get("correctness") is not True and not result.get("metadata", {}).get("tool_checks")):

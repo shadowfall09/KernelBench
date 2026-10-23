@@ -135,6 +135,8 @@ def validate_payload(payload):
     for key in ("request_id", "ref_arch_src", "eval_config", "level", "problem_id"):
         if key not in payload:
             raise ValueError(f"Missing {key}")
+    if not isinstance(payload["eval_config"], dict) or not isinstance(payload["ref_arch_src"], str):
+        raise ValueError("eval_config must be a dictionary and ref_arch_src a string")
     if not isinstance(payload["request_id"], str) or not payload["request_id"]:
         raise ValueError("request_id must be a nonempty string")
     if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing", "qualify_small", "origin_audit"}:
@@ -143,6 +145,9 @@ def validate_payload(payload):
         raise ValueError("kernel_src must be provided")
     if payload["eval_config"].get("timeout", 0) <= 0:
         raise ValueError("Evaluation timeout must be positive")
+    from .reference_revisions import validate_payload as validate_revision
+
+    validate_revision(payload)
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):

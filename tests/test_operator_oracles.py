@@ -115,13 +115,8 @@ def test_all_original_l1_operators_have_frozen_independent_cpu_formulas(pid):
         truth = operator_oracles.execute(pid, model, args)
         expected = model(*copy.deepcopy(args))
         result = precision_gate(expected, expected.clone() if isinstance(expected, torch.Tensor) else copy.deepcopy(expected), truth, POLICY)
-    if pid == 92:
-        assert not result["passed"] and not result["reference_qualified"]
-        assert expected.shape != truth.shape
-        assert spec["known_reference_issue"]
-    else:
-        assert result["passed"], (pid, result)
-        assert result["reference_qualified"]
+    assert result["passed"], (pid, result)
+    assert result["reference_qualified"]
     assert operator_oracles.estimate_bytes(pid, model, args) > 0
 
 

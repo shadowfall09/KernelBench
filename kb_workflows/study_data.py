@@ -24,6 +24,7 @@ def study_digest():
 
 def evaluation_contract(config):
     from .isolation import options
+    from .tool_checks import diagnostic_options
 
     fields = ("hardware", "gpu_arch", "device_backend", "precision", "fp32_tolerance", "baseline", "baseline_suite", "baseline_portfolio",
               "hidden_tests", "num_correct_trials", "num_perf_trials", "strict_validation", "evidence_level",
@@ -31,6 +32,7 @@ def evaluation_contract(config):
               "task_track", "task_profile", "task_memory_mb", "num_samples", "evaluation", "timeout",
               "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")
     result = {key: getattr(config, key) for key in fields}
+    result.update(diagnostic_options(config))
     result["verifier_isolation"] = options(config)
     result["evaluator_sha256"] = evaluator_digest()
     path = ROOT / "results/timing" / config.hardware / f"{config.baseline}.json"

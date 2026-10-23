@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
 from .production import task_input_policy
+from .reference_revisions import record_result
 
 
 def configure_tf32(torch, enabled):
@@ -30,6 +31,9 @@ def validate_sources(payload):
     reference = problem_paths(payload["level"])[payload["problem_id"]].read_text()
     if reference != payload["ref_arch_src"]:
         raise ValueError("Client and verifier reference sources differ; use the same repository checkout")
+    from .reference_revisions import validate_payload
+
+    validate_payload(payload)
     return reference
 
 
@@ -278,6 +282,7 @@ def qualify_small(payload):
     return result
 
 
+@record_result
 def dispatch(payload):
     if payload.get("task") == "origin_audit":
         from .origin_task import audit
