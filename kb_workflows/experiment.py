@@ -42,6 +42,7 @@ def protocol(config):
         "development_feedback": "none" if config.generation_mode == "one-shot" else ("external" if external else "standard_only"),
         "profiling": config.agent_profile if not external and config.generation_mode == "feedback" else False,
         "diagnostic_contract": diagnostic_options(config),
+        "input_calibration_sha256": fingerprint(read_json(Path(config.input_calibration))) if config.input_calibration else None,
         "determinism_policy_sha256": fingerprint(read_json(Path(config.determinism_policy_file))) if config.determinism_policy_file else None,
         "held_out_feedback": False if not external else None,
         "selection": "single_candidate" if config.generation_mode == "one-shot" else ("external" if external else "best_correct_development_mean"),
@@ -112,7 +113,7 @@ def compare_runs(directories):
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
         contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))
-                        for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)})
+                        for option in ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)})
         contract.update(task_profile=config.task_profile, task_memory_mb=config.task_memory_mb)
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})

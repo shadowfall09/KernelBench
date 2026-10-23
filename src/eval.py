@@ -187,6 +187,9 @@ def load_original_model_and_inputs(
     get_init_inputs_fn = context.get("get_init_inputs")
     get_inputs_fn = context.get("get_inputs")
     Model = context.get("Model")
+    from kb_workflows.input_profiles import wrap_factory
+
+    get_inputs_fn = wrap_factory(model_original_src, get_inputs_fn)
     return (Model, get_init_inputs_fn, get_inputs_fn)
 
 
@@ -762,8 +765,11 @@ def eval_kernel_against_ref(
                     return [_process_input_tensor(x, device, precision) for x in get_inputs()]
 
                 def verifier(fresh, actual):
+                    from kb_workflows.input_calibration import verify_output
+
                     expected = clone_tensors(original_model(*fresh))
                     synchronize(device)
+                    verify_output(original_model, fresh, expected, actual)
                     issue = compare_outputs(expected, actual, get_tolerance_for_precision(precision))
                     if issue:
                         raise RuntimeError(f"Timed output did not match varied input: {issue}")

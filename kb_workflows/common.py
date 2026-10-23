@@ -100,6 +100,8 @@ def evaluator_digest():
         "kb_workflows/operator_specs.py", "kb_workflows/operator_oracles.json",
         "kb_workflows/reference_revisions.py", "kb_workflows/reference_revisions.json",
         "kb_workflows/scan_cases.py",
+        "kb_workflows/input_profiles.py", "kb_workflows/input_calibration.py", "kb_workflows/input_calibration_task.py",
+        "scripts/calibrate_inputs.py",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
         "kb_workflows/submission_source.py", "kb_workflows/kernel_origin.py", "kb_workflows/cuda_origin.py",
         "kb_workflows/origin_binaries.py", "kb_workflows/origin_graphs.py",

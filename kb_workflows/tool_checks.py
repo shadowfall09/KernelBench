@@ -265,10 +265,11 @@ def reusable(result, payload):
     """A matching negative outcome can resume; a missing/changed receipt cannot."""
     if result.get("metadata", {}).get("workflow_signature") != fingerprint(payload):
         return False
+    from .input_calibration import issue as input_issue
     from .isolation import issue as isolation_issue
     from .reference_revisions import issue as revision_issue
 
-    if isolation_issue(result, payload) or revision_issue(result, payload):
+    if isolation_issue(result, payload) or revision_issue(result, payload) or input_issue(result, payload):
         return False
     if not enabled(payload) or (not result.get("metadata", {}).get("tool_checks") and result.get("correctness") is not True):
         return True
@@ -280,8 +281,11 @@ def reusable(result, payload):
 
 
 def issue(result, payload):
+    from .input_calibration import issue as input_issue
     from .reference_revisions import issue as revision_issue
 
+    if reason := input_issue(result, payload):
+        return reason
     if reason := revision_issue(result, payload):
         return reason
     if not enabled(payload):

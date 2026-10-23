@@ -22,7 +22,10 @@ def _spec(payload):
     if settings.get("oracle_spec_sha256") != fingerprint(spec):
         raise ValueError("Independent oracle specification is missing or changed")
     precision = {"fp32": "float32", "fp16": "float16", "bf16": "bfloat16"}[settings["precision"]]
-    return spec, spec["precision"][precision]
+    from .input_calibration import validate_inline
+
+    profile = validate_inline(payload)
+    return spec, profile["precision_contract"] if profile is not None else spec["precision"][precision]
 
 
 def _signal_valid(signal, absolute_tolerance):

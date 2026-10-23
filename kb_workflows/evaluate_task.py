@@ -11,6 +11,7 @@ from contextlib import ExitStack, nullcontext
 from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
+from .input_calibration import task_policy as nominal_input_policy
 from .production import task_input_policy
 from .reference_revisions import record_result
 
@@ -169,7 +170,7 @@ def baseline(payload: dict):
     settings = payload["eval_config"]
     os.environ["KB_FP32_TOL"] = str(settings["fp32_tolerance"])
     variant = settings.get("baseline_variant", "eager")
-    tf32 = settings["precision"] == "fp32" and not settings.get("baseline_suite", False)
+    tf32 = settings["precision"] == "fp32" and not settings.get("baseline_suite", False) and not settings.get("input_profile")
     configure_tf32(torch, tf32)
     device = torch.device("cuda:0")
     dtype = get_torch_dtype_from_string(settings["precision"])
@@ -202,6 +203,9 @@ def baseline(payload: dict):
         actual = model(*fresh)
         synchronize(device)
         first_forward_ms = (CLOCK() - started) * 1000
+        from .input_calibration import verify_output
+
+        verify_output(oracle, args, expected, actual)
         issue = compare_outputs(expected, actual, get_tolerance_for_precision(dtype))
         del expected, actual, fresh
         if issue:
@@ -217,6 +221,7 @@ def baseline(payload: dict):
         def verifier(fresh, output):
             expected = clone_tensors(oracle(*fresh))
             synchronize(device)
+            verify_output(oracle, fresh, expected, output)
             issue = compare_outputs(expected, output, get_tolerance_for_precision(dtype))
             if issue:
                 raise RuntimeError(f"Baseline varied-input correctness failed: {issue}")
@@ -283,7 +288,12 @@ def qualify_small(payload):
 
 
 @record_result
+@nominal_input_policy
 def dispatch(payload):
+    if payload.get("task") == "calibrate_inputs":
+        from .input_calibration_task import calibrate
+
+        return calibrate(payload)
     if payload.get("task") == "origin_audit":
         from .origin_task import audit
 

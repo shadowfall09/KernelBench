@@ -38,7 +38,7 @@ def evaluation_contract(config):
     path = ROOT / "results/timing" / config.hardware / f"{config.baseline}.json"
     result["baseline_dataset_sha256"] = fingerprint(read_json(path, {}))
     result["external_files"] = {key: fingerprint(read_json(Path(getattr(config, key)), {}))
-                                for key in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, key)}
+                                for key in ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, key)}
     return result
 
 

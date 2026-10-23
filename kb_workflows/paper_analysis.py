@@ -201,9 +201,10 @@ def analyze_paper(config):
             if status == "verified":
                 status = compatible(baseline, raw, digest) or status
             if status == "verified":
+                from .input_calibration import baseline_issue as calibrated_baseline_issue
                 from .isolation import baseline_issue
 
-                status = baseline_issue(config, baseline, pid) or status
+                status = baseline_issue(config, baseline, pid) or calibrated_baseline_issue(config, baseline, pid) or status
             if status == "verified":
                 expected_baseline = fingerprint(task_payload(config, pid, task="baseline"))
                 if baseline.get("metadata", {}).get("workflow_signature") != expected_baseline:

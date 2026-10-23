@@ -14,7 +14,7 @@ from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_nam
 from .config import RunConfig
 
 PROTOCOL = "kernelbench_pro_artifact_regrade_v1"
-EXTERNAL = ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file")
+EXTERNAL = ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file")
 HISTORY = ("run_config.json", "paper_analysis.json", "generation_budget.json", "generation_attempts.json", "generation_summary.json",
            "eval_results.json", "eval_results_hidden.json", "final_manifest.json", "regrade_manifest.json", "baseline_snapshot.json")
 MAX_SOURCE_BYTES = 8 * 1024**2

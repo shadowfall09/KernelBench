@@ -27,6 +27,8 @@ def _options(config):
         "sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats")}
     options["isolation"] = isolation_options(config)
     options.update(diagnostic_options(config))
+    if config.input_calibration:
+        options["input_calibration_sha256"] = fingerprint(read_json(Path(config.input_calibration)))
     if config.task_dimensions:
         options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})
     if config.determinism_policy_file:

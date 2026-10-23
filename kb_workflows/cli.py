@@ -24,6 +24,12 @@ def main(argv=None):
             if config.stage != "analyze":
                 raise ValueError("Use scripts.regrade_artifacts native-run for artifact verification; batch supports its analysis only")
         selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+        calibrated_inputs = None
+        if config.input_calibration:
+            from .input_calibration import record_for
+
+            calibrated_inputs = {pid: record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())["selected_recipe"]
+                                 for pid, path in selected.items()}
         strict_coverage = None
         if config.strict_validation:
             from .contract_specs import coverage
@@ -50,6 +56,7 @@ def main(argv=None):
                         "problems": list(selected),
                         "suite": selection_receipt(config),
                         "strict_coverage": strict_coverage,
+                        **({"calibrated_inputs": calibrated_inputs} if calibrated_inputs is not None else {}),
                         **({"numerical_coverage": numerical_coverage} if numerical_coverage is not None else {}),
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],
                         "run_dir": str(config.run_dir),

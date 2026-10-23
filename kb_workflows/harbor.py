@@ -137,6 +137,11 @@ def write_task(directory, config, pid, sid=0, device=None):
         selected_spec = document.get(f"level{config.level}", {}).get(str(pid), {})
         atomic_json(tests / "problem_specs.json", {f"level{config.level}": {str(pid): selected_spec}})
         child.problem_specs = "/tests/problem_specs.json"
+    if config.input_calibration:
+        from .input_calibration import subset
+
+        atomic_json(tests / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source))
+        child.input_calibration = "/tests/input_calibration.json"
     if config.device_calibration:
         shutil.copy2(config.device_calibration, tests / "device_calibration.json")
         child.device_calibration = "/tests/device_calibration.json"
@@ -168,13 +173,21 @@ exec python -m kb_workflows.harbor_verifier --manifest /tests/config.json \\
     (solution / "reference.py").write_text(source + "\nModelNew = Model\n")
     (solution / "solve.sh").write_text("#!/bin/bash\nset -euo pipefail\ncp /solution/reference.py /app/solution.py\n")
     (solution / "solve.sh").chmod(0o755)
+    calibrated_instruction = ""
+    if config.input_calibration:
+        from .input_calibration import record_for
+
+        row = record_for(config.input_calibration, config.level, pid, config.precision, source)
+        calibrated_instruction = (f"Nominal value distribution: {row['selected_recipe']}; frozen FP64 error policy: "
+                                  f"{row['precision_contract']}. Shapes and discrete roles are unchanged. "
+                                  "Both reference and candidate must qualify; hidden distributions remain separate.\n")
     (directory / "instruction.md").write_text(f"""# KernelBench Pro: level {config.level}, problem {pid}
 
 Implement ModelNew in /app/solution.py using custom GPU kernels.
 Read /app/model.py for the reference interface and preserve its algorithm,
 parameters, output structure, shape and dtype. The precision is {config.precision}.
 Target GPU: {config.hardware or config.gpu}; architecture: {config.gpu_arch}.
-Use a single self-contained Python file; inline CUDA and Triton are supported.
+{calibrated_instruction}Use a single self-contained Python file; inline CUDA and Triton are supported.
 Do not modify model.py. Test your implementation with your own inputs.
 The final verifier runs standard and multi-seed hidden correctness checks,
 measures synchronized wall time and compares against PyTorch baselines.

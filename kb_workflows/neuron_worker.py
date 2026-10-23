@@ -177,8 +177,12 @@ def _evaluate(payload, *, adapter=None):
 
         return map_tensors(value, transfer)
 
+    from .input_profiles import wrap_factory
+
+    nominal_factory = wrap_factory(source, reference["get_inputs"])
+
     def inputs():
-        values = reference["get_inputs"]()
+        values = nominal_factory()
         if instance is None:
             values = map_tensors(values, lambda tensor: tensor.to(dtype=dtype) if tensor.is_floating_point() else tensor)
         return values
@@ -232,6 +236,9 @@ def _evaluate(payload, *, adapter=None):
             if expected is None:
                 expected = host(copy.deepcopy(cpu)(*clone_tensors(cpu_args))) if contract else host(ref(*move(cpu_args)))
             actual = host(actual)
+            from .input_calibration import verify_output
+
+            verify_output(ref, cpu_args, expected, actual)
             if issue := compare_outputs(expected, actual, settings["fp32_tolerance"]):
                 raise ValueError(f"Neuron output mismatch: {issue}")
             if contract:
@@ -330,7 +337,7 @@ def _evaluate(payload, *, adapter=None):
                 control = prepare_variant(copy.deepcopy(ref), winner, level=payload["level"], pid=payload["problem_id"])
                 paired = collect_pairs(baseline, model, control, factory, ref, device=device,
                     trials=settings["paired_trials"], seed=settings.get("evaluation_seed", 42), set_seed=seed,
-                    tolerance=settings["fp32_tolerance"], verifier=verify if contract else None)
+                    tolerance=settings["fp32_tolerance"], verifier=verify if contract or settings.get("input_profile") else None)
                 metadata["paired_timing"] = {**paired, "baseline_variant": winner,
                     "output_consumed": True, "varied_inputs": True, "all_outputs_verified": True}
                 return {"compiled": True, "correctness": True, "runtime": paired["candidate_mean_ms"], "metadata": metadata}

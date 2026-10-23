@@ -100,7 +100,7 @@ def evaluate_paired(payload):
     if settings.get("use_hidden_tests"):
         raise ValueError("Paired timing uses the public performance workload, never hidden feedback")
     source = validate_sources(payload)
-    configure_tf32(torch, settings["precision"] == "fp32" and not settings.get("baseline_suite", True))
+    configure_tf32(torch, settings["precision"] == "fp32" and not settings.get("baseline_suite", True) and not settings.get("input_profile"))
     dtype, device = get_torch_dtype_from_string(settings["precision"]), torch.device("cuda:0")
     seed = settings.get("evaluation_seed", 42)
     variant = settings.get("paired_baseline_variant", "eager")
@@ -143,9 +143,18 @@ def evaluate_paired(payload):
     def reset(name):
         models[name].load_state_dict(snapshots[name])
 
+    def verify(args, output):
+        from .input_calibration import verify_output
+
+        # Reset oracle state before every output's untimed reference check.
+        reset("oracle")
+        expected = clone_tensors(models["oracle"](*clone_tensors(args)))
+        verify_output(models["oracle"], args, expected, output)
+
     result = collect_pairs(functions["R"], models["C"], functions["B"], factory, models["oracle"],
                            device=device, trials=settings.get("paired_trials", 30), seed=seed,
-                           reset=reset, set_seed=set_seed, tolerance=get_tolerance_for_precision(dtype))
+                           reset=reset, set_seed=set_seed, tolerance=get_tolerance_for_precision(dtype),
+                           verifier=verify if settings.get("input_profile") else None)
     result.update(baseline_variant=variant, input_signature=input_signature(nominal), output_consumed=True,
                   varied_inputs=True, all_outputs_verified=True)
     return {"compiled": True, "correctness": True, "runtime": result["candidate_mean_ms"],

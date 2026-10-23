@@ -1323,9 +1323,13 @@
         "kb_workflows/strict_validation.py",
         "kb_workflows/numerical.py",
         "kb_workflows/numerical_audit.py",
-        "tests/test_numerical_audit.py"
+        "tests/test_numerical_audit.py",
+        "kb_workflows/input_calibration.py",
+        "kb_workflows/input_profiles.py",
+        "scripts/calibrate_inputs.py",
+        "docs/INPUT_CALIBRATION.md"
       ],
-      "reason": "已实现附加实例及L1实际原生输入的逐叶信号诊断/收据重算，至少一例须有信息量；原计时输入不变，逐题自动校准、合法输入修复与相应新基线仍需完成"
+      "reason": "已实现实际输入信号审计及原L1的参考专用名义值分布选择、固定强数值预算、逐输出FP64检查与新基线/恢复契约；隐藏分布保留。L2/L3全题适配与逐设备阈值校准仍缺；按用户要求不跑设备/模型实验"
     },
     {
       "id": "R-06",
@@ -2932,6 +2936,105 @@
         "docs/REFERENCE_REVISIONS.md"
       ],
       "reason": "CPU核对轴/空边界/精度提升、实际隐藏入口、队列与全部dispatch阶段、Harbor私有文件及旧证据拒绝，不运行设备实验"
+    },
+    {
+      "id": "V26-01",
+      "title": "参考专用输入配方选择",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_calibration_task.py",
+        "kb_workflows/input_calibration.py"
+      ],
+      "reason": "按固定顺序与三个种子检查参考FP64资格、信号和探针变化，保留失败尝试，不加载候选或采集速度"
+    },
+    {
+      "id": "V26-02",
+      "title": "L1角色保持的值分布",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_profiles.py",
+        "tests/test_input_calibration.py"
+      ],
+      "reason": "100题适配保留shape/stride/离散角色；乘积随机有界前缀、概率与三角结构受约束，隐藏工厂不套用名义配方"
+    },
+    {
+      "id": "V26-03",
+      "title": "冻结强数值政策与逐输出复核",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_calibration.py",
+        "kb_workflows/evaluate_task.py",
+        "kb_workflows/paired_task.py",
+        "src/eval.py"
+      ],
+      "reason": "绝对误差项收紧为零且不放宽原预算，参考和候选均须通过独立FP64；首基线、warmup及每个计时输出在计时外核对"
+    },
+    {
+      "id": "V26-04",
+      "title": "新基线与恢复证据",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py",
+        "kb_workflows/paper_analysis.py",
+        "kb_workflows/input_calibration.py"
+      ],
+      "reason": "输入记录进入基线指纹，缺当前配方、执行设备、工厂调用或逐输出检查数不能恢复/评分，旧分布基线须重测"
+    },
+    {
+      "id": "V26-05",
+      "title": "多设备分布复用与实测身份",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_calibration.py",
+        "kb_workflows/neuron_worker.py",
+        "tests/test_input_calibration.py"
+      ],
+      "reason": "分别记录校准设备和执行设备；复用配方须在本设备再次数值资格，不借用性能或可达性证据"
+    },
+    {
+      "id": "V26-06",
+      "title": "校准文件贯穿冻结与任务桥接",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/generation.py",
+        "kb_workflows/harbor.py",
+        "kb_workflows/final_verification.py",
+        "kb_workflows/rl_plan.py",
+        "kb_workflows/study_data.py"
+      ],
+      "reason": "文件内容进入最终冻结、研究/RL及重新评分；单题子任务和Harbor私有文件保持一致，公开提示词说明分布及政策"
+    },
+    {
+      "id": "V26-07",
+      "title": "轻量校准预览与准入回归",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/calibrate_inputs.py",
+        "tests/test_input_calibration.py",
+        "docs/INPUT_CALIBRATION.md"
+      ],
+      "reason": "默认预览无SDK/输入/目录副作用，执行显式开启；内存超限在变换/公式前拒绝，CPU反例覆盖证据删改及所有计时输出"
     }
   ]
 }

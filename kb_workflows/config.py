@@ -67,6 +67,7 @@ class RunConfig:
     determinism_checks: bool = False
     state_validation: bool = False
     numerical_validation: bool = False
+    input_calibration: str = ""
     oracle_memory_mb: int = 4096
     determinism_repeats: int = 5
     determinism_policy_file: str = ""
@@ -221,6 +222,14 @@ class RunConfig:
             raise ValueError("Determinism checks require an explicit boolean and 3 to 100 repeats")
         if type(self.state_validation) is not bool:
             raise ValueError("State validation requires an explicit boolean")
+        if self.input_calibration:
+            from .input_calibration import read_bundle
+
+            if not isinstance(self.input_calibration, str) or self.level != 1:
+                raise ValueError("Input calibration currently requires a file and original level 1")
+            self.input_calibration = str(Path(self.input_calibration).expanduser().resolve())
+            read_bundle(self.input_calibration)
+            self.numerical_validation = True
         if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level != 1):
             raise ValueError("Independent numerical validation currently requires an explicit boolean and level 1")
         if type(self.oracle_memory_mb) is not int or not 1 <= self.oracle_memory_mb <= 1048576:
@@ -410,6 +419,7 @@ def parser():
     for name in (
         "score_mode",
         "device_calibration",
+        "input_calibration",
         "baseline_portfolio",
         "evidence_level",
         "suite",
@@ -495,7 +505,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value

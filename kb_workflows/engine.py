@@ -51,6 +51,10 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
 
     if revision := binding(config.level, pid, path.read_text()):
         options["reference_revision"] = revision
+    if config.input_calibration:
+        from .input_calibration import record_for
+
+        options["input_profile"] = record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())
     if config.numerical_validation:
         from .operator_specs import spec_for
 
@@ -244,6 +248,7 @@ def write_validation_summary(config, standard=None, hidden=None):
 
 
 def record_baseline(config):
+    from .input_calibration import issue as calibrated_input_issue
     from .isolation import issue as isolation_issue
 
     if not config.hardware:
@@ -259,12 +264,15 @@ def record_baseline(config):
         payload = task_payload(config, pid, task="baseline")
         signature = fingerprint(payload)
         if (config.resume and (level.get(path.name) or {}).get("metadata", {}).get("workflow_signature") == signature
-                and not isolation_issue(level[path.name], payload)):
+                and not isolation_issue(level[path.name], payload) and not calibrated_input_issue(level[path.name], payload)):
             continue
         key = f"baseline-{pid}"
         names[key] = path.name
         tasks.append((key, payload))
     for key, result in evaluate_tasks(config, tasks):
+        expected = next(payload for task_key, payload in tasks if task_key == key)
+        if reason := calibrated_input_issue(result, expected):
+            result = failure(reason)
         level[names[key]] = result
         atomic_json(target, results)
         print(f"[baseline] {names[key]}: {result.get('mean', result.get('metadata'))}", flush=True)
@@ -295,6 +303,8 @@ def analyze_run(config):
 
 def record_baseline_suite(config):
     from .baseline_variants import select_baseline, variants_for
+    from .input_calibration import baseline_issue as calibrated_baseline_issue
+    from .input_calibration import issue as calibrated_input_issue
     from .isolation import baseline_issue
 
     target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
@@ -306,7 +316,7 @@ def record_baseline_suite(config):
         signature = fingerprint(base)
         previous = level.get(path.name, {})
         if (config.resume and previous.get("suite_complete") and previous.get("metadata", {}).get("workflow_signature") == signature
-                and not baseline_issue(config, previous, pid)):
+                and not baseline_issue(config, previous, pid) and not calibrated_baseline_issue(config, previous, pid)):
             continue
         signatures[path.name] = signature
         variants[path.name] = {}
@@ -319,6 +329,9 @@ def record_baseline_suite(config):
             tasks.append((key, payload))
     for key, result in evaluate_tasks(config, tasks):
         name, variant, pid = names[key]
+        expected = next(payload for task_key, payload in tasks if task_key == key)
+        if reason := calibrated_input_issue(result, expected):
+            result = failure(reason)
         variants[name][variant] = result
         chosen = select_baseline(variants[name], config.cold_calls)
         chosen.setdefault("metadata", {})["workflow_signature"] = signatures[name]

@@ -139,15 +139,20 @@ def validate_payload(payload):
         raise ValueError("eval_config must be a dictionary and ref_arch_src a string")
     if not isinstance(payload["request_id"], str) or not payload["request_id"]:
         raise ValueError("request_id must be a nonempty string")
-    if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing", "qualify_small", "origin_audit"}:
+    if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing", "qualify_small", "origin_audit", "calibrate_inputs"}:
         raise ValueError("Unknown task")
     if payload.get("task", "evaluate") in {"evaluate", "profile", "paired_timing", "qualify_small", "origin_audit"} and not isinstance(payload.get("kernel_src"), str):
         raise ValueError("kernel_src must be provided")
+    if payload.get("task") == "calibrate_inputs" and "kernel_src" in payload:
+        raise ValueError("Reference input calibration accepts no candidate")
     if payload["eval_config"].get("timeout", 0) <= 0:
         raise ValueError("Evaluation timeout must be positive")
     from .reference_revisions import validate_payload as validate_revision
 
     validate_revision(payload)
+    from .input_calibration import validate_inline
+
+    validate_inline(payload)
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):

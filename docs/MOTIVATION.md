@@ -133,6 +133,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V25-01 Exclusive scan参考有版本修正 | 沿声明轴补零/累加/裁剪，保留负轴、singleton与空轴shape；独立移位公式和旧错误反例同时核对，不改变名义计时尺寸 | M5 | [92_cumsum_exclusive.py](../KernelBench/level1/92_cumsum_exclusive.py), [operator_oracles.py](../kb_workflows/operator_oracles.py), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
 | V25-02 扫描输入族与原分布保留 | 五题追加奇数/非连续/rank-3/单元素/空轴，保留原3或4分布；乘积保持信号、mask保持bool，生成器不丢新增入口 | M1 | [scan_cases.py](../kb_workflows/scan_cases.py), [89_hidden.py](../hidden_tests/level1/89_hidden.py), [90_hidden.py](../hidden_tests/level1/90_hidden.py), [91_hidden.py](../hidden_tests/level1/91_hidden.py), [92_hidden.py](../hidden_tests/level1/92_hidden.py), [93_hidden.py](../hidden_tests/level1/93_hidden.py), [test_scan_cases.py](../tests/test_scan_cases.py) |
 | V25-05 空输出数值契约 | 合法空Tensor按结构/dtype检查，RMS及误差保留null，不编造测得零误差；空输出不能单独提供参考信号 | — | [numerical.py](../kb_workflows/numerical.py), [numerical_audit.py](../kb_workflows/numerical_audit.py), [test_numerical_audit.py](../tests/test_numerical_audit.py) |
+| V26-01 参考专用输入配方选择 | 按固定顺序与三个种子检查参考FP64资格、信号和探针变化，保留失败尝试，不加载候选或采集速度 | — | [input_calibration_task.py](../kb_workflows/input_calibration_task.py), [input_calibration.py](../kb_workflows/input_calibration.py) |
+| V26-02 L1角色保持的值分布 | 100题适配保留shape/stride/离散角色；乘积随机有界前缀、概率与三角结构受约束，隐藏工厂不套用名义配方 | — | [input_profiles.py](../kb_workflows/input_profiles.py), [test_input_calibration.py](../tests/test_input_calibration.py) |
+| V26-03 冻结强数值政策与逐输出复核 | 绝对误差项收紧为零且不放宽原预算，参考和候选均须通过独立FP64；首基线、warmup及每个计时输出在计时外核对 | — | [input_calibration.py](../kb_workflows/input_calibration.py), [evaluate_task.py](../kb_workflows/evaluate_task.py), [paired_task.py](../kb_workflows/paired_task.py), [eval.py](../src/eval.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -175,6 +178,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V20-03 来源时间并集与未知重放 | 逐调用重算保守自写时间占比，重叠活动只计一次，未知/Graph/内存活动不获自写信用；丢记录、错绑和模式变化不通过 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V21-03 原生内存操作与双轨道诊断 | 成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [cuda_origin.py](../kb_workflows/cuda_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V25-06 诊断设置贯穿冻结与比较 | 统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告 | M2, M5 | [tool_checks.py](../kb_workflows/tool_checks.py), [experiment.py](../kb_workflows/experiment.py), [final_verification.py](../kb_workflows/final_verification.py), [study_data.py](../kb_workflows/study_data.py), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
+| V26-04 新基线与恢复证据 | 输入记录进入基线指纹，缺当前配方、执行设备、工厂调用或逐输出检查数不能恢复/评分，旧分布基线须重测 | — | [engine.py](../kb_workflows/engine.py), [paper_analysis.py](../kb_workflows/paper_analysis.py), [input_calibration.py](../kb_workflows/input_calibration.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -267,6 +271,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V25-03 任务修订与共享依赖绑定 | 记录参考/隐藏前后哈希、连续版本链和共享生成器；worker/队列执行前核对，新结果记录修订，评分恢复拒绝无当前修订的正结果 | M2 | [reference_revisions.py](../kb_workflows/reference_revisions.py), [reference_revisions.json](../kb_workflows/reference_revisions.json), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
 | V25-04 选集运行快照升级与历史档案 | KernelBench-105清单v2保留250题身份/105主选/5探针/140扩展及seed，显式基底加修订；原研究CSV不重写为新结果 | M1, M3 | [suites.py](../kb_workflows/suites.py), [kernelbench105.json](../kb_workflows/suites/kernelbench105.json), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
 | V25-07 修订任务跨入口回归 | CPU核对轴/空边界/精度提升、实际隐藏入口、队列与全部dispatch阶段、Harbor私有文件及旧证据拒绝，不运行设备实验 | M2 | [test_reference_revisions.py](../tests/test_reference_revisions.py), [test_scan_cases.py](../tests/test_scan_cases.py), [generate_hidden_inputs.py](../scripts/generate_hidden_inputs.py), [REFERENCE_REVISIONS.md](../docs/REFERENCE_REVISIONS.md) |
+| V26-05 多设备分布复用与实测身份 | 分别记录校准设备和执行设备；复用配方须在本设备再次数值资格，不借用性能或可达性证据 | — | [input_calibration.py](../kb_workflows/input_calibration.py), [neuron_worker.py](../kb_workflows/neuron_worker.py), [test_input_calibration.py](../tests/test_input_calibration.py) |
+| V26-06 校准文件贯穿冻结与任务桥接 | 文件内容进入最终冻结、研究/RL及重新评分；单题子任务和Harbor私有文件保持一致，公开提示词说明分布及政策 | — | [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py), [final_verification.py](../kb_workflows/final_verification.py), [rl_plan.py](../kb_workflows/rl_plan.py), [study_data.py](../kb_workflows/study_data.py) |
+| V26-07 轻量校准预览与准入回归 | 默认预览无SDK/输入/目录副作用，执行显式开启；内存超限在变换/公式前拒绝，CPU反例覆盖证据删改及所有计时输出 | — | [calibrate_inputs.py](../scripts/calibrate_inputs.py), [test_input_calibration.py](../tests/test_input_calibration.py), [INPUT_CALIBRATION.md](../docs/INPUT_CALIBRATION.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -280,7 +287,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-02 多dtype任务族与显存缩放 | 代码已实现 | M1 | 已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证 |
 | R-03 选集区分度重新验证 | 代码已实现 | M1 | 已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验 |
 | R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成 |
-| R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现附加实例及L1实际原生输入的逐叶信号诊断/收据重算，至少一例须有信息量；原计时输入不变，逐题自动校准、合法输入修复与相应新基线仍需完成 |
+| R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现实际输入信号审计及原L1的参考专用名义值分布选择、固定强数值预算、逐输出FP64检查与新基线/恢复契约；隐藏分布保留。L2/L3全题适配与逐设备阈值校准仍缺；按用户要求不跑设备/模型实验 |
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 覆盖17道旧题附加形状及新41题角色/边界实例；扫描89–93保留原分布并追加奇数、stride、rank-3、singleton、空轴与bool mask案例，cumprod保留有效信号；旧250题其余算子输入族与特殊值适配继续实现 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |

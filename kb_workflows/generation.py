@@ -74,6 +74,14 @@ def build_prompt(config, pid):
         contract = (f"\nTrack: {spec['track']}; activation family: {spec['fixed_activation_dtype'] or config.precision}. "
                     "Input dtypes follow the public per-role contract; keep scale factors FP32 and indices/masks discrete. "
                     "Packed FP4 references specify software E2M1 semantics, not mandatory native FP4 instructions.\n")
+    if config.input_calibration:
+        from .input_calibration import record_for
+
+        source = select_problems(config.level, problem_ids=[pid])[pid].read_text()
+        row = record_for(config.input_calibration, config.level, pid, config.precision, source)
+        contract += (f"\nNominal value distribution: {row['selected_recipe']}; shapes and discrete roles stay unchanged. "
+                     f"Frozen RMS/all-element FP64 error policy: {row['precision_contract']}. "
+                     "Both the reference and submission must qualify. Hidden distributions remain separate.\n")
     implementation = ("real NKI kernels using import nki and native torch_neuronx.nki_op registration, taking neuron tensors; keep the ModelNew torch.nn.Module interface"
                       if config.device_backend == "neuron" else "real CUDA/Triton kernels")
     return f"""Implement ModelNew for KernelBench Pro level {config.level}, problem {pid}.
@@ -139,6 +147,12 @@ def prepare_job(config, pid, sid):
             job["queue_url"] = job["queue_url"].replace("localhost", "host.docker.internal")
     if config.generation == "modal":
         job["runs_dir"] = "/work/runs"
+    if config.input_calibration:
+        from .input_calibration import subset
+
+        atomic_json(directory / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source))
+        job["input_calibration"] = ("/work/input_calibration.json" if config.generation in {"docker", "modal"}
+                                    else str(directory / "input_calibration.json"))
     if config.determinism_policy_file:
         from .determinism import POLICY_PROTOCOL, read_policies
 
