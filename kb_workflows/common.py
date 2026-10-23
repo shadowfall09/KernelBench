@@ -124,6 +124,7 @@ def evaluator_digest():
         "kb_workflows/production.py", "kb_workflows/production_ops.py", "kb_workflows/production_specs.py",
         "kb_workflows/suites/production41.json",
         "kb_workflows/baseline_rewrites.py", "kb_workflows/baseline_rewrites.json",
+        "kb_workflows/baseline_policies.py",
         "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
         "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",
     ):

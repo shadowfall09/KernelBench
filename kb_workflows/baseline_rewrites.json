@@ -1,17 +1,3887 @@
 {
+  "1/1": {
+    "reference_sha256": "2d349d77a97fd1a6f29365553275729685ab1cfff57ca4458bb6a8c09b88e91d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/2": {
+    "reference_sha256": "bce22f4d7998a206e01997a59183bd8290b8d2e9993e19ec44d40fe019ff6965",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/3": {
+    "reference_sha256": "f785135fb4b6dcce703e086882993fddda81c107eef5dd425da53b1d26a1e04e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/4": {
+    "reference_sha256": "e2dae47c5eb114f64a2800006e1fe2dbf66c47536e9dae5e1404ebd5ddeda14b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/5": {
+    "reference_sha256": "cebe7f46e6399e4711743bcf1a89efceed348feaf481961b4ae1ff329d6a58c1",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/6": {
+    "reference_sha256": "98dc90d168182da70323df08295acd6136dd946f74f801fda2cd22fe2ba473d2",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/7": {
+    "reference_sha256": "3aa3688513fc95456e6ed9f2de9a0c71773a33f16e42405d3bca4678d8c27024",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/8": {
+    "reference_sha256": "e5a83f3620f6cc123f7292399be80e8ae17969ee180d3540bbd35a3a4807150f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/9": {
+    "reference_sha256": "183b5173c6b56a8ac1c20d606c075fba88e3b606208dfe129d0038aa7be52fc1",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/10": {
+    "reference_sha256": "9feadc5bac2eb98fa95bd224f87bdffb390fe41632e58b6811a0ade4367233ab",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/11": {
+    "reference_sha256": "09fc7f7f20b65c2a9e59251cb3abaa1cf59211f71ce80245ddd791fe537bd698",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/12": {
+    "reference_sha256": "62342e32e5d33f65deb299004b052473b5f78094cc897daa845cf09e1a6e0bec",
+    "rewrite": "diagonal_row_scale",
+    "rewrites": [
+      "diagonal_row_scale"
+    ],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution",
+    "rewrite_domains": {
+      "diagonal_row_scale": "finite_nominal_inputs; native_output_comparison_rejects_nonfinite_semantic_differences"
+    }
+  },
+  "1/13": {
+    "reference_sha256": "8782872f96b406fc9d134201c1ae0cc840bd460a72a57b6891cb76be1a5f2864",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/14": {
+    "reference_sha256": "070bdfbd6afcb82c1ddd8cd82c5a2fbb742089afc6aabfbc8d952e579068129d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/15": {
+    "reference_sha256": "069687881e034120fa1de076b1b9d9761c8fe45d5ac9a2972dbe1f8307c931c7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/16": {
+    "reference_sha256": "e44b045efbae7379e912e8fa7770acb1b5e8b82eaef80d77b875630e27d05776",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/17": {
+    "reference_sha256": "a89773f8bd7f34b13fbcdba2c5670d0985cf38f767e272e9fe2ac7cb011d1b7c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/18": {
+    "reference_sha256": "fc22bfbd08aa11fc82a1ec02c2469ad6f39a650404e5ae73d21f53bbede91701",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/19": {
+    "reference_sha256": "3f3571481e280fdd960ec50ca9cbda184948b86b283c62af3ea6eb971848d84c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/20": {
+    "reference_sha256": "324f633b00a15888a798203317d76bd14287d50804c9b3f75f62b9e9cbda9345",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/21": {
+    "reference_sha256": "2220654dea1baaa2be7805ae74fc072b3c0a715d3bd6eb13098077eaf1fbe90a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/22": {
+    "reference_sha256": "d72fb7d9001f9d19b712ac2030187c7f9a123963ae00ef74db083268efd12c88",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/23": {
+    "reference_sha256": "4314753740f2f885486149f2449e04d463314dd0daa35a961e3b8b61bf334a8c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/24": {
+    "reference_sha256": "e22665b54ec00bf7510cdcde13dec2d645721976f3e12486ca2bddfc875b3a7e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/25": {
+    "reference_sha256": "455a745129977ab79abb2ca0cee1b3aad5fea82ccbf2eac975185237ae275b89",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/26": {
+    "reference_sha256": "5a63f7999287a10c0974b9beb591253b5b9c6d27d5d067583abad208dd322f6e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/27": {
+    "reference_sha256": "c54c764742a5ec1994ac41f9e4becae6f4ada027b1b554e7a5b31af6513e0b16",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/28": {
+    "reference_sha256": "e8077a6dfbf48823180676e7ad6d45c28a8b78e29d68e6daa32be339318873ea",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/29": {
+    "reference_sha256": "7481cd5fb1ddfd951c6fc859e2aae0e37bbd6a8620377b83f7c6535371609a9e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/30": {
+    "reference_sha256": "d549a64f573785690f590740d9850aa4b7a4a7c579790b1a3fa7ae1ac529effd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/31": {
+    "reference_sha256": "69645350385f6c7133c48a6ed1e2f78e2124fd74a05ad11a76cb8976b933e03f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/32": {
+    "reference_sha256": "abe4bc7205002c762d007832256f6ac459f2c05a9643d084d43d98f78b7a88ac",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/33": {
+    "reference_sha256": "d91ed9ef739197df1baacc064e3fdea486add500588f7228a94bbcbeedcd9cfc",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/34": {
+    "reference_sha256": "0db2fb5746f2616f306c4e1383086ab7e2cc01cb460e3b4fed556805e5d1f89b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/35": {
+    "reference_sha256": "dae7ea880e78cf6af30f328cfbd3da72a115f8c5fa9443263d5db814232ba92b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
   "1/36": {
-    "rewrite": "channel_rms_norm",
     "reference_sha256": "5219d89deaa2522637880af7981c9078b9f8e0808bc9bc7101e905650cd4faf1",
-    "contract": "framework-only algebraic equivalent; every measured output is validated; eps preserved"
+    "rewrite": "channel_rms_norm",
+    "rewrites": [
+      "channel_rms_norm"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/37": {
+    "reference_sha256": "87c0d8e9d80ada38d30140c842f7d17d566c86852f1c506b8306827b94ca47b9",
+    "rewrite": "frobenius_vector_norm",
+    "rewrites": [
+      "frobenius_vector_norm"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
   },
   "1/38": {
-    "rewrite": "l1_normalize",
     "reference_sha256": "f6dc16b4edfc7a6700002794ccc3708caca2609eb2ef32126855ba8a09158204",
-    "contract": "framework-only algebraic equivalent; every measured output is validated; eps preserved"
+    "rewrite": "l1_normalize",
+    "rewrites": [
+      "l1_normalize"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
   },
   "1/39": {
-    "rewrite": "l2_normalize",
     "reference_sha256": "0b483cf3c5c4c963163e8b0e388452f20679c41ac4201e1e4bc436949b8c146f",
-    "contract": "framework-only algebraic equivalent; every measured output is validated; eps preserved"
+    "rewrite": "l2_normalize",
+    "rewrites": [
+      "l2_normalize"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/40": {
+    "reference_sha256": "3186ba7f571f0b5a27d6a6fa8c44fdfa6e993c288ef4a004fbd1518aafbcf55e",
+    "rewrite": "var_mean_layer_norm",
+    "rewrites": [
+      "var_mean_layer_norm"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/41": {
+    "reference_sha256": "788e2222fd6968f224ce81dbcd8f7ad1d9d92104c6b1687bf3ef41d821c03341",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/42": {
+    "reference_sha256": "4e2ee3d9952c29095079ece7fb12e62a21f209c6abce742a78894f1b7678fc8e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/43": {
+    "reference_sha256": "89d254eb6436700597bceba64d60a8fd1b095d868c0785c4d9b264eb07648560",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/44": {
+    "reference_sha256": "0fe5629462900a05f368d863c9c28cfa7acbc44f27136014c6bc3b2a398b395c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/45": {
+    "reference_sha256": "062bb9762938a827cefe172a5b450c304abe4047bcb251019c1c76579936378c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/46": {
+    "reference_sha256": "3e3a1797d851cb37e001c14353ff3bf051e79ed574a7d2e5be80f44f262438ee",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/47": {
+    "reference_sha256": "ee0a62cb65f320beb6388016e670195c2a7795f83527d76264eefec6b27ea158",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/48": {
+    "reference_sha256": "653ab19c0481d741f13967747d5874b8573031f555eb663228d5d8b280497023",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/49": {
+    "reference_sha256": "3c7b0ca3422c0da3679e69bf4cc59e58da18df99666b1d6745655e50a7d31f78",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/50": {
+    "reference_sha256": "e8095fb3c67a391c106e198305eb2bf035a97166898a47a52869adfcc7925b8b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/51": {
+    "reference_sha256": "c1ce09c9f6168c5c9b759668d36afd6ef24433d07ec5af11a173b69490634f3d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/52": {
+    "reference_sha256": "a3b221e180f6d6f436ce42e292ee06b4e260df6a60d1b43b175b19f038a0ce27",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/53": {
+    "reference_sha256": "293f21ff5e68d91ecc38c8308dbb43b9d8cf5abdcc3cff99d1a04631e5f342f6",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/54": {
+    "reference_sha256": "c262f76cf959b35c7aab20464e47ef92a312a5c3bb99c130841d6deece3130dd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/55": {
+    "reference_sha256": "aee14a975627a05a2f83427a5aacc82936de0e90072fec871ffd8ea907510cbb",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/56": {
+    "reference_sha256": "5225fa9be367b3306613f2859f56a0888ec94099ebe550a18bf73e1226230bda",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/57": {
+    "reference_sha256": "4efddd03597fb3a0dff2b6d3b6246647bfcdfb412b7f8cafac8694e0fa37ba2b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/58": {
+    "reference_sha256": "ea59e34508a12639e637f696f71858ba8822570df1db7c1dd2c0d10108213694",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/59": {
+    "reference_sha256": "5ac98396901754f1f913dd917734f10baa340f99fb4367911ecca4004b4adaa8",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/60": {
+    "reference_sha256": "973abd15cea073b99ef905bad0b1a435d11d3c58bae2b1045928d93fc02475b7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/61": {
+    "reference_sha256": "f7f8ccd26f8710f47e1f7500da202342a400920ee0c7a6d1467d7edabb94acea",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/62": {
+    "reference_sha256": "ff17e1771b64dc2c75180f712b380e964fb7cbe65f1d5134c1e7d66ade292efc",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/63": {
+    "reference_sha256": "5ae80deafc5d8fd5d5e411cbc1e6e6ee023c792edfa008a5370499eb87db45dd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/64": {
+    "reference_sha256": "4c83f819cc5b81945b5da0a2272b8f9bbbf01b405e3f3e0f2ba0b32997f4f631",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/65": {
+    "reference_sha256": "f5363206823b51cb8b059d63892b64422bc19945e81b47f8fe7dbe0e208ef904",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/66": {
+    "reference_sha256": "f716f33c97c180ebceb22745fea0f9698873564469b0198b7d12272caf61e087",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/67": {
+    "reference_sha256": "7a8e48ec22a52062af0e972c7bdd9a45e07681c4d0508ef9b10b7d982957cd8b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/68": {
+    "reference_sha256": "3ef96c5ebd8e476040be78d213b156c096f314cf45d9d765279708abb53138cb",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/69": {
+    "reference_sha256": "14d75d426a241346c69f07529603556ce461dec8325f23b6858072e403de17bb",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/70": {
+    "reference_sha256": "e225fb16bd92aa821904ccc7b79fb78cda1af6c5b069dc4c421d83ca05e0c299",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/71": {
+    "reference_sha256": "e853d51d8a2f8685c468e9c7a31a544ce82876e1b280b95772df144a2b02a809",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/72": {
+    "reference_sha256": "4abb4af5c7a68ced6bbede5d96937c0f0e38053b143643355ac5381554d50521",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/73": {
+    "reference_sha256": "c9652bf021895c6b1fdfe4632aa24d62e993a201f122e8014d80ea8ed65e5e19",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/74": {
+    "reference_sha256": "959a2e0100c4fa55ac5ce5814953a15728f8f81d035a8b345eea4a4aa1b5ad9f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/75": {
+    "reference_sha256": "29b7ceecf13fb2ea071ca22ed3805c974831d17cb70157d64ab5df5b6868999b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/76": {
+    "reference_sha256": "14f573c50d1da58563f5b6c6d2f1a0490b74a100c7be790f40adb4565bfb9f26",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/77": {
+    "reference_sha256": "0103aece769b11a1507c42308e3e1f94bcb64d3fe7a3e21cf8bed246c317fa96",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/78": {
+    "reference_sha256": "071cf6841f518ebe65d5d150b9f20804d39b79762b24612004710fd3e0fb0466",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/79": {
+    "reference_sha256": "6db00a9c6819b6c725d89580f47073b005f9b2a3ac4c1236ae54f19d998327d6",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/80": {
+    "reference_sha256": "3a4df4097b281c35dfb470298446a707e22627cb79284cc37ec22cdf9b2dd716",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/81": {
+    "reference_sha256": "eeb221ea34d93233163ab269f22aa41dd65da4ee27b1e5be7ad8c52d88b14014",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/82": {
+    "reference_sha256": "9cd970cf2dcbcd23c2fec81e8b806af311569ad0dae274962bc13792ed38c99d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/83": {
+    "reference_sha256": "ccaa89bdc56c5d34e8b4f009cb5258e61d124a30d8bfb1242842832586f22835",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/84": {
+    "reference_sha256": "e482e98f260c091ca19764e4381afecfc86285f2d62278ffd7120b02eae41545",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/85": {
+    "reference_sha256": "1c0b71d45574e8cf6b8b34adf42abad98c276fb19c15c17ee6c8e19912a4343a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/86": {
+    "reference_sha256": "6fb958ece3cff7d7877502c7cd4cccfaf08030b017451a612a8829e813d254e5",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/87": {
+    "reference_sha256": "54af8c6b12cea1125b2156dc8eb61d599d31e88a147dc729d1ec8931e9aceb84",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/88": {
+    "reference_sha256": "ae3a237ab91e2589255fdc9ef9b9cc4ace03a8d8afe51c25aef4c0a0680cdf23",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/89": {
+    "reference_sha256": "2fb0fb197070475cba3a73b0a151e722663d690c25971305b2b62af1088f37de",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/90": {
+    "reference_sha256": "029c4a283aae03fa1b8b39f06190d0a89e2c553253b4c91e0d29043526b5c9ff",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/91": {
+    "reference_sha256": "e9d0f300c234f1abbab58930c10a32b4e718c0ecefe26a83195c2145fbe74af0",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/92": {
+    "reference_sha256": "a28412433ca97d2afad29401e70fa6b4c61716c20a251180d810658669e41e52",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/93": {
+    "reference_sha256": "65a573b890e9d6a63c44073eb641d560387e7d8771b36b93813615e05a90087e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/94": {
+    "reference_sha256": "538280e46663419892c0acefa6a8264976be2d0327eebd3a288cb4debcfbbe89",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/95": {
+    "reference_sha256": "5c666d9e45fd6fcaf2690fabed98b2fab856e02c7fd94906a1d043776f5298f9",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/96": {
+    "reference_sha256": "547112ff0b584d76f0d18a182440b9a7c212ab9e6925858f1e8930a0fe44c6c6",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/97": {
+    "reference_sha256": "735745270232c3b928377533e3cfebebdcddab44efc097d4968e1c4eb3984b92",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/98": {
+    "reference_sha256": "2f253e58d23590369c5e860ebe09651eb96276376aa9db4e244c43264eb62ad8",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/99": {
+    "reference_sha256": "a64bc248d53b22a5ed6a2533f4a896012b2cac71eb8656eab2f8668939761c6a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "1/100": {
+    "reference_sha256": "695acd3fbedece6b39112b5513816403bc47a28ad6f8503db8ea4471c9e675d7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/1": {
+    "reference_sha256": "ba540866a1e581ef93959167d1637b82122c853e95cc48dd8bef7d2c10c758b3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/2": {
+    "reference_sha256": "31f49a84239cb24383e84ea78c778d9fc047455a12df3e2eb269ce6deedaf808",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/3": {
+    "reference_sha256": "5bac18327a7e80406922981e800f85d5612a758b536f69fc28fb15d5b5b56556",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/4": {
+    "reference_sha256": "48691719d44ab4bdad7ac2f8e5c21cd8202bb3de369e781c14d18f251a8bfc6f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/5": {
+    "reference_sha256": "bbbdcd8069263174b11a4000d0b319145b9958a98abff520d0cf0c44a73f49bc",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/6": {
+    "reference_sha256": "c66153344b228be0e6d343641eddd1df5c877d9be84593c216191f5ba774e4cd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/7": {
+    "reference_sha256": "dc0184aad245553bf5a68da67b78f917d66483ae4cd74b367cff91a22ce5d2cb",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/8": {
+    "reference_sha256": "1c910449832d9f6052391f3c631ffe20ce3855ec6865bd628283555cf96e1420",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/9": {
+    "reference_sha256": "24fc232d2a63ba394c49e43f7425408edfab157be4369b9423087884a098afb7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/10": {
+    "reference_sha256": "a7ff8fad9a4cd86053a9183fb26f129b1bc73c22d044058594ea05ea2eabd9de",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/11": {
+    "reference_sha256": "8d6e2ba894ebaec25a6fdc27c88b3f051d59e1ad10fe83d23304623e0b4ec749",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/12": {
+    "reference_sha256": "bfa5d039e0b35af0e8b41a7a5a103aea8dbd3175897bb46b461bd6303358f244",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/13": {
+    "reference_sha256": "275efb5bc85aab48028130a467a3411632573d641db405ddf8d7d22a25a150fa",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/14": {
+    "reference_sha256": "d9e094a0c51342ebc5fd6c8a14bb3108da2584ee6c2ed67a7516b446f5983a66",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/15": {
+    "reference_sha256": "314134ed665768921c1cf9c20b1a3185cebec1e12b30a47d90958d6635f1862a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/16": {
+    "reference_sha256": "67ae8541ee1687a56f588227f33acc28ec7fc56f243fa8b1f3cfa6ff32448653",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/17": {
+    "reference_sha256": "838de7f098817f0c866db81ef3ce199280aa2516da901665ca169515952042d5",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/18": {
+    "reference_sha256": "56bacb42639d47010c14c6cefdb1c913dcf44d9064d4959f22146ea399cc78b3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/19": {
+    "reference_sha256": "c494efb23e569e2cdcf65f8be0c14c157be065d36b8af1faaf458fd27fadb0e4",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/20": {
+    "reference_sha256": "26b0bf48928213578a5965bc693edc5807b8aa45373071df34ce57a1b8c5130e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/21": {
+    "reference_sha256": "bc9fef0d0d164267670dba37432642c2c29ec06eee2284dec6efb95e2043820e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/22": {
+    "reference_sha256": "854798d11b8bbddf0842d3b417b9153e30bc680f7cc7e4a226ceaacefe66a2b7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/23": {
+    "reference_sha256": "52ca8191da18b57ebf67f4bfbe3fe20c36f0705bf8b88cc7772ee31e25398436",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/24": {
+    "reference_sha256": "67a444b6a1a885449960e2f1acebcaaab33c86a38b449c6556fad13c4b4d30f3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/25": {
+    "reference_sha256": "f64b714457a48def6bf6ef9c5f1757d8b121594463826fc14af54ec64593003d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/26": {
+    "reference_sha256": "4db3bf0488fad20102e911d50f25d30e0d1c8c5b0bf31f89b88b5c06ad1a73a4",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/27": {
+    "reference_sha256": "abe2302501cdb9a25a64f5e0b9343db1f4ba4b4ef39a18f71172c5e445dda14c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/28": {
+    "reference_sha256": "87337d4d282be3213827bd378d1cc3f009b3a4e55edfd6556a0e8464ab0d3a23",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/29": {
+    "reference_sha256": "1e9eedb83d3bcf8b9916e317bea8624c21c34f9a73f767fe49fa68bd6ea24e6d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/30": {
+    "reference_sha256": "e96b8f9e9875955cabf5f96c3f1d9fcee06cef1db9198573b90ac06aad64cbdf",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/31": {
+    "reference_sha256": "5a575fa204921d8326b7b8a1e4ecb333aae0e89326ef264cc00161911015e73b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/32": {
+    "reference_sha256": "c7149e3b76727c01622c71789af6ee6d1df7fd2ca91e8fc15d29d34ea69b2970",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/33": {
+    "reference_sha256": "381791fb7ea4b177cc5ddbd8712d17ac6556c28b04b3bfb36ff78bd067df3e29",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/34": {
+    "reference_sha256": "804ca4baf55ea6e5bbeaab94b8fa3bb48154c032db59960d00d8040fd4efb0f2",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/35": {
+    "reference_sha256": "06545dc1324d3b7fe903b3ac720d1dd33a3b521bdf55e7f7812d8f6c8ea11972",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/36": {
+    "reference_sha256": "3942bf858c47356bfb9e831bf1b96fc2eb8258539e511e70e889403c3ef9236f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/37": {
+    "reference_sha256": "bc05ae9407cc9d98307328a7a3c46b0c19dc84740d4cbbc90a1e925a030a15e3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/38": {
+    "reference_sha256": "c21da157314e0a3602504244725088381d49bc41d49ea5e6e5a3eb5ce1585490",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/39": {
+    "reference_sha256": "6efcf848d388b373beb6fbf4ae28885a943f1d8b4c6e090eb59bc0a7f2e200f7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/40": {
+    "reference_sha256": "559a68f953ce465ded0127fa10dc7974156889934f4e84d7db6445bff5309be9",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/41": {
+    "reference_sha256": "264f0601dd95a01187bfe7e228c441c8ce5cc42c62a2a59c7b16caf412a486f0",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/42": {
+    "reference_sha256": "8a462b56da126adc3e1589e87ebbcc5ffb978198d44a2209e4970e701c1f47f1",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/43": {
+    "reference_sha256": "1e689e3764f9cc300940c1274875107b6e001831d1078cb5df85e0a29fed9767",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/44": {
+    "reference_sha256": "ec7db013c234f3712e274318aac61e869196444644566da44ba78d37f43df67a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/45": {
+    "reference_sha256": "b1ca8d57447f26ffdc4b9c4ce12a1315b946a1ddd730e8598da41df857e1fde5",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/46": {
+    "reference_sha256": "d4e92d787a439e000f0d6331459a37aca40edb9b28d4139a9430eb505bcfd11e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/47": {
+    "reference_sha256": "a5973cf2dbdc2e71788be4b0ca0526e4972267cc886d142414b4f823cfdd8468",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/48": {
+    "reference_sha256": "15ca8a92dc0fda0436a6488d197a12d69e29201740689dca9881f0d21f99053d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/49": {
+    "reference_sha256": "05cef9d9088e2ce0c21d1b8918d5fdf6e1e988f58939de37acd05ddfdb6ef36b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/50": {
+    "reference_sha256": "de69586f157c6d74621b7f3912859caeebe0b0cdef8e48865bd9a028dd6a7b6e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/51": {
+    "reference_sha256": "84207220188137189df4c656d3dbef1c00ebd10fa5a06fee3a9bd0ccf4289f93",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/52": {
+    "reference_sha256": "8ce597ff927cb578b244a7fea6c8a2f008060eae8204ea94fdb72372c7f9f42e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/53": {
+    "reference_sha256": "bcbacbc69af815aba39f25e8e49b97ab6bfa1599bb3e3570e22071bf4fbeadfe",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/54": {
+    "reference_sha256": "3a93a348e601a81646b52456091efaf9d968b46b90ef247fc27ed3841e325b63",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/55": {
+    "reference_sha256": "2ac86e0e0934830585a90923fdb2442f6290cf7271c7eee040b896a20eba85c3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/56": {
+    "reference_sha256": "d5c1f6244996aad6a8666fcd60d40d30824ac2a51d0f9ebfb56b90aa4a6eb628",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/57": {
+    "reference_sha256": "697c4d26722931ff796352bda8f1478f2ec22cec00eef47627038e0506004b9a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/58": {
+    "reference_sha256": "284e7b4bb26a398e12865be51a6330e399f835206cf049b0a080690150ca2d7f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/59": {
+    "reference_sha256": "77f8e2fe6e44c41f6e454c5105ff7fc86b79128ded7176cc6add3f277ced7246",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/60": {
+    "reference_sha256": "b84e35276d220c7c3ff4148b1229e306af13a1dceee58307b827d0b73f37b2a7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/61": {
+    "reference_sha256": "b0456cf7db9ff4e8e546adf3669d7a453a5972260fece7c46659843d7c9cee2a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/62": {
+    "reference_sha256": "05838bd8f7cb34d69481f79ea6657cc5675581cdec492b13cfb44040f4c91f8b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/63": {
+    "reference_sha256": "6931eb418cac3a14a8ea15197a1a370af21597e4abf4b1ea8914316bb90ed05c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/64": {
+    "reference_sha256": "4b11de02c18b74ac908dc80ab3b753785f3bacee135caea5043287deffb05277",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/65": {
+    "reference_sha256": "c210dbcd025851c9a5986aae1627addd6295c2f92a77bba741fa443c6f5d81e0",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/66": {
+    "reference_sha256": "c696f1feabbd7a70d0ebc5bd4d7ba5a37ab6707028d616e16f97072e80ee4ce2",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/67": {
+    "reference_sha256": "8b82fd51b4b866dbf9fb531050e36058a969072fe6fa3f5ad57e063f06bc8731",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/68": {
+    "reference_sha256": "ff97bd992ac5807cab0f5620244ee59e7a4fb089dc69b902eda6ee9bbcd0dd48",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/69": {
+    "reference_sha256": "2fd812c4db02d6e2648d24ea2ae980c2503da5949a910efa64a9a77a7acd8f3d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/70": {
+    "reference_sha256": "7a1c85b309abb54fd8f9d540c51a052d2224aa6372eb4b01f2051b69cbd63b8a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/71": {
+    "reference_sha256": "ea87108342e2b2ff0624c9a922fcda46ebc5e6a039a4daee4ddb139741867464",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/72": {
+    "reference_sha256": "54818aefa857749c915e70affea3c0ea13631a420f5555823e4723b1d3cf4984",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/73": {
+    "reference_sha256": "f3f8766fc20d5a9b168d2b912572a29cf7de1d6945eb52b9dc4f6417b77899b7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/74": {
+    "reference_sha256": "7b2af2a4b98cae1d89fcaccf959eb13fa7bc3f0dfb1d1b642498c46fcee49209",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/75": {
+    "reference_sha256": "047d1129531e484fb4226dd2635f93e6ebb87e9350f0e0e3e3f2031c5568fdf8",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/76": {
+    "reference_sha256": "fc6f0c377c7c8f3e4e99feaae8faf15c69fc75fa0d215109d0700c8715ecee4e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/77": {
+    "reference_sha256": "646ff9d5b78370f0d54e86360f2475e8b55574dbf62bb083dfc9c3c89e12152d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/78": {
+    "reference_sha256": "7864e11a9c87533d87d99c4b45ea7f0de1365bee32fb657d210514ee4d3db893",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/79": {
+    "reference_sha256": "20aa38776a6828a89d2a2dedafcefdcb05462afdb7e2e91bf2236d8a38963e88",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/80": {
+    "reference_sha256": "8fda72715b863bd1426ede28a0ced2e82abe770cf354ec6ec7182264247afc2e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/81": {
+    "reference_sha256": "37ea2302eb0d1478c42f21ef33563d419badf4bc94f26b292e0b2dc3e38b0e05",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/82": {
+    "reference_sha256": "fd857069ae0b74f32e8f067463cb7771bfe76513dc0be0d4031cf7255eff5ef0",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/83": {
+    "reference_sha256": "f5ff5a6f45fdc7afe2cd00c7b39e0eb626abe62ba7dc18d7ae2952a832af6592",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/84": {
+    "reference_sha256": "eb21b820cb5e67217eb4337542adfeb2f6fbff8b7875735a17b49edc0f0c5ca2",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/85": {
+    "reference_sha256": "c3708330e8a0646b3837717a2179b776d137dda91e1e1ecb3b97550b2376b7ee",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/86": {
+    "reference_sha256": "0777d6c87b3b85004bc9512275e82032d87271e3dd8042f34629ad92bece45b8",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/87": {
+    "reference_sha256": "8afa9f9bec3428f74f6b94e86a29c4fc849f53801ee9d992879b3abe8abe241b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/88": {
+    "reference_sha256": "98eb5a64aef2edc2a6d32d7a65d30a057ac8e17dfeeba40a3782a291f5a180c6",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/89": {
+    "reference_sha256": "c45b3ac54572356970a00c632ba44460218ec4567015c016faee1bd1b02beb5b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/90": {
+    "reference_sha256": "8d4efa6fa865c106362a016f0a3e8273577ba5e220f9f5769ccec1acec1d7f38",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/91": {
+    "reference_sha256": "a4c8eef67a61abc7784ac97268852e67b438f1482dab720cafea5607346db55b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/92": {
+    "reference_sha256": "a2ac20d478d5a9cdc419d1300785dc70350f92b2dc8db69bdb836d2a9f1bbecd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/93": {
+    "reference_sha256": "c847015302d74e464d0e51efabf8c66c70f46137fe0fdfc57f60ca263ad15536",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/94": {
+    "reference_sha256": "3558f6d924ceeedc03a511e7405b192fca6515f3e7d8dc59ef31d95c0b7be113",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/95": {
+    "reference_sha256": "1e98c23b57053d967c361ec6c974d57b6382075d73ec90318d70c1a50cf89276",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/96": {
+    "reference_sha256": "984651340dec798829d5211721bdba6faf45b925ac9abc611c903e7f5953b20a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/97": {
+    "reference_sha256": "629ae63b050972248737337991c19fba59feae61dbba2984820cf67c882a86fe",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/98": {
+    "reference_sha256": "c59a6ab1316760313db25687d28ae2b1a8ac72ba47d7aa4c72b34b8c95f39743",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/99": {
+    "reference_sha256": "ba8fa8e324315d271633f16aebb3765ba823d101bbe22b061f0e3f86e2ef2208",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "2/100": {
+    "reference_sha256": "afbd703071d4c5983a8445efa37c1cde5409774ba6855e6d9981af0aa5fea52b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last_3d"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last_3d",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/1": {
+    "reference_sha256": "d78f9c39c087a74f2e924bcd8a0bb73972763094f2de096bec1337ab8836553a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/2": {
+    "reference_sha256": "97ac6a239b3b13723e44bf783b4fc9886d50d8d1db2ccbf4cc8c36355d0a3ca4",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/3": {
+    "reference_sha256": "283b711bfabf4a01bce42997ee2de2c66374833f8b544915cdf4f0343d162a57",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/4": {
+    "reference_sha256": "902061771421939d1c4bda54d8f3b87072bea520e8e9137f5f9cc305f1ed0d51",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/5": {
+    "reference_sha256": "a57f39f0e738049fca70c539d44bc1c0b011483696d6f2063327b7492bc2e33c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/6": {
+    "reference_sha256": "6fa5eb8f7868b1e2e29e996ad359b88bcb2ab9c55f24bb6812a54118a69af8ea",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/7": {
+    "reference_sha256": "cdc41b4508cb3a05030d5d09212c9d6e38c49f6bf4dd7dd3aca087a0cb897b60",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/8": {
+    "reference_sha256": "27ab52b5f1c1b3d626cabc8dc97bc5092ca18c8262bedd045e454d0856df3eb9",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/9": {
+    "reference_sha256": "09cb0d7aa15d7e239d1cf360e92b6f173aa06ad965537870c7179adbaa930848",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/10": {
+    "reference_sha256": "08e9cc6d9bb650503cc790993531dfaa642a665c21ff3d8b46ac62347939e60c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/11": {
+    "reference_sha256": "8c33145177dfa355a099fe0b31b4d9b8670520b57134313411732cff6223b20b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/12": {
+    "reference_sha256": "dcc9400c30845cf6f9dec3469a1ad8de3780879b649ea0103bfe55ac57a4d8dc",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/13": {
+    "reference_sha256": "2788a60304fd83707e8a88501f9e1eebaaff22db8ac81b006028f5bebd06c147",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/14": {
+    "reference_sha256": "fcc1e2e3204575e85e7b9073592cd67f4271474f4bc947b57385076c0bc30bcb",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/15": {
+    "reference_sha256": "2873646fa2cc03d52ca93e794a1a452695f0c371697820e5f38723deba5c5b45",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/16": {
+    "reference_sha256": "0c0edbc737931e3fdd50d0a5a919b18be803c358e897270ea1da03fbb646e713",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/17": {
+    "reference_sha256": "4020b7a15a9a050a58de8c61f39112f5925342aaee2771d399287a6db3dde7d3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/18": {
+    "reference_sha256": "79b9876cb8531df7ddc2df67713db4801f854cffdbc61a0a869d2bdd7eec9b0e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/19": {
+    "reference_sha256": "cd3a24946280f20d0f2ff9c64d277979e57748cb15001f8d580d071431c782d9",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/20": {
+    "reference_sha256": "0893710956091efd3d84aa936561cd1d2d2a022437c9ef4efd8d5274121c12c6",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/21": {
+    "reference_sha256": "46da3281450f7bf8f60bdf07e58a8039661e1d0bca1e9be825cbe48b34ef9232",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/22": {
+    "reference_sha256": "6da3203f08aef6a42c46a21b5599b8301fc89fd8d5e96643093b19a4795779e9",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/23": {
+    "reference_sha256": "7a5beeb21ed2d5a33095a4b126e96e01f816499c6472b3d7f2e7f3874a9752f4",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/24": {
+    "reference_sha256": "f5bdbba494d09ae9fac3624a0d84d1217a8df3bf979c5a26a2d99f7d004d8f00",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/25": {
+    "reference_sha256": "92516bd920358eadbd5642a3216c1887012c2cbeed5ba86f1bb1955afc896d87",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/26": {
+    "reference_sha256": "8a7631f40c63e470655bfcd6adb92e9204d3016c47454de8a736555faeacb760",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/27": {
+    "reference_sha256": "905d62920e7c12e10825c0f75ded694b5e078e48b29aa47a6bbbe1cf2e5c82ce",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/28": {
+    "reference_sha256": "0309d307b753465c07bbfb4fb8750287192adc1d25a581580a34ca02216e20c5",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/29": {
+    "reference_sha256": "d97e3a7607add0cc89289fd54af4e07360602ef6a3afcc59ef6e7bac933f313e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/30": {
+    "reference_sha256": "c1f148827733d4432352cf6e32fb4b0a336663de8b382f52c79a56590ee8546b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/31": {
+    "reference_sha256": "56794699ca64c26338e67867fc43e8bab26d52f5f6fcbf832205f6aae99aee9a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/32": {
+    "reference_sha256": "671388d0212014813dc638e5bd5992f40d6c12f2de6f438d0a79114047fb9fff",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      },
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/33": {
+    "reference_sha256": "a8300695605386cf219f26bce8eb00e44d215b05179ece2844dda6e4aea63a69",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/34": {
+    "reference_sha256": "fd0b06460263d06cbc02d844d2a207701bba9f5a6d6440e41e13732777e5edf9",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/35": {
+    "reference_sha256": "c3dabf3f49a6d01bf7ee93dd4da94e8615fa2d316d72690d6c4ba95fa2487a2d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/36": {
+    "reference_sha256": "b47f419beae1b55d4c8968709ed88c1dd3b97a23d68cff91adeb02e9889a8434",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/37": {
+    "reference_sha256": "db923f0e386e603c29497a1f19530160b48ad6cba037c8f64fd39b83eb161afd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/38": {
+    "reference_sha256": "4d002c6c7596f5f76c5ad311198043bc82e4a45aa10ecc0633401681b75ec303",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/39": {
+    "reference_sha256": "30efd0ed24e1f69427a89c51c32fb83dbeb02c05e38465b13f9795722821559d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/40": {
+    "reference_sha256": "462667780c2e95c5ab98cad88f17d0937a56e6c3e237aa20afb56348137755fe",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/41": {
+    "reference_sha256": "c9a75cfc0ab39b044d8680b6ade0e67d43cf3cafd8d82a3818bc30c7a215bf30",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/42": {
+    "reference_sha256": "21321d9cf15f10ffee5b9ef7390048ca4973a0e7ac9f26afd4cfd34b49ffab64",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/43": {
+    "reference_sha256": "d8b466852583ccd5045fa15397e0062f6e147714a71b01b0ea3068cdeef54bb3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/44": {
+    "reference_sha256": "79fec66a2839e84922f25145d5d2252f1a6632bdb5355fba951f31eb227ea065",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/45": {
+    "reference_sha256": "80a225d44d1a4c69cd435ec2f590c6dd54a5839b1ff72cf58cb0979f8b62a60f",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cudnn_benchmark": {
+        "cudnn_benchmark": true
+      },
+      "channels_last": {
+        "memory_format": "channels_last"
+      },
+      "channels_last_cudnn_benchmark": {
+        "memory_format": "channels_last",
+        "cudnn_benchmark": true
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/46": {
+    "reference_sha256": "78c5c35feefc12870e0fa6375040be0e4b5266d542da46367cbb292502c5d393",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/47": {
+    "reference_sha256": "9f342c5eb20134ca74cfe214ab93164b67f0396e669f3c896a07e884d8c19402",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/48": {
+    "reference_sha256": "c25228132ebf5bb4d61e05ef901654a1bf3b1fd8f9c5a0e57f43d9829c1de26a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/49": {
+    "reference_sha256": "1763d0c81092a9aba2a9e59fdf9629a4597bb067098f47bddf9a97dbf4c193a3",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "3/50": {
+    "reference_sha256": "44c428b6272de53454190485e184a8d7c85a21317a28f6be27f7e18da15d5754",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/1": {
+    "reference_sha256": "d6e36f636904d976077f9bab6ba5c248898d283b3a9a4e2300ecfbe7e5a2106a",
+    "rewrite": "production_sdpa",
+    "rewrites": [
+      "production_sdpa"
+    ],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/2": {
+    "reference_sha256": "eddb52ca680c850eb3edfc2656d6cb7ca3c43b5cca64f0e8de5eac91ca1376ae",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/3": {
+    "reference_sha256": "1c087ed66f8659bb04f1c8c379d86c15adada004d32a98417ec5ea2d9cc48452",
+    "rewrite": "production_layer_norm",
+    "rewrites": [
+      "production_layer_norm",
+      "production_var_mean"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/4": {
+    "reference_sha256": "de627ac86cb4f29b39bd0907644cdf72d0b1939aca829587702f17c48caecd0b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/5": {
+    "reference_sha256": "5b73744be67e9534548c802e3b4312e21292abcec500a4218e06d8ca5be0287e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/6": {
+    "reference_sha256": "3a79278512239edae9ddce5fa3faebc2506f22d0a037b4f4c3f2a874657b9078",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/7": {
+    "reference_sha256": "0966e31e02d3e6676af8b446fb4d7966a58374f9dfa8d3cd69d1db3d9a5fcc5e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/8": {
+    "reference_sha256": "2772e964f34805b49b0f6ce94dcd9d61b6a82984fbb3ef2bc78a705e9bf1475e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/9": {
+    "reference_sha256": "1b99109227cf728659ac4faf990ac41582eadcf63273074f7edeb27f2a6ca18c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/10": {
+    "reference_sha256": "3b439355bd592e76bfb89ab7e31b19fb5bece36a265ef3634a8232d398db7356",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/11": {
+    "reference_sha256": "bf479ed3c49db0c8dddfa6d07270b5a00b87ebbb88b3ecaa211fd954f6aede47",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/12": {
+    "reference_sha256": "ae3afadb4561e40fac43fdcfa33f87a782441c7fc37e967448920206b6bc7f81",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/13": {
+    "reference_sha256": "2cbddd5ec78654e85933d97c90d477d200b0d451554526798d7df695e77f8052",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/14": {
+    "reference_sha256": "295b413d24467425862e7212ff8e0e36f2339ecedffc75d21757781dac96cdb7",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/15": {
+    "reference_sha256": "104c6e70b095465f8004ec4f29e9b3ee6586a481e8a501d19fcfdd36559ed67b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/16": {
+    "reference_sha256": "37db1c451937737530669ec807f0ab0717904c58620f4eb3be701834fc38218e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/17": {
+    "reference_sha256": "07ef66c9e048fdabe7d727072ec4e065b6271212268dc5b1b2dac8297cc00a7c",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/18": {
+    "reference_sha256": "22ac469e848797bbabb8a76758ed1ff3941e0b3a7d94b81138ddacba2510b241",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/19": {
+    "reference_sha256": "571b0dd1678efdfe5c7f62c9fa0453fbb9763f8c75efa92f92ad6ad4ed5dfd2d",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/20": {
+    "reference_sha256": "6b920bacc9ec6075098d19847b46818422e8865db22f1db384522f3058f3d30a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/21": {
+    "reference_sha256": "d7e197669fce896e9ecf956117cfb3af279feae70bc58022116ff98f4f10a4f2",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/22": {
+    "reference_sha256": "84091212994f129e05f6601c3286f0c0717ddc72b53b0acc8d2703130d1e080e",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/23": {
+    "reference_sha256": "a8823095e55a2e6885eb41db4b5752eddbee2005ac0c9f34923e03a106429ad4",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/24": {
+    "reference_sha256": "bd794559f97f6e8e307d8a22e39b876b16a22c7fd6283f98b1e871248a4b6bb5",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/25": {
+    "reference_sha256": "1bd1ac1619781fcbaa104f66c136899d3e9176f0cc3cb8b69e9b288b50f9643b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/26": {
+    "reference_sha256": "e2f40f7dc1e6b850a5b9454975d4fa9012e1c6ba26a737e19f18435ea9bb465b",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/27": {
+    "reference_sha256": "59c9fe7d89141b9f92b0a3b97d911df4dd171045d0608d4afd2cf91be2d1fd91",
+    "rewrite": "production_residual_rms",
+    "rewrites": [
+      "production_residual_rms"
+    ],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/28": {
+    "reference_sha256": "5ce77d4d1df691ada4a30e16288153b04b085f5a551bc98b35fd6bbf0e62049a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/29": {
+    "reference_sha256": "a91b3eed2886f45554ff70c9280cd6adc9dd96f7d9c6fd86535e7aa97f4a9322",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/30": {
+    "reference_sha256": "ca25664059f68e04d255583f0fe35de5e923ff47a44603984dfecc0a2b559556",
+    "rewrite": "production_gqa",
+    "rewrites": [
+      "production_gqa"
+    ],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/31": {
+    "reference_sha256": "f889dfb073643b0d99ca7de073147264a8030a6f60f8947d061d3478fb3aee9a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/32": {
+    "reference_sha256": "9e309ae0b0473730f5e2d9dc33b1a4df239d2388235a68e2dbd512addbc37ec1",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/33": {
+    "reference_sha256": "b6f9a9300ea98324808e60aad36513fbf8d25f33803db7c49427e78e211eb6ce",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/34": {
+    "reference_sha256": "73a8c8fabeab44e67008601ae63db8801a0f9cb0448c81234ee4dc88890e254a",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/35": {
+    "reference_sha256": "ed0ee4518a20fcb15ecb58129b653ec68583aebc885282eab76a7b1d03bec182",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/36": {
+    "reference_sha256": "947c36a1ed3a9ffcbbe1907358ce1607522d1f5eb0c5625abbaf77f8db00b5dd",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/37": {
+    "reference_sha256": "8abb75d03d35063450b3c4521de41b45e76260a05608285ccb81f58ae739e569",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {},
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/38": {
+    "reference_sha256": "9e594f1d4e1f1837a0ba219bf8c1ed19c32d40fc76a876ecc3bf432509bbc802",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/39": {
+    "reference_sha256": "15a43ef2d0766a27250fbfd9af6a07c83767d77cdf0aa5f57fb3356370effa64",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/40": {
+    "reference_sha256": "085a2473f80030625385202d8eec314c6b0889e23c92cbd1cd8ac255da8a4c59",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
+  },
+  "5/41": {
+    "reference_sha256": "e7df63918a8ad2bbae71d71197f56d6cc74de9058403c9da55e98864c74bcd55",
+    "rewrite": null,
+    "rewrites": [],
+    "backend_policies": {
+      "cublaslt": {
+        "blas_preference": "cublaslt"
+      }
+    },
+    "contract": "same precision/mode; initial and every measured output verified; layout copy and preference dispatch timed; backend preferences do not establish actual library attribution"
   }
 }

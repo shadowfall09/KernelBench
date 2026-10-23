@@ -155,7 +155,7 @@ def baseline(payload: dict):
     )
     from src.validation import clone_tensors, compare_outputs
 
-    from .baseline_rewrites import rewrite_for
+    from .baseline_rewrites import plan_for, rewrite_for
     from .baseline_variants import prepare_baseline
     from .measurement import (
         CLOCK,
@@ -171,6 +171,7 @@ def baseline(payload: dict):
     settings = payload["eval_config"]
     os.environ["KB_FP32_TOL"] = str(settings["fp32_tolerance"])
     variant = settings.get("baseline_variant", "eager")
+    baseline_plan = plan_for(payload["level"], payload["problem_id"], reference, variant)
     tf32 = settings["precision"] == "fp32" and not settings.get("baseline_suite", False) and not settings.get("input_profile")
     configure_tf32(torch, tf32)
     device = torch.device("cuda:0")
@@ -194,7 +195,7 @@ def baseline(payload: dict):
         backend = settings.get("compile_backend")
         mode = settings.get("compile_mode", "default")
         model, backend, mode = prepare_baseline(model, args, device, variant, backend=backend, mode=mode,
-                                                rewrite=rewrite_for(payload["level"], payload["problem_id"], reference))
+                                                rewrite=rewrite_for(payload["level"], payload["problem_id"], reference), plan=baseline_plan)
         synchronize(device)
         setup_ms = (CLOCK() - started) * 1000
         set_seed(42)
@@ -244,6 +245,7 @@ def baseline(payload: dict):
             "compile_backend": backend,
             "compile_mode": mode,
             "baseline_variant": variant,
+            "baseline_plan": baseline_plan,
             "baseline_correctness": True,
             "device_fingerprint": device_fingerprint(device),
             "input_signature": input_signature(args),

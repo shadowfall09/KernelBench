@@ -15,24 +15,32 @@ def variants_for(config, pid):
         return ("neuron_eager", "neuron_compile", "neuron_library") if library_supported(config.level, pid) else ("neuron_eager", "neuron_compile")
     if config.baseline_portfolio == "standard":
         return VARIANTS
-    from .baseline_rewrites import rewrite_for
+    from .baseline_rewrites import extension_options
     from .common import select_problems
 
     source = select_problems(config.level, problem_ids=[pid])[pid].read_text()
-    return (*EXTENDED_VARIANTS, "library_rewrite", "library_rewrite_cuda_graph") if rewrite_for(config.level, pid, source) else EXTENDED_VARIANTS
+    return (*EXTENDED_VARIANTS, *extension_options(config.level, pid, source))
 
 
-def prepare_baseline(model, args, device, variant, *, backend="", mode="default", rewrite=None):
+def prepare_baseline(model, args, device, variant, *, backend="", mode="default", rewrite=None, plan=None):
     import torch
 
     from .baseline_rewrites import framework_rewrite
 
-    if variant not in {*EXTENDED_VARIANTS, "library_rewrite", "library_rewrite_cuda_graph"}:
+    if plan is not None:
+        if plan.get("protocol") != "kernelbench_pro_baseline_recipe_v1" or plan.get("variant") != variant:
+            raise ValueError("Baseline variant differs from its source-bound recipe")
+        rewrite = plan.get("rewrite")
+    if variant not in {*EXTENDED_VARIANTS, "library_rewrite", "library_rewrite_cuda_graph"} and plan is None:
         raise ValueError(f"Unknown baseline variant: {variant}")
     if variant.startswith("library_rewrite"):
         if rewrite is None:
             raise ValueError("No reviewed library rewrite for this task")
         model = framework_rewrite(model, rewrite)
+    if plan is not None and plan.get("backend_policy"):
+        from .baseline_policies import apply
+
+        model = apply(model, plan["backend_policy"])
     if variant.startswith("compile_"):
         backend, mode = "inductor", "max-autotune" if variant.startswith("compile_max_autotune") else "default"
         if variant.endswith("_cuda_graph") and mode == "max-autotune":

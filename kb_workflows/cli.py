@@ -25,6 +25,12 @@ def main(argv=None):
                 raise ValueError("Use scripts.regrade_artifacts native-run for artifact verification; batch supports its analysis only")
         selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         calibrated_inputs = None
+        baseline_variants = None
+        if config.baseline_suite and config.baseline_portfolio == "extended":
+            from .baseline_variants import variants_for
+
+            choices = {pid: list(variants_for(config, pid)) for pid in selected}
+            baseline_variants = {"portfolio": "extended", "declared_variants": sum(map(len, choices.values())), "tasks": choices}
         if config.state_validation:
             from .state_policies import plan as state_plan
 
@@ -77,6 +83,7 @@ def main(argv=None):
                         **({"operator_input_coverage": operator_input_coverage} if operator_input_coverage else {}),
                         **({"calibrated_inputs": calibrated_inputs} if calibrated_inputs is not None else {}),
                         **({"numerical_coverage": numerical_coverage} if numerical_coverage is not None else {}),
+                        **({"baseline_variants": baseline_variants} if baseline_variants is not None else {}),
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],
                         "run_dir": str(config.run_dir),
                     },

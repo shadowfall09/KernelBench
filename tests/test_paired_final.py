@@ -107,7 +107,11 @@ def test_expanded_portfolio_requests_all_graph_combinations_and_reviewed_rewrite
     def evaluate(config, tasks):
         for key, payload in tasks:
             seen.append(payload)
+            from kb_workflows.baseline_rewrites import plan_for
+
             yield key, {"mean": 1, "cold_start_ms": 2, "baseline_correctness": True,
+                        "baseline_plan": plan_for(payload["level"], payload["problem_id"], payload["ref_arch_src"], payload["eval_config"]["baseline_variant"]),
+                        "reference_sha256": fingerprint({"source": payload["ref_arch_src"]}),
                         "metadata": {"evaluation_config": payload["eval_config"]}}
 
     monkeypatch.setattr(engine, "evaluate_tasks", evaluate)

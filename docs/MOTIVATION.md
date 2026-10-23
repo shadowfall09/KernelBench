@@ -211,6 +211,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V25-06 诊断设置贯穿冻结与比较 | 统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告 | M2, M5 | [tool_checks.py](../kb_workflows/tool_checks.py), [experiment.py](../kb_workflows/experiment.py), [final_verification.py](../kb_workflows/final_verification.py), [study_data.py](../kb_workflows/study_data.py), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
 | V26-04 新基线与恢复证据 | 输入记录进入基线指纹，缺当前配方、执行设备、工厂调用或逐输出检查数不能恢复/评分，旧分布基线须重测 | — | [engine.py](../kb_workflows/engine.py), [paper_analysis.py](../kb_workflows/paper_analysis.py), [input_calibration.py](../kb_workflows/input_calibration.py) |
 | V31-05 吞吐差异复核与性能资格 | 逐轮10%标记可来自正常并行，不抹除原生答案；未消除差异不获性能分，分母不减 | M2 | [paper_analysis.py](../kb_workflows/paper_analysis.py) |
+| V34-01 全题来源绑定的基线清单 | 291题冻结参考SHA、11个数学改写和491个适用后端策略；没有额外改写的题目保留基础组合 | M5 | [baseline_rewrites.json](../kb_workflows/baseline_rewrites.json) |
+| V34-02 注意力与归一化库改写 | SDPA/GQA、LayerNorm/var_mean、残差RMS及行缩放/范数形式保持名义域、mask、eps、affine和输出格式 | M2 | [baseline_rewrites.py](../kb_workflows/baseline_rewrites.py) |
+| V34-03 卷积布局与后端偏好作用域 | channels-last/3d、cuDNN benchmark、cuBLASLt偏好按调用设置恢复，转换与设置成本计时；不冒充GPU来源 | M2 | [baseline_policies.py](../kb_workflows/baseline_policies.py) |
+| V34-04 每个扩展项的Graph对应 | 六基础组合加每项库/后端Graph版本，完整声明2750个分题变体；不支持捕获和错误输出保留失败 | — | [baseline_variants.py](../kb_workflows/baseline_variants.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -323,6 +327,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V32-07 全族回归与原始范围验收 | 小输入验证L1/L2/生产族、缓存反例及私有流程；R09按最初四项验收，不增加万能GPU证明条件 | M2 | [test_cache_audit.py](../tests/test_cache_audit.py) |
 | V33-06 全题状态政策与私有工作流 | 291题source绑定政策贯穿CLI/生成/队列/Harbor/最终，普通状态白名单和未使用角色不借可执行回调 | M2 | [engine.py](../kb_workflows/engine.py) |
 | V33-07 原构造元数据与循环状态回归 | 291题仅构造meta模型、不调用输入工厂；小循环状态/对象缓存、别名、快照和收据反例验证有限软件范围 | M2 | [test_ordinary_state.py](../tests/test_ordinary_state.py) |
+| V34-05 基线政策收据与复核门 | 新变体的配方/来源/策略/Graph收据进入恢复、配对与评分；缺项失格但保留原始时间和诊断 | M3 | [engine.py](../kb_workflows/engine.py) |
+| V34-06 原生预检与多后端边界 | SDK轻量预览列逐题变体和总数，原生/最终/私有Harbor共用清单；Neuron保留自己的非CUDA组合 | M3 | [cli.py](../kb_workflows/cli.py) |
+| V34-07 数学格式与后端模拟回归 | 三个dtype的合法值配方、291题清单、2D/3D布局、设置异常恢复、原生错误拒绝与收据删改；不运行设备实验 | M2 | [test_baseline_recipes.py](../tests/test_baseline_recipes.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -344,7 +351,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |
 | R-12 独立最终重测 | 代码已实现 | M3 | 已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行 |
-| R-13 扩展基线组合 | 部分实现 | M3 | 已有compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖仍需实现，真实GPU部署和实验按用户要求不运行 |
+| R-13 扩展基线组合 | 代码已实现 | M3 | 291题来源清单已覆盖论文指定的SDPA、LayerNorm/var_mean、卷积benchmark/布局和cuBLASLt偏好；六基础组合及每个改写/策略的Graph对应共2750个分题声明。逐输出验证、失败保留、政策收据、冷成本/稳态选择与恢复/配对/评分门已实现；最强指声明且通过的集合，非全库最优性证明；不运行硬件实验 |
 | R-14 设备实测上限与边界证书 | 代码已实现 | M3 | 已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理 |
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
 | R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA busy并集与部分源码/库/Graph来源诊断、Neuron框架/NEFF/NTFF及每引擎指令并集、缺计数器时AE/O与launch_only；硬件工作计数器、完整来源与正式归因门待实现，没有运行设备实验 |

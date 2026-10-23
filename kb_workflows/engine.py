@@ -314,6 +314,8 @@ def analyze_run(config):
 
 
 def record_baseline_suite(config):
+    from .baseline_rewrites import baseline_issue as recipe_baseline_issue
+    from .baseline_rewrites import issue as recipe_issue
     from .baseline_variants import select_baseline, variants_for
     from .input_calibration import baseline_issue as calibrated_baseline_issue
     from .input_calibration import issue as calibrated_input_issue
@@ -328,7 +330,8 @@ def record_baseline_suite(config):
         signature = fingerprint(base)
         previous = level.get(path.name, {})
         if (config.resume and previous.get("suite_complete") and previous.get("metadata", {}).get("workflow_signature") == signature
-                and not baseline_issue(config, previous, pid) and not calibrated_baseline_issue(config, previous, pid)):
+                and not baseline_issue(config, previous, pid) and not calibrated_baseline_issue(config, previous, pid)
+                and not recipe_baseline_issue(config, previous, pid)):
             continue
         signatures[path.name] = signature
         variants[path.name] = {}
@@ -344,6 +347,8 @@ def record_baseline_suite(config):
         expected = next(payload for task_key, payload in tasks if task_key == key)
         if reason := calibrated_input_issue(result, expected):
             result = failure(reason)
+        if reason := recipe_issue(result, expected):
+            result = {**result, "baseline_correctness": False, "metadata": {**result.get("metadata", {}), "error": reason}}
         variants[name][variant] = result
         chosen = select_baseline(variants[name], config.cold_calls)
         chosen.setdefault("metadata", {})["workflow_signature"] = signatures[name]
@@ -357,11 +362,14 @@ def record_baseline_suite(config):
 
 
 def paired_variant(config, pid):
+    from .baseline_rewrites import baseline_issue as recipe_baseline_issue
     from .measurement import amortized
 
     reference = select_problems(config.level, problem_ids=[pid])[pid]
     data = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
     baseline = data.get(f"level{config.level}", {}).get(reference.name, {})
+    if recipe_baseline_issue(config, baseline, pid):
+        raise ValueError("Paired timing requires current source-bound baseline recipe receipts")
     options = baseline.get("variants", {"eager": baseline})
     valid = {name: value for name, value in options.items() if value.get("baseline_correctness") is True
              and type(value.get("mean")) in (int, float) and math.isfinite(value["mean"]) and value["mean"] > 0

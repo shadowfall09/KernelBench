@@ -27,6 +27,7 @@ def valid_time(value):
 
 
 def compatible(baseline, candidate, current_digest):
+    from .baseline_rewrites import artifact_issue
     from .isolation import runtime_issue
 
     metadata = candidate.get("metadata", {})
@@ -34,6 +35,8 @@ def compatible(baseline, candidate, current_digest):
         return reason
     if baseline.get("baseline_correctness") is not True or (baseline.get("baseline_suite") and not baseline.get("suite_complete")):
         return "baseline_not_validated_or_incomplete"
+    if reason := artifact_issue(baseline):
+        return reason
     if not same_device_class(baseline.get("device_fingerprint", {}), metadata.get("device_fingerprint", {})):
         return "device_or_software_mismatch"
     if baseline.get("timing_method") != "synchronized_wall" or metadata.get("timing_method") != "synchronized_wall":
@@ -211,10 +214,12 @@ def analyze_paper(config):
             if status == "verified":
                 status = compatible(baseline, raw, digest) or status
             if status == "verified":
+                from .baseline_rewrites import baseline_issue as recipe_baseline_issue
                 from .input_calibration import baseline_issue as calibrated_baseline_issue
                 from .isolation import baseline_issue
 
-                status = baseline_issue(config, baseline, pid) or calibrated_baseline_issue(config, baseline, pid) or status
+                status = (baseline_issue(config, baseline, pid) or calibrated_baseline_issue(config, baseline, pid)
+                          or recipe_baseline_issue(config, baseline, pid) or status)
             if status == "verified":
                 expected_baseline = fingerprint(task_payload(config, pid, task="baseline"))
                 if baseline.get("metadata", {}).get("workflow_signature") != expected_baseline:

@@ -1468,13 +1468,16 @@
       "title": "扩展基线组合",
       "primary": "M3",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/baseline_variants.py",
-        "kb_workflows/baseline_rewrites.py"
+        "kb_workflows/baseline_rewrites.py",
+        "kb_workflows/baseline_policies.py",
+        "tests/test_baseline_recipes.py",
+        "docs/BASELINE_PORTFOLIO.md"
       ],
-      "reason": "已有compile两模式各自Graph及3道归一化题的可信框架改写；完整题目级库改写覆盖仍需实现，真实GPU部署和实验按用户要求不运行"
+      "reason": "291题来源清单已覆盖论文指定的SDPA、LayerNorm/var_mean、卷积benchmark/布局和cuBLASLt偏好；六基础组合及每个改写/策略的Graph对应共2750个分题声明。逐输出验证、失败保留、政策收据、冷成本/稳态选择与恢复/配对/评分门已实现；最强指声明且通过的集合，非全库最优性证明；不运行硬件实验"
     },
     {
       "id": "R-14",
@@ -3712,6 +3715,102 @@
         "tests/test_ordinary_state.py"
       ],
       "reason": "291题仅构造meta模型、不调用输入工厂；小循环状态/对象缓存、别名、快照和收据反例验证有限软件范围"
+    },
+    {
+      "id": "V34-01",
+      "title": "全题来源绑定的基线清单",
+      "primary": "M3",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/baseline_rewrites.json"
+      ],
+      "reason": "291题冻结参考SHA、11个数学改写和491个适用后端策略；没有额外改写的题目保留基础组合"
+    },
+    {
+      "id": "V34-02",
+      "title": "注意力与归一化库改写",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/baseline_rewrites.py"
+      ],
+      "reason": "SDPA/GQA、LayerNorm/var_mean、残差RMS及行缩放/范数形式保持名义域、mask、eps、affine和输出格式"
+    },
+    {
+      "id": "V34-03",
+      "title": "卷积布局与后端偏好作用域",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/baseline_policies.py"
+      ],
+      "reason": "channels-last/3d、cuDNN benchmark、cuBLASLt偏好按调用设置恢复，转换与设置成本计时；不冒充GPU来源"
+    },
+    {
+      "id": "V34-04",
+      "title": "每个扩展项的Graph对应",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/baseline_variants.py"
+      ],
+      "reason": "六基础组合加每项库/后端Graph版本，完整声明2750个分题变体；不支持捕获和错误输出保留失败"
+    },
+    {
+      "id": "V34-05",
+      "title": "基线政策收据与复核门",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "新变体的配方/来源/策略/Graph收据进入恢复、配对与评分；缺项失格但保留原始时间和诊断"
+    },
+    {
+      "id": "V34-06",
+      "title": "原生预检与多后端边界",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/cli.py"
+      ],
+      "reason": "SDK轻量预览列逐题变体和总数，原生/最终/私有Harbor共用清单；Neuron保留自己的非CUDA组合"
+    },
+    {
+      "id": "V34-07",
+      "title": "数学格式与后端模拟回归",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_baseline_recipes.py"
+      ],
+      "reason": "三个dtype的合法值配方、291题清单、2D/3D布局、设置异常恢复、原生错误拒绝与收据删改；不运行设备实验"
     }
   ]
 }

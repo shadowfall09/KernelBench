@@ -88,7 +88,7 @@ def evaluate_paired(payload):
     )
     from src.validation import clone_tensors
 
-    from .baseline_rewrites import rewrite_for
+    from .baseline_rewrites import plan_for, rewrite_for
     from .baseline_variants import prepare_baseline
     from .common import ROOT, fingerprint
     from .evaluate_task import configure_tf32, validate_sources
@@ -131,11 +131,12 @@ def evaluate_paired(payload):
     set_seed(seed)
     nominal = [_process_input_tensor(value, device, dtype) for value in inputs()]
     rewrite = rewrite_for(payload["level"], payload["problem_id"], source)
+    baseline_plan = plan_for(payload["level"], payload["problem_id"], source, variant)
     functions = {}
     for name in ("R", "B"):
         functions[name], _, _ = prepare_baseline(models[name], nominal, device, variant,
                                                 backend=settings.get("compile_backend", ""),
-                                                mode=settings.get("compile_mode", "default"), rewrite=rewrite)
+                                                mode=settings.get("compile_mode", "default"), rewrite=rewrite, plan=baseline_plan)
 
     def factory(index):
         return [_process_input_tensor(value, device, dtype) for value in inputs()]
@@ -155,7 +156,7 @@ def evaluate_paired(payload):
                            device=device, trials=settings.get("paired_trials", 30), seed=seed,
                            reset=reset, set_seed=set_seed, tolerance=get_tolerance_for_precision(dtype),
                            verifier=verify if settings.get("input_profile") else None)
-    result.update(baseline_variant=variant, input_signature=input_signature(nominal), output_consumed=True,
+    result.update(baseline_variant=variant, baseline_plan=baseline_plan, input_signature=input_signature(nominal), output_consumed=True,
                   varied_inputs=True, all_outputs_verified=True)
     return {"compiled": True, "correctness": True, "runtime": result["candidate_mean_ms"],
             "runtime_stats": {}, "peak_memory": -1, "memory_stats": {},
@@ -190,6 +191,15 @@ def validate_for_score(config, pid, sid, variant, baseline):
             return "paired_measurement_runtime_mismatch", None
         metadata = result.get("metadata", {})
         record = metadata.get("paired_timing", {})
+        if config.device_backend == "cuda":
+            from .baseline_rewrites import plan_for
+
+            try:
+                plan = plan_for(config.level, pid, expected["ref_arch_src"], variant)
+            except (ValueError, KeyError, TypeError):
+                return "paired_baseline_recipe_changed", None
+            if record.get("baseline_plan") != plan:
+                return "paired_baseline_recipe_missing_or_changed", None
         if (not same_device_class(baseline.get("device_fingerprint", {}), metadata.get("device_fingerprint", {}))
                 or record.get("baseline_variant") != variant or record.get("num_pairs") != config.paired_trials
                 or metadata.get("input_signature") != baseline.get("input_signature")
