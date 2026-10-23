@@ -1,0 +1,65 @@
+# 原生输入的独立数值复核
+
+`numerical_validation`增加原生输入上的CPU FP64/complex128数值门，当前有原L1全部100题的独立算式适配器。默认关闭，不替换原生正确性或性能协议，不自动授予完整L0。
+
+```toml
+[run]
+level = 1
+numerical_validation = true
+oracle_memory_mb = 4096
+timeout = 1800
+sanitizer_timeout = 600
+```
+
+只预览配置及源码覆盖：
+
+```bash
+python scripts/run_batch.py --config configs/a6000-feedback.toml \
+  --numerical-validation --oracle-memory-mb 4096 --dry-run
+```
+
+`--dry-run`不加载Torch，不分配题目输入、不运行设备；输出`numerical_coverage`及已记录的参考问题。源码SHA与[适配器清单](../kb_workflows/operator_oracles.json)不一致时，预检和worker都拒绝套用旧公式。L2/L3及生产任务尚未接入这条独立算式路径，选择它们时不允许用通用`.double()`替代后声称全覆盖。
+
+## 实际检查什么
+
+原生worker先按现有协议完成正确性及计时。随后独立复核worker关闭性能采样，在每个实际标准/隐藏双向正确性实例前，先由CPU公式计算真值，再在隔离模型与输入副本上分别调用参考和候选。每个实例重放原种子，恢复RNG和进程设置，不推进原生模型。
+
+原始shape、stride、输入值和模型超参数不被重采样、缩小或自动修复。整数、bool及标签保留角色；输入浮点存储的实际值被提升到FP64，参数/buffer同样使用其实际存储值。参考和候选输出搬到CPU时保留原dtype；真值不先舍入到输出dtype。
+
+独立公式不调用参考或候选的`forward`，也不调用对应的原生融合算子：
+
+- 矩阵家族使用CPU FP64矩阵算术，并保留转置、对角、三角等题义。
+- 卷积按空间kernel偏移做逐组收缩，转置卷积按合法目标索引累加；保持stride、padding、dilation、groups、output padding和bias。
+- 池化显式枚举窗口，处理padding、ceil边界、平均池分母和最大池返回索引；索引与并列结果精确比较。
+- 归一化按声明轴显式计算中心化/方差或范数，保留仿射状态及train/eval中的running state；attention显式计算缩放、稳定softmax和加权和。
+- 激活、scan及loss保留精确GELU与tanh近似的区别、exclusive/reverse/masked语义、cross-entropy标签、KL零target项及triplet epsilon/margin等参数。
+
+实现仍依赖安装的CPU Tensor算术和FP64精度，不能解释为底层库无误或数学精确算术的证明。完整公式见[实现](../kb_workflows/operator_oracles.py)。
+
+## 误差、参考自资格与信号
+
+每个浮点叶子同时满足RMS和所有元素误差门，公式与[严格契约](STRICT_VALIDATION.md)相同。当前清单公布的是**初始误差预算**，没有运行设备校准；不能把“配置了阈值”写成“阈值已校准”。参考自身也必须满足同一FP64门；不为使参考通过而自动放宽阈值。
+
+结构、shape、dtype、离散输出和NaN/Inf位置另行核对。参考资格独立于候选判断：oracle shape或结构不一致时，缺少数值叶子不能算参考合格；候选自身结构错误也不能凭空否定一个已通过参考自检查的参考。
+
+每个实际实例还记录参考输出的有限值、RMS、最大值、超过绝对阈值的比例和常数标记。该次任务至少有一个信息量足够的实例才能通过`reference_signal`；常数本身不是语义错误。弱信号会被报告，输入自动校准及相应新基线仍需实现。
+
+## 主机内存与请求预算
+
+`oracle_memory_mb`是1–1048576 MiB的增量主机内存**估计准入包络**，默认4096 MiB。worker在复制或执行oracle前，根据实际输入、状态、输出及attention/卷积等中间量估计峰值。超包络记`not_measured`，不缩小原尺寸、不换低精度；分配失败、超时和不完整执行也不能通过。
+
+该估计不是OS RSS硬限制或无OOM保证；实际操作系统资源限制仍由[受限验证器](ISOLATION_REGRADE.md)和部署负责。原生运行、可选工具与复核共用请求`timeout`，保留5秒清理，复核受`sanitizer_timeout`阶段上限约束。大尺寸CPU FP64可能很慢；本实现没有执行原尺寸设备实验。
+
+## 证据、评分与恢复
+
+`metadata.tool_checks.control.result.metadata.numerical_audit`保存规格摘要、数值策略、内存包络，以及逐实例label、seed、输入签名、估计内存、数值门、参考自资格、信号诊断和错误。
+
+评分和恢复重新核对实际原生实例集合、冻结规格/误差/内存政策、RMS限值、误差计数和逐例完成状态。缺实例、改seed、加宽误差或内存政策、把非零失败计数改成“passed”均不能只改外层摘要取得资格。模拟执行不能建立设备资格。该路径进入本地、Docker、Modal、HTTP队列和Harbor的同一监督进程，可与状态和重复检查共用一次复核。诊断时间及输出不替换最初的性能样本。
+
+## 发现的参考问题与未完成范围
+
+原L1第92题在`dim`方向拼接零，却用`[:-1]`裁剪第0维。当前配置`dim=1`时，输出shape不是exclusive cumsum题义的原输入shape。独立公式沿声明轴移位并保留shape，因此参考自资格失败；该问题在清单和逐任务诊断中保留。原题文件与历史题集快照在本版没有修改，也没有把题目或失败从分母移除。
+
+另有固定CPU反例表明，BF16 triplet loss在接近抵消的结果上，参考也可能超出公布预算；与参考相同的候选不会因此自动获得资格。测试保留此反例，而不是放宽误差门。
+
+当前新增路径覆盖L1的实际实例，原17题小实例严格契约继续保留；L2/L3的独立数值适配、全题原尺寸校准、输入修复和新基线、原题问题的有版本修正仍未完成。本文的CPU/模拟回归不能替代设备或模型实验。没有运行GPU、Trainium、真实模型、容器或训练实验。

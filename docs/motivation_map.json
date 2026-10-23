@@ -1302,10 +1302,13 @@
       "source": "paper_design",
       "evidence": [
         "kb_workflows/numerical.py",
-        "kb_workflows/strict_validation.py",
-        "kb_workflows/production.py"
+        "kb_workflows/operator_oracles.py",
+        "kb_workflows/operator_oracles.json",
+        "kb_workflows/numerical_audit.py",
+        "tests/test_operator_oracles.py",
+        "docs/NUMERICAL_VALIDATION.md"
       ],
-      "reason": "17道旧题附加FP64参考自资格及新41题参考误差门已接入；6道数值设计有FP64算术参考与逐题预算，原250题原尺寸独立oracle校准与完整覆盖仍需实现"
+      "reason": "保留17题附加契约，新增原L1全部100题的独立CPU FP64算式与实际原生输入复核，参考/候选同门自资格；检出92题轴裁剪缺陷及BF16抵消反例；L2/L3独立适配、全题校准与参考问题的有版本修正仍需完成"
     },
     {
       "id": "R-05",
@@ -1316,9 +1319,11 @@
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py"
+        "kb_workflows/numerical.py",
+        "kb_workflows/numerical_audit.py",
+        "tests/test_numerical_audit.py"
       ],
-      "reason": "已实现输出信号诊断和限定域输入族，至少一组实例有信息量；原计时输入不变，逐题自动校准与新基线待完成"
+      "reason": "已实现附加实例及L1实际原生输入的逐叶信号诊断/收据重算，至少一例须有信息量；原计时输入不变，逐题自动校准、合法输入修复与相应新基线仍需完成"
     },
     {
       "id": "R-06",
@@ -2711,6 +2716,98 @@
         "tests/test_state_audit.py"
       ],
       "reason": "拒绝共享模型/状态存储和改变快照值，逐例重算绑定摘要与模式/参数步骤；改容差/漏实例/模拟执行不能获得设备资格"
+    },
+    {
+      "id": "V24-01",
+      "title": "L1独立FP64算式与源码绑定",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/operator_specs.py",
+        "kb_workflows/operator_oracles.py",
+        "kb_workflows/operator_oracles.json",
+        "tests/test_operator_oracles.py"
+      ],
+      "reason": "为原L1全部100题提供冻结源码/域/初始误差预算的CPU公式，不调用参考forward；原题不被改写，L2/L3缺适配不冒充覆盖"
+    },
+    {
+      "id": "V24-02",
+      "title": "卷积与池化窗口参考",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/operator_oracles.py",
+        "tests/test_operator_oracles.py"
+      ],
+      "reason": "显式逐组空间收缩与转置散射，保留stride/dilation/padding/output padding；窗口池化保留ceil边界、分母与并列索引，不调用原融合算子"
+    },
+    {
+      "id": "V24-03",
+      "title": "数值语义与低精度自资格反例",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/operator_oracles.py",
+        "tests/test_operator_oracles.py"
+      ],
+      "reason": "归一化/attention/loss采用显式FP64公式并保留状态、标签、epsilon和精确激活语义；固定BF16抵消反例不能因候选等于参考而通过"
+    },
+    {
+      "id": "V24-04",
+      "title": "实际输入复核与内存准入",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/numerical_audit.py",
+        "kb_workflows/config.py",
+        "kb_workflows/evaluate_task.py",
+        "tests/test_numerical_audit.py"
+      ],
+      "reason": "可选numerical_validation覆盖实际原生标准/隐藏输入，分配前核对主机内存估计包络；不缩小原尺寸，独立复核不替换性能样本"
+    },
+    {
+      "id": "V24-05",
+      "title": "参考结构与离散自资格修正",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/numerical.py",
+        "tests/test_operator_oracles.py"
+      ],
+      "reason": "参考资格独立计算，oracle shape/结构/离散dtype不符时不能因没有数值叶子而通过；92题exclusive scan参考缺陷明确保留失败"
+    },
+    {
+      "id": "V24-06",
+      "title": "数值与信号证据重算",
+      "primary": "M2",
+      "secondary": [
+        "M5",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/numerical_audit.py",
+        "kb_workflows/tool_checks.py",
+        "kb_workflows/cli.py",
+        "tests/test_numerical_audit.py"
+      ],
+      "reason": "核对逐原生实例、冻结规格/误差/内存政策、RMS限值、元素计数和信号叶子；源码漂移/缺项/模拟不能获得设备资格，配置贯穿Harbor及评分恢复"
     }
   ]
 }

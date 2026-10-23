@@ -29,6 +29,14 @@ def main(argv=None):
             from .contract_specs import coverage
 
             strict_coverage = coverage(config.level, selected)
+        numerical_coverage = None
+        if config.numerical_validation:
+            from .operator_specs import spec_for
+
+            specs = {pid: spec_for(config.level, pid, path.read_text()) for pid, path in selected.items()}
+            numerical_coverage = {"supported": list(specs), "scope": "independent_FP64_on_actual_native_inputs",
+                                  "known_reference_issues": {pid: spec["known_reference_issue"] for pid, spec in specs.items()
+                                                             if spec["known_reference_issue"]}}
         if config.hidden_tests and config.stage in {"all", "evaluate"}:
             for pid in selected:
                 path = ROOT / "hidden_tests" / f"level{config.level}" / f"{pid}_hidden.py"
@@ -42,6 +50,7 @@ def main(argv=None):
                         "problems": list(selected),
                         "suite": selection_receipt(config),
                         "strict_coverage": strict_coverage,
+                        **({"numerical_coverage": numerical_coverage} if numerical_coverage is not None else {}),
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],
                         "run_dir": str(config.run_dir),
                     },

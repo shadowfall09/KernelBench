@@ -96,6 +96,8 @@ def evaluator_digest():
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
         "kb_workflows/state_contract.py",
         "kb_workflows/state_audit.py",
+        "kb_workflows/numerical_audit.py", "kb_workflows/operator_oracles.py",
+        "kb_workflows/operator_specs.py", "kb_workflows/operator_oracles.json",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
         "kb_workflows/submission_source.py", "kb_workflows/kernel_origin.py", "kb_workflows/cuda_origin.py",
         "kb_workflows/origin_binaries.py", "kb_workflows/origin_graphs.py",

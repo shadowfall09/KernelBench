@@ -1,0 +1,732 @@
+{
+  "protocol": "kernelbench_pro_operator_oracles_v1",
+  "threshold_source": "Published initial error budgets, not device-calibrated; reference must independently qualify on each actual input",
+  "tasks": {
+    "1/1": {
+      "name": "Square_matrix_multiplication_",
+      "reference_sha256": "2d349d77a97fd1a6f29365553275729685ab1cfff57ca4458bb6a8c09b88e91d",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/2": {
+      "name": "Standard_matrix_multiplication_",
+      "reference_sha256": "bce22f4d7998a206e01997a59183bd8290b8d2e9993e19ec44d40fe019ff6965",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/3": {
+      "name": "Batched_matrix_multiplication",
+      "reference_sha256": "f785135fb4b6dcce703e086882993fddda81c107eef5dd425da53b1d26a1e04e",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/4": {
+      "name": "Matrix_vector_multiplication_",
+      "reference_sha256": "e2dae47c5eb114f64a2800006e1fe2dbf66c47536e9dae5e1404ebd5ddeda14b",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/5": {
+      "name": "Matrix_scalar_multiplication",
+      "reference_sha256": "cebe7f46e6399e4711743bcf1a89efceed348feaf481961b4ae1ff329d6a58c1",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/6": {
+      "name": "Matmul_with_large_K_dimension_",
+      "reference_sha256": "98dc90d168182da70323df08295acd6136dd946f74f801fda2cd22fe2ba473d2",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/7": {
+      "name": "Matmul_with_small_K_dimension_",
+      "reference_sha256": "3aa3688513fc95456e6ed9f2de9a0c71773a33f16e42405d3bca4678d8c27024",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/8": {
+      "name": "Matmul_with_irregular_shapes_",
+      "reference_sha256": "e5a83f3620f6cc123f7292399be80e8ae17969ee180d3540bbd35a3a4807150f",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/9": {
+      "name": "Tall_skinny_matrix_multiplication_",
+      "reference_sha256": "183b5173c6b56a8ac1c20d606c075fba88e3b606208dfe129d0038aa7be52fc1",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/10": {
+      "name": "3D_tensor_matrix_multiplication",
+      "reference_sha256": "9feadc5bac2eb98fa95bd224f87bdffb390fe41632e58b6811a0ade4367233ab",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/11": {
+      "name": "4D_tensor_matrix_multiplication",
+      "reference_sha256": "09fc7f7f20b65c2a9e59251cb3abaa1cf59211f71ce80245ddd791fe537bd698",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/12": {
+      "name": "Matmul_with_diagonal_matrices_",
+      "reference_sha256": "62342e32e5d33f65deb299004b052473b5f78094cc897daa845cf09e1a6e0bec",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/13": {
+      "name": "Matmul_for_symmetric_matrices",
+      "reference_sha256": "8782872f96b406fc9d134201c1ae0cc840bd460a72a57b6891cb76be1a5f2864",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/14": {
+      "name": "Matmul_for_upper_triangular_matrices",
+      "reference_sha256": "070bdfbd6afcb82c1ddd8cd82c5a2fbb742089afc6aabfbc8d952e579068129d",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/15": {
+      "name": "Matmul_for_lower_triangular_matrices",
+      "reference_sha256": "069687881e034120fa1de076b1b9d9761c8fe45d5ac9a2972dbe1f8307c931c7",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/16": {
+      "name": "Matmul_with_transposed_A",
+      "reference_sha256": "e44b045efbae7379e912e8fa7770acb1b5e8b82eaef80d77b875630e27d05776",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/17": {
+      "name": "Matmul_with_transposed_B",
+      "reference_sha256": "a89773f8bd7f34b13fbcdba2c5670d0985cf38f767e272e9fe2ac7cb011d1b7c",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/18": {
+      "name": "Matmul_with_transposed_both",
+      "reference_sha256": "fc22bfbd08aa11fc82a1ec02c2469ad6f39a650404e5ae73d21f53bbede91701",
+      "family": "matmul",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with the frozen task's coupled matrix dimensions; symmetric/triangular/diagonal structure is retained for tasks 12–15."
+    },
+    "1/19": {
+      "name": "ReLU",
+      "reference_sha256": "3f3571481e280fdd960ec50ca9cbda184948b86b283c62af3ea6eb971848d84c",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/20": {
+      "name": "LeakyReLU",
+      "reference_sha256": "324f633b00a15888a798203317d76bd14287d50804c9b3f75f62b9e9cbda9345",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/21": {
+      "name": "Sigmoid",
+      "reference_sha256": "2220654dea1baaa2be7805ae74fc072b3c0a715d3bd6eb13098077eaf1fbe90a",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/22": {
+      "name": "Tanh",
+      "reference_sha256": "d72fb7d9001f9d19b712ac2030187c7f9a123963ae00ef74db083268efd12c88",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/23": {
+      "name": "Softmax",
+      "reference_sha256": "4314753740f2f885486149f2449e04d463314dd0daa35a961e3b8b61bf334a8c",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/24": {
+      "name": "LogSoftmax",
+      "reference_sha256": "e22665b54ec00bf7510cdcde13dec2d645721976f3e12486ca2bddfc875b3a7e",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/25": {
+      "name": "Swish",
+      "reference_sha256": "455a745129977ab79abb2ca0cee1b3aad5fea82ccbf2eac975185237ae275b89",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/26": {
+      "name": "GELU_",
+      "reference_sha256": "5a63f7999287a10c0974b9beb591253b5b9c6d27d5d067583abad208dd322f6e",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/27": {
+      "name": "SELU_",
+      "reference_sha256": "c54c764742a5ec1994ac41f9e4becae6f4ada027b1b554e7a5b31af6513e0b16",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/28": {
+      "name": "HardSigmoid",
+      "reference_sha256": "e8077a6dfbf48823180676e7ad6d45c28a8b78e29d68e6daa32be339318873ea",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/29": {
+      "name": "Softplus",
+      "reference_sha256": "7481cd5fb1ddfd951c6fc859e2aae0e37bbd6a8620377b83f7c6535371609a9e",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/30": {
+      "name": "Softsign",
+      "reference_sha256": "d549a64f573785690f590740d9850aa4b7a4a7c579790b1a3fa7ae1ac529effd",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/31": {
+      "name": "ELU",
+      "reference_sha256": "69645350385f6c7133c48a6ed1e2f78e2124fd74a05ad11a76cb8976b933e03f",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/32": {
+      "name": "HardTanh",
+      "reference_sha256": "abe4bc7205002c762d007832256f6ac459f2c05a9643d084d43d98f78b7a88ac",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/33": {
+      "name": "BatchNorm",
+      "reference_sha256": "d91ed9ef739197df1baacc064e3fdea486add500588f7228a94bbcbeedcd9cfc",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/34": {
+      "name": "InstanceNorm",
+      "reference_sha256": "0db2fb5746f2616f306c4e1383086ab7e2cc01cb460e3b4fed556805e5d1f89b",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/35": {
+      "name": "GroupNorm_",
+      "reference_sha256": "dae7ea880e78cf6af30f328cfbd3da72a115f8c5fa9443263d5db814232ba92b",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/36": {
+      "name": "RMSNorm_",
+      "reference_sha256": "5219d89deaa2522637880af7981c9078b9f8e0808bc9bc7101e905650cd4faf1",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/37": {
+      "name": "FrobeniusNorm_",
+      "reference_sha256": "87c0d8e9d80ada38d30140c842f7d17d566c86852f1c506b8306827b94ca47b9",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/38": {
+      "name": "L1Norm_",
+      "reference_sha256": "f6dc16b4edfc7a6700002794ccc3708caca2609eb2ef32126855ba8a09158204",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/39": {
+      "name": "L2Norm_",
+      "reference_sha256": "0b483cf3c5c4c963163e8b0e388452f20679c41ac4201e1e4bc436949b8c146f",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/40": {
+      "name": "LayerNorm",
+      "reference_sha256": "3186ba7f571f0b5a27d6a6fa8c44fdfa6e993c288ef4a004fbd1518aafbcf55e",
+      "family": "normalization",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
+    },
+    "1/41": {
+      "name": "Max_Pooling_1D",
+      "reference_sha256": "788e2222fd6968f224ce81dbcd8f7ad1d9d92104c6b1687bf3ef41d821c03341",
+      "family": "pooling",
+      "known_reference_issue": null,
+      "legal_domain": "Legal positive spatial dimensions, numeric padding, stride, dilation and ceil-mode of the frozen module; discrete returned indices are exact."
+    },
+    "1/42": {
+      "name": "Max_Pooling_2D",
+      "reference_sha256": "4e2ee3d9952c29095079ece7fb12e62a21f209c6abce742a78894f1b7678fc8e",
+      "family": "pooling",
+      "known_reference_issue": null,
+      "legal_domain": "Legal positive spatial dimensions, numeric padding, stride, dilation and ceil-mode of the frozen module; discrete returned indices are exact."
+    },
+    "1/43": {
+      "name": "Max_Pooling_3D",
+      "reference_sha256": "89d254eb6436700597bceba64d60a8fd1b095d868c0785c4d9b264eb07648560",
+      "family": "pooling",
+      "known_reference_issue": null,
+      "legal_domain": "Legal positive spatial dimensions, numeric padding, stride, dilation and ceil-mode of the frozen module; discrete returned indices are exact."
+    },
+    "1/44": {
+      "name": "Average_Pooling_1D",
+      "reference_sha256": "0fe5629462900a05f368d863c9c28cfa7acbc44f27136014c6bc3b2a398b395c",
+      "family": "pooling",
+      "known_reference_issue": null,
+      "legal_domain": "Legal positive spatial dimensions, numeric padding, stride, dilation and ceil-mode of the frozen module; discrete returned indices are exact."
+    },
+    "1/45": {
+      "name": "Average_Pooling_2D",
+      "reference_sha256": "062bb9762938a827cefe172a5b450c304abe4047bcb251019c1c76579936378c",
+      "family": "pooling",
+      "known_reference_issue": null,
+      "legal_domain": "Legal positive spatial dimensions, numeric padding, stride, dilation and ceil-mode of the frozen module; discrete returned indices are exact."
+    },
+    "1/46": {
+      "name": "Average_Pooling_3D",
+      "reference_sha256": "3e3a1797d851cb37e001c14353ff3bf051e79ed574a7d2e5be80f44f262438ee",
+      "family": "pooling",
+      "known_reference_issue": null,
+      "legal_domain": "Legal positive spatial dimensions, numeric padding, stride, dilation and ceil-mode of the frozen module; discrete returned indices are exact."
+    },
+    "1/47": {
+      "name": "Sum_reduction_over_a_dimension",
+      "reference_sha256": "ee0a62cb65f320beb6388016e670195c2a7795f83527d76264eefec6b27ea158",
+      "family": "reduction",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared reduction axis; argmax/argmin use the first matching index."
+    },
+    "1/48": {
+      "name": "Mean_reduction_over_a_dimension",
+      "reference_sha256": "653ab19c0481d741f13967747d5874b8573031f555eb663228d5d8b280497023",
+      "family": "reduction",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared reduction axis; argmax/argmin use the first matching index."
+    },
+    "1/49": {
+      "name": "Max_reduction_over_a_dimension",
+      "reference_sha256": "3c7b0ca3422c0da3679e69bf4cc59e58da18df99666b1d6745655e50a7d31f78",
+      "family": "reduction",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared reduction axis; argmax/argmin use the first matching index."
+    },
+    "1/50": {
+      "name": "conv_standard_2D__square_input__square_kernel",
+      "reference_sha256": "e8095fb3c67a391c106e198305eb2bf035a97166898a47a52869adfcc7925b8b",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/51": {
+      "name": "Argmax_over_a_dimension",
+      "reference_sha256": "c1ce09c9f6168c5c9b759668d36afd6ef24433d07ec5af11a173b69490634f3d",
+      "family": "reduction",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared reduction axis; argmax/argmin use the first matching index."
+    },
+    "1/52": {
+      "name": "Argmin_over_a_dimension",
+      "reference_sha256": "a3b221e180f6d6f436ce42e292ee06b4e260df6a60d1b43b175b19f038a0ce27",
+      "family": "reduction",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared reduction axis; argmax/argmin use the first matching index."
+    },
+    "1/53": {
+      "name": "Min_reduction_over_a_dimension",
+      "reference_sha256": "293f21ff5e68d91ecc38c8308dbb43b9d8cf5abdcc3cff99d1a04631e5f342f6",
+      "family": "reduction",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared reduction axis; argmax/argmin use the first matching index."
+    },
+    "1/54": {
+      "name": "conv_standard_3D__square_input__square_kernel",
+      "reference_sha256": "c262f76cf959b35c7aab20464e47ef92a312a5c3bb99c130841d6deece3130dd",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/55": {
+      "name": "conv_standard_2D__asymmetric_input__square_kernel",
+      "reference_sha256": "aee14a975627a05a2f83427a5aacc82936de0e90072fec871ffd8ea907510cbb",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/56": {
+      "name": "conv_standard_2D__asymmetric_input__asymmetric_kernel",
+      "reference_sha256": "5225fa9be367b3306613f2859f56a0888ec94099ebe550a18bf73e1226230bda",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/57": {
+      "name": "conv_transposed_2D__square_input__square_kernel",
+      "reference_sha256": "4efddd03597fb3a0dff2b6d3b6246647bfcdfb412b7f8cafac8694e0fa37ba2b",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/58": {
+      "name": "conv_transposed_3D__asymmetric_input__asymmetric_kernel",
+      "reference_sha256": "ea59e34508a12639e637f696f71858ba8822570df1db7c1dd2c0d10108213694",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/59": {
+      "name": "conv_standard_3D__asymmetric_input__square_kernel",
+      "reference_sha256": "5ac98396901754f1f913dd917734f10baa340f99fb4367911ecca4004b4adaa8",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/60": {
+      "name": "conv_standard_3D__square_input__asymmetric_kernel",
+      "reference_sha256": "973abd15cea073b99ef905bad0b1a435d11d3c58bae2b1045928d93fc02475b7",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/61": {
+      "name": "conv_transposed_3D__square_input__square_kernel",
+      "reference_sha256": "f7f8ccd26f8710f47e1f7500da202342a400920ee0c7a6d1467d7edabb94acea",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/62": {
+      "name": "conv_standard_2D__square_input__asymmetric_kernel",
+      "reference_sha256": "ff17e1771b64dc2c75180f712b380e964fb7cbe65f1d5134c1e7d66ade292efc",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/63": {
+      "name": "conv_standard_2D__square_input__square_kernel",
+      "reference_sha256": "5ae80deafc5d8fd5d5e411cbc1e6e6ee023c792edfa008a5370499eb87db45dd",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/64": {
+      "name": "conv_transposed_1D",
+      "reference_sha256": "4c83f819cc5b81945b5da0a2272b8f9bbbf01b405e3f3e0f2ba0b32997f4f631",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/65": {
+      "name": "conv_transposed_2D__square_input__asymmetric_kernel",
+      "reference_sha256": "f5363206823b51cb8b059d63892b64422bc19945e81b47f8fe7dbe0e208ef904",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/66": {
+      "name": "conv_standard_3D__asymmetric_input__asymmetric_kernel",
+      "reference_sha256": "f716f33c97c180ebceb22745fea0f9698873564469b0198b7d12272caf61e087",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/67": {
+      "name": "conv_standard_1D",
+      "reference_sha256": "7a8e48ec22a52062af0e972c7bdd9a45e07681c4d0508ef9b10b7d982957cd8b",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/68": {
+      "name": "conv_transposed_3D__square_input__asymmetric_kernel",
+      "reference_sha256": "3ef96c5ebd8e476040be78d213b156c096f314cf45d9d765279708abb53138cb",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/69": {
+      "name": "conv_transposed_2D__asymmetric_input__asymmetric_kernel",
+      "reference_sha256": "14d75d426a241346c69f07529603556ce461dec8325f23b6858072e403de17bb",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/70": {
+      "name": "conv_transposed_3D__asymmetric_input__square_kernel",
+      "reference_sha256": "e225fb16bd92aa821904ccc7b79fb78cda1af6c5b069dc4c421d83ca05e0c299",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/71": {
+      "name": "conv_transposed_2D__asymmetric_input__square_kernel",
+      "reference_sha256": "e853d51d8a2f8685c468e9c7a31a544ce82876e1b280b95772df144a2b02a809",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/72": {
+      "name": "conv_transposed_3D_asymmetric_input_asymmetric_kernel___strided_padded_grouped_",
+      "reference_sha256": "4abb4af5c7a68ced6bbede5d96937c0f0e38053b143643355ac5381554d50521",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/73": {
+      "name": "conv_transposed_3D_asymmetric_input_square_kernel__strided_padded__grouped",
+      "reference_sha256": "c9652bf021895c6b1fdfe4632aa24d62e993a201f122e8014d80ea8ed65e5e19",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/74": {
+      "name": "conv_transposed_1D_dilated",
+      "reference_sha256": "959a2e0100c4fa55ac5ce5814953a15728f8f81d035a8b345eea4a4aa1b5ad9f",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/75": {
+      "name": "conv_transposed_2D_asymmetric_input_asymmetric_kernel_strided__grouped____padded____dilated__",
+      "reference_sha256": "29b7ceecf13fb2ea071ca22ed3805c974831d17cb70157d64ab5df5b6868999b",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/76": {
+      "name": "conv_standard_1D_dilated_strided__",
+      "reference_sha256": "14f573c50d1da58563f5b6c6d2f1a0490b74a100c7be790f40adb4565bfb9f26",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/77": {
+      "name": "conv_transposed_3D_square_input_square_kernel___padded____dilated____strided__",
+      "reference_sha256": "0103aece769b11a1507c42308e3e1f94bcb64d3fe7a3e21cf8bed246c317fa96",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/78": {
+      "name": "conv_transposed_2D_asymmetric_input_asymmetric_kernel___padded__",
+      "reference_sha256": "071cf6841f518ebe65d5d150b9f20804d39b79762b24612004710fd3e0fb0466",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/79": {
+      "name": "conv_transposed_1D_asymmetric_input_square_kernel___padded____strided____dilated__",
+      "reference_sha256": "6db00a9c6819b6c725d89580f47073b005f9b2a3ac4c1236ae54f19d998327d6",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/80": {
+      "name": "conv_standard_2D_square_input_asymmetric_kernel___dilated____padded__",
+      "reference_sha256": "3a4df4097b281c35dfb470298446a707e22627cb79284cc37ec22cdf9b2dd716",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/81": {
+      "name": "conv_transposed_2D_asymmetric_input_square_kernel___dilated____padded____strided__",
+      "reference_sha256": "eeb221ea34d93233163ab269f22aa41dd65da4ee27b1e5be7ad8c52d88b14014",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/82": {
+      "name": "conv_depthwise_2D_square_input_square_kernel",
+      "reference_sha256": "9cd970cf2dcbcd23c2fec81e8b806af311569ad0dae274962bc13792ed38c99d",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/83": {
+      "name": "conv_depthwise_2D_square_input_asymmetric_kernel",
+      "reference_sha256": "ccaa89bdc56c5d34e8b4f009cb5258e61d124a30d8bfb1242842832586f22835",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/84": {
+      "name": "conv_depthwise_2D_asymmetric_input_square_kernel",
+      "reference_sha256": "e482e98f260c091ca19764e4381afecfc86285f2d62278ffd7120b02eae41545",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/85": {
+      "name": "conv_depthwise_2D_asymmetric_input_asymmetric_kernel",
+      "reference_sha256": "1c0b71d45574e8cf6b8b34adf42abad98c276fb19c15c17ee6c8e19912a4343a",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/86": {
+      "name": "conv_depthwise_separable_2D",
+      "reference_sha256": "6fb958ece3cff7d7877502c7cd4cccfaf08030b017451a612a8829e813d254e5",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/87": {
+      "name": "conv_pointwise_2D",
+      "reference_sha256": "54af8c6b12cea1125b2156dc8eb61d599d31e88a147dc729d1ec8931e9aceb84",
+      "family": "convolution",
+      "known_reference_issue": null,
+      "legal_domain": "Legal grouped/depthwise convolution or transposed convolution with the frozen numeric zero padding, stride, dilation, output padding, weights and bias."
+    },
+    "1/88": {
+      "name": "MinGPTNewGelu",
+      "reference_sha256": "ae3a237ab91e2589255fdc9ef9b9cc4ace03a8d8afe51c25aef4c0a0680cdf23",
+      "family": "activation",
+      "known_reference_issue": null,
+      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+    },
+    "1/89": {
+      "name": "cumsum",
+      "reference_sha256": "2fb0fb197070475cba3a73b0a151e722663d690c25971305b2b62af1088f37de",
+      "family": "scan",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+    },
+    "1/90": {
+      "name": "cumprod",
+      "reference_sha256": "029c4a283aae03fa1b8b39f06190d0a89e2c553253b4c91e0d29043526b5c9ff",
+      "family": "scan",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+    },
+    "1/91": {
+      "name": "cumsum_reverse",
+      "reference_sha256": "e9d0f300c234f1abbab58930c10a32b4e718c0ecefe26a83195c2145fbe74af0",
+      "family": "scan",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+    },
+    "1/92": {
+      "name": "cumsum_exclusive",
+      "reference_sha256": "ef79ef0e6387a1b04cde4c3815f4bda5464e79263dcadfeda0e648ec82759260",
+      "family": "scan",
+      "known_reference_issue": "exclusive cumsum concatenates on dim but slices axis 0; the independent oracle retains the input shape",
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+    },
+    "1/93": {
+      "name": "masked_cumsum",
+      "reference_sha256": "65a573b890e9d6a63c44073eb641d560387e7d8771b36b93813615e05a90087e",
+      "family": "scan",
+      "known_reference_issue": null,
+      "legal_domain": "Legal declared scan axis; boolean masks retain their role. Exclusive sum retains input shape and shifts along the declared axis."
+    },
+    "1/94": {
+      "name": "MSELoss",
+      "reference_sha256": "538280e46663419892c0acefa6a8264976be2d0327eebd3a288cb4debcfbbe89",
+      "family": "loss",
+      "known_reference_issue": null,
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+    },
+    "1/95": {
+      "name": "CrossEntropyLoss",
+      "reference_sha256": "5c666d9e45fd6fcaf2690fabed98b2fab856e02c7fd94906a1d043776f5298f9",
+      "family": "loss",
+      "known_reference_issue": null,
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+    },
+    "1/96": {
+      "name": "HuberLoss",
+      "reference_sha256": "547112ff0b584d76f0d18a182440b9a7c212ab9e6925858f1e8930a0fe44c6c6",
+      "family": "loss",
+      "known_reference_issue": null,
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+    },
+    "1/97": {
+      "name": "ScaledDotProductAttention",
+      "reference_sha256": "735745270232c3b928377533e3cfebebdcddab44efc097d4968e1c4eb3984b92",
+      "family": "attention",
+      "known_reference_issue": null,
+      "legal_domain": "Unmasked noncausal scaled dot-product attention with matching Q/K head dimensions, K/V sequence length, and zero dropout as in the frozen source."
+    },
+    "1/98": {
+      "name": "KLDivLoss",
+      "reference_sha256": "2f253e58d23590369c5e860ebe09651eb96276376aa9db4e244c43264eb62ad8",
+      "family": "loss",
+      "known_reference_issue": null,
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+    },
+    "1/99": {
+      "name": "TripletMarginLoss",
+      "reference_sha256": "a64bc248d53b22a5ed6a2533f4a896012b2cac71eb8656eab2f8668939761c6a",
+      "family": "loss",
+      "known_reference_issue": null,
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+    },
+    "1/100": {
+      "name": "HingeLoss",
+      "reference_sha256": "695acd3fbedece6b39112b5513816403bc47a28ad6f8503db8ea4471c9e675d7",
+      "family": "loss",
+      "known_reference_issue": null,
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+    }
+  },
+  "oracle": "independent_cpu_fp64_formula",
+  "precision": {
+    "float32": {
+      "norm_rtol": 5e-06,
+      "norm_atol": 1e-07,
+      "element_rtol": 5e-05,
+      "element_atol": 5e-07,
+      "element_scale_rtol": 1e-06
+    },
+    "float16": {
+      "norm_rtol": 0.005,
+      "norm_atol": 1e-05,
+      "element_rtol": 0.02,
+      "element_atol": 0.001,
+      "element_scale_rtol": 0.001
+    },
+    "bfloat16": {
+      "norm_rtol": 0.03,
+      "norm_atol": 0.0001,
+      "element_rtol": 0.06,
+      "element_atol": 0.01,
+      "element_scale_rtol": 0.01
+    }
+  },
+  "scope": "actual_native_case; no_dimension_or_value_change",
+  "native_input_roles_preserved": true
+}

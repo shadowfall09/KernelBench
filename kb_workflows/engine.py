@@ -44,6 +44,8 @@ def settings(config, hidden=False):
         "sanitizer_timeout": config.sanitizer_timeout,
         "determinism_checks": config.determinism_checks,
         "state_validation": config.state_validation,
+        "numerical_validation": config.numerical_validation,
+        "oracle_memory_mb": config.oracle_memory_mb,
         "determinism_repeats": config.determinism_repeats,
         "isolation": options(config),
     }
@@ -52,6 +54,10 @@ def settings(config, hidden=False):
 def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
     path = select_problems(config.level, problem_ids=[pid])[pid]
     options = settings(config, hidden)
+    if config.numerical_validation:
+        from .operator_specs import spec_for
+
+        options["oracle_spec_sha256"] = fingerprint(spec_for(config.level, pid, path.read_text()))
     if config.determinism_checks:
         from .determinism import policy_for
 

@@ -163,7 +163,8 @@ def evaluate(payload, *, run=None, binary=None):
                 record = worker(request, tool, tool, instrumented=True)
             document["tools"][tool] = record
         preliminary = derive(document, payload)
-        if settings.get("determinism_checks") or settings.get("state_validation") or all(preliminary[f"sanitizer_{tool}"]["status"] == "passed" for tool in tools):
+        if (settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation")
+                or all(preliminary[f"sanitizer_{tool}"]["status"] == "passed" for tool in tools)):
             document["control"] = worker(child_payload(payload, nonce, "control"), "control")
         if tools and not injected and resolved.get("status") == "measured":
             target = Path(resolved["path"])

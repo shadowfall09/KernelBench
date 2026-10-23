@@ -33,7 +33,7 @@ def enabled(payload):
     settings = payload["eval_config"]
     return payload.get("task", "evaluate") in {"evaluate", "paired_timing"} and bool(
         select_tools(settings.get("sanitizer_tools", "none")) or settings.get("determinism_checks")
-        or settings.get("state_validation"))
+        or settings.get("state_validation") or settings.get("numerical_validation"))
 
 
 def child_payload(payload, nonce, stage):
@@ -191,6 +191,15 @@ def derive(document, payload):
         checks["mode_state"] = verdict(document, child.get("metadata", {}).get("reliability_checks"),
             expected_tolerance=tolerance) if control_ok else check(
             "not_measured", reason="No complete native state-control run")
+    if settings.get("numerical_validation"):
+        from .numerical_audit import verdicts
+
+        if control_ok:
+            checks.update(verdicts(child.get("metadata", {}).get("numerical_audit"),
+                                   child.get("metadata", {}).get("reliability_checks"), payload))
+        else:
+            checks.update({name: check("not_measured", reason="No complete independent numerical-control run")
+                           for name in ("precision_contract", "reference_signal")})
     return checks
 
 

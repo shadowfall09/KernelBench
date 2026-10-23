@@ -66,6 +66,8 @@ class RunConfig:
     sanitizer_timeout: int = 600
     determinism_checks: bool = False
     state_validation: bool = False
+    numerical_validation: bool = False
+    oracle_memory_mb: int = 4096
     determinism_repeats: int = 5
     determinism_policy_file: str = ""
     isolation_mode: str = "standard"
@@ -219,6 +221,10 @@ class RunConfig:
             raise ValueError("Determinism checks require an explicit boolean and 3 to 100 repeats")
         if type(self.state_validation) is not bool:
             raise ValueError("State validation requires an explicit boolean")
+        if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level != 1):
+            raise ValueError("Independent numerical validation currently requires an explicit boolean and level 1")
+        if type(self.oracle_memory_mb) is not int or not 1 <= self.oracle_memory_mb <= 1048576:
+            raise ValueError("Oracle host-memory envelope must be 1..1048576 MiB")
         if self.determinism_policy_file:
             from .determinism import read_policies
 
@@ -371,6 +377,7 @@ def parser():
         "agent_output_token_limit",
         "agent_max_output_tokens",
         "sanitizer_timeout",
+        "oracle_memory_mb",
         "determinism_repeats",
         "isolation_cpus",
         "isolation_memory_mb",
@@ -455,7 +462,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation"):
+    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)

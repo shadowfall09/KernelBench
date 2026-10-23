@@ -306,7 +306,7 @@ def diagnostic_control(payload):
     """Collect requested functional probes in the separate, untimed control run."""
     settings = payload["eval_config"]
     with ExitStack() as stack:
-        repeat, state = None, None
+        repeat, state, numerical = None, None, None
         if settings.get("determinism_checks"):
             from .determinism import audit, validate_inline
 
@@ -316,12 +316,18 @@ def diagnostic_control(payload):
             from .state_audit import audit
 
             state = stack.enter_context(audit())
+        if settings.get("numerical_validation"):
+            from .numerical_audit import audit
+
+            numerical = stack.enter_context(audit(payload))
         result = dispatch(payload)
     metadata = result.setdefault("metadata", {})
     if repeat is not None:
         metadata["repeat_audit"] = repeat.document()
     if state is not None:
         metadata["state_audit"] = state.document()
+    if numerical is not None:
+        metadata["numerical_audit"] = numerical.document()
     return result
 
 
@@ -333,7 +339,7 @@ def main():
         native_worker = sys.argv[3:] == ["--native-worker"]
         settings = payload["eval_config"]
         if native_worker and settings.get("diagnostic_stage") == "control" and (
-                settings.get("determinism_checks") or settings.get("state_validation")):
+                settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation")):
             result = diagnostic_control(payload)
         elif enabled(payload) and not native_worker:
             from .tool_runner import evaluate as evaluate_with_tools

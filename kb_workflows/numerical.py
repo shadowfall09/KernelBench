@@ -40,7 +40,7 @@ def _rms(values):
     return scale * torch.sqrt(torch.mean((values / scale).square()))
 
 
-def precision_gate(reference, candidate, oracle, contract):
+def precision_gate(reference, candidate, oracle, contract, *, _self_check=False):
     """Reference must meet the same contract; do not bless an uncalibrated oracle."""
     rows, issues = [], []
 
@@ -53,7 +53,7 @@ def precision_gate(reference, candidate, oracle, contract):
                 issues.append(f"{path}: shape or output dtype mismatch")
                 return
             if not (ref.is_floating_point() or ref.is_complex()):
-                if not torch.equal(ref, cand) or not torch.equal(ref, truth):
+                if truth.dtype != ref.dtype or not torch.equal(ref, cand) or not torch.equal(ref, truth):
                     issues.append(f"{path}: discrete outputs differ")
                 return
             if truth.dtype != (torch.complex128 if ref.is_complex() else torch.float64):
@@ -100,9 +100,14 @@ def precision_gate(reference, candidate, oracle, contract):
             issues.append(f"{path}: scalar mismatch")
 
     visit(reference, candidate, oracle, "output")
+    # Structural errors may prevent the joint walk from visiting the reference.
+    # Qualify it independently on failures; an empty leaf list is not evidence
+    # that a mismatched oracle shape or discrete dtype is acceptable.
+    qualification = precision_gate(reference, reference, oracle, contract, _self_check=True) if issues and not _self_check else None
+    reference_qualified = qualification["passed"] if qualification is not None else not issues
     return {"passed": not issues, "issues": issues, "leaves": rows, "all_elements_required": True,
-            "oracle_dtype": "float64/complex128", "reference_qualified": all(row["reference"]["passed"] for row in rows)
-            and not any("oracle" in issue or "structure" in issue for issue in issues)}
+            "oracle_dtype": "float64/complex128", "reference_qualified": reference_qualified,
+            "reference_issues": qualification["issues"] if qualification is not None else issues if _self_check else []}
 
 
 def signal_audit(value, *, absolute_tolerance):
