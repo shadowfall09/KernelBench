@@ -11,6 +11,7 @@ sanitizer_command = "compute-sanitizer"
 sanitizer_timeout = 300
 determinism_checks = true
 determinism_repeats = 5
+# state_validation = true  # 可独立开启的模式/注册状态/参数更新检查
 timeout = 1800
 # determinism_policy_file = "reviewed-policies.json"
 ```
@@ -29,10 +30,12 @@ python scripts/run_batch.py --config configs/a6000-safety.toml --dry-run
 
 1. 独立原生worker运行原来的正确性和性能协议；已有失败直接返回。
 2. 每个选定工具分别启动新的正确性worker，沿用冻结源码、标准/隐藏范围和种子，关闭性能采样。
-3. 全部选定工具通过后，再进行一次无插桩正确性复核。开启重复检查时，即使工具失败也保留这次复核诊断。
+3. 全部选定工具通过后，再进行一次无插桩正确性复核。开启重复或状态检查时，即使工具失败也保留这次复核诊断。
 4. 结果保留第一步的runtime、原始样本、冷启动成本和配对记录。工具和复核耗时只进入请求墙钟与资源核算。
 
 所有transport使用同一个CLI监督进程，因此本地、Docker、Modal、HTTP队列和Harbor验证复用这条路径；部署与实机可用性未验证。配对计时的工具子任务使用独立标准正确性流程，不对插桩后的速度做配对推断。标准与隐藏结果分别绑定自己的请求；隐藏日志不会反馈给开发agent。
+
+`state_validation`在这次独立复核中为每个原生实例增加连续模式、注册状态映射及参数更新探针，与重复检查可以同时开启；接口和覆盖边界见[状态审计](STATE_VALIDATION.md)。它不要求安装Sanitizer，也不受17题FP64附加契约清单限制。缺少完整实例、绑定、模式或更新记录时拒绝资格；不改变原生采样时间。
 
 工具跟踪整个worker及子进程，要求CUDA初始化，设置非零错误退出码，逐进程保留日志。memcheck启用32字节padding，并在Torch导入前禁用PyTorch CUDA内存缓存，增强对逻辑分配越界的可见性。racecheck保留warning及error，不强制阻塞launch，不设置suppression或跳过kernel的过滤器。监督进程清理外部`NV_COMPUTE_SANITIZER_*`及CUDA injection路径覆盖。
 

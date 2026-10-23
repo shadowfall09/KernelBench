@@ -1341,10 +1341,14 @@
       "status": "in_progress",
       "source": "paper_design",
       "evidence": [
+        "kb_workflows/state_contract.py",
+        "kb_workflows/state_audit.py",
         "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py"
+        "tests/test_state_contract.py",
+        "tests/test_state_audit.py",
+        "docs/STATE_VALIDATION.md"
       ],
-      "reason": "已实现train/eval、同名buffer/参数契约与输入敏感性，CPU反例验证参数缓存和BN计数错误；复杂模型状态映射与全题适配待完成"
+      "reason": "已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配"
     },
     {
       "id": "R-08",
@@ -2631,6 +2635,82 @@
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1"
+    },
+    {
+      "id": "V23-01",
+      "title": "声明式注册状态映射",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/state_contract.py",
+        "tests/test_state_contract.py"
+      ],
+      "reason": "支持重命名、融合切片、转置与不复制存储的reshape，核对值/元数据/共享关系；映射不能豁免状态比较"
+    },
+    {
+      "id": "V23-02",
+      "title": "连续模式与累计状态检查",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/state_contract.py",
+        "tests/test_state_contract.py"
+      ],
+      "reason": "同一模型连续train/train/eval/train/eval，检查累计buffer、输出及training/grad后置状态，不只检查首次调用"
+    },
+    {
+      "id": "V23-03",
+      "title": "零值参数与缓存失效探针",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/state_contract.py",
+        "tests/test_state_contract.py"
+      ],
+      "reason": "分别在train/eval预热后两轮修改同一参数存储；非零偏移覆盖全零参数，共享参数只修改一次，记录参考敏感性"
+    },
+    {
+      "id": "V23-04",
+      "title": "原生逐实例状态复核",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/state_audit.py",
+        "kb_workflows/evaluate_task.py",
+        "kb_workflows/tool_checks.py",
+        "tests/test_state_audit.py"
+      ],
+      "reason": "可选state_validation经过统一后端与Harbor，独立复核覆盖实际标准/隐藏输入，共享原请求预算，诊断不替换性能样本"
+    },
+    {
+      "id": "V23-05",
+      "title": "状态快照与证据重算",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "current_integration",
+      "evidence": [
+        "kb_workflows/state_contract.py",
+        "kb_workflows/state_audit.py",
+        "kb_workflows/common.py",
+        "tests/test_state_audit.py"
+      ],
+      "reason": "拒绝共享模型/状态存储和改变快照值，逐例重算绑定摘要与模式/参数步骤；改容差/漏实例/模拟执行不能获得设备资格"
     }
   ]
 }

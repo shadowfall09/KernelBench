@@ -7,7 +7,7 @@ import json
 import math
 import os
 import sys
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
@@ -302,6 +302,29 @@ def dispatch(payload):
     raise ValueError("Unknown evaluation task")
 
 
+def diagnostic_control(payload):
+    """Collect requested functional probes in the separate, untimed control run."""
+    settings = payload["eval_config"]
+    with ExitStack() as stack:
+        repeat, state = None, None
+        if settings.get("determinism_checks"):
+            from .determinism import audit, validate_inline
+
+            validate_inline(settings["determinism_policy"], payload["ref_arch_src"])
+            repeat = stack.enter_context(audit(settings["determinism_policy"], settings["determinism_repeats"]))
+        if settings.get("state_validation"):
+            from .state_audit import audit
+
+            state = stack.enter_context(audit())
+        result = dispatch(payload)
+    metadata = result.setdefault("metadata", {})
+    if repeat is not None:
+        metadata["repeat_audit"] = repeat.document()
+    if state is not None:
+        metadata["state_audit"] = state.document()
+    return result
+
+
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
@@ -309,13 +332,9 @@ def main():
 
         native_worker = sys.argv[3:] == ["--native-worker"]
         settings = payload["eval_config"]
-        if native_worker and settings.get("diagnostic_stage") == "control" and settings.get("determinism_checks"):
-            from .determinism import audit, validate_inline
-
-            validate_inline(settings["determinism_policy"], payload["ref_arch_src"])
-            with audit(settings["determinism_policy"], settings["determinism_repeats"]) as collector:
-                result = dispatch(payload)
-            result.setdefault("metadata", {})["repeat_audit"] = collector.document()
+        if native_worker and settings.get("diagnostic_stage") == "control" and (
+                settings.get("determinism_checks") or settings.get("state_validation")):
+            result = diagnostic_control(payload)
         elif enabled(payload) and not native_worker:
             from .tool_runner import evaluate as evaluate_with_tools
 

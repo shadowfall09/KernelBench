@@ -16,6 +16,7 @@ from src.validation import clone_tensors, compare_outputs, preserve_backend_sett
 from .contract_specs import contract_for
 from .evidence import check
 from .numerical import PrecisionContract, precision_gate, signal_audit, to_oracle
+from .state_contract import state_checks
 
 
 def _backend_flags():
@@ -105,48 +106,6 @@ def cases(contract, *, hidden, seed, device, dtype):
             yield f"shape_{index}/{name}", fresh
         if hidden:
             yield f"shape_{index}/noncontiguous", [_strided(value) for value in args]
-
-
-def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, device):
-    """Explicit same-name state contract; unsupported representations fail closed."""
-    issues = []
-    with torch.no_grad():
-        for training in (True, False):
-            ref, cand = copy.deepcopy(reference).train(training), copy.deepcopy(candidate).train(training)
-            set_seed(seed)
-            expected = clone_tensors(ref(*clone_tensors(args)))
-            set_seed(seed)
-            actual = clone_tensors(cand(*clone_tensors(args)))
-            synchronize(device)
-            issue = compare_outputs(expected, actual, tolerance)
-            if issue:
-                issues.append(f"mode={training}: {issue}")
-            ref_buffers, cand_buffers = dict(ref.named_buffers()), dict(cand.named_buffers())
-            for name, value in ref_buffers.items():
-                if name not in cand_buffers or compare_outputs(value, cand_buffers[name], tolerance):
-                    issues.append(f"mode={training}: required state {name} differs")
-        ref, cand = copy.deepcopy(reference), copy.deepcopy(candidate)
-        parameters, counterparts = dict(ref.named_parameters()), dict(cand.named_parameters())
-        if parameters:
-            for model in (ref, cand):
-                set_seed(seed)
-                model(*clone_tensors(args))  # Populate caches before mutating the same parameter objects.
-            for name, parameter in parameters.items():
-                other = counterparts.get(name)
-                if other is None or parameter.shape != other.shape:
-                    issues.append(f"Required mutable parameter {name} is unavailable")
-                    continue
-                parameter.mul_(1.1)
-                other.mul_(1.1)
-            set_seed(seed)
-            expected = clone_tensors(ref(*clone_tensors(args)))
-            set_seed(seed)
-            actual = clone_tensors(cand(*clone_tensors(args)))
-            synchronize(device)
-            if issue := compare_outputs(expected, actual, tolerance):
-                issues.append(f"after parameter update: {issue}")
-    return check("failed" if issues else "passed", reason="Declared train/eval, same-name buffer and mutable parameter contract",
-                 values={"issues": issues, "parameter_count": len(parameters)})
 
 
 def run_checks(reference, candidate, contract, *, hidden, seed, device, dtype, set_seed, oracle_on_cpu=False):

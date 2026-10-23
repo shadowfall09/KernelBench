@@ -43,6 +43,7 @@ def settings(config, hidden=False):
         "sanitizer_command": config.sanitizer_command,
         "sanitizer_timeout": config.sanitizer_timeout,
         "determinism_checks": config.determinism_checks,
+        "state_validation": config.state_validation,
         "determinism_repeats": config.determinism_repeats,
         "isolation": options(config),
     }

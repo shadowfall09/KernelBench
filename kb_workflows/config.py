@@ -65,6 +65,7 @@ class RunConfig:
     sanitizer_command: str = "compute-sanitizer"
     sanitizer_timeout: int = 600
     determinism_checks: bool = False
+    state_validation: bool = False
     determinism_repeats: int = 5
     determinism_policy_file: str = ""
     isolation_mode: str = "standard"
@@ -216,6 +217,8 @@ class RunConfig:
             raise ValueError("Compute Sanitizer requires CUDA; Neuron has no equivalent tool suite")
         if type(self.determinism_checks) is not bool or type(self.determinism_repeats) is not int or not 3 <= self.determinism_repeats <= 100:
             raise ValueError("Determinism checks require an explicit boolean and 3 to 100 repeats")
+        if type(self.state_validation) is not bool:
+            raise ValueError("State validation requires an explicit boolean")
         if self.determinism_policy_file:
             from .determinism import read_policies
 
@@ -452,7 +455,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks"):
+    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)

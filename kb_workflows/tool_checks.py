@@ -32,7 +32,8 @@ def select_tools(value):
 def enabled(payload):
     settings = payload["eval_config"]
     return payload.get("task", "evaluate") in {"evaluate", "paired_timing"} and bool(
-        select_tools(settings.get("sanitizer_tools", "none")) or settings.get("determinism_checks"))
+        select_tools(settings.get("sanitizer_tools", "none")) or settings.get("determinism_checks")
+        or settings.get("state_validation"))
 
 
 def child_payload(payload, nonce, stage):
@@ -182,6 +183,14 @@ def derive(document, payload):
         checks["repeat_consistency"] = repeat_verdict(child.get("metadata", {}).get("repeat_audit"),
             settings["determinism_policy"], settings["determinism_repeats"],
             child.get("metadata", {}).get("reliability_checks")) if control_ok else check("not_measured", reason="No complete direct repeat-control run")
+    if settings.get("state_validation"):
+        from .state_audit import verdict
+
+        document = child.get("metadata", {}).get("state_audit")
+        tolerance = settings["fp32_tolerance"] if settings.get("precision") == "fp32" or settings.get("device_backend") == "neuron" else 1e-2
+        checks["mode_state"] = verdict(document, child.get("metadata", {}).get("reliability_checks"),
+            expected_tolerance=tolerance) if control_ok else check(
+            "not_measured", reason="No complete native state-control run")
     return checks
 
 
