@@ -97,7 +97,7 @@ def write_task(directory, config, pid, sid=0, device=None):
     for path in (environment, tests, solution):
         path.mkdir()
     source = reference.read_text()
-    if config.level == 1:
+    if config.level in {1, 2, 3}:
         from .operator_input_policy import plan
 
         plan(config.level, pid, source, config.input_family_memory_mb)

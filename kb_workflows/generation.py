@@ -66,7 +66,7 @@ def agent_environment(config):
 
 def build_prompt(config, pid):
     filename = kernel_name(config.level, pid)
-    if config.level == 1:
+    if config.level in {1, 2, 3}:
         from .operator_input_policy import plan
 
         plan(config.level, pid, select_problems(config.level, problem_ids=[pid])[pid].read_text(), config.input_family_memory_mb)

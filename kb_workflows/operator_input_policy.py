@@ -14,10 +14,14 @@ ACTIVE = ContextVar("kernelbench_operator_inputs", default=None)
 
 
 def plan(level, pid, source, memory_mb):
-    if level != 1:
+    if level not in {1, 2, 3}:
         return None
     if type(memory_mb) is not int or not 1 <= memory_mb <= 1048576:
         raise ValueError("Invalid reviewed input-family memory envelope")
+    if level in {2, 3}:
+        from .model_input_cases import plan as model_plan
+
+        return model_plan(level, pid, source, memory_mb)
     spec = spec_for(level, pid, source)
     return {"protocol": PROTOCOL, "reference_sha256": spec["reference_sha256"], "family": spec["family"],
             "labels": list(labels(pid)), "memory_mb": memory_mb,
@@ -44,6 +48,10 @@ def task_policy(function):
         spec = validate_inline(payload)
         enabled = spec is not None and payload["eval_config"].get("use_hidden_tests") and payload.get("task", "evaluate") == "evaluate"
         state = {"spec": spec, "pid": payload["problem_id"], "records": []} if enabled else None
+        if state is not None and payload["level"] in {2, 3}:
+            from .model_input_cases import reviewed_spec
+
+            state["model_family"] = reviewed_spec(payload["level"], payload["problem_id"], payload["ref_arch_src"])
         token = ACTIVE.set(state)
         try:
             result = function(payload, *args, **kwargs)
@@ -61,7 +69,13 @@ def extra_cases(reference, seed):
     state = ACTIVE.get()
     if state is None:
         return
-    for row in cases(state["pid"], reference, seed=seed, memory_mb=state["spec"]["memory_mb"]):
+    if "model_family" in state:
+        from .model_input_cases import cases as model_cases
+
+        iterator = model_cases(state["model_family"], seed=seed, memory_mb=state["spec"]["memory_mb"])
+    else:
+        iterator = cases(state["pid"], reference, seed=seed, memory_mb=state["spec"]["memory_mb"])
+    for row in iterator:
         yield {**row, "seed": seed, "case_label": f"operator/{seed}/{row['label']}"}
 
 
@@ -96,10 +110,15 @@ def _valid_signature(signature):
 
 def issue(result, payload):
     settings = payload["eval_config"]
-    if payload["level"] != 1 or not settings.get("use_hidden_tests") or result.get("correctness") is not True:
+    if payload["level"] not in {1, 2, 3} or not settings.get("use_hidden_tests") or result.get("correctness") is not True:
         return None
     try:
         spec = validate_inline(payload)
+        model_family = None
+        if payload["level"] in {2, 3}:
+            from .model_input_cases import reviewed_spec, signature_matches
+
+            model_family = reviewed_spec(payload["level"], payload["problem_id"], payload["ref_arch_src"])
         document = result.get("metadata", {}).get("operator_inputs", {})
         seeds = settings.get("hidden_seeds", (42, 123, 456))
         expected = [(f"operator/{seed}/{label}", label, seed) for seed in seeds for label in spec["labels"]]
@@ -125,6 +144,9 @@ def issue(result, payload):
                     or actual[row["label"]].get("input_signature") != row["input_signature"]
                     or (row["family_label"] == "strided" and any(item.get("stride", [2])[-1] != 2 for item in row["input_signature"]))):
                 return "operator_input_family_execution_evidence_incomplete"
+            if model_family is not None and not signature_matches(
+                    model_family, row["family_label"], row["input_signature"], settings.get("precision")):
+                return "operator_input_family_geometry_or_precision_changed"
     except (KeyError, TypeError, ValueError, OSError, AttributeError):
         return "operator_input_family_contract_invalid"
     return None

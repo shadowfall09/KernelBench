@@ -1350,9 +1350,12 @@
         "tests/test_scan_cases.py",
         "kb_workflows/operator_cases.py",
         "kb_workflows/operator_input_policy.py",
-        "docs/OPERATOR_INPUTS.md"
+        "docs/OPERATOR_INPUTS.md",
+        "kb_workflows/model_input_cases.py",
+        "kb_workflows/model_input_families.json",
+        "tests/test_model_input_cases.py"
       ],
-      "reason": "原L1全部100题追加真实初始化下的算子专用形状/stride/值族，每种子632例，保留旧分布与扫描修订；新41题已有角色/边界。追加NaN/Inf仅限明确五题；L2/L3的150题、旧分布语义迁移与更完整输入族仍待实现"
+      "reason": "原250题均有来源绑定输入族，每种子1529例；L2保留卷积/残差/LayerNorm耦合，L3同步序列状态并明确三题固定形状。98/100旧域变换显式修订；新41题已有角色边界。复合/序列更专门的饱和、抵消、极值与存储别名反例仍待补齐，meta不证明数值或设备资格"
     },
     {
       "id": "R-07",
@@ -3264,6 +3267,84 @@
         "docs/COMPOSITE_NUMERICS.md"
       ],
       "reason": "100题小配置CPU数值与原构造/名义shape的meta检查，禁用融合forward、两类低精度、随机收据及准入反例"
+    },
+    {
+      "id": "V29-01",
+      "title": "L2融合输入族与残差耦合",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_input_families.json"
+      ],
+      "reason": "全100题600例每种子，保留学习特征、LayerNorm末轴及外部转置卷积残差几何"
+    },
+    {
+      "id": "V29-02",
+      "title": "L3序列状态与固定形状规则",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_input_cases.py"
+      ],
+      "reason": "50题297例，区分序列与状态batch轴，三题保留固定初始化并明示原因"
+    },
+    {
+      "id": "V29-03",
+      "title": "旧概率和浮点标签语义修订",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/reference_revisions.json"
+      ],
+      "reason": "KL温度归一化及hinge只变预测；保留槽位/公式并冻结修订历史，生成器不退回旧域"
+    },
+    {
+      "id": "V29-04",
+      "title": "全题逐例隐藏覆盖门",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_input_policy.py"
+      ],
+      "reason": "250题原生与Neuron按seed、双向调用、内存、布局复核，缺完整执行证据不能恢复正结果"
+    },
+    {
+      "id": "V29-05",
+      "title": "形状精度独立重放与来源预检",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "L2/L3从冻结清单重建shape/dtype，CLI/生成/队列/Harbor同源预检且无SDK导入"
+    },
+    {
+      "id": "V29-06",
+      "title": "全模型元数据与域迁移反例",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_model_input_cases.py"
+      ],
+      "reason": "150原工厂/初始化meta与CPU小输入、数值控制、Neuron模拟覆盖；超限分配、篡改与旧域回归"
     }
   ]
 }

@@ -695,7 +695,8 @@
       "reference_sha256": "2f253e58d23590369c5e860ebe09651eb96276376aa9db4e244c43264eb62ad8",
       "family": "loss",
       "known_reference_issue": null,
-      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles.",
+      "reference_revision": "l1-98-probability-domain-v2"
     },
     "1/99": {
       "name": "TripletMarginLoss",
@@ -709,7 +710,8 @@
       "reference_sha256": "695acd3fbedece6b39112b5513816403bc47a28ad6f8503db8ea4471c9e675d7",
       "family": "loss",
       "known_reference_issue": null,
-      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles."
+      "legal_domain": "Frozen reduction and hyperparameters; valid class indices (or ignore_index=-100), nonnegative KL target with positive predictions, and retained target roles.",
+      "reference_revision": "l1-100-hinge-label-domain-v2"
     },
     "2/1": {
       "name": "Conv2D_ReLU_BiasAdd",

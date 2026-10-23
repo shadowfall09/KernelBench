@@ -990,7 +990,8 @@
       "role": "extended",
       "layer": "F",
       "cell": "L1/F-loss",
-      "reason": "cell size 5, keep 3"
+      "reason": "cell size 5, keep 3",
+      "reference_revision": "l1-98-probability-domain-v2"
     },
     {
       "level": 1,
@@ -1010,7 +1011,8 @@
       "role": "scored",
       "layer": "F",
       "cell": "L1/F-loss",
-      "reason": "cell size 5, keep 3"
+      "reason": "cell size 5, keep 3",
+      "reference_revision": "l1-100-hinge-label-domain-v2"
     },
     {
       "level": 2,
@@ -2514,5 +2516,5 @@
     }
   ],
   "selection_reference_snapshot": "92c27f4c020a4860d5ca546b88a50b007f629e3f",
-  "reference_revision_registry_sha256": "a065cd90b42183e645fdc706548e6e82e0090c27afbf11978cde0f30ad45b6d2"
+  "reference_revision_registry_sha256": "43877042bb6109d2174862930248b06855b73b875a648847b82f2d311b36ae6c"
 }

@@ -31,7 +31,7 @@ def main(argv=None):
             calibrated_inputs = {pid: record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())["selected_recipe"]
                                  for pid, path in selected.items()}
         operator_input_coverage = None
-        if config.level == 1:
+        if config.level in {1, 2, 3}:
             from .operator_input_policy import plan
 
             plans = {pid: plan(config.level, pid, path.read_text(), config.input_family_memory_mb) for pid, path in selected.items()}

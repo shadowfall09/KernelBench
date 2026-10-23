@@ -67,7 +67,7 @@ def test_repaired_scan_supports_noncontiguous_inputs_and_rejects_the_legacy_axis
 
 def test_current_revision_registry_matches_every_physical_source_and_hidden_file():
     data = reference_revisions.registry()
-    assert {(row["level"], row["problem_id"]) for row in data["revisions"]} == {(1, pid) for pid in range(89, 94)}
+    assert {(row["level"], row["problem_id"]) for row in data["revisions"]} == {(1, pid) for pid in (*range(89, 94), 98, 100)}
     for row in data["revisions"]:
         source = problem_paths(row["level"])[row["problem_id"]]
         hidden = ROOT / "hidden_tests" / f"level{row['level']}" / f"{row['problem_id']}_hidden.py"
@@ -171,7 +171,7 @@ def test_suite_revision_preserves_task_selection_and_old_research_evidence():
     assert {role: sum(row["role"] == role for row in manifest["problems"]) for role in suites.ROLES} == {
         "scored": 105, "probe": 5, "extended": 140}
     repaired = [row for row in manifest["problems"] if row.get("reference_revision")]
-    assert {row["problem_id"] for row in repaired} == set(range(89, 94))
+    assert {row["problem_id"] for row in repaired} == {*range(89, 94), 98, 100}
     receipt = suites.selection_receipt(RunConfig(suite="kernelbench105"))
     assert receipt["reference_revision_registry_sha256"] == hashlib.sha256(reference_revisions.REGISTRY.read_bytes()).hexdigest()
     archive = json.loads((ROOT / "research/headroom/evidence/source_manifest.json").read_text())

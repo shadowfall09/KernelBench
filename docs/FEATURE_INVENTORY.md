@@ -866,6 +866,32 @@ BN/IN新增CPU FP32失格反例保留，不放宽预算。全非有限输出只�
 
 验证：Python 3.12.12 / Torch 2.12.0下2,149项CPU/模拟/meta回归通过，本版新增255项。覆盖全部100题小配置独立数值与真实初始化/名义shape元数据、20道代表题禁用原数值forward、FP16/BF16、随机收据删改、inplace别名、原dtype常量舍入、正式构造拒绝小配置、主机准入和SDK轻量预览。6条warning保留，包括原2/28非仿射IN的通道提示与环境driver提示。Ruff、201项动机映射、30份Markdown本地链接、skill与177包依赖检查通过；离线wheel包含新程序/数据，37个轻量入口无设备SDK导入。未运行GPU、Trainium、预训练模型、容器或训练实验。
 
+## 第二十九版：L2/L3隐藏输入族与旧输入角色修订
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add source-bound L2/L3 hidden input families and repair legacy roles |
+| 日期 | 2026-10-23 |
+| 基础提交 | `f88155d` |
+| 状态 | 软件、CPU小输入、meta及模拟回归；不运行设备或模型实验 |
+
+本版继续R-06，为剩余150题冻结合法输入角色与形状，原250题每种子共1,529例附加隐藏输入。完整范围及例外见[隐藏输入](OPERATOR_INPUTS.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V29-01 | L2融合输入族与残差耦合 | 全100题追加600例每种子；固定学习特征，改变batch/合法空间，保留LayerNorm末轴及转置卷积残差耦合 | `kb_workflows/model_input_families.json` | [M2](MOTIVATION.md#m2) |
+| V29-02 | L3序列状态与固定形状规则 | 50题追加297例，RNN/LSTM/GRU同步输入与状态batch轴，attention/NetVLAD变序列；三题显式保留构造约束 | `kb_workflows/model_input_cases.py` | [M2](MOTIVATION.md#m2) |
+| V29-03 | 旧概率和浮点标签语义修订 | 98题改温度归一化，100题仅缩放预测且保留结构化标签，槽位/参考/计时尺寸不变；前后哈希与生成器同步 | `kb_workflows/reference_revisions.json` | [M2](MOTIVATION.md#m2) |
+| V29-04 | 全题逐例隐藏覆盖门 | 250题共用原生与Neuron入口；逐seed/双向调用/内存/布局缺项拒绝，正结果不能借摘要恢复 | `kb_workflows/operator_input_policy.py` | [M2](MOTIVATION.md#m2) |
+| V29-05 | 形状精度独立重放与来源预检 | L2/L3从冻结清单重建实际shape和dtype，CLI/生成/队列/Harbor绑定同计划，轻量入口无设备SDK | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
+| V29-06 | 全模型元数据与域迁移反例 | 原150工厂/初始化meta检查，CPU隐藏/独立数值与Neuron模拟，缺例/改尺寸/改dtype、超限分配和生成器域回归 | `tests/test_model_input_cases.py` | [M5](MOTIVATION.md#m5) |
+
+L3/33的普通hidden属性、48/49的A/B/C参数固定部分尺寸，不通过替换状态或broadcast缩题；仍测试值和布局。Mamba两题输入估计需2,048 MiB，默认256 MiB会明确拒绝，不会跳过后通过。meta证明本版Torch形状推导，不证明后端、数值或设备资格。
+
+复合/序列算法更专门的饱和、抵消、极值和存储别名实例仍需补齐，R-06保持部分实现；23项仍为14项代码已实现、9项部分实现。L3独立数值、L2/L3校准及其他余项继续，旧stash未恢复或修改。实验按用户要求不运行。
+
+验证：Python 3.12.12 / Torch 2.12.0下2,469项CPU/模拟/meta回归通过，本版新增320项；9条warning保留原IN通道、Transformer/meshgrid与driver提示。JSON编码格式整理后另有145项修订/冻结/RL/集成检查通过。150题原构造及全部族仅做meta检查；小输入原生隐藏、L2独立数值、Neuron模拟和旧角色生成器检查通过。Ruff、207项动机映射、34份Markdown的844个本地链接、skill及177包依赖检查通过；离线wheel包含新模块/清单，18个安装后轻量入口未导入设备SDK。没有运行GPU、Trainium、预训练模型、容器或训练实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

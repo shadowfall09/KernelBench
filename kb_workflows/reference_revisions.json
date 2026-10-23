@@ -99,6 +99,38 @@
       "hidden_dependencies": {
         "kb_workflows/scan_cases.py": "728a5169b674eaf6fe1fed545b4be05a129fb6f1f58171bde96eba792b988fe3"
       }
+    },
+    {
+      "id": "l1-100-hinge-label-domain-v2",
+      "level": 1,
+      "problem_id": 100,
+      "revision": 2,
+      "reference_before_sha256": "695acd3fbedece6b39112b5513816403bc47a28ad6f8503db8ea4471c9e675d7",
+      "reference_sha256": "695acd3fbedece6b39112b5513816403bc47a28ad6f8503db8ea4471c9e675d7",
+      "hidden_before_sha256": "3f05997df463dc1f1b6fe0b697999429b289504fd534921f3e08c687915d0e76",
+      "hidden_sha256": "48ff937edc990abcad6708efab50e1f829b4a43be835d97c578f1981575cf17d",
+      "last_legacy_commit": "f88155df05e93d86bc7146d41efd6e6b19e18e7c",
+      "reason": "Distribution shifts scale predictions only. Floating hinge target labels must remain \u00b11; scaling both inputs leaves D4 products unchanged and makes D2/D3 labels invalid. Reference formula and 1-D target broadcasting are unchanged.",
+      "input_policy": "Retain all five legacy variants and nominal dimensions; preserve binary target roles in D2/D3/D4 and the structured D5 broadcast-axis check.",
+      "evidence": [
+        "tests/test_model_input_cases.py"
+      ]
+    },
+    {
+      "id": "l1-98-probability-domain-v2",
+      "level": 1,
+      "problem_id": 98,
+      "revision": 2,
+      "reference_before_sha256": "2f253e58d23590369c5e860ebe09651eb96276376aa9db4e244c43264eb62ad8",
+      "reference_sha256": "2f253e58d23590369c5e860ebe09651eb96276376aa9db4e244c43264eb62ad8",
+      "hidden_before_sha256": "6bec7baa4ef4941aedb0c913b9f1a8461316051c5d14742f161e560638a73830",
+      "hidden_sha256": "6fd0dede2a3e34411ebf29d9035c0c357e60bcb084bf29a6ba3403b53e9b1e18",
+      "last_legacy_commit": "f88155df05e93d86bc7146d41efd6e6b19e18e7c",
+      "reason": "The reference declares probability distributions. Replace mass-changing multiply transforms with positive log-probability temperature transforms and normalize each row. Reference KL formula and nominal factory are unchanged.",
+      "input_policy": "Retain three legacy variant slots; D2/D3 sharpen/flatten distributions while preserving positive predictions and nonnegative unit-mass targets. Negative temperature is outside the declared domain.",
+      "evidence": [
+        "tests/test_model_input_cases.py"
+      ]
     }
   ]
 }
