@@ -31,7 +31,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/2": {
       "reference_sha256": "31f49a84239cb24383e84ea78c778d9fc047455a12df3e2eb269ce6deedaf808",
@@ -62,7 +83,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/3": {
       "reference_sha256": "5bac18327a7e80406922981e800f85d5612a758b536f69fc28fb15d5b5b56556",
@@ -96,7 +134,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed. LayerNorm normalizes the final spatial axis, whose original width is fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/4": {
       "reference_sha256": "48691719d44ab4bdad7ac2f8e5c21cd8202bb3de369e781c14d18f251a8bfc6f",
@@ -127,7 +182,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/5": {
       "reference_sha256": "bbbdcd8069263174b11a4000d0b319145b9958a98abff520d0cf0c44a73f49bc",
@@ -158,7 +234,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/6": {
       "reference_sha256": "c66153344b228be0e6d343641eddd1df5c877d9be84593c216191f5ba774e4cd",
@@ -192,7 +285,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/7": {
       "reference_sha256": "dc0184aad245553bf5a68da67b78f917d66483ae4cd74b367cff91a22ce5d2cb",
@@ -226,7 +340,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/8": {
       "reference_sha256": "1c910449832d9f6052391f3c631ffe20ce3855ec6865bd628283555cf96e1420",
@@ -260,7 +395,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/9": {
       "reference_sha256": "24fc232d2a63ba394c49e43f7425408edfab157be4369b9423087884a098afb7",
@@ -285,7 +441,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/10": {
       "reference_sha256": "a7ff8fad9a4cd86053a9183fb26f129b1bc73c22d044058594ea05ea2eabd9de",
@@ -316,7 +494,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/11": {
       "reference_sha256": "8d6e2ba894ebaec25a6fdc27c88b3f051d59e1ad10fe83d23304623e0b4ec749",
@@ -347,7 +542,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/12": {
       "reference_sha256": "bfa5d039e0b35af0e8b41a7a5a103aea8dbd3175897bb46b461bd6303358f244",
@@ -372,7 +584,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/13": {
       "reference_sha256": "275efb5bc85aab48028130a467a3411632573d641db405ddf8d7d22a25a150fa",
@@ -406,7 +640,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/14": {
       "reference_sha256": "d9e094a0c51342ebc5fd6c8a14bb3108da2584ee6c2ed67a7516b446f5983a66",
@@ -431,7 +682,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/15": {
       "reference_sha256": "314134ed665768921c1cf9c20b1a3185cebec1e12b30a47d90958d6635f1862a",
@@ -465,7 +733,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/16": {
       "reference_sha256": "67ae8541ee1687a56f588227f33acc28ec7fc56f243fa8b1f3cfa6ff32448653",
@@ -496,7 +781,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/17": {
       "reference_sha256": "838de7f098817f0c866db81ef3ce199280aa2516da901665ca169515952042d5",
@@ -527,7 +829,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/18": {
       "reference_sha256": "56bacb42639d47010c14c6cefdb1c913dcf44d9064d4959f22146ea399cc78b3",
@@ -552,7 +875,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/19": {
       "reference_sha256": "c494efb23e569e2cdcf65f8be0c14c157be065d36b8af1faaf458fd27fadb0e4",
@@ -583,7 +928,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/20": {
       "reference_sha256": "26b0bf48928213578a5965bc693edc5807b8aa45373071df34ce57a1b8c5130e",
@@ -617,7 +979,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/21": {
       "reference_sha256": "bc9fef0d0d164267670dba37432642c2c29ec06eee2284dec6efb95e2043820e",
@@ -648,7 +1027,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/22": {
       "reference_sha256": "854798d11b8bbddf0842d3b417b9153e30bc680f7cc7e4a226ceaacefe66a2b7",
@@ -673,7 +1073,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/23": {
       "reference_sha256": "52ca8191da18b57ebf67f4bfbe3fe20c36f0705bf8b88cc7772ee31e25398436",
@@ -707,7 +1129,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/24": {
       "reference_sha256": "67a444b6a1a885449960e2f1acebcaaab33c86a38b449c6556fad13c4b4d30f3",
@@ -741,7 +1184,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/25": {
       "reference_sha256": "f64b714457a48def6bf6ef9c5f1757d8b121594463826fc14af54ec64593003d",
@@ -772,7 +1236,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/26": {
       "reference_sha256": "4db3bf0488fad20102e911d50f25d30e0d1c8c5b0bf31f89b88b5c06ad1a73a4",
@@ -827,7 +1312,26 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed. External residual spatial dimensions equal the ConvTranspose3d output formula.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1,
+          4
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/27": {
       "reference_sha256": "abe2302501cdb9a25a64f5e0b9343db1f4ba4b4ef39a18f71172c5e445dda14c",
@@ -861,7 +1365,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/28": {
       "reference_sha256": "87337d4d282be3213827bd378d1cc3f009b3a4e55edfd6556a0e8464ab0d3a23",
@@ -898,7 +1423,31 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1,
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "bmm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/29": {
       "reference_sha256": "1e9eedb83d3bcf8b9916e317bea8624c21c34f9a73f767fe49fa68bd6ea24e6d",
@@ -923,7 +1472,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/30": {
       "reference_sha256": "e96b8f9e9875955cabf5f96c3f1d9fcee06cef1db9198573b90ac06aad64cbdf",
@@ -948,7 +1519,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/31": {
       "reference_sha256": "5a575fa204921d8326b7b8a1e4ecb333aae0e89326ef264cc00161911015e73b",
@@ -979,7 +1572,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/32": {
       "reference_sha256": "c7149e3b76727c01622c71789af6ee6d1df7fd2ca91e8fc15d29d34ea69b2970",
@@ -1010,7 +1624,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/33": {
       "reference_sha256": "381791fb7ea4b177cc5ddbd8712d17ac6556c28b04b3bfb36ff78bd067df3e29",
@@ -1035,7 +1670,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/34": {
       "reference_sha256": "804ca4baf55ea6e5bbeaab94b8fa3bb48154c032db59960d00d8040fd4efb0f2",
@@ -1069,7 +1726,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed. LayerNorm normalizes the final spatial axis, whose original width is fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/35": {
       "reference_sha256": "06545dc1324d3b7fe903b3ac720d1dd33a3b521bdf55e7f7812d8f6c8ea11972",
@@ -1100,7 +1774,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/36": {
       "reference_sha256": "3942bf858c47356bfb9e831bf1b96fc2eb8258539e511e70e889403c3ef9236f",
@@ -1131,7 +1826,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/37": {
       "reference_sha256": "bc05ae9407cc9d98307328a7a3c46b0c19dc84740d4cbbc90a1e925a030a15e3",
@@ -1156,7 +1868,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/38": {
       "reference_sha256": "c21da157314e0a3602504244725088381d49bc41d49ea5e6e5a3eb5ce1585490",
@@ -1190,7 +1924,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/39": {
       "reference_sha256": "6efcf848d388b373beb6fbf4ae28885a943f1d8b4c6e090eb59bc0a7f2e200f7",
@@ -1215,7 +1966,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/40": {
       "reference_sha256": "559a68f953ce465ded0127fa10dc7974156889934f4e84d7db6445bff5309be9",
@@ -1240,7 +2013,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/41": {
       "reference_sha256": "264f0601dd95a01187bfe7e228c441c8ce5cc42c62a2a59c7b16caf412a486f0",
@@ -1265,7 +2060,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/42": {
       "reference_sha256": "8a462b56da126adc3e1589e87ebbcc5ffb978198d44a2209e4970e701c1f47f1",
@@ -1296,7 +2113,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/43": {
       "reference_sha256": "1e689e3764f9cc300940c1274875107b6e001831d1078cb5df85e0a29fed9767",
@@ -1330,7 +2164,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/44": {
       "reference_sha256": "ec7db013c234f3712e274318aac61e869196444644566da44ba78d37f43df67a",
@@ -1361,7 +2216,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/45": {
       "reference_sha256": "b1ca8d57447f26ffdc4b9c4ce12a1315b946a1ddd730e8598da41df857e1fde5",
@@ -1386,7 +2258,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear1",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/46": {
       "reference_sha256": "d4e92d787a439e000f0d6331459a37aca40edb9b28d4139a9430eb505bcfd11e",
@@ -1417,7 +2311,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/47": {
       "reference_sha256": "a5973cf2dbdc2e71788be4b0ca0526e4972267cc886d142414b4f823cfdd8468",
@@ -1451,7 +2366,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/48": {
       "reference_sha256": "15ca8a92dc0fda0436a6488d197a12d69e29201740689dca9881f0d21f99053d",
@@ -1485,7 +2421,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/49": {
       "reference_sha256": "05cef9d9088e2ce0c21d1b8918d5fdf6e1e988f58939de37acd05ddfdb6ef36b",
@@ -1519,7 +2476,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/50": {
       "reference_sha256": "de69586f157c6d74621b7f3912859caeebe0b0cdef8e48865bd9a028dd6a7b6e",
@@ -1553,7 +2527,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/51": {
       "reference_sha256": "84207220188137189df4c656d3dbef1c00ebd10fa5a06fee3a9bd0ccf4289f93",
@@ -1578,7 +2569,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/52": {
       "reference_sha256": "8ce597ff927cb578b244a7fea6c8a2f008060eae8204ea94fdb72372c7f9f42e",
@@ -1609,7 +2617,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/53": {
       "reference_sha256": "bcbacbc69af815aba39f25e8e49b97ab6bfa1599bb3e3570e22071bf4fbeadfe",
@@ -1634,7 +2663,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/54": {
       "reference_sha256": "3a93a348e601a81646b52456091efaf9d968b46b90ef247fc27ed3841e325b63",
@@ -1665,7 +2716,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/55": {
       "reference_sha256": "2ac86e0e0934830585a90923fdb2442f6290cf7271c7eee040b896a20eba85c3",
@@ -1690,7 +2762,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/56": {
       "reference_sha256": "d5c1f6244996aad6a8666fcd60d40d30824ac2a51d0f9ebfb56b90aa4a6eb628",
@@ -1715,7 +2809,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/57": {
       "reference_sha256": "697c4d26722931ff796352bda8f1478f2ec22cec00eef47627038e0506004b9a",
@@ -1746,7 +2862,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/58": {
       "reference_sha256": "284e7b4bb26a398e12865be51a6330e399f835206cf049b0a080690150ca2d7f",
@@ -1780,7 +2917,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/59": {
       "reference_sha256": "77f8e2fe6e44c41f6e454c5105ff7fc86b79128ded7176cc6add3f277ced7246",
@@ -1805,7 +2959,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/60": {
       "reference_sha256": "b84e35276d220c7c3ff4148b1229e306af13a1dceee58307b827d0b73f37b2a7",
@@ -1839,7 +3015,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/61": {
       "reference_sha256": "b0456cf7db9ff4e8e546adf3669d7a453a5972260fece7c46659843d7c9cee2a",
@@ -1873,7 +3066,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/62": {
       "reference_sha256": "05838bd8f7cb34d69481f79ea6657cc5675581cdec492b13cfb44040f4c91f8b",
@@ -1898,7 +3108,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "fc",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/63": {
       "reference_sha256": "6931eb418cac3a14a8ea15197a1a370af21597e4abf4b1ea8914316bb90ed05c",
@@ -1923,7 +3155,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/64": {
       "reference_sha256": "4b11de02c18b74ac908dc80ab3b753785f3bacee135caea5043287deffb05277",
@@ -1948,7 +3202,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/65": {
       "reference_sha256": "c210dbcd025851c9a5986aae1627addd6295c2f92a77bba741fa443c6f5d81e0",
@@ -1979,7 +3255,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/66": {
       "reference_sha256": "c696f1feabbd7a70d0ebc5bd4d7ba5a37ab6707028d616e16f97072e80ee4ce2",
@@ -2004,7 +3301,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/67": {
       "reference_sha256": "8b82fd51b4b866dbf9fb531050e36058a969072fe6fa3f5ad57e063f06bc8731",
@@ -2035,7 +3354,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/68": {
       "reference_sha256": "ff97bd992ac5807cab0f5620244ee59e7a4fb089dc69b902eda6ee9bbcd0dd48",
@@ -2060,7 +3400,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/69": {
       "reference_sha256": "2fd812c4db02d6e2648d24ea2ae980c2503da5949a910efa64a9a77a7acd8f3d",
@@ -2091,7 +3453,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/70": {
       "reference_sha256": "7a1c85b309abb54fd8f9d540c51a052d2224aa6372eb4b01f2051b69cbd63b8a",
@@ -2116,7 +3499,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/71": {
       "reference_sha256": "ea87108342e2b2ff0624c9a922fcda46ebc5e6a039a4daee4ddb139741867464",
@@ -2147,7 +3552,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/72": {
       "reference_sha256": "54818aefa857749c915e70affea3c0ea13631a420f5555823e4723b1d3cf4984",
@@ -2181,7 +3607,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/73": {
       "reference_sha256": "f3f8766fc20d5a9b168d2b912572a29cf7de1d6945eb52b9dc4f6417b77899b7",
@@ -2212,7 +3655,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/74": {
       "reference_sha256": "7b2af2a4b98cae1d89fcaccf959eb13fa7bc3f0dfb1d1b642498c46fcee49209",
@@ -2246,7 +3710,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/75": {
       "reference_sha256": "047d1129531e484fb4226dd2635f93e6ebb87e9350f0e0e3e3f2031c5568fdf8",
@@ -2271,7 +3752,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/76": {
       "reference_sha256": "fc6f0c377c7c8f3e4e99feaae8faf15c69fc75fa0d215109d0700c8715ecee4e",
@@ -2296,7 +3799,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/77": {
       "reference_sha256": "646ff9d5b78370f0d54e86360f2475e8b55574dbf62bb083dfc9c3c89e12152d",
@@ -2330,7 +3855,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/78": {
       "reference_sha256": "7864e11a9c87533d87d99c4b45ea7f0de1365bee32fb657d210514ee4d3db893",
@@ -2364,7 +3906,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/79": {
       "reference_sha256": "20aa38776a6828a89d2a2dedafcefdcb05462afdb7e2e91bf2236d8a38963e88",
@@ -2398,7 +3957,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/80": {
       "reference_sha256": "8fda72715b863bd1426ede28a0ced2e82abe770cf354ec6ec7182264247afc2e",
@@ -2423,7 +4003,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/81": {
       "reference_sha256": "37ea2302eb0d1478c42f21ef33563d419badf4bc94f26b292e0b2dc3e38b0e05",
@@ -2448,7 +4050,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/82": {
       "reference_sha256": "fd857069ae0b74f32e8f067463cb7771bfe76513dc0be0d4031cf7255eff5ef0",
@@ -2479,7 +4103,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/83": {
       "reference_sha256": "f5ff5a6f45fdc7afe2cd00c7b39e0eb626abe62ba7dc18d7ae2952a832af6592",
@@ -2513,7 +4158,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/84": {
       "reference_sha256": "eb21b820cb5e67217eb4337542adfeb2f6fbff8b7875735a17b49edc0f0c5ca2",
@@ -2538,7 +4204,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/85": {
       "reference_sha256": "c3708330e8a0646b3837717a2179b776d137dda91e1e1ecb3b97550b2376b7ee",
@@ -2569,7 +4257,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/86": {
       "reference_sha256": "0777d6c87b3b85004bc9512275e82032d87271e3dd8042f34629ad92bece45b8",
@@ -2594,7 +4303,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/87": {
       "reference_sha256": "8afa9f9bec3428f74f6b94e86a29c4fc849f53801ee9d992879b3abe8abe241b",
@@ -2625,7 +4356,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/88": {
       "reference_sha256": "98eb5a64aef2edc2a6d32d7a65d30a057ac8e17dfeeba40a3782a291f5a180c6",
@@ -2650,7 +4402,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/89": {
       "reference_sha256": "c45b3ac54572356970a00c632ba44460218ec4567015c016faee1bd1b02beb5b",
@@ -2684,7 +4458,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/90": {
       "reference_sha256": "8d4efa6fa865c106362a016f0a3e8273577ba5e220f9f5769ccec1acec1d7f38",
@@ -2718,7 +4509,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/91": {
       "reference_sha256": "a4c8eef67a61abc7784ac97268852e67b438f1482dab720cafea5607346db55b",
@@ -2749,7 +4561,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/92": {
       "reference_sha256": "a2ac20d478d5a9cdc419d1300785dc70350f92b2dc8db69bdb836d2a9f1bbecd",
@@ -2780,7 +4609,28 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/93": {
       "reference_sha256": "c847015302d74e464d0e51efabf8c66c70f46137fe0fdfc57f60ca263ad15536",
@@ -2811,7 +4661,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/94": {
       "reference_sha256": "3558f6d924ceeedc03a511e7405b192fca6515f3e7d8dc59ef31d95c0b7be113",
@@ -2836,7 +4703,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gemm",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/95": {
       "reference_sha256": "1e98c23b57053d967c361ec6c974d57b6382075d73ec90318d70c1a50cf89276",
@@ -2861,7 +4750,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/96": {
       "reference_sha256": "984651340dec798829d5211721bdba6faf45b925ac9abc611c903e7f5953b20a",
@@ -2895,7 +4806,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/97": {
       "reference_sha256": "629ae63b050972248737337991c19fba59feae61dbba2984820cf67c882a86fe",
@@ -2920,7 +4848,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/98": {
       "reference_sha256": "c59a6ab1316760313db25687d28ae2b1a8ac72ba47d7aa4c72b34b8c95f39743",
@@ -2945,7 +4895,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "matmul",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/99": {
       "reference_sha256": "ba8fa8e324315d271633f16aebb3765ba823d101bbe22b061f0e3f86e2ef2208",
@@ -2970,7 +4942,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "linear_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "linear",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "2/100": {
       "reference_sha256": "afbd703071d4c5983a8445efa37c1cde5409774ba6855e6d9981af0aa5fea52b",
@@ -3004,7 +4998,24 @@
         ]
       },
       "shape_constraints": "Vary batch and odd spatial dimensions; input channels and all learned features stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "convolution_fusion",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/1": {
       "reference_sha256": "d78f9c39c087a74f2e924bcd8a0bb73972763094f2de096bec1337ab8836553a",
@@ -3029,7 +5040,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "network.0",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/2": {
       "reference_sha256": "97ac6a239b3b13723e44bf783b4fc9886d50d8d1db2ccbf4cc8c36355d0a3ca4",
@@ -3054,7 +5087,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "network.0",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/3": {
       "reference_sha256": "283b711bfabf4a01bce42997ee2de2c66374833f8b544915cdf4f0343d162a57",
@@ -3079,7 +5134,29 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "network.0",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/4": {
       "reference_sha256": "902061771421939d1c4bda54d8f3b87072bea520e8e9137f5f9cc305f1ed0d51",
@@ -3110,7 +5187,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/5": {
       "reference_sha256": "a57f39f0e738049fca70c539d44bc1c0b011483696d6f2063327b7492bc2e33c",
@@ -3141,7 +5239,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/6": {
       "reference_sha256": "6fa5eb8f7868b1e2e29e996ad359b88bcb2ab9c55f24bb6812a54118a69af8ea",
@@ -3172,7 +5291,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "branch1x1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/7": {
       "reference_sha256": "cdc41b4508cb3a05030d5d09212c9d6e38c49f6bf4dd7dd3aca087a0cb897b60",
@@ -3203,7 +5343,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/8": {
       "reference_sha256": "27ab52b5f1c1b3d626cabc8dc97bc5092ca18c8262bedd045e454d0856df3eb9",
@@ -3234,7 +5395,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/9": {
       "reference_sha256": "09cb0d7aa15d7e239d1cf360e92b6f173aa06ad965537870c7179adbaa930848",
@@ -3265,7 +5443,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/10": {
       "reference_sha256": "08e9cc6d9bb650503cc790993531dfaa642a665c21ff3d8b46ac62347939e60c",
@@ -3296,7 +5495,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/11": {
       "reference_sha256": "8c33145177dfa355a099fe0b31b4d9b8670520b57134313411732cff6223b20b",
@@ -3327,7 +5547,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "features.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/12": {
       "reference_sha256": "dcc9400c30845cf6f9dec3469a1ad8de3780879b649ea0103bfe55ac57a4d8dc",
@@ -3358,7 +5599,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "features.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/13": {
       "reference_sha256": "2788a60304fd83707e8a88501f9e1eebaaff22db8ac81b006028f5bebd06c147",
@@ -3389,7 +5651,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/14": {
       "reference_sha256": "fcc1e2e3204575e85e7b9073592cd67f4271474f4bc947b57385076c0bc30bcb",
@@ -3420,7 +5699,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/15": {
       "reference_sha256": "2873646fa2cc03d52ca93e794a1a452695f0c371697820e5f38723deba5c5b45",
@@ -3451,7 +5747,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "features.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/16": {
       "reference_sha256": "0c0edbc737931e3fdd50d0a5a919b18be803c358e897270ea1da03fbb646e713",
@@ -3482,7 +5799,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "features.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/17": {
       "reference_sha256": "4020b7a15a9a050a58de8c61f39112f5925342aaee2771d399287a6db3dde7d3",
@@ -3513,7 +5851,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "squeeze",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/18": {
       "reference_sha256": "79b9876cb8531df7ddc2df67713db4801f854cffdbc61a0a869d2bdd7eec9b0e",
@@ -3544,7 +5903,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "features.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/19": {
       "reference_sha256": "cd3a24946280f20d0f2ff9c64d277979e57748cb15001f8d580d071431c782d9",
@@ -3575,7 +5955,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "model.0.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/20": {
       "reference_sha256": "0893710956091efd3d84aa936561cd1d2d2a022437c9ef4efd8d5274121c12c6",
@@ -3606,7 +6007,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "features.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/21": {
       "reference_sha256": "46da3281450f7bf8f60bdf07e58a8039661e1d0bca1e9be825cbe48b34ef9232",
@@ -3637,7 +6059,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/22": {
       "reference_sha256": "6da3203f08aef6a42c46a21b5599b8301fc89fd8d5e96643093b19a4795779e9",
@@ -3668,7 +6107,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/23": {
       "reference_sha256": "7a5beeb21ed2d5a33095a4b126e96e01f816499c6472b3d7f2e7f3874a9752f4",
@@ -3699,7 +6159,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/24": {
       "reference_sha256": "f5bdbba494d09ae9fac3624a0d84d1217a8df3bf979c5a26a2d99f7d004d8f00",
@@ -3730,7 +6211,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/25": {
       "reference_sha256": "92516bd920358eadbd5642a3216c1887012c2cbeed5ba86f1bb1955afc896d87",
@@ -3761,7 +6263,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/26": {
       "reference_sha256": "8a7631f40c63e470655bfcd6adb92e9204d3016c47454de8a736555faeacb760",
@@ -3792,7 +6315,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "conv1",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/27": {
       "reference_sha256": "905d62920e7c12e10825c0f75ded694b5e078e48b29aa47a6bbbe1cf2e5c82ce",
@@ -3823,7 +6367,28 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "feature_extractor.0.0",
+          "kind": "convolution"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/28": {
       "reference_sha256": "0309d307b753465c07bbfb4fb8750287192adc1d25a581580a34ca02216e20c5",
@@ -3854,7 +6419,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/29": {
       "reference_sha256": "d97e3a7607add0cc89289fd54af4e07360602ef6a3afcc59ef6e7bac933f313e",
@@ -3885,7 +6467,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/30": {
       "reference_sha256": "c1f148827733d4432352cf6e32fb4b0a336663de8b382f52c79a56590ee8546b",
@@ -3916,7 +6515,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/31": {
       "reference_sha256": "56794699ca64c26338e67867fc43e8bab26d52f5f6fcbf832205f6aae99aee9a",
@@ -3947,7 +6563,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/32": {
       "reference_sha256": "671388d0212014813dc638e5bd5992f40d6c12f2de6f438d0a79114047fb9fff",
@@ -3978,7 +6611,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/33": {
       "reference_sha256": "a8300695605386cf219f26bce8eb00e44d215b05179ece2844dda6e4aea63a69",
@@ -4005,7 +6655,31 @@
         ]
       },
       "shape_constraints": "The plain hidden tensor fixes batch and hidden feature dimensions at construction.",
-      "fixed_shape_reason": "The plain hidden tensor fixes batch and hidden feature dimensions at construction."
+      "fixed_shape_reason": "The plain hidden tensor fixes batch and hidden feature dimensions at construction.",
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          1,
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "i2h",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/34": {
       "reference_sha256": "fd0b06460263d06cbc02d844d2a207701bba9f5a6d6440e41e13732777e5edf9",
@@ -4045,7 +6719,31 @@
         ]
       },
       "shape_constraints": "Sequence-first x: sequence axis 0, batch axis 1; initial hidden batch axis 0 varies with x.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          1
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "i2h",
+          "kind": "linear",
+          "flatten": false
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/35": {
       "reference_sha256": "c3dabf3f49a6d01bf7ee93dd4da94e8615fa2d316d72690d6c4ba95fa2487a2d",
@@ -4073,7 +6771,24 @@
         ]
       },
       "shape_constraints": "Batch-first LSTM: x batch/sequence axes 0/1; h0/c0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/36": {
       "reference_sha256": "b47f419beae1b55d4c8968709ed88c1dd3b97a23d68cff91adeb02e9889a8434",
@@ -4131,7 +6846,31 @@
         ]
       },
       "shape_constraints": "Batch-first LSTM: x batch/sequence axes 0/1; h0/c0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "lstm",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/37": {
       "reference_sha256": "db923f0e386e603c29497a1f19530160b48ad6cba037c8f64fd39b83eb161afd",
@@ -4189,7 +6928,31 @@
         ]
       },
       "shape_constraints": "Batch-first LSTM: x batch/sequence axes 0/1; h0/c0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "lstm",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/38": {
       "reference_sha256": "4d002c6c7596f5f76c5ad311198043bc82e4a45aa10ecc0633401681b75ec303",
@@ -4247,7 +7010,31 @@
         ]
       },
       "shape_constraints": "Batch-first LSTM: x batch/sequence axes 0/1; h0/c0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "lstm",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/39": {
       "reference_sha256": "30efd0ed24e1f69427a89c51c32fb83dbeb02c05e38465b13f9795722821559d",
@@ -4290,7 +7077,30 @@
         ]
       },
       "shape_constraints": "Sequence-first GRU: x sequence/batch axes 0/1; h0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gru",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/40": {
       "reference_sha256": "462667780c2e95c5ab98cad88f17d0937a56e6c3e237aa20afb56348137755fe",
@@ -4333,7 +7143,30 @@
         ]
       },
       "shape_constraints": "Sequence-first GRU: x sequence/batch axes 0/1; h0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gru",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/41": {
       "reference_sha256": "c9a75cfc0ab39b044d8680b6ade0e67d43cf3cafd8d82a3818bc30c7a215bf30",
@@ -4376,7 +7209,30 @@
         ]
       },
       "shape_constraints": "Sequence-first GRU: x sequence/batch axes 0/1; h0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gru",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/42": {
       "reference_sha256": "21321d9cf15f10ffee5b9ef7390048ca4973a0e7ac9f26afd4cfd34b49ffab64",
@@ -4419,7 +7275,30 @@
         ]
       },
       "shape_constraints": "Sequence-first GRU: x sequence/batch axes 0/1; h0 batch axis 1, fixed layers/directions and hidden features.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "recurrent",
+        "feature_axes": [
+          2,
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset",
+          "shared_storage",
+          "weight_cancellation"
+        ],
+        "direct_main": {
+          "attribute": "gru",
+          "kind": "recurrent"
+        },
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/43": {
       "reference_sha256": "d8b466852583ccd5045fa15397e0062f6e147714a71b01b0ea3068cdeef54bb3",
@@ -4447,7 +7326,24 @@
         ]
       },
       "shape_constraints": "Batch and sequence vary within the initialized attention mask capacity; embedding/head dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "attention",
+        "feature_axes": [
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/44": {
       "reference_sha256": "79fec66a2839e84922f25145d5d2252f1a6632bdb5355fba951f31eb227ea065",
@@ -4475,7 +7371,24 @@
         ]
       },
       "shape_constraints": "Batch and sequence vary within the initialized attention mask capacity; embedding/head dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "attention",
+        "feature_axes": [
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/45": {
       "reference_sha256": "80a225d44d1a4c69cd435ec2f590c6dd54a5839b1ff72cf58cb0979f8b62a60f",
@@ -4506,7 +7419,24 @@
         ]
       },
       "shape_constraints": "Batch axis 0 varies; features and all remaining constructor-dependent dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "vision_or_mlp",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/46": {
       "reference_sha256": "78c5c35feefc12870e0fa6375040be0e4b5266d542da46367cbb292502c5d393",
@@ -4534,7 +7464,24 @@
         ]
       },
       "shape_constraints": "Batch and descriptor count vary; feature, cluster and ghost-cluster constructor dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "descriptor",
+        "feature_axes": [
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/47": {
       "reference_sha256": "9f342c5eb20134ca74cfe214ab93164b67f0396e669f3c896a07e884d8c19402",
@@ -4562,7 +7509,24 @@
         ]
       },
       "shape_constraints": "Batch and descriptor count vary; feature, cluster and ghost-cluster constructor dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "descriptor",
+        "feature_axes": [
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/48": {
       "reference_sha256": "c25228132ebf5bb4d61e05ef901654a1bf3b1fd8f9c5a0e57f43d9829c1de26a",
@@ -4585,7 +7549,24 @@
         ]
       },
       "shape_constraints": "A/B/C parameters fix batch, sequence and heads; preserve the declared d_head and block_len as well.",
-      "fixed_shape_reason": "A/B/C parameters fix batch, sequence and heads; preserve the declared d_head and block_len as well."
+      "fixed_shape_reason": "A/B/C parameters fix batch, sequence and heads; preserve the declared d_head and block_len as well.",
+      "stress_policy": {
+        "family": "state_space",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/49": {
       "reference_sha256": "1763d0c81092a9aba2a9e59fdf9629a4597bb067098f47bddf9a97dbf4c193a3",
@@ -4608,7 +7589,24 @@
         ]
       },
       "shape_constraints": "A/B/C parameters fix batch, sequence and heads; preserve the declared d_head and block_len as well.",
-      "fixed_shape_reason": "A/B/C parameters fix batch, sequence and heads; preserve the declared d_head and block_len as well."
+      "fixed_shape_reason": "A/B/C parameters fix batch, sequence and heads; preserve the declared d_head and block_len as well.",
+      "stress_policy": {
+        "family": "state_space",
+        "feature_axes": [
+          3
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     },
     "3/50": {
       "reference_sha256": "44c428b6272de53454190485e184a8d7c85a21317a28f6be27f7e18da15d5754",
@@ -4636,7 +7634,24 @@
         ]
       },
       "shape_constraints": "Batch and sequence vary within the initialized attention mask capacity; embedding/head dimensions stay fixed.",
-      "fixed_shape_reason": null
+      "fixed_shape_reason": null,
+      "stress_policy": {
+        "family": "attention",
+        "feature_axes": [
+          2
+        ],
+        "activation_amplitude": 32,
+        "labels": [
+          "signed_feature_pairs",
+          "activation_extremes",
+          "isolated_extrema",
+          "coordinate_asymmetry",
+          "storage_offset"
+        ],
+        "direct_main": null,
+        "weight_policy": "actual reference coefficients only; never replace parameters",
+        "qualification": "input patterns do not certify internal saturation or reference signal"
+      }
     }
   }
 }

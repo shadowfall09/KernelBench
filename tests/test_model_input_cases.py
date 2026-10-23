@@ -54,13 +54,15 @@ def test_all_original_l2_l3_factories_and_initializations_accept_frozen_input_fa
         spec = model_input_cases.reviewed_spec(level, pid, source)
         assert [list(value.shape) for value in nominal] == spec["nominal_shapes"]
         before = {name: (value.shape, value.dtype) for name, value in model.state_dict().items()}
-        rows = list(model_input_cases.cases(spec, seed=123, memory_mb=4096, allocation_device="meta"))
+        rows = list(model_input_cases.cases(spec, seed=123, memory_mb=8192, allocation_device="meta"))
         assert [row["label"] for row in rows] == list(model_input_cases.labels(spec))
         for row in rows:
             args = row["inputs"]
             assert all(value.device.type == "meta" for value in args)
             assert [list(value.shape) for value in args] == model_input_cases.shapes(spec, row["label"])
-            assert row["estimated_input_bytes"] == 16 * sum(value.numel() for value in args)
+            from kb_workflows.input_layouts import estimate
+
+            assert row["estimated_input_bytes"] == estimate(row["label"], [list(value.shape) for value in args])
             if row["label"] == "strided":
                 assert all(value.stride(-1) == 2 and not value.is_contiguous() for value in args)
             output = copy.deepcopy(model)(*args)
@@ -160,13 +162,28 @@ def test_cpu_hidden_entrypoint_runs_each_family_and_replays_actual_execution(tmp
                 row["input_signature"][0]["dtype"] = "torch.bfloat16"
             actual["input_signature"] = copy.deepcopy(row["input_signature"])
         assert operator_input_policy.issue(bad, request)
+    for damage in ("source", "digest", "replaced", "positions"):
+        bad = copy.deepcopy(result)
+        details = next(row["stress_details"] for row in bad["metadata"]["operator_inputs"]["cases"]
+                       if row["family_label"] == "weight_cancellation")
+        if damage == "source":
+            details["coefficient_source"] = "meta_unmeasured"
+        elif damage == "digest":
+            details["coefficient_sha256"] = "made-up"
+        elif damage == "replaced":
+            details["reference_parameters_replaced"] = True
+        else:
+            details["weight_positions"] = []
+        assert operator_input_policy.issue(bad, request) == "operator_input_family_weight_counterexample_missing_or_changed"
 
 
 def test_cpu_value_families_and_seed_replay_are_independent_of_model_outputs():
     spec = model_input_cases.reviewed_spec(3, 34, problem_paths(3)[34].read_text())
-    first = list(model_input_cases.cases(spec, seed=42))
-    same = list(model_input_cases.cases(spec, seed=42))
-    changed = list(model_input_cases.cases(spec, seed=123))
+    Model, init, _ = native.load_original_model_and_inputs(problem_paths(3)[34].read_text(), {})
+    model = Model(*init())
+    first = list(model_input_cases.cases(spec, seed=42, reference=model))
+    same = list(model_input_cases.cases(spec, seed=42, reference=model))
+    changed = list(model_input_cases.cases(spec, seed=123, reference=model))
     assert all(torch.equal(a, b) for x, y in zip(first, same) for a, b in zip(x["inputs"], y["inputs"]))
     assert not torch.equal(first[0]["inputs"][0], changed[0]["inputs"][0])
     for row in first:
@@ -271,7 +288,7 @@ def test_l3_shared_policy_reaches_neuron_on_explicit_cpu_simulator(tmp_path, mon
 
     result = worker(payload)
     assert result["correctness"] and result["metadata"]["simulated_execution"]
-    assert len(result["metadata"]["operator_inputs"]["cases"]) == 6
+    assert len(result["metadata"]["operator_inputs"]["cases"]) == len(model_input_cases.labels(spec))
     assert operator_input_policy.issue(result, payload) is None
 
 

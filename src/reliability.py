@@ -8,6 +8,7 @@ from pathlib import Path
 
 import torch
 
+from .input_groups import copy_inputs, layout
 from .validation import clone_tensors, compare_outputs, preserve_backend_settings, synchronize
 
 PROTOCOL = "paired_order_multiseed_stress_v1"
@@ -72,7 +73,8 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     observe_numerical(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     from kb_workflows.measurement import input_signature
 
-    receipt = {"label": label, "seed": seed, "passed": False, "orders": [], "input_signature": input_signature(inputs)}
+    receipt = {"label": label, "seed": seed, "passed": False, "orders": [], "input_signature": input_signature(inputs),
+               "input_layout": layout(inputs), "copied_layouts": []}
     metadata.setdefault("reliability_checks", []).append(receipt)
     metadata["reliability_protocol"] = PROTOCOL
     for order in ("candidate_first", "reference_first"):
@@ -80,7 +82,8 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
         names = ("candidate", "reference") if order == "candidate_first" else ("reference", "candidate")
         for name in names:
             try:
-                fresh = clone_tensors(inputs)
+                fresh = copy_inputs(inputs)
+                receipt["copied_layouts"].append({"order": order, "model": name, "layout": layout(fresh)})
                 set_seed(seed)
                 synchronize(device)
                 started = clock() if record_first_call and name == "candidate" else None

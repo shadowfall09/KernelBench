@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from contextvars import ContextVar
 from functools import wraps
 
@@ -72,7 +73,7 @@ def extra_cases(reference, seed):
     if "model_family" in state:
         from .model_input_cases import cases as model_cases
 
-        iterator = model_cases(state["model_family"], seed=seed, memory_mb=state["spec"]["memory_mb"])
+        iterator = model_cases(state["model_family"], seed=seed, memory_mb=state["spec"]["memory_mb"], reference=reference)
     else:
         iterator = cases(state["pid"], reference, seed=seed, memory_mb=state["spec"]["memory_mb"])
     for row in iterator:
@@ -80,14 +81,22 @@ def extra_cases(reference, seed):
 
 
 def completed(row, inputs, passed):
+    from src.input_groups import layout
+
+    from .input_layouts import LABELS as LAYOUT_LABELS
+    from .input_layouts import expected
     from .measurement import input_signature
 
     state = ACTIVE.get()
     if state is None:
         raise ValueError("Operator input case executed outside its frozen plan")
+    signature = input_signature(inputs)
+    actual_layout = layout(inputs)
+    if row["label"] in LAYOUT_LABELS and actual_layout != expected(row["label"], signature):
+        raise ValueError("Actual backend did not deliver the required input offset/storage aliases")
     state["records"].append({"label": row["case_label"], "family_label": row["label"], "seed": row["seed"],
-        "passed": passed, "input_signature": input_signature(inputs),
-        "estimated_input_bytes": row["estimated_input_bytes"]})
+        "passed": passed, "input_signature": signature, "input_layout": actual_layout,
+        "estimated_input_bytes": row["estimated_input_bytes"], "stress_details": row.get("stress_details", {})})
 
 
 def _valid_signature(signature):
@@ -109,6 +118,9 @@ def _valid_signature(signature):
 
 
 def issue(result, payload):
+    from .input_layouts import LABELS as LAYOUT_LABELS
+    from .input_layouts import estimate, matches
+    from .input_layouts import expected as expected_layout
     settings = payload["eval_config"]
     if payload["level"] not in {1, 2, 3} or not settings.get("use_hidden_tests") or result.get("correctness") is not True:
         return None
@@ -137,16 +149,37 @@ def issue(result, payload):
             if (row.get("passed") is not True or type(row.get("seed")) is not int or not _valid_signature(row.get("input_signature"))
                     or type(row.get("estimated_input_bytes")) is not int
                     or not 0 < row["estimated_input_bytes"] <= spec["memory_mb"] * 1024**2
-                    or row["estimated_input_bytes"] != 16 * sum(math.prod(item["shape"]) for item in row["input_signature"] if "shape" in item)
+                    or row["estimated_input_bytes"] != estimate(row["family_label"], [item["shape"] for item in row["input_signature"] if "shape" in item])
                     or actual.get(row["label"], {}).get("passed") is not True
                     or actual[row["label"]].get("seed") != row["seed"]
                     or actual[row["label"]].get("orders") != ["candidate_first", "reference_first"]
                     or actual[row["label"]].get("input_signature") != row["input_signature"]
                     or (row["family_label"] == "strided" and any(item.get("stride", [2])[-1] != 2 for item in row["input_signature"]))):
                 return "operator_input_family_execution_evidence_incomplete"
+            if row["family_label"] in LAYOUT_LABELS:
+                target = expected_layout(row["family_label"], row["input_signature"])
+                native = actual[row["label"]]
+                expected_calls = [(order, name) for order, names in (("candidate_first", ("candidate", "reference")),
+                                  ("reference_first", ("reference", "candidate"))) for name in names]
+                copies = native.get("copied_layouts", [])
+                if (not matches(row.get("input_layout"), target) or not matches(native.get("input_layout"), target)
+                        or not isinstance(copies, list) or any(not isinstance(item, dict) for item in copies)
+                        or [(item.get("order"), item.get("model")) for item in copies] != expected_calls
+                        or any(not matches(item.get("layout"), target) for item in copies)):
+                    return "operator_input_family_alias_delivery_missing_or_changed"
             if model_family is not None and not signature_matches(
                     model_family, row["family_label"], row["input_signature"], settings.get("precision")):
                 return "operator_input_family_geometry_or_precision_changed"
+            if row["family_label"] == "weight_cancellation":
+                details = row.get("stress_details", {})
+                if (details.get("value_recipe") != "weight_cancellation" or details.get("reference_parameters_replaced") is not False
+                        or details.get("coefficient_source") != "actual_reference_weight"
+                        or not isinstance(details.get("coefficient_sha256"), str)
+                        or not re.fullmatch("[0-9a-f]{64}", details["coefficient_sha256"])
+                        or type(details.get("two_nonzero_products")) is not bool
+                        or not isinstance(details.get("weight_positions"), list) or not 2 <= len(details["weight_positions"]) <= 3
+                        or not isinstance(details.get("input_positions"), list) or len(details["input_positions"]) != len(details["weight_positions"])):
+                    return "operator_input_family_weight_counterexample_missing_or_changed"
     except (KeyError, TypeError, ValueError, OSError, AttributeError):
         return "operator_input_family_contract_invalid"
     return None

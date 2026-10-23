@@ -154,6 +154,12 @@ def _process_input_tensor(input, device, precision=torch.float32):
     return output
 
 
+def _process_input_group(inputs, device, precision=torch.float32):
+    from .input_groups import copy_inputs
+
+    return copy_inputs(inputs, lambda value: _process_input_tensor(value, device, precision), isolate=False)
+
+
 class KernelExecResult(BaseModel):
     """
     Single Kernel Execution
@@ -441,7 +447,7 @@ def run_correctness_on_fixed_inputs(
     to generate random tensors — it uses the provided raw_inputs directly.
     This is used for hidden test configs where inputs are fixed and deterministic.
     """
-    inputs = [_process_input_tensor(x, device, precision) for x in raw_inputs]
+    inputs = _process_input_group(raw_inputs, device, precision)
     with torch.no_grad():
         issue = check_paired_calls(
             move_model(original_model_instance, device, precision),
@@ -512,7 +518,7 @@ def run_hidden_correctness_check(
         from kb_workflows.operator_input_policy import extra_cases
 
         for row in extra_cases(original_model_instance, seed):
-            effective = [_process_input_tensor(value, device, precision) for value in row["inputs"]]
+            effective = _process_input_group(row["inputs"], device, precision)
             passed = run_correctness_on_fixed_inputs(
                 original_model_instance, new_model_instance, effective, metadata,
                 verbose=verbose, device=device, precision=precision,
@@ -557,7 +563,7 @@ def measure_hidden_speedup(
     for i, raw_inputs in enumerate(hidden_configs):
         config_label = f"config_{i + 1}"
         try:
-            inputs = [_process_input_tensor(x, device, precision) for x in raw_inputs]
+            inputs = _process_input_group(raw_inputs, device, precision)
             model = move_model(original_model_instance, device, precision)
             model_new = move_model(new_model_instance, device, precision)
 
@@ -895,10 +901,10 @@ def run_and_check_correctness(
     pass_count = 0
     from kb_workflows.throughput_audit import bind_factory
 
-    bind_factory(lambda: [_process_input_tensor(value, device, precision) for value in get_inputs_fn()])
+    bind_factory(lambda: _process_input_group(get_inputs_fn(), device, precision))
     from kb_workflows.cache_audit import bind_factory as bind_cache_factory
 
-    bind_cache_factory(lambda: [_process_input_tensor(value, device, precision) for value in get_inputs_fn()])
+    bind_cache_factory(lambda: _process_input_group(get_inputs_fn(), device, precision))
     generator = torch.Generator().manual_seed(seed)
     seeds = torch.randint(0, 2**32 - 1, (num_correct_trials,), generator=generator).tolist()
     with torch.no_grad():
@@ -906,7 +912,7 @@ def run_and_check_correctness(
         model_new = move_model(new_model_instance, device, precision)
         for trial, trial_seed in enumerate(seeds):
             set_seed(trial_seed)
-            inputs = [_process_input_tensor(x, device, precision) for x in get_inputs_fn()]
+            inputs = _process_input_group(get_inputs_fn(), device, precision)
             issue = check_paired_calls(
                 model, model_new, inputs, seed=trial_seed,
                 tolerance=get_tolerance_for_precision(precision), device=device,

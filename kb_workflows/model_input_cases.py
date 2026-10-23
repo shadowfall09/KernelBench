@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from pathlib import Path
 
 from .common import fingerprint
+from .input_layouts import LABELS as LAYOUT_LABELS
+from .input_layouts import estimate
 from .operator_cases import PROTOCOL
 
 MANIFEST = Path(__file__).with_name("model_input_families.json")
@@ -45,11 +46,29 @@ def reviewed_spec(level, pid, source):
         raise ValueError("A fixed-shape contract cannot replace nominal dimensions")
     if not fixed and variants["odd"] == variants["alternative_shape"]:
         raise ValueError("Variable model input families require distinct legal shapes")
+    stress = row.get("stress_policy")
+    if (not isinstance(stress, dict) or stress.get("family") not in {"convolution_fusion", "linear_fusion", "vision_or_mlp", "recurrent", "attention", "descriptor", "state_space"}
+            or not isinstance(stress.get("feature_axes"), list) or len(stress["feature_axes"]) != len(nominal)
+            or any(type(axis) is not int or not 0 <= axis < len(shape) for axis, shape in zip(stress["feature_axes"], nominal))
+            or type(stress.get("activation_amplitude")) is not int or stress["activation_amplitude"] != 32):
+        raise ValueError("Invalid reviewed model stress roles or amplitudes")
+    main = stress.get("direct_main")
+    if main is not None and (not isinstance(main, dict) or main.get("kind") not in {"linear", "convolution", "recurrent", "recurrent_cell"}
+            or not isinstance(main.get("attribute"), str) or not main["attribute"]
+            or type(main.get("flatten", False)) is not bool):
+        raise ValueError("Invalid reviewed direct cancellation module")
+    required = ["signed_feature_pairs", "activation_extremes", "isolated_extrema", "coordinate_asymmetry", "storage_offset"]
+    if len(nominal) > 1:
+        required.append("shared_storage")
+    if main:
+        required.append("weight_cancellation")
+    if stress.get("labels") != required:
+        raise ValueError("Incomplete reviewed model stress labels")
     return row
 
 
 def labels(spec):
-    return (*spec["shape_variants"], *VALUE_LABELS)
+    return (*spec["shape_variants"], *VALUE_LABELS, *spec["stress_policy"]["labels"])
 
 
 def shapes(spec, label):
@@ -67,7 +86,7 @@ def plan(level, pid, source, memory_mb):
             "scope": "additional_hidden_correctness_only; actual_reference_initialization; nominal_timing_unchanged"}
 
 
-def cases(spec, *, seed, memory_mb=256, allocation_device="cpu"):
+def cases(spec, *, seed, memory_mb=256, allocation_device="cpu", reference=None):
     """Generate lazily after admission; never resize or select by output quality."""
     import torch
 
@@ -79,8 +98,8 @@ def cases(spec, *, seed, memory_mb=256, allocation_device="cpu"):
     generator = torch.Generator().manual_seed(seed)
     for label in labels(spec):
         dimensions = shapes(spec, label)
-        estimate = 16 * sum(math.prod(shape) for shape in dimensions)
-        if estimate > memory_mb * 1024**2:
+        storage = estimate(label, dimensions)
+        if storage > memory_mb * 1024**2:
             raise ValueError("Reviewed original-parameter input case exceeds its memory envelope; no resizing")
         values = [torch.randn(shape, generator=generator, dtype=torch.float32, device=allocation_device)
                   for shape in dimensions]
@@ -96,7 +115,13 @@ def cases(spec, *, seed, memory_mb=256, allocation_device="cpu"):
                 value.reshape(-1)[-1] = 8
         if label == "strided":
             values = [_strided(value) for value in values]
-        yield {"label": label, "inputs": values, "estimated_input_bytes": estimate,
+        from .input_layouts import apply as alias_inputs
+        from .model_stress import apply as stress_inputs
+
+        details = stress_inputs(values, label, spec, reference=reference, allocation_device=allocation_device)
+        if label in LAYOUT_LABELS:
+            values = alias_inputs(values, label, generator=generator, allocation_device=allocation_device)
+        yield {"label": label, "inputs": values, "estimated_input_bytes": storage, "stress_details": details,
                "reference_parameters_replaced": False, "nominal_timing_changed": False}
 
 

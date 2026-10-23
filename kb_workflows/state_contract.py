@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import torch
 
+from src.input_groups import copy_inputs
 from src.validation import clone_tensors, compare_outputs, synchronize
 
 from .evidence import check
@@ -454,9 +455,9 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
             raise StateContractError("Root training mode differs from the requested mode")
         before_modes = binding.modes()
         set_seed(seed)
-        expected = clone_tensors(ref(*clone_tensors(args)))
+        expected = clone_tensors(ref(*copy_inputs(args)))
         set_seed(seed)
-        actual = clone_tensors(cand(*clone_tensors(args)))
+        actual = clone_tensors(cand(*copy_inputs(args)))
         synchronize(device)
         if ref.training is not training or cand.training is not training or torch.is_grad_enabled():
             issues.append(f"{label}: forward changed the requested mode or gradient state")

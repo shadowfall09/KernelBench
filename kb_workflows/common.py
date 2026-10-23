@@ -84,6 +84,7 @@ def evaluator_digest():
     digest = hashlib.sha256()
     for name in (
         "src/eval.py", "src/utils.py", "src/validation.py", "src/reliability.py", "requirements.txt", "requirements-neuron-worker.txt",
+        "src/input_groups.py",
         "kb_workflows/evaluate_task.py", "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py",
         "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
         "kb_workflows/transports.py", "kb_workflows/queue_worker.py", "kb_workflows/paper_analysis.py",
@@ -107,6 +108,7 @@ def evaluator_digest():
         "kb_workflows/reference_revisions.py", "kb_workflows/reference_revisions.json",
         "kb_workflows/scan_cases.py", "kb_workflows/operator_cases.py", "kb_workflows/operator_input_policy.py",
         "kb_workflows/model_input_cases.py", "kb_workflows/model_input_families.json",
+        "kb_workflows/model_stress.py", "kb_workflows/input_layouts.py",
         "kb_workflows/input_profiles.py", "kb_workflows/input_calibration.py", "kb_workflows/input_calibration_task.py",
         "scripts/calibrate_inputs.py",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",

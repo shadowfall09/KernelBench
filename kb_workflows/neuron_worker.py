@@ -164,7 +164,9 @@ def _evaluate(payload, *, adapter=None):
             torch.neuron.manual_seed(value)
 
     def host(value):
-        return map_tensors(value, lambda tensor: tensor.detach().cpu().clone())
+        from src.input_groups import copy_inputs
+
+        return copy_inputs(value, lambda tensor: tensor.detach().cpu())
 
     def move(value):
         def transfer(tensor):
@@ -175,7 +177,9 @@ def _evaluate(payload, *, adapter=None):
                 return output.copy_(copied)
             return copied.clone()
 
-        return map_tensors(value, transfer)
+        from src.input_groups import copy_inputs
+
+        return copy_inputs(value, transfer, isolate=False)
 
     from .input_profiles import wrap_factory
 

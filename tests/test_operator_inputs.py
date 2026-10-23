@@ -69,7 +69,7 @@ def test_every_original_initialization_accepts_planned_shapes_without_allocation
         Model, init, _ = native.load_original_model_and_inputs(source, {})
         model = Model(*init())
         before = {name: (tuple(value.shape), value.dtype) for name, value in model.state_dict().items()}
-        for row in operator_cases.cases(pid, model, seed=123, allocation_device="meta"):
+        for row in operator_cases.cases(pid, model, seed=123, memory_mb=8192, allocation_device="meta"):
             output = model(*row["inputs"])
             tensors = output if isinstance(output, (tuple, list)) else [output]
             assert all(value.device.type == "meta" for value in tensors)
@@ -313,5 +313,5 @@ def test_shared_operator_policy_reaches_neuron_hidden_calls_on_explicit_simulato
 
     result = worker(request)
     assert result["correctness"] and result["metadata"]["simulated_execution"]
-    assert len(result["metadata"]["operator_inputs"]["cases"]) == 16
+    assert len(result["metadata"]["operator_inputs"]["cases"]) == 2 * len(operator_cases.labels(19))
     assert operator_input_policy.issue(result, request) is None

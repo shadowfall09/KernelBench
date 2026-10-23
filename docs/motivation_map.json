@@ -1340,7 +1340,7 @@
       "title": "针对算子的输入族与隐藏形状",
       "primary": "M2",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
@@ -1353,9 +1353,13 @@
         "docs/OPERATOR_INPUTS.md",
         "kb_workflows/model_input_cases.py",
         "kb_workflows/model_input_families.json",
-        "tests/test_model_input_cases.py"
+        "tests/test_model_input_cases.py",
+        "kb_workflows/model_stress.py",
+        "kb_workflows/input_layouts.py",
+        "src/input_groups.py",
+        "tests/test_input_layouts.py"
       ],
-      "reason": "原250题均有来源绑定输入族，每种子1529例；L2保留卷积/残差/LayerNorm耦合，L3同步序列状态并明确三题固定形状。98/100旧域变换显式修订；新41题已有角色边界。复合/序列更专门的饱和、抵消、极值与存储别名反例仍待补齐，meta不证明数值或设备资格"
+      "reason": "原250题来源绑定输入族每种子2551例：角色/形状、异号与实际权重抵消、GELU/有限极值/索引、offset与33题共享存储；转移和双向隔离副本逐项核对布局与实际系数。291题另有生产角色及模式/参数/重复检查。有限模板不保证内部传播或全部错误检出，原尺寸只做meta，按用户要求不运行实验"
     },
     {
       "id": "R-07",
@@ -3811,6 +3815,107 @@
         "tests/test_baseline_recipes.py"
       ],
       "reason": "三个dtype的合法值配方、291题清单、2D/3D布局、设置异常恢复、原生错误拒绝与收据删改；不运行设备实验"
+    },
+    {
+      "id": "V35-01",
+      "title": "复合与序列专用压力政策",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_input_families.json"
+      ],
+      "reason": "150题冻结七类角色与特征轴，追加异号对、激活分支、孤立极值和坐标不对称输入"
+    },
+    {
+      "id": "V35-02",
+      "title": "当前实际权重的成对抵消",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_stress.py"
+      ],
+      "reason": "100个直接线性/标准卷积/循环入口按权重比值构造有界输入，保留参数与偏置并记录实际系数摘要"
+    },
+    {
+      "id": "V35-03",
+      "title": "GELU与有限极值判别输入",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_cases.py"
+      ],
+      "reason": "15个激活题覆盖±32/±32752，26/88加±2.699，池化/极值归约检查实际窗口内的单个边界极值"
+    },
+    {
+      "id": "V35-04",
+      "title": "偏移与共享存储隐藏输入",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_layouts.py"
+      ],
+      "reason": "250题追加非零offset，33个合法多输入题追加重叠存储，初始化守卫并在分配前核对更大包络"
+    },
+    {
+      "id": "V35-05",
+      "title": "按存储组隔离与转移",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/input_groups.py",
+        "src/reliability.py",
+        "kb_workflows/neuron_worker.py"
+      ],
+      "reason": "原生/Neuron转换、双向比较、状态/重复/数值检查保留stride、offset、别名和重复对象；输出快照保持独立"
+    },
+    {
+      "id": "V35-06",
+      "title": "实际副本交付收据",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_input_policy.py",
+        "tests/test_model_input_cases.py"
+      ],
+      "reason": "重算有效输入及双向四次隔离副本布局，缺API/压紧/拆存储/错dtype不能取得别名资格；实际权重收据拒绝meta替代"
+    },
+    {
+      "id": "V35-07",
+      "title": "别名与低精度反例回归",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_input_layouts.py"
+      ],
+      "reason": "全250题转移及隔离的meta布局、小输入权重抵消/参数不变、GELU近似与BF16反例、边界极值及收据删改"
     }
   ]
 }

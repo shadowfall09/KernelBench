@@ -161,6 +161,7 @@ class Collector:
     def observe(self, reference, candidate, inputs, *, seed, device, set_seed, tolerance, label):
         import torch
 
+        from src.input_groups import copy_inputs
         from src.validation import clone_tensors, compare_outputs, synchronize
 
         from .measurement import consume_output, input_signature
@@ -186,7 +187,7 @@ class Collector:
                     random.seed(seed)
                     if numpy := sys.modules.get("numpy"):
                         numpy.random.seed(seed % (1 << 32))
-                    expected = clone_tensors(ref(*clone_tensors(inputs)))
+                    expected = clone_tensors(ref(*copy_inputs(inputs)))
                     synchronize(device)
                     row["reference_calls"] += 1
                     set_seed(seed)
@@ -194,7 +195,7 @@ class Collector:
                     if numpy:
                         numpy.random.seed(seed % (1 << 32))
                     with environment_guard(changes):
-                        actual = cand(*clone_tensors(inputs))
+                        actual = cand(*copy_inputs(inputs))
                         consumed = consume_output(actual)
                         synchronize(device)
                     row["candidate_calls"] += 1

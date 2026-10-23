@@ -19,6 +19,15 @@ def labels(pid):
         result.append("cancellation")
     if pid in NONFINITE_TASKS:
         result.extend(("nonfinite_mixed", "nonfinite_only"))
+    if 19 <= pid <= 32 or pid == 88:
+        result.extend(("activation_extremes", "format_extremes"))
+    if pid in {26, 88}:
+        result.append("gelu_discriminator")
+    if pid in {41, 42, 43, 49, 51, 52, 53}:
+        result.append("isolated_extrema")
+    result.append("storage_offset")
+    if pid in {*range(1, 19), 94, 96, 97, 98, 99} - {5}:
+        result.append("shared_storage")
     return tuple(result)
 
 
@@ -118,6 +127,9 @@ def cases(pid, model, *, seed, memory_mb=256, allocation_device="cpu"):
     """Yield cases lazily. The allocation device is injectable for meta-only tests."""
     import torch
 
+    from .input_layouts import apply as alias_inputs
+    from .input_layouts import estimate as storage_estimate
+
     if type(seed) is not int or type(memory_mb) is not int or not 1 <= memory_mb <= 1048576:
         raise ValueError("Operator cases require an integer seed and a positive memory envelope")
     if allocation_device not in {"cpu", "meta"}:
@@ -127,7 +139,7 @@ def cases(pid, model, *, seed, memory_mb=256, allocation_device="cpu"):
         dimensions = shapes(pid, model, alternate=label == "alternative_shape")
         # Includes generation temporaries and strided backing. This is a
         # conservative input-storage estimate, not an OS/process memory limit.
-        estimate = 16 * sum(math.prod(shape) for shape in dimensions if shape is not None)
+        estimate = storage_estimate(label, dimensions)
         if estimate > memory_mb * 1024**2:
             raise ValueError("Reviewed original-parameter input case exceeds its memory envelope; no resizing")
         values = []
@@ -173,6 +185,18 @@ def cases(pid, model, *, seed, memory_mb=256, allocation_device="cpu"):
                 value.reshape(-1)[2::5] = -float("inf")
             elif label == "nonfinite_only":
                 value.fill_(float("nan"))
+            elif label in {"activation_extremes", "format_extremes"}:
+                amplitude = 32 if label == "activation_extremes" else 32752
+                value.fill_(-amplitude)
+                value.reshape(-1)[1::2] = amplitude
+            elif label == "gelu_discriminator":
+                value.fill_(-2.699)
+                value.reshape(-1)[1::2] = 2.699
+            elif label == "isolated_extrema":
+                value.fill_(64 if pid in {52, 53} else -64)
+                # Odd spatial tails may lie outside a floor-pooled window;
+                # the first border is in its first declared window.
+                value.reshape(-1)[0 if pid in {41, 42, 43} else -1] = 32 if pid in {52, 53} else -32
         if pid == 13:
             values = [(value + value.t()) / 2 for value in values]
         elif pid in {14, 15}:
@@ -209,5 +233,6 @@ def cases(pid, model, *, seed, memory_mb=256, allocation_device="cpu"):
                 values = [anchor, anchor + 2, anchor + values[2] / 128]
         if label == "strided":
             values = [_strided(value) if isinstance(value, torch.Tensor) else value for value in values]
+        values = alias_inputs(values, label, generator=generator, allocation_device=allocation_device)
         yield {"protocol": PROTOCOL, "label": label, "inputs": values, "estimated_input_bytes": estimate,
                "nominal_timing_changed": False, "reference_parameters_replaced": False}

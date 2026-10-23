@@ -154,6 +154,7 @@ class Collector:
     def observe(self, reference, candidate, inputs, *, seed, device, set_seed, tolerance, label):
         import torch
 
+        from src.input_groups import copy_inputs
         from src.validation import clone_tensors, synchronize
 
         from .determinism import preserve_rng
@@ -187,10 +188,10 @@ class Collector:
                     row.update(source_device=str(prepared.input_device), composite_receipt=prepared.receipt())
                 ref, cand = _isolated_pair(reference, candidate)
                 set_seed(seed)
-                expected = clone_tensors(ref(*clone_tensors(inputs)))
+                expected = clone_tensors(ref(*copy_inputs(inputs)))
                 synchronize(device)
                 set_seed(seed)
-                actual = clone_tensors(cand(*clone_tensors(inputs)))
+                actual = clone_tensors(cand(*copy_inputs(inputs)))
                 synchronize(device)
                 # Preserve output storage dtypes when bringing measured values to
                 # CPU. Only the independent arithmetic truth uses FP64.
