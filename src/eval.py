@@ -210,12 +210,15 @@ def load_custom_model(
         os.environ["TORCH_EXTENSIONS_DIR"] = str(build_directory)
 
     try:
-        if build_directory:
-            from kb_workflows.submission_source import execute
+        from kb_workflows.allocation_audit import candidate_scope
 
-            execute(model_custom_src, context, build_directory)
-        else:
-            exec(compile(model_custom_src, "<string>", "exec"), context)
+        with candidate_scope("import"):
+            if build_directory:
+                from kb_workflows.submission_source import execute
+
+                execute(model_custom_src, context, build_directory)
+            else:
+                exec(compile(model_custom_src, "<string>", "exec"), context)
         # DANGER: need to delete refernece from global namespace
     except SyntaxError as e:
         print(f"Syntax Error in custom generated code or Compilation Error {e}")
@@ -680,11 +683,14 @@ def eval_kernel_against_ref(
     try:
         with torch.no_grad():
             set_seed(seed_num)  # set seed for reproducible weights
-            custom_model = ModelNew(*init_inputs)
-            assert hasattr(custom_model, "forward")
+            from kb_workflows.allocation_audit import candidate_scope
+
+            with candidate_scope("constructor"):
+                custom_model = ModelNew(*init_inputs)
+                assert hasattr(custom_model, "forward")
+                custom_model = move_model(custom_model, device, precision)
+                torch.cuda.synchronize(device=device)
             original_model = move_model(original_model, device, precision)
-            custom_model = move_model(custom_model, device, precision)
-            torch.cuda.synchronize(device=device)
         if verbose:
             print("[Eval] New Model with Custom CUDA Kernel Loaded")
     except RuntimeError as e:

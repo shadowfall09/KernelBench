@@ -73,12 +73,17 @@ def binary_identity(command, *, run=process, directory, timeout=5):
             "version": version, "version_sha256": hashlib.sha256(version.encode()).hexdigest()}
 
 
-def environment(*, sanitized=False):
+def environment(*, sanitized=False, allocation=False):
     values = {key: value for key, value in os.environ.items() if not key.startswith("NV_COMPUTE_SANITIZER_")}
     for key in ("CUDA_INJECTION64_PATH", "CUDA_INJECTION32_PATH"):
         values.pop(key, None)
-    if sanitized:
+    if sanitized or allocation:
         values["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "1"
+    if allocation:
+        from .allocation_audit import ENVIRONMENT
+
+        values.pop("PYTORCH_CUDA_ALLOC_CONF", None)
+        values.update(ENVIRONMENT)
     return values
 
 
@@ -94,6 +99,9 @@ def command(tool, binary, log_pattern, worker):
 
 def evaluate(payload, *, run=None, binary=None):
     """Used by the native CLI supervisor on every supported execution transport."""
+    from .allocation_audit import validate_inline
+
+    validate_inline(payload)
     injected = run is not None or binary is not None
     run = run or process
     settings = payload["eval_config"]
@@ -121,7 +129,8 @@ def evaluate(payload, *, run=None, binary=None):
                 response = {"exit_code": 124, "timed_out": True, "request_wall_seconds": 0}
             else:
                 try:
-                    response = run(invocation, limit, log, environment=environment(sanitized=instrumented))
+                    response = run(invocation, limit, log, environment=environment(
+                        sanitized=instrumented, allocation=stage.startswith("allocation_")))
                 except (OSError, ValueError, RuntimeError) as exc:
                     response = {"exit_code": None, "timed_out": False, "request_wall_seconds": None, "error": str(exc)}
             result = read_json(target, {})
@@ -148,7 +157,7 @@ def evaluate(payload, *, run=None, binary=None):
         tools = select_tools(settings.get("sanitizer_tools", "none"))
         document = {"protocol": PROTOCOL, "evaluator_sha256": evaluator_digest(), "payload_sha256": fingerprint(payload),
             "nonce": nonce, "native_result": copy.deepcopy(base), "native_process": {key: value for key, value in native.items() if key != "result"},
-            "simulated_execution": injected, "tools": {}, "control": {},
+            "simulated_execution": injected, "tools": {}, "control": {}, "allocation_controls": {},
             "timing_policy": "only_original_uninstrumented_native_samples_are_scored",
             "coverage_scope": "tested_worker_and_descendants; no_proof_of_race_freedom_or_kernel_authorship",
             "security_isolation_certified": False}
@@ -162,8 +171,13 @@ def evaluate(payload, *, run=None, binary=None):
             else:
                 record = worker(request, tool, tool, instrumented=True)
             document["tools"][tool] = record
+        if settings.get("allocation_validation"):
+            from .allocation_audit import STAGES
+
+            for pattern, stage in STAGES.items():
+                document["allocation_controls"][pattern] = worker(child_payload(payload, nonce, stage), stage)
         preliminary = derive(document, payload)
-        if (settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation")
+        if (settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation")
                 or all(preliminary[f"sanitizer_{tool}"]["status"] == "passed" for tool in tools)):
             document["control"] = worker(child_payload(payload, nonce, "control"), "control")
         if tools and not injected and resolved.get("status") == "measured":

@@ -82,7 +82,12 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
                 set_seed(seed)
                 synchronize(device)
                 started = clock() if record_first_call and name == "candidate" else None
-                with preserve_backend_settings():
+                from contextlib import nullcontext
+
+                from kb_workflows.allocation_audit import candidate_scope
+
+                context = candidate_scope("forward", label=label, seed=seed, order=order) if name == "candidate" else nullcontext()
+                with preserve_backend_settings(), context:
                     output = (candidate if name == "candidate" else reference)(*fresh)
                     synchronize(device)
                 if started is not None:

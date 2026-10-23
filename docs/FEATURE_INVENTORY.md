@@ -892,6 +892,30 @@ L3/33的普通hidden属性、48/49的A/B/C参数固定部分尺寸，不通过�
 
 验证：Python 3.12.12 / Torch 2.12.0下2,469项CPU/模拟/meta回归通过，本版新增320项；9条warning保留原IN通道、Transformer/meshgrid与driver提示。JSON编码格式整理后另有145项修订/冻结/RL/集成检查通过。150题原构造及全部族仅做meta检查；小输入原生隐藏、L2独立数值、Neuron模拟和旧角色生成器检查通过。Ruff、207项动机映射、34份Markdown的844个本地链接、skill及177包依赖检查通过；离线wheel包含新模块/清单，18个安装后轻量入口未导入设备SDK。没有运行GPU、Trainium、预训练模型、容器或训练实验。
 
+## 第三十版：独立候选分配预填充检查
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add isolated candidate allocation poisoning controls |
+| 日期 | 2026-10-23 |
+| 基础提交 | `f25a3eb` |
+| 状态 | 软件、CPU与模拟回归；不运行GPU/Trainium或模型实验 |
+
+本版继续R-09，增加显式`allocation_validation`选项。两个独立正确性进程覆盖观察到的候选分配，保持原性能数据与算法政策。完整边界见[分配检查](ALLOCATION_VALIDATION.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V30-01 | 双模式候选分配预填充 | 浮点/复数NaN配合另一确定值，整数与bool用两端值，防止未写入输出碰巧符合参考 | `kb_workflows/allocation_audit.py` | [M2](MOTIVATION.md#m2) |
+| V30-02 | 导入构造与实际调用作用域 | 覆盖候选模块全局缓存、构造缓存及逐原生双向调用；参考/输入工厂不预填，不强制确定性算法 | `src/reliability.py` | [M2](MOTIVATION.md#m2) |
+| V30-03 | 连续扩容前缀保护与未知存储 | resize增长只填新逻辑尾部；非连续增长/量化/不支持填充保留未知，meta存储量为null | `kb_workflows/allocation_audit.py` | [M2](MOTIVATION.md#m2) |
+| V30-04 | 独立进程关闭缓存并同步报错 | 父进程设native allocator、无缓存与launch blocking，两种模式各自创建候选，后续直接复核；不替换原计时 | `kb_workflows/tool_runner.py` | [M5](MOTIVATION.md#m5) |
+| V30-05 | 来源调用收据与冻结部署 | 复核模式/设备/来源/环境/导入构造/逐例seed-order，开关进入最终/研究/RL/Harbor合同，缺项不沿用正结果 | `kb_workflows/tool_checks.py` | [M5](MOTIVATION.md#m5) |
+| V30-06 | 预填充反例与覆盖范围声明 | 多dtype/五种分配前端、部分写入和缓存、首模式碰撞、进程超时/改seed/设备及不支持路径CPU回归 | `tests/test_allocation_audit.py` | [M2](MOTIVATION.md#m2) |
+
+默认关闭，CUDA后端显式开启；不把CPU模拟、零分配或未观察到错误视作完整GPU执行证明。原始allocator、其他线程、Graph及部分编译/扩展路径、吞吐对照仍待完成，R-09保持部分实现。23项仍为14项代码已实现、9项部分实现；旧stash保持原样。按用户要求不运行设备、模型或训练实验。
+
+验证：Python 3.12.12 / Torch 2.12.0下2,619项CPU/模拟/meta回归通过，本版新增150项；9条既有warning保留。覆盖12种dtype、五种分配前端、连续扩容保护、首模式碰撞、全局/构造缓存与部分输出、meta未知、环境恢复、模拟进程缺项/超时/改seed/设备、冻结与Harbor。Ruff（工作流、测试与共享调用）、src/eval.py既有诊断等价核对、213项动机映射、35份Markdown的866个本地链接、skill及177包依赖兼容性检查通过。离线wheel包含新模块与调用钩子，19个安装后轻量入口未导入设备SDK。未运行GPU、Trainium、真实模型、容器或训练实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

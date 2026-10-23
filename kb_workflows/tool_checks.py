@@ -15,7 +15,7 @@ TOOLS = ("memcheck", "racecheck", "synccheck", "initcheck")
 ERROR_EXIT = 86
 MAX_LOG_BYTES = 16 * 1024**2
 DIAGNOSTIC_FIELDS = ("sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats",
-                     "state_validation", "numerical_validation", "oracle_memory_mb", "input_family_memory_mb")
+                     "state_validation", "numerical_validation", "allocation_validation", "oracle_memory_mb", "input_family_memory_mb")
 
 
 def diagnostic_options(config):
@@ -37,10 +37,13 @@ def select_tools(value):
 
 
 def enabled(payload):
+    from .allocation_audit import validate_inline
+
+    validate_inline(payload)
     settings = payload["eval_config"]
     return payload.get("task", "evaluate") in {"evaluate", "paired_timing"} and bool(
         select_tools(settings.get("sanitizer_tools", "none")) or settings.get("determinism_checks")
-        or settings.get("state_validation") or settings.get("numerical_validation"))
+        or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation"))
 
 
 def child_payload(payload, nonce, stage):
@@ -171,6 +174,31 @@ def derive(document, payload):
 
     if control_ok and payload.get("task", "evaluate") == "evaluate" and cases(base) != cases(child):
         control_ok = False
+    if settings.get("allocation_validation"):
+        from .allocation_audit import STAGES, verdict
+
+        for pattern, stage in STAGES.items():
+            record = document.get("allocation_controls", {}).get(pattern, {})
+            expected = child_payload(payload, document["nonce"], stage)
+            poisoned = record.get("result", {})
+            metadata = poisoned.get("metadata", {})
+            valid = (identity and record.get("exit_code") == 0 and record.get("timed_out") is False and not record.get("error")
+                     and record.get("payload_sha256") == fingerprint(expected) and poisoned.get("compiled") is True
+                     and metadata.get("device_fingerprint") == device
+                     and metadata.get("reference_sha256") == fingerprint({"source": payload["ref_arch_src"]})
+                     and metadata.get("kernel_sha256") == fingerprint({"source": payload["kernel_src"]}))
+            if poisoned.get("correctness") is True:
+                valid = valid and bool(coverage(poisoned)) and record.get("coverage") == coverage(poisoned)
+                if payload.get("task", "evaluate") == "evaluate" and cases(base) != cases(poisoned):
+                    valid = False
+                if not control_ok or cases(child) != cases(poisoned):
+                    valid = False
+            value = verdict(metadata.get("allocation_audit"), expected,
+                metadata.get("reliability_checks"), pattern=pattern) if valid else check(
+                "not_measured", reason="No complete source/device-bound fresh allocation-control worker")
+            if value["status"] == "passed" and poisoned.get("correctness") is not True:
+                value = check("not_measured", reason="Poisoned worker did not complete native correctness")
+            checks[stage] = value
     selected = []
     for tool in tools:
         name = f"sanitizer_{tool}"
@@ -243,6 +271,10 @@ def validate(result, payload, *, allow_simulated=False):
     tools = select_tools(settings.get("sanitizer_tools", "none"))
     if set(document.get("tools", {})) != set(tools):
         raise ValueError("Tool-check receipt lost or added a declared tool")
+    from .allocation_audit import PATTERNS
+
+    if set(document.get("allocation_controls", {})) != (set(PATTERNS) if settings.get("allocation_validation") else set()):
+        raise ValueError("Allocation-control receipt lost or added a declared pattern")
     if tools and document.get("binary", {}).get("status") == "measured":
         binary = document.get("binary", {})
         if (not re.fullmatch("[0-9a-f]{64}", binary.get("sha256", "")) or not binary.get("path")

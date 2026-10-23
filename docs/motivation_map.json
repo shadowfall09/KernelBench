@@ -1404,9 +1404,13 @@
       "evidence": [
         "kb_workflows/strict_validation.py",
         "kb_workflows/numerical.py",
-        "kb_workflows/neuron_worker.py"
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/allocation_audit.py",
+        "kb_workflows/tool_runner.py",
+        "tests/test_allocation_audit.py",
+        "docs/ALLOCATION_VALIDATION.md"
       ],
-      "reason": "已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计；来源诊断冻结配置容差并观察training/grad后置状态"
+      "reason": "已有同对象修改缓存、导入/执行环境恢复、Neuron冻结编译来源；新增双模式独立候选分配预填充，覆盖ATen导入/构造/原生调用并保护resize前缀。原始allocator/线程/Graph及部分编译路径、吞吐对照与完整GPU执行证据仍待完成；观察范围不冒充完整内存或来源证明"
     },
     {
       "id": "R-10",
@@ -3345,6 +3349,84 @@
         "tests/test_model_input_cases.py"
       ],
       "reason": "150原工厂/初始化meta与CPU小输入、数值控制、Neuron模拟覆盖；超限分配、篡改与旧域回归"
+    },
+    {
+      "id": "V30-01",
+      "title": "双模式候选分配预填充",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/allocation_audit.py"
+      ],
+      "reason": "两组不同填充值检查浮点/复数/整数/bool，首模式与参考碰巧一致仍须通过第二模式"
+    },
+    {
+      "id": "V30-02",
+      "title": "导入构造与实际调用作用域",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/reliability.py"
+      ],
+      "reason": "候选全局/构造缓存与逐原生双向调用预填，参考/输入不预填，也不强制确定性算法"
+    },
+    {
+      "id": "V30-03",
+      "title": "连续扩容前缀保护与未知存储",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/allocation_audit.py"
+      ],
+      "reason": "只填连续扩容新逻辑尾部；不支持存储保留未知，metadata-only存储量为null"
+    },
+    {
+      "id": "V30-04",
+      "title": "独立进程关闭缓存并同步报错",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/tool_runner.py"
+      ],
+      "reason": "两模式各用父进程配置的fresh CUDA正确性worker，直接后续复核，不替换原生性能时间"
+    },
+    {
+      "id": "V30-05",
+      "title": "来源调用收据与冻结部署",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/tool_checks.py"
+      ],
+      "reason": "复核设备/来源/模式/环境/导入构造/实际case-seed-order，开关进入冻结、研究、RL与Harbor"
+    },
+    {
+      "id": "V30-06",
+      "title": "预填充反例与覆盖范围声明",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_allocation_audit.py"
+      ],
+      "reason": "CPU多dtype分配、局部未写与缓存、首模式碰撞和模拟进程篡改/超时；原始allocator与Graph等未知不宣称覆盖"
     }
   ]
 }

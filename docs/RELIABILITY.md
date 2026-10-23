@@ -40,6 +40,8 @@
 
 ## 输出与恢复
 
+后续版本已扩展为原250题的[来源绑定输入族](OPERATOR_INPUTS.md)，并提供可选的[候选分配预填充](ALLOCATION_VALIDATION.md)。后者以独立进程检查观察到的未初始化存储，保持原生性能采样；它不是完整GPU内存覆盖或安全证明。
+
 `eval_results*.json` 的 metadata 增加：
 
 - `reliability_protocol=paired_order_multiseed_stress_v1`。

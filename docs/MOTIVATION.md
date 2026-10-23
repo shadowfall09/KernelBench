@@ -149,6 +149,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V29-02 L3序列状态与固定形状规则 | 50题297例，区分序列与状态batch轴，三题保留固定初始化并明示原因 | — | [model_input_cases.py](../kb_workflows/model_input_cases.py) |
 | V29-03 旧概率和浮点标签语义修订 | KL温度归一化及hinge只变预测；保留槽位/公式并冻结修订历史，生成器不退回旧域 | — | [reference_revisions.json](../kb_workflows/reference_revisions.json) |
 | V29-04 全题逐例隐藏覆盖门 | 250题原生与Neuron按seed、双向调用、内存、布局复核，缺完整执行证据不能恢复正结果 | M5 | [operator_input_policy.py](../kb_workflows/operator_input_policy.py) |
+| V30-01 双模式候选分配预填充 | 两组不同填充值检查浮点/复数/整数/bool，首模式与参考碰巧一致仍须通过第二模式 | — | [allocation_audit.py](../kb_workflows/allocation_audit.py) |
+| V30-02 导入构造与实际调用作用域 | 候选全局/构造缓存与逐原生双向调用预填，参考/输入不预填，也不强制确定性算法 | — | [reliability.py](../src/reliability.py) |
+| V30-03 连续扩容前缀保护与未知存储 | 只填连续扩容新逻辑尾部；不支持存储保留未知，metadata-only存储量为null | — | [allocation_audit.py](../kb_workflows/allocation_audit.py) |
+| V30-06 预填充反例与覆盖范围声明 | CPU多dtype分配、局部未写与缓存、首模式碰撞和模拟进程篡改/超时；原始allocator与Graph等未知不宣称覆盖 | M5 | [test_allocation_audit.py](../tests/test_allocation_audit.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -296,6 +300,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V28-08 全L2数学与名义形状回归 | 100题小配置CPU数值与原构造/名义shape的meta检查，禁用融合forward、两类低精度、随机收据及准入反例 | — | [_composite_cases.py](../tests/_composite_cases.py), [test_composite_oracles.py](../tests/test_composite_oracles.py), [COMPOSITE_NUMERICS.md](../docs/COMPOSITE_NUMERICS.md) |
 | V29-05 形状精度独立重放与来源预检 | L2/L3从冻结清单重建shape/dtype，CLI/生成/队列/Harbor同源预检且无SDK导入 | M2 | [engine.py](../kb_workflows/engine.py) |
 | V29-06 全模型元数据与域迁移反例 | 150原工厂/初始化meta与CPU小输入、数值控制、Neuron模拟覆盖；超限分配、篡改与旧域回归 | M2 | [test_model_input_cases.py](../tests/test_model_input_cases.py) |
+| V30-04 独立进程关闭缓存并同步报错 | 两模式各用父进程配置的fresh CUDA正确性worker，直接后续复核，不替换原生性能时间 | M2 | [tool_runner.py](../kb_workflows/tool_runner.py) |
+| V30-05 来源调用收据与冻结部署 | 复核设备/来源/模式/环境/导入构造/实际case-seed-order，开关进入冻结、研究、RL与Harbor | M2 | [tool_checks.py](../kb_workflows/tool_checks.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -313,7 +319,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 原250题均有来源绑定输入族，每种子1529例；L2保留卷积/残差/LayerNorm耦合，L3同步序列状态并明确三题固定形状。98/100旧域变换显式修订；新41题已有角色边界。复合/序列更专门的饱和、抵消、极值与存储别名反例仍待补齐，meta不证明数值或设备资格 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
-| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计；来源诊断冻结配置容差并观察training/grad后置状态 |
+| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已有同对象修改缓存、导入/执行环境恢复、Neuron冻结编译来源；新增双模式独立候选分配预填充，覆盖ATen导入/构造/原生调用并保护resize前缀。原始allocator/线程/Graph及部分编译路径、吞吐对照与完整GPU执行证据仍待完成；观察范围不冒充完整内存或来源证明 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |
 | R-12 独立最终重测 | 代码已实现 | M3 | 已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行 |

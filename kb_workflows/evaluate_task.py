@@ -292,6 +292,9 @@ def qualify_small(payload):
 @nominal_input_policy
 @operator_input_policy
 def dispatch(payload):
+    from .allocation_audit import validate_inline
+
+    validate_inline(payload)
     if payload.get("task") == "calibrate_inputs":
         from .input_calibration_task import calibrate
 
@@ -348,6 +351,20 @@ def diagnostic_control(payload):
     return result
 
 
+def allocation_control(payload):
+    """Candidate-only poisoning in its own fresh, untimed worker."""
+    from .allocation_audit import STAGES, audit
+
+    stage = payload["eval_config"].get("diagnostic_stage")
+    pattern = next((pattern for pattern, name in STAGES.items() if name == stage), None)
+    if pattern is None or not payload["eval_config"].get("allocation_validation"):
+        raise ValueError("Missing allocation-control pattern or policy")
+    with audit(payload, pattern) as collector:
+        result = dispatch(payload)
+    result.setdefault("metadata", {})["allocation_audit"] = collector.document()
+    return result
+
+
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
@@ -355,7 +372,11 @@ def main():
 
         native_worker = sys.argv[3:] == ["--native-worker"]
         settings = payload["eval_config"]
-        if native_worker and settings.get("diagnostic_stage") == "control" and (
+        from .allocation_audit import STAGES
+
+        if native_worker and settings.get("diagnostic_stage") in STAGES.values():
+            result = allocation_control(payload)
+        elif native_worker and settings.get("diagnostic_stage") == "control" and (
                 settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation")):
             result = diagnostic_control(payload)
         elif enabled(payload) and not native_worker:
