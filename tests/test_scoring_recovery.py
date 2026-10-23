@@ -84,6 +84,30 @@ def test_failures_and_missing_slots_stay_in_denominator(run):
     assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
 
 
+@pytest.mark.parametrize("review", [False, True])
+def test_throughput_review_excludes_performance_credit_and_preserves_saved_native_verdict(run, monkeypatch, review):
+    """Analysis of already-qualified synthetic receipts; no device claims."""
+    config, baseline, standard, secret, save = run
+    config.throughput_validation = True
+    expected = engine.task_payload(config, 1, task="baseline")
+    baseline["metadata"].update(evaluation_config=expected["eval_config"], workflow_signature=fingerprint(expected))
+    for results, hidden in ((standard, False), (secret, True)):
+        for sid in range(config.num_samples):
+            expected = engine.task_payload(config, 1, sid, hidden=hidden)
+            results[f"1_{sid}"]["metadata"].update(evaluation_config=expected["eval_config"], workflow_signature=fingerprint(expected))
+    for result in standard.values():
+        result["metadata"]["tool_checks"] = {"checks": {"throughput_contrast": {
+            "status": "passed", "values": {"review_required": review, "threshold": .1}}}}
+    # Raw receipt validation is covered by the supervisor/contrast regressions;
+    # this test isolates score policy after that validation has succeeded.
+    monkeypatch.setattr(paper_analysis, "current_result", lambda *args: None)
+    save()
+    report = paper_analysis.analyze_paper(config)
+    assert report["bounded_gain_macro"] == (0 if review else 1)
+    assert {row["status"] for row in report["details"]} == ({"throughput_discrepancy_requires_review"} if review else {"verified"})
+    assert all(row["correctness"] for row in read_json(config.run_dir / "eval_results.json").values())
+
+
 def test_rl_public_hidden_gap_regrades_identical_saved_sources_without_execution(run, monkeypatch):
     from dataclasses import replace
 

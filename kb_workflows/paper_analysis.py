@@ -201,6 +201,13 @@ def analyze_paper(config):
                     issue = "hidden_source_missing"
                 if issue:
                     status = "stale_or_unknown_hidden_check"
+            if status == "verified" and config.throughput_validation:
+                contrast = raw.get("metadata", {}).get("tool_checks", {}).get("checks", {}).get("throughput_contrast", {})
+                row["throughput_contrast"] = contrast.get("values")
+                if contrast.get("status") != "passed":
+                    status = "throughput_diagnostics_missing_or_invalid"
+                elif contrast.get("values", {}).get("review_required") is True:
+                    status = "throughput_discrepancy_requires_review"
             if status == "verified":
                 status = compatible(baseline, raw, digest) or status
             if status == "verified":

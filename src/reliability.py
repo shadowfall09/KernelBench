@@ -64,7 +64,9 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     from kb_workflows.determinism import observe
     from kb_workflows.numerical_audit import observe as observe_numerical
     from kb_workflows.state_audit import observe as observe_state
+    from kb_workflows.throughput_audit import observe as observe_throughput
 
+    observe_throughput(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_state(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_numerical(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
@@ -85,9 +87,11 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
                 from contextlib import nullcontext
 
                 from kb_workflows.allocation_audit import candidate_scope
+                from kb_workflows.throughput_audit import candidate_guard
 
                 context = candidate_scope("forward", label=label, seed=seed, order=order) if name == "candidate" else nullcontext()
-                with preserve_backend_settings(), context:
+                throughput_context = candidate_guard() if name == "candidate" else nullcontext()
+                with preserve_backend_settings(), context, throughput_context:
                     output = (candidate if name == "candidate" else reference)(*fresh)
                     synchronize(device)
                 if started is not None:

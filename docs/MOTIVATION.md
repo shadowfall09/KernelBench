@@ -153,6 +153,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V30-02 导入构造与实际调用作用域 | 候选全局/构造缓存与逐原生双向调用预填，参考/输入不预填，也不强制确定性算法 | — | [reliability.py](../src/reliability.py) |
 | V30-03 连续扩容前缀保护与未知存储 | 只填连续扩容新逻辑尾部；不支持存储保留未知，metadata-only存储量为null | — | [allocation_audit.py](../kb_workflows/allocation_audit.py) |
 | V30-06 预填充反例与覆盖范围声明 | CPU多dtype分配、局部未写与缓存、首模式碰撞和模拟进程篡改/超时；原始allocator与Graph等未知不宣称覆盖 | M5 | [test_allocation_audit.py](../tests/test_allocation_audit.py) |
+| V31-01 独立同步与连续提交进程 | 两种新公开worker对照逐次同步和连续N次后同步，参考/候选交替且原计时保持 | M3 | [tool_runner.py](../kb_workflows/tool_runner.py) |
+| V31-02 完整输出快照与复用缓冲区 | 相同快照消费成本保留每次复用缓冲区输出，逐例结构/形状/精度/设备与数值核对 | — | [throughput_audit.py](../kb_workflows/throughput_audit.py) |
+| V31-03 连续状态随机与执行政策 | 可信工厂字节和序列种子跨模式一致，模型连续推进；根模式/no_grad/线程及设置恢复 | — | [reliability.py](../src/reliability.py) |
+| V31-07 排队模拟与状态输出反例 | CPU排队/合法摊销、状态随机、复用与结构化输出、缺项篡改/超时和Neuron前端证明代码路径 | M5 | [test_throughput_audit.py](../tests/test_throughput_audit.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -196,6 +200,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V21-03 原生内存操作与双轨道诊断 | 成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放 | M2 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [cuda_origin.py](../kb_workflows/cuda_origin.py), [test_kernel_origin.py](../tests/test_kernel_origin.py) |
 | V25-06 诊断设置贯穿冻结与比较 | 统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告 | M2, M5 | [tool_checks.py](../kb_workflows/tool_checks.py), [experiment.py](../kb_workflows/experiment.py), [final_verification.py](../kb_workflows/final_verification.py), [study_data.py](../kb_workflows/study_data.py), [test_reference_revisions.py](../tests/test_reference_revisions.py) |
 | V26-04 新基线与恢复证据 | 输入记录进入基线指纹，缺当前配方、执行设备、工厂调用或逐输出检查数不能恢复/评分，旧分布基线须重测 | — | [engine.py](../kb_workflows/engine.py), [paper_analysis.py](../kb_workflows/paper_analysis.py), [input_calibration.py](../kb_workflows/input_calibration.py) |
+| V31-05 吞吐差异复核与性能资格 | 逐轮10%标记可来自正常并行，不抹除原生答案；未消除差异不获性能分，分母不减 | M2 | [paper_analysis.py](../kb_workflows/paper_analysis.py) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -302,6 +307,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V29-06 全模型元数据与域迁移反例 | 150原工厂/初始化meta与CPU小输入、数值控制、Neuron模拟覆盖；超限分配、篡改与旧域回归 | M2 | [test_model_input_cases.py](../tests/test_model_input_cases.py) |
 | V30-04 独立进程关闭缓存并同步报错 | 两模式各用父进程配置的fresh CUDA正确性worker，直接后续复核，不替换原生性能时间 | M2 | [tool_runner.py](../kb_workflows/tool_runner.py) |
 | V30-05 来源调用收据与冻结部署 | 复核设备/来源/模式/环境/导入构造/实际case-seed-order，开关进入冻结、研究、RL与Harbor | M2 | [tool_checks.py](../kb_workflows/tool_checks.py) |
+| V31-04 名义元数据和存储准入 | 参考meta输出推导后原尺寸存储准入，未知/超额不换实例、不缩题或降N | M2 | [throughput_audit.py](../kb_workflows/throughput_audit.py) |
+| V31-06 请求冻结与多后端私有部署 | 来源/设备/模式/调用/seed/字节/时间重放，统一冻结/研究/RL/队列/Harbor且无隐藏诊断 | M2 | [tool_checks.py](../kb_workflows/tool_checks.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -319,7 +326,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 原250题均有来源绑定输入族，每种子1529例；L2保留卷积/残差/LayerNorm耦合，L3同步序列状态并明确三题固定形状。98/100旧域变换显式修订；新41题已有角色边界。复合/序列更专门的饱和、抵消、极值与存储别名反例仍待补齐，meta不证明数值或设备资格 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
-| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已有同对象修改缓存、导入/执行环境恢复、Neuron冻结编译来源；新增双模式独立候选分配预填充，覆盖ATen导入/构造/原生调用并保护resize前缀。原始allocator/线程/Graph及部分编译路径、吞吐对照与完整GPU执行证据仍待完成；观察范围不冒充完整内存或来源证明 |
+| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已有同对象缓存/环境恢复与双模式独立分配预填；新增公开名义输入的fresh latency/burst快照消费对照、连续状态/RNG、模式/梯度/线程及差异性能门。原始allocator/任意线程、Graph/完整stream来源和GPU执行证明仍待完成；第二次屏障与10%标记不冒充作弊证明 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |
 | R-12 独立最终重测 | 代码已实现 | M3 | 已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行 |

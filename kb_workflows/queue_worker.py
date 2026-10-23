@@ -159,6 +159,9 @@ def validate_payload(payload):
     from .allocation_audit import validate_inline as validate_allocations
 
     validate_allocations(payload)
+    from .throughput_audit import validate_inline as validate_throughput
+
+    validate_throughput(payload)
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):

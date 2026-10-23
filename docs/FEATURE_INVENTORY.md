@@ -916,6 +916,31 @@ L3/33的普通hidden属性、48/49的A/B/C参数固定部分尺寸，不通过�
 
 验证：Python 3.12.12 / Torch 2.12.0下2,619项CPU/模拟/meta回归通过，本版新增150项；9条既有warning保留。覆盖12种dtype、五种分配前端、连续扩容保护、首模式碰撞、全局/构造缓存与部分输出、meta未知、环境恢复、模拟进程缺项/超时/改seed/设备、冻结与Harbor。Ruff（工作流、测试与共享调用）、src/eval.py既有诊断等价核对、213项动机映射、35份Markdown的866个本地链接、skill及177包依赖兼容性检查通过。离线wheel包含新模块与调用钩子，19个安装后轻量入口未导入设备SDK。未运行GPU、Trainium、真实模型、容器或训练实验。
 
+## 第三十一版：逐次同步与连续提交的吞吐对照
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add fresh-worker throughput contrast and performance review gates |
+| 日期 | 2026-10-23 |
+| 基础提交 | `3b968a5` |
+| 状态 | CPU队列/Neuron前端模拟与静态回归；不运行设备或模型实验 |
+
+本版继续R-09，增加默认关闭的`throughput_validation`及调用数、重复数和存储额度。完整流水线语义与限制见[吞吐对照](THROUGHPUT_VALIDATION.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V31-01 | 独立同步与连续提交进程 | 两个新公开正确性worker对照逐次屏障与N次连续提交，参考/候选交替顺序；原生时间不替换 | `kb_workflows/tool_runner.py` | [M2](MOTIVATION.md#m2) |
+| V31-02 | 完整输出快照与复用缓冲区 | 两模式相同的消费和预分配快照复制成本，最终逐次核对结构/shape/dtype/device与数值，复用工作区仍保留各次输出 | `kb_workflows/throughput_audit.py` | [M2](MOTIVATION.md#m2) |
+| V31-03 | 连续状态随机与执行政策 | 同工厂/输入字节/序列seed，模型连续推进不逐次重置；记录根模式/no_grad/线程并恢复环境与确定性设置 | `src/reliability.py` | [M2](MOTIVATION.md#m2) |
+| V31-04 | 名义元数据和存储准入 | 原尺寸meta输出推导后估算三组输入/两组快照/哈希及消费暂存，超限或不支持保留未知、不降N或换实例 | `kb_workflows/throughput_audit.py` | [M5](MOTIVATION.md#m5) |
+| V31-05 | 吞吐差异复核与性能资格 | 按每轮10%阈值重算标记，标记不等于作弊；保存原生答案，未消除差异不获论文性能分且槽位不移除 | `kb_workflows/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
+| V31-06 | 请求冻结与多后端私有部署 | 逐模式来源/设备/覆盖/seed/时间收据重放，选项进入最终/研究/RL/队列/Harbor；隐藏阶段不运行此诊断 | `kb_workflows/tool_checks.py` | [M5](MOTIVATION.md#m5) |
+| V31-07 | 排队模拟与状态输出反例 | CPU虚拟排队验证最终完成屏障、合法摊销、缓冲区复用、随机/状态/结构化输出、篡改/超时及Neuron入口 | `tests/test_throughput_audit.py` | [M2](MOTIVATION.md#m2) |
+
+诊断测量含快照消费，不能冒充原始forward均值。当前流消费契约、meta未知、CUDA launch blocking、存储包络和第二次屏障的边界明确记录。完整线程/stream/allocator/Graph与GPU来源/执行证据仍需补齐，R-09保持部分实现；23项仍为14项代码已实现、9项部分实现。旧stash保持原样。
+
+验证：Python 3.12.12 / Torch 2.12.0下2,662项CPU/模拟/meta回归通过，本版新增43项；9条既有warning保留。覆盖排队屏障与合法摊销、逐输出/复用缓冲区、随机与连续状态、结构化/scalar/整数/bool快照、后续调用失效、根模式/梯度/线程/环境、存储拒绝、收据改动、论文性能门、私有Harbor与显式Neuron模拟。Ruff、src/eval.py既有诊断等价、220项动机映射、36份Markdown的889个本地链接、skill和177包依赖兼容性检查通过；离线wheel包含新模块及两后端钩子，20个安装后轻量入口不导入设备SDK。未运行GPU、Trainium、真实模型、容器或训练实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

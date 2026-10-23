@@ -295,6 +295,9 @@ def dispatch(payload):
     from .allocation_audit import validate_inline
 
     validate_inline(payload)
+    from .throughput_audit import validate_inline as validate_throughput
+
+    validate_throughput(payload)
     if payload.get("task") == "calibrate_inputs":
         from .input_calibration_task import calibrate
 
@@ -365,6 +368,17 @@ def allocation_control(payload):
     return result
 
 
+def throughput_control(payload):
+    """One of two fresh native correctness workers for a public contrast."""
+    from .throughput_audit import STAGES, audit
+
+    mode = next((mode for mode, stage in STAGES.items() if stage == payload["eval_config"].get("diagnostic_stage")), None)
+    with audit(payload, mode) as collector:
+        result = dispatch(payload)
+    result.setdefault("metadata", {})["throughput_audit"] = collector.document()
+    return result
+
+
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
@@ -373,9 +387,12 @@ def main():
         native_worker = sys.argv[3:] == ["--native-worker"]
         settings = payload["eval_config"]
         from .allocation_audit import STAGES
+        from .throughput_audit import STAGES as THROUGHPUT_STAGES
 
         if native_worker and settings.get("diagnostic_stage") in STAGES.values():
             result = allocation_control(payload)
+        elif native_worker and settings.get("diagnostic_stage") in THROUGHPUT_STAGES.values():
+            result = throughput_control(payload)
         elif native_worker and settings.get("diagnostic_stage") == "control" and (
                 settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation")):
             result = diagnostic_control(payload)

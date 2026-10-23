@@ -68,6 +68,10 @@ class RunConfig:
     state_validation: bool = False
     numerical_validation: bool = False
     allocation_validation: bool = False
+    throughput_validation: bool = False
+    throughput_calls: int = 8
+    throughput_repeats: int = 4
+    throughput_memory_mb: int = 1024
     input_calibration: str = ""
     input_family_memory_mb: int = 256
     oracle_memory_mb: int = 4096
@@ -226,6 +230,9 @@ class RunConfig:
             raise ValueError("State validation requires an explicit boolean")
         if type(self.allocation_validation) is not bool or self.allocation_validation and self.device_backend != "cuda":
             raise ValueError("Allocation validation requires an explicit boolean and the CUDA backend")
+        from .throughput_audit import validate_inline as validate_throughput
+
+        validate_throughput({"eval_config": self.to_dict()})
         if self.input_calibration:
             from .input_calibration import read_bundle
 
@@ -395,6 +402,9 @@ def parser():
         "oracle_memory_mb",
         "input_family_memory_mb",
         "determinism_repeats",
+        "throughput_calls",
+        "throughput_repeats",
+        "throughput_memory_mb",
         "isolation_cpus",
         "isolation_memory_mb",
         "isolation_pids",
@@ -479,7 +489,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation", "allocation_validation"):
+    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation", "allocation_validation", "throughput_validation"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)

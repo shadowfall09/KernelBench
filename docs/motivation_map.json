@@ -1408,9 +1408,12 @@
         "kb_workflows/allocation_audit.py",
         "kb_workflows/tool_runner.py",
         "tests/test_allocation_audit.py",
-        "docs/ALLOCATION_VALIDATION.md"
+        "docs/ALLOCATION_VALIDATION.md",
+        "kb_workflows/throughput_audit.py",
+        "tests/test_throughput_audit.py",
+        "docs/THROUGHPUT_VALIDATION.md"
       ],
-      "reason": "已有同对象修改缓存、导入/执行环境恢复、Neuron冻结编译来源；新增双模式独立候选分配预填充，覆盖ATen导入/构造/原生调用并保护resize前缀。原始allocator/线程/Graph及部分编译路径、吞吐对照与完整GPU执行证据仍待完成；观察范围不冒充完整内存或来源证明"
+      "reason": "已有同对象缓存/环境恢复与双模式独立分配预填；新增公开名义输入的fresh latency/burst快照消费对照、连续状态/RNG、模式/梯度/线程及差异性能门。原始allocator/任意线程、Graph/完整stream来源和GPU执行证明仍待完成；第二次屏障与10%标记不冒充作弊证明"
     },
     {
       "id": "R-10",
@@ -3427,6 +3430,100 @@
         "tests/test_allocation_audit.py"
       ],
       "reason": "CPU多dtype分配、局部未写与缓存、首模式碰撞和模拟进程篡改/超时；原始allocator与Graph等未知不宣称覆盖"
+    },
+    {
+      "id": "V31-01",
+      "title": "独立同步与连续提交进程",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/tool_runner.py"
+      ],
+      "reason": "两种新公开worker对照逐次同步和连续N次后同步，参考/候选交替且原计时保持"
+    },
+    {
+      "id": "V31-02",
+      "title": "完整输出快照与复用缓冲区",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/throughput_audit.py"
+      ],
+      "reason": "相同快照消费成本保留每次复用缓冲区输出，逐例结构/形状/精度/设备与数值核对"
+    },
+    {
+      "id": "V31-03",
+      "title": "连续状态随机与执行政策",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/reliability.py"
+      ],
+      "reason": "可信工厂字节和序列种子跨模式一致，模型连续推进；根模式/no_grad/线程及设置恢复"
+    },
+    {
+      "id": "V31-04",
+      "title": "名义元数据和存储准入",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/throughput_audit.py"
+      ],
+      "reason": "参考meta输出推导后原尺寸存储准入，未知/超额不换实例、不缩题或降N"
+    },
+    {
+      "id": "V31-05",
+      "title": "吞吐差异复核与性能资格",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "逐轮10%标记可来自正常并行，不抹除原生答案；未消除差异不获性能分，分母不减"
+    },
+    {
+      "id": "V31-06",
+      "title": "请求冻结与多后端私有部署",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/tool_checks.py"
+      ],
+      "reason": "来源/设备/模式/调用/seed/字节/时间重放，统一冻结/研究/RL/队列/Harbor且无隐藏诊断"
+    },
+    {
+      "id": "V31-07",
+      "title": "排队模拟与状态输出反例",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_throughput_audit.py"
+      ],
+      "reason": "CPU排队/合法摊销、状态随机、复用与结构化输出、缺项篡改/超时和Neuron前端证明代码路径"
     }
   ]
 }

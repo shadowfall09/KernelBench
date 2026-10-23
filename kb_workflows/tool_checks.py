@@ -15,7 +15,8 @@ TOOLS = ("memcheck", "racecheck", "synccheck", "initcheck")
 ERROR_EXIT = 86
 MAX_LOG_BYTES = 16 * 1024**2
 DIAGNOSTIC_FIELDS = ("sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats",
-                     "state_validation", "numerical_validation", "allocation_validation", "oracle_memory_mb", "input_family_memory_mb")
+                     "state_validation", "numerical_validation", "allocation_validation", "oracle_memory_mb", "input_family_memory_mb",
+                     "throughput_validation", "throughput_calls", "throughput_repeats", "throughput_memory_mb")
 
 
 def diagnostic_options(config):
@@ -40,10 +41,13 @@ def enabled(payload):
     from .allocation_audit import validate_inline
 
     validate_inline(payload)
+    from .throughput_audit import validate_inline as throughput_enabled
+
+    throughput = throughput_enabled(payload)
     settings = payload["eval_config"]
     return payload.get("task", "evaluate") in {"evaluate", "paired_timing"} and bool(
         select_tools(settings.get("sanitizer_tools", "none")) or settings.get("determinism_checks")
-        or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation"))
+        or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation") or throughput)
 
 
 def child_payload(payload, nonce, stage):
@@ -235,6 +239,30 @@ def derive(document, payload):
         else:
             checks.update({name: check("not_measured", reason="No complete independent numerical-control run")
                            for name in ("precision_contract", "reference_signal")})
+    from .throughput_audit import STAGES as THROUGHPUT_STAGES
+    from .throughput_audit import validate_inline as throughput_enabled
+    from .throughput_audit import verdict as throughput_verdict
+
+    if throughput_enabled(payload):
+        requests = {mode: child_payload(payload, document["nonce"], stage) for mode, stage in THROUGHPUT_STAGES.items()}
+        documents, native_cases, valid = {}, {}, bool(identity and control_ok)
+        for mode, expected in requests.items():
+            record = document.get("throughput_controls", {}).get(mode, {})
+            result = record.get("result", {})
+            metadata = result.get("metadata", {})
+            valid = valid and (record.get("exit_code") == 0 and record.get("timed_out") is False and not record.get("error")
+                and record.get("payload_sha256") == fingerprint(expected) and result.get("compiled") is True
+                and metadata.get("device_fingerprint") == device
+                and metadata.get("reference_sha256") == fingerprint({"source": payload["ref_arch_src"]})
+                and metadata.get("kernel_sha256") == fingerprint({"source": payload["kernel_src"]}))
+            documents[mode], native_cases[mode] = metadata.get("throughput_audit"), metadata.get("reliability_checks")
+            if (isinstance(documents[mode], dict) and isinstance(documents[mode].get("case"), dict)
+                    and documents[mode]["case"].get("status") == "passed"):
+                valid = valid and (result.get("correctness") is True and bool(coverage(result))
+                    and record.get("coverage") == coverage(result) and cases(child) == cases(result))
+        checks["throughput_contrast"] = throughput_verdict(documents, requests, native_cases,
+            allow_simulated=bool(document.get("simulated_execution"))) if valid else check(
+            "not_measured", reason="No complete source/device-bound fresh throughput workers and direct control")
     return checks
 
 
@@ -275,6 +303,11 @@ def validate(result, payload, *, allow_simulated=False):
 
     if set(document.get("allocation_controls", {})) != (set(PATTERNS) if settings.get("allocation_validation") else set()):
         raise ValueError("Allocation-control receipt lost or added a declared pattern")
+    from .throughput_audit import MODES
+    from .throughput_audit import validate_inline as throughput_enabled
+
+    if set(document.get("throughput_controls", {})) != (set(MODES) if throughput_enabled(payload) else set()):
+        raise ValueError("Throughput-control receipt lost or added a declared mode")
     if tools and document.get("binary", {}).get("status") == "measured":
         binary = document.get("binary", {})
         if (not re.fullmatch("[0-9a-f]{64}", binary.get("sha256", "")) or not binary.get("path")

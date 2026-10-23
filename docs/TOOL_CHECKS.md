@@ -14,6 +14,10 @@ determinism_repeats = 5
 # state_validation = true  # 可独立开启的模式/注册状态/参数更新检查
 # numerical_validation = true  # L1/L2原生实际输入的独立CPU FP64复核
 # allocation_validation = true  # CUDA候选分配的独立预填充控制
+# throughput_validation = true  # 公开名义输入的逐次同步/连续提交对照
+# throughput_calls = 8
+# throughput_repeats = 4
+# throughput_memory_mb = 1024
 # oracle_memory_mb = 4096
 timeout = 1800
 # determinism_policy_file = "reviewed-policies.json"
@@ -34,8 +38,9 @@ python scripts/run_batch.py --config configs/a6000-safety.toml --dry-run
 1. 独立原生worker运行原来的正确性和性能协议；已有失败直接返回。
 2. 每个选定工具分别启动新的正确性worker，沿用冻结源码、标准/隐藏范围和种子，关闭性能采样。
 3. 若开启分配检查，两个独立子进程分别使用NaN/极值与另一组确定值，覆盖候选导入、构造和实际正确性调用；不用这些进程采样性能。
-4. 全部选定工具通过后，再进行一次无插桩正确性复核。开启重复、状态、数值或分配检查时，即使工具失败也保留这次复核诊断。
-5. 结果保留第一步的runtime、原始样本、冷启动成本和配对记录。工具和复核耗时只进入请求墙钟与资源核算。
+4. 若开启吞吐检查且为公开范围，另用两个新进程对照逐次同步与N次连续提交；两种模式包含相同快照消费并逐次验证输出，不使用隐藏输入。
+5. 全部选定工具通过后，再进行一次无插桩正确性复核。开启重复、状态、数值、分配或公开吞吐检查时，即使工具失败也保留这次复核诊断。
+6. 结果保留第一步的runtime、原始样本、冷启动成本和配对记录。工具和复核耗时只进入请求墙钟与资源核算。
 
 所有transport使用同一个CLI监督进程，因此本地、Docker、Modal、HTTP队列和Harbor验证复用这条路径；部署与实机可用性未验证。配对计时的工具子任务使用独立标准正确性流程，不对插桩后的速度做配对推断。标准与隐藏结果分别绑定自己的请求；隐藏日志不会反馈给开发agent。
 
@@ -44,6 +49,8 @@ python scripts/run_batch.py --config configs/a6000-safety.toml --dry-run
 `numerical_validation`在同一次复核中为L1/L2的每个实际输入增加CPU独立算式的FP64门与参考信号诊断，保留原shape和值，并在分配前核对主机内存估计包络。参考也须通过；原尺寸超包络不能缩小后算通过。范围和参考问题见[数值复核](NUMERICAL_VALIDATION.md)。
 
 `allocation_validation`另用两个新进程进行候选分配预填充，启动前关闭CUDA缓存allocator并要求同步报错；不切换确定性算法，参考分配不被填充。当前线程ATen观察的范围、连续扩容保护、量化/Graph/原始分配限制和完整收据见[分配检查](ALLOCATION_VALIDATION.md)。它不替代四工具的memory_safety证据。
+
+`throughput_validation`支持CUDA/Neuron的公共同步接口，记录消费流水线的逐次同步/连续提交差异。原尺寸存储准入、状态/RNG连续推进、逐输出快照、差异复核及资格政策见[吞吐对照](THROUGHPUT_VALIDATION.md)。它不会把正常并行差异自动判为作弊，也不提供完整GPU执行证明。
 
 工具跟踪整个worker及子进程，要求CUDA初始化，设置非零错误退出码，逐进程保留日志。memcheck启用32字节padding，并在Torch导入前禁用PyTorch CUDA内存缓存，增强对逻辑分配越界的可见性。racecheck保留warning及error，不强制阻塞launch，不设置suppression或跳过kernel的过滤器。监督进程清理外部`NV_COMPUTE_SANITIZER_*`及CUDA injection路径覆盖。
 

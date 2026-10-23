@@ -23,6 +23,7 @@ LICENSE file in the root directory of this source tree.
 - 原250题追加来源绑定的[隐藏输入族](docs/OPERATOR_INPUTS.md)，核对耦合形状、布局与逐例执行；固定状态/参数约束和内存不足均明确保留。
 - 可选四种Compute Sanitizer工具与题目级重复一致性检查，检查耗时与性能采样分开。
 - 可选[分配预填充检查](docs/ALLOCATION_VALIDATION.md)，以两个独立正确性进程检查候选未写满输出和未初始化缓存，不替换性能样本。
+- 可选[吞吐对照](docs/THROUGHPUT_VALIDATION.md)，逐次验证同步/连续提交下的输出，记录差异与复核标记，保留原始性能数据。
 - 可选受限Docker验证器和Harbor网络策略；支持冻结已有候选后用当前验证器重评分，默认仅生成计划。
 - 评分包含失败和缺失样本，恢复时核对源码、配置和测量证据。
 
