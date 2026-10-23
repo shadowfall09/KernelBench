@@ -205,9 +205,10 @@ def _evaluate(payload, *, adapter=None):
                 baseline_cpu = baseline_cpu.to(dtype=dtype)
             model = prepare_variant(baseline_cpu.to(device=device), variant, level=payload["level"], pid=payload["problem_id"])
         else:
+            from .cache_audit import candidate_guard as cache_guard
             from .throughput_audit import candidate_guard
 
-            with environment_guard(changes), candidate_guard():
+            with environment_guard(changes), candidate_guard(), cache_guard():
                 candidate = load_source(payload["kernel_src"], "kernelbench_neuron_candidate", filename=build / "candidate.py")
                 seed(settings.get("evaluation_seed", 42))
                 model = candidate["ModelNew"](*clone_tensors(initial)).to(device=device, **({"dtype": dtype} if instance is None else {}))
@@ -302,6 +303,9 @@ def _evaluate(payload, *, adapter=None):
             from .throughput_audit import bind_factory
 
             bind_factory(lambda: move(inputs()))
+            from .cache_audit import bind_factory as bind_cache_factory
+
+            bind_cache_factory(lambda: move(inputs()))
             for label, values, value in cases():
                 observed = []
                 dev = move(values)

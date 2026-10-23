@@ -157,6 +157,11 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V31-02 完整输出快照与复用缓冲区 | 相同快照消费成本保留每次复用缓冲区输出，逐例结构/形状/精度/设备与数值核对 | — | [throughput_audit.py](../kb_workflows/throughput_audit.py) |
 | V31-03 连续状态随机与执行政策 | 可信工厂字节和序列种子跨模式一致，模型连续推进；根模式/no_grad/线程及设置恢复 | — | [reliability.py](../src/reliability.py) |
 | V31-07 排队模拟与状态输出反例 | CPU排队/合法摊销、状态随机、复用与结构化输出、缺项篡改/超时和Neuron前端证明代码路径 | M5 | [test_throughput_audit.py](../tests/test_throughput_audit.py) |
+| V32-01 全实际实例的同对象更新 | 独立worker覆盖原生公开/隐藏实例，三次复用Tensor身份并逐次验证输出，原计时保持 | — | [cache_audit.py](../kb_workflows/cache_audit.py) |
+| V32-02 来源绑定的合法值配方 | L1/L2/L3和生产41题保持几何/耦合与离散角色；公开继续可信工厂，隐藏不借公开配方 | — | [cache_recipes.py](../kb_workflows/cache_recipes.py) |
+| V32-03 输入存储别名与几何恢复 | 隔离重复对象/正stride/offset/广播别名、分离计算图并原地复制；几何恢复记录且未知表示不通过 | M5 | [input_reuse.py](../kb_workflows/input_reuse.py) |
+| V32-04 连续状态与稳定输出快照 | 参考候选相同调用数和随机重放，不重置状态；立即快照复用输出，常量参考不误判作弊 | — | [cache_audit.py](../kb_workflows/cache_audit.py) |
+| V32-05 运行设置拒绝与组合诊断修复 | 导入/构造/原生/更新调用记录并恢复设置；修复状态收据覆盖父文档而破坏后续诊断 | — | [tool_checks.py](../kb_workflows/tool_checks.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -309,6 +314,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V30-05 来源调用收据与冻结部署 | 复核设备/来源/模式/环境/导入构造/实际case-seed-order，开关进入冻结、研究、RL与Harbor | M2 | [tool_checks.py](../kb_workflows/tool_checks.py) |
 | V31-04 名义元数据和存储准入 | 参考meta输出推导后原尺寸存储准入，未知/超额不换实例、不缩题或降N | M2 | [throughput_audit.py](../kb_workflows/throughput_audit.py) |
 | V31-06 请求冻结与多后端私有部署 | 来源/设备/模式/调用/seed/字节/时间重放，统一冻结/研究/RL/队列/Harbor且无隐藏诊断 | M2 | [tool_checks.py](../kb_workflows/tool_checks.py) |
+| V32-06 存储准入和私有部署冻结 | 全底层存储和暂存估计先准入；源码/设备/原生覆盖/更新收据进入队列、Harbor及最终/研究/RL合同 | M2 | [engine.py](../kb_workflows/engine.py) |
+| V32-07 全族回归与原始范围验收 | 小输入验证L1/L2/生产族、缓存反例及私有流程；R09按最初四项验收，不增加万能GPU证明条件 | M2 | [test_cache_audit.py](../tests/test_cache_audit.py) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -326,7 +333,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 原250题均有来源绑定输入族，每种子1529例；L2保留卷积/残差/LayerNorm耦合，L3同步序列状态并明确三题固定形状。98/100旧域变换显式修订；新41题已有角色边界。复合/序列更专门的饱和、抵消、极值与存储别名反例仍待补齐，meta不证明数值或设备资格 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
-| R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已有同对象缓存/环境恢复与双模式独立分配预填；新增公开名义输入的fresh latency/burst快照消费对照、连续状态/RNG、模式/梯度/线程及差异性能门。原始allocator/任意线程、Graph/完整stream来源和GPU执行证明仍待完成；第二次屏障与10%标记不冒充作弊证明 |
+| R-09 执行完整性与缓存审计 | 代码已实现 | M2 | 原始四项已提供可选软件路径：候选分配双预填、全实际正确性实例同对象更新、公开同步/连续提交对照、候选导入/构造/调用运行设置拒绝与恢复。来源/设备/覆盖收据贯穿评分恢复；不支持路径不通过。完整GPU/线程/Graph证明不是原设计验收条件，来源与正式归因仍归R-08/R-16；按用户要求不运行实验 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |
 | R-12 独立最终重测 | 代码已实现 | M3 | 已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行 |

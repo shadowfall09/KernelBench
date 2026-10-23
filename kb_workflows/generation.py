@@ -66,6 +66,10 @@ def agent_environment(config):
 
 def build_prompt(config, pid):
     filename = kernel_name(config.level, pid)
+    if config.cache_validation:
+        from .cache_recipes import plan as cache_plan
+
+        cache_plan(config.level, pid, select_problems(config.level, problem_ids=[pid])[pid].read_text())
     if config.level in {1, 2, 3}:
         from .operator_input_policy import plan
 

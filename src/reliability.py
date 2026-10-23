@@ -87,11 +87,13 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
                 from contextlib import nullcontext
 
                 from kb_workflows.allocation_audit import candidate_scope
+                from kb_workflows.cache_audit import candidate_guard as cache_guard
                 from kb_workflows.throughput_audit import candidate_guard
 
                 context = candidate_scope("forward", label=label, seed=seed, order=order) if name == "candidate" else nullcontext()
                 throughput_context = candidate_guard() if name == "candidate" else nullcontext()
-                with preserve_backend_settings(), context, throughput_context:
+                cache_context = cache_guard() if name == "candidate" else nullcontext()
+                with preserve_backend_settings(), context, throughput_context, cache_context:
                     output = (candidate if name == "candidate" else reference)(*fresh)
                     synchronize(device)
                 if started is not None:
@@ -111,4 +113,8 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
         if verify_pair:
             verify_pair(inputs, outputs)
     receipt["passed"] = True
+    from kb_workflows.cache_audit import observe as observe_cache
+
+    observe_cache(reference, candidate, inputs, reference_output=outputs["reference"], seed=seed,
+                  tolerance=tolerance, device=device, set_seed=set_seed, label=label)
     return None

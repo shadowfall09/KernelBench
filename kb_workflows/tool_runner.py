@@ -105,6 +105,9 @@ def evaluate(payload, *, run=None, binary=None):
     from .throughput_audit import validate_inline as throughput_enabled
 
     throughput = throughput_enabled(payload)
+    from .cache_audit import validate_inline as cache_enabled
+
+    cache = cache_enabled(payload)
     injected = run is not None or binary is not None
     run = run or process
     settings = payload["eval_config"]
@@ -160,7 +163,7 @@ def evaluate(payload, *, run=None, binary=None):
         tools = select_tools(settings.get("sanitizer_tools", "none"))
         document = {"protocol": PROTOCOL, "evaluator_sha256": evaluator_digest(), "payload_sha256": fingerprint(payload),
             "nonce": nonce, "native_result": copy.deepcopy(base), "native_process": {key: value for key, value in native.items() if key != "result"},
-            "simulated_execution": injected, "tools": {}, "control": {}, "allocation_controls": {}, "throughput_controls": {},
+            "simulated_execution": injected, "tools": {}, "control": {}, "allocation_controls": {}, "throughput_controls": {}, "input_cache_control": {},
             "timing_policy": "only_original_uninstrumented_native_samples_are_scored",
             "coverage_scope": "tested_worker_and_descendants; no_proof_of_race_freedom_or_kernel_authorship",
             "security_isolation_certified": False}
@@ -184,8 +187,10 @@ def evaluate(payload, *, run=None, binary=None):
 
             for mode, stage in THROUGHPUT_STAGES.items():
                 document["throughput_controls"][mode] = worker(child_payload(payload, nonce, stage), stage)
+        if cache:
+            document["input_cache_control"] = worker(child_payload(payload, nonce, "input_cache"), "input_cache")
         preliminary = derive(document, payload)
-        if (settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation") or throughput
+        if (settings.get("determinism_checks") or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation") or throughput or cache
                 or all(preliminary[f"sanitizer_{tool}"]["status"] == "passed" for tool in tools)):
             document["control"] = worker(child_payload(payload, nonce, "control"), "control")
         if tools and not injected and resolved.get("status") == "measured":

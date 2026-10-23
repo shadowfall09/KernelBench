@@ -211,9 +211,10 @@ def load_custom_model(
 
     try:
         from kb_workflows.allocation_audit import candidate_scope
+        from kb_workflows.cache_audit import candidate_guard as cache_guard
         from kb_workflows.throughput_audit import candidate_guard
 
-        with candidate_scope("import"), candidate_guard():
+        with candidate_scope("import"), candidate_guard(), cache_guard():
             if build_directory:
                 from kb_workflows.submission_source import execute
 
@@ -685,9 +686,10 @@ def eval_kernel_against_ref(
         with torch.no_grad():
             set_seed(seed_num)  # set seed for reproducible weights
             from kb_workflows.allocation_audit import candidate_scope
+            from kb_workflows.cache_audit import candidate_guard as cache_guard
             from kb_workflows.throughput_audit import candidate_guard
 
-            with candidate_scope("constructor"), candidate_guard():
+            with candidate_scope("constructor"), candidate_guard(), cache_guard():
                 custom_model = ModelNew(*init_inputs)
                 assert hasattr(custom_model, "forward")
                 custom_model = move_model(custom_model, device, precision)
@@ -894,6 +896,9 @@ def run_and_check_correctness(
     from kb_workflows.throughput_audit import bind_factory
 
     bind_factory(lambda: [_process_input_tensor(value, device, precision) for value in get_inputs_fn()])
+    from kb_workflows.cache_audit import bind_factory as bind_cache_factory
+
+    bind_cache_factory(lambda: [_process_input_tensor(value, device, precision) for value in get_inputs_fn()])
     generator = torch.Generator().manual_seed(seed)
     seeds = torch.randint(0, 2**32 - 1, (num_correct_trials,), generator=generator).tolist()
     with torch.no_grad():

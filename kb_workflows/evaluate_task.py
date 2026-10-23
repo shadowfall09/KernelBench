@@ -298,6 +298,9 @@ def dispatch(payload):
     from .throughput_audit import validate_inline as validate_throughput
 
     validate_throughput(payload)
+    from .cache_audit import validate_inline as validate_cache
+
+    validate_cache(payload)
     if payload.get("task") == "calibrate_inputs":
         from .input_calibration_task import calibrate
 
@@ -379,6 +382,16 @@ def throughput_control(payload):
     return result
 
 
+def cache_control(payload):
+    """All native cases with same-object value updates in one fresh worker."""
+    from .cache_audit import audit
+
+    with audit(payload) as collector:
+        result = dispatch(payload)
+    result.setdefault("metadata", {})["input_cache_audit"] = collector.document()
+    return result
+
+
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
@@ -389,7 +402,9 @@ def main():
         from .allocation_audit import STAGES
         from .throughput_audit import STAGES as THROUGHPUT_STAGES
 
-        if native_worker and settings.get("diagnostic_stage") in STAGES.values():
+        if native_worker and settings.get("diagnostic_stage") == "input_cache":
+            result = cache_control(payload)
+        elif native_worker and settings.get("diagnostic_stage") in STAGES.values():
             result = allocation_control(payload)
         elif native_worker and settings.get("diagnostic_stage") in THROUGHPUT_STAGES.values():
             result = throughput_control(payload)

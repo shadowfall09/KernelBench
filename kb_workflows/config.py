@@ -68,6 +68,8 @@ class RunConfig:
     state_validation: bool = False
     numerical_validation: bool = False
     allocation_validation: bool = False
+    cache_validation: bool = False
+    cache_memory_mb: int = 1024
     throughput_validation: bool = False
     throughput_calls: int = 8
     throughput_repeats: int = 4
@@ -233,6 +235,9 @@ class RunConfig:
         from .throughput_audit import validate_inline as validate_throughput
 
         validate_throughput({"eval_config": self.to_dict()})
+        from .cache_audit import validate_inline as validate_cache
+
+        validate_cache({"eval_config": self.to_dict()})
         if self.input_calibration:
             from .input_calibration import read_bundle
 
@@ -405,6 +410,7 @@ def parser():
         "throughput_calls",
         "throughput_repeats",
         "throughput_memory_mb",
+        "cache_memory_mb",
         "isolation_cpus",
         "isolation_memory_mb",
         "isolation_pids",
@@ -489,7 +495,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation", "allocation_validation", "throughput_validation"):
+    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation", "allocation_validation", "throughput_validation", "cache_validation"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)

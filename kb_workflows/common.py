@@ -98,6 +98,7 @@ def evaluator_digest():
         "kb_workflows/state_audit.py",
         "kb_workflows/allocation_audit.py",
         "kb_workflows/throughput_audit.py",
+        "kb_workflows/cache_audit.py", "kb_workflows/cache_recipes.py", "kb_workflows/input_reuse.py",
         "kb_workflows/numerical_audit.py", "kb_workflows/operator_oracles.py",
         "kb_workflows/composite_math.py", "kb_workflows/composite_oracles.py", "kb_workflows/composite_specs.py",
         "kb_workflows/composite_programs.json",

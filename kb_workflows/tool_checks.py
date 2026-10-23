@@ -16,7 +16,8 @@ ERROR_EXIT = 86
 MAX_LOG_BYTES = 16 * 1024**2
 DIAGNOSTIC_FIELDS = ("sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats",
                      "state_validation", "numerical_validation", "allocation_validation", "oracle_memory_mb", "input_family_memory_mb",
-                     "throughput_validation", "throughput_calls", "throughput_repeats", "throughput_memory_mb")
+                     "throughput_validation", "throughput_calls", "throughput_repeats", "throughput_memory_mb",
+                     "cache_validation", "cache_memory_mb")
 
 
 def diagnostic_options(config):
@@ -44,10 +45,13 @@ def enabled(payload):
     from .throughput_audit import validate_inline as throughput_enabled
 
     throughput = throughput_enabled(payload)
+    from .cache_audit import validate_inline as cache_enabled
+
+    cache = cache_enabled(payload)
     settings = payload["eval_config"]
     return payload.get("task", "evaluate") in {"evaluate", "paired_timing"} and bool(
         select_tools(settings.get("sanitizer_tools", "none")) or settings.get("determinism_checks")
-        or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation") or throughput)
+        or settings.get("state_validation") or settings.get("numerical_validation") or settings.get("allocation_validation") or throughput or cache)
 
 
 def child_payload(payload, nonce, stage):
@@ -225,9 +229,9 @@ def derive(document, payload):
     if settings.get("state_validation"):
         from .state_audit import verdict
 
-        document = child.get("metadata", {}).get("state_audit")
+        state_document = child.get("metadata", {}).get("state_audit")
         tolerance = settings["fp32_tolerance"] if settings.get("precision") == "fp32" or settings.get("device_backend") == "neuron" else 1e-2
-        checks["mode_state"] = verdict(document, child.get("metadata", {}).get("reliability_checks"),
+        checks["mode_state"] = verdict(state_document, child.get("metadata", {}).get("reliability_checks"),
             expected_tolerance=tolerance) if control_ok else check(
             "not_measured", reason="No complete native state-control run")
     if settings.get("numerical_validation"):
@@ -263,6 +267,27 @@ def derive(document, payload):
         checks["throughput_contrast"] = throughput_verdict(documents, requests, native_cases,
             allow_simulated=bool(document.get("simulated_execution"))) if valid else check(
             "not_measured", reason="No complete source/device-bound fresh throughput workers and direct control")
+    from .cache_audit import STAGE as CACHE_STAGE
+    from .cache_audit import validate_inline as cache_enabled
+    from .cache_audit import verdict as cache_verdict
+
+    if cache_enabled(payload):
+        record = document.get("input_cache_control", {})
+        expected = child_payload(payload, document["nonce"], CACHE_STAGE)
+        result = record.get("result", {})
+        metadata = result.get("metadata", {})
+        valid = (identity and control_ok and record.get("exit_code") == 0 and record.get("timed_out") is False
+            and not record.get("error") and record.get("payload_sha256") == fingerprint(expected)
+            and result.get("compiled") is True and metadata.get("device_fingerprint") == device
+            and metadata.get("reference_sha256") == fingerprint({"source": payload["ref_arch_src"]})
+            and metadata.get("kernel_sha256") == fingerprint({"source": payload["kernel_src"]}))
+        cache_doc = metadata.get("input_cache_audit")
+        if isinstance(cache_doc, dict) and cache_doc.get("cases") and all(row.get("status") == "passed" for row in cache_doc["cases"]):
+            valid = valid and (result.get("correctness") is True and bool(coverage(result))
+                and record.get("coverage") == coverage(result) and cases(child) == cases(result))
+        checks["same_object_inputs"] = cache_verdict(cache_doc, expected, metadata.get("reliability_checks"),
+            allow_simulated=bool(document.get("simulated_execution"))) if valid else check(
+            "not_measured", reason="No complete source/device-bound fresh input-cache worker and direct control")
     return checks
 
 
@@ -308,6 +333,11 @@ def validate(result, payload, *, allow_simulated=False):
 
     if set(document.get("throughput_controls", {})) != (set(MODES) if throughput_enabled(payload) else set()):
         raise ValueError("Throughput-control receipt lost or added a declared mode")
+    from .cache_audit import validate_inline as cache_enabled
+
+    cache_record = document.get("input_cache_control", {})
+    if not isinstance(cache_record, dict) or bool(cache_record) != bool(cache_enabled(payload)):
+        raise ValueError("Input-cache receipt lost or added its declared worker")
     if tools and document.get("binary", {}).get("status") == "measured":
         binary = document.get("binary", {})
         if (not re.fullmatch("[0-9a-f]{64}", binary.get("sha256", "")) or not binary.get("path")

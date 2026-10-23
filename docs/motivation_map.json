@@ -1399,7 +1399,7 @@
       "title": "执行完整性与缓存审计",
       "primary": "M2",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
@@ -1411,9 +1411,14 @@
         "docs/ALLOCATION_VALIDATION.md",
         "kb_workflows/throughput_audit.py",
         "tests/test_throughput_audit.py",
-        "docs/THROUGHPUT_VALIDATION.md"
+        "docs/THROUGHPUT_VALIDATION.md",
+        "kb_workflows/cache_audit.py",
+        "kb_workflows/cache_recipes.py",
+        "kb_workflows/input_reuse.py",
+        "tests/test_cache_audit.py",
+        "docs/INPUT_CACHE.md"
       ],
-      "reason": "已有同对象缓存/环境恢复与双模式独立分配预填；新增公开名义输入的fresh latency/burst快照消费对照、连续状态/RNG、模式/梯度/线程及差异性能门。原始allocator/任意线程、Graph/完整stream来源和GPU执行证明仍待完成；第二次屏障与10%标记不冒充作弊证明"
+      "reason": "原始四项已提供可选软件路径：候选分配双预填、全实际正确性实例同对象更新、公开同步/连续提交对照、候选导入/构造/调用运行设置拒绝与恢复。来源/设备/覆盖收据贯穿评分恢复；不支持路径不通过。完整GPU/线程/Graph证明不是原设计验收条件，来源与正式归因仍归R-08/R-16；按用户要求不运行实验"
     },
     {
       "id": "R-10",
@@ -3524,6 +3529,96 @@
         "tests/test_throughput_audit.py"
       ],
       "reason": "CPU排队/合法摊销、状态随机、复用与结构化输出、缺项篡改/超时和Neuron前端证明代码路径"
+    },
+    {
+      "id": "V32-01",
+      "title": "全实际实例的同对象更新",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/cache_audit.py"
+      ],
+      "reason": "独立worker覆盖原生公开/隐藏实例，三次复用Tensor身份并逐次验证输出，原计时保持"
+    },
+    {
+      "id": "V32-02",
+      "title": "来源绑定的合法值配方",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/cache_recipes.py"
+      ],
+      "reason": "L1/L2/L3和生产41题保持几何/耦合与离散角色；公开继续可信工厂，隐藏不借公开配方"
+    },
+    {
+      "id": "V32-03",
+      "title": "输入存储别名与几何恢复",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_reuse.py"
+      ],
+      "reason": "隔离重复对象/正stride/offset/广播别名、分离计算图并原地复制；几何恢复记录且未知表示不通过"
+    },
+    {
+      "id": "V32-04",
+      "title": "连续状态与稳定输出快照",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/cache_audit.py"
+      ],
+      "reason": "参考候选相同调用数和随机重放，不重置状态；立即快照复用输出，常量参考不误判作弊"
+    },
+    {
+      "id": "V32-05",
+      "title": "运行设置拒绝与组合诊断修复",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/tool_checks.py"
+      ],
+      "reason": "导入/构造/原生/更新调用记录并恢复设置；修复状态收据覆盖父文档而破坏后续诊断"
+    },
+    {
+      "id": "V32-06",
+      "title": "存储准入和私有部署冻结",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "全底层存储和暂存估计先准入；源码/设备/原生覆盖/更新收据进入队列、Harbor及最终/研究/RL合同"
+    },
+    {
+      "id": "V32-07",
+      "title": "全族回归与原始范围验收",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_cache_audit.py"
+      ],
+      "reason": "小输入验证L1/L2/生产族、缓存反例及私有流程；R09按最初四项验收，不增加万能GPU证明条件"
     }
   ]
 }

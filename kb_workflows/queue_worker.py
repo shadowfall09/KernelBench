@@ -162,6 +162,9 @@ def validate_payload(payload):
     from .throughput_audit import validate_inline as validate_throughput
 
     validate_throughput(payload)
+    from .cache_audit import validate_inline as validate_cache
+
+    validate_cache(payload)
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):

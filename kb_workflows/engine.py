@@ -63,6 +63,10 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         from .operator_specs import spec_for
 
         options["oracle_spec_sha256"] = fingerprint(spec_for(config.level, pid, path.read_text()))
+    if config.cache_validation:
+        from .cache_recipes import plan as cache_plan
+
+        options["input_cache_plan"] = cache_plan(config.level, pid, path.read_text())
     if config.determinism_checks:
         from .determinism import policy_for
 
