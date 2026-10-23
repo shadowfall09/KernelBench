@@ -165,6 +165,9 @@ def validate_payload(payload):
     from .cache_audit import validate_inline as validate_cache
 
     validate_cache(payload)
+    from .state_policies import validate_inline as validate_state
+
+    validate_state(payload)
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):

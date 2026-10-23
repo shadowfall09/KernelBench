@@ -301,6 +301,9 @@ def dispatch(payload):
     from .cache_audit import validate_inline as validate_cache
 
     validate_cache(payload)
+    from .state_policies import validate_inline as validate_state
+
+    validate_state(payload)
     if payload.get("task") == "calibrate_inputs":
         from .input_calibration_task import calibrate
 
@@ -341,7 +344,7 @@ def diagnostic_control(payload):
         if settings.get("state_validation"):
             from .state_audit import audit
 
-            state = stack.enter_context(audit())
+            state = stack.enter_context(audit(payload))
         if settings.get("numerical_validation"):
             from .numerical_audit import audit
 

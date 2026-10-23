@@ -1362,7 +1362,7 @@
       "title": "模式、状态、参数更新与输入敏感性",
       "primary": "M2",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/state_contract.py",
@@ -1370,9 +1370,12 @@
         "kb_workflows/strict_validation.py",
         "tests/test_state_contract.py",
         "tests/test_state_audit.py",
-        "docs/STATE_VALIDATION.md"
+        "docs/STATE_VALIDATION.md",
+        "kb_workflows/state_paths.py",
+        "kb_workflows/state_policies.py",
+        "tests/test_ordinary_state.py"
       ],
-      "reason": "已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配"
+      "reason": "原始逐题模式/BN/参数/输入域软件契约已实现：291来源绑定政策、注册与普通Tensor状态/容器/对象、参考对应替换、逐状态所有者模式、同对象规范参数更新及R-06/R-09输入变化。L3/33持久hidden与41未使用self.h0分别审核；任意表示/非线性解码不作为通用证明，候选须保留可映射规范参数；按用户要求不跑实验"
     },
     {
       "id": "R-08",
@@ -3619,6 +3622,96 @@
         "tests/test_cache_audit.py"
       ],
       "reason": "小输入验证L1/L2/生产族、缓存反例及私有流程；R09按最初四项验收，不增加万能GPU证明条件"
+    },
+    {
+      "id": "V33-01",
+      "title": "稳定普通Tensor状态路径",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/state_paths.py"
+      ],
+      "reason": "按真实字典键/类型、列表位置和普通对象属性绑定，跳过注册参数的框架别名，不执行property"
+    },
+    {
+      "id": "V33-02",
+      "title": "循环模型逐题状态语义",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/state_policies.py"
+      ],
+      "reason": "源绑定L3/33持久hidden替换和放置，以及L3/41未使用初始化h0；候选可省略无用属性而不省输入"
+    },
+    {
+      "id": "V33-03",
+      "title": "普通状态快照隔离与保真",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/state_contract.py"
+      ],
+      "reason": "普通属性/容器/对象的值、元数据、路径及对象/重叠存储别名保真；deepcopy不能修复断开的共享或重连失效缓存"
+    },
+    {
+      "id": "V33-04",
+      "title": "持久状态替换与规范参数更新",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/state_contract.py"
+      ],
+      "reason": "按实际参考连续比较替换后的普通状态，支持映射注册buffer；注册参数仍要求同对象存储及非零更新"
+    },
+    {
+      "id": "V33-05",
+      "title": "状态所有者模式与收据重放",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/state_audit.py"
+      ],
+      "reason": "每次调用记录并比较全部映射状态所有者的train/eval和no_grad，漏模式/改角色/缺持久状态拒绝资格"
+    },
+    {
+      "id": "V33-06",
+      "title": "全题状态政策与私有工作流",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/engine.py"
+      ],
+      "reason": "291题source绑定政策贯穿CLI/生成/队列/Harbor/最终，普通状态白名单和未使用角色不借可执行回调"
+    },
+    {
+      "id": "V33-07",
+      "title": "原构造元数据与循环状态回归",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_ordinary_state.py"
+      ],
+      "reason": "291题仅构造meta模型、不调用输入工厂；小循环状态/对象缓存、别名、快照和收据反例验证有限软件范围"
     }
   ]
 }

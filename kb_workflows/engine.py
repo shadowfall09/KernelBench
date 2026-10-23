@@ -67,6 +67,10 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         from .cache_recipes import plan as cache_plan
 
         options["input_cache_plan"] = cache_plan(config.level, pid, path.read_text())
+    if config.state_validation:
+        from .state_policies import plan as state_plan
+
+        options["state_policy"] = state_plan(config.level, pid, path.read_text())
     if config.determinism_checks:
         from .determinism import policy_for
 

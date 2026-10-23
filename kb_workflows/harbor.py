@@ -97,6 +97,10 @@ def write_task(directory, config, pid, sid=0, device=None):
     for path in (environment, tests, solution):
         path.mkdir()
     source = reference.read_text()
+    if config.state_validation:
+        from .state_policies import plan as state_plan
+
+        state_plan(config.level, pid, source)
     if config.cache_validation:
         from .cache_recipes import plan as cache_plan
 

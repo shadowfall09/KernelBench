@@ -95,6 +95,7 @@ def evaluator_digest():
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
         "kb_workflows/state_contract.py",
+        "kb_workflows/state_paths.py", "kb_workflows/state_policies.py",
         "kb_workflows/state_audit.py",
         "kb_workflows/allocation_audit.py",
         "kb_workflows/throughput_audit.py",

@@ -1,4 +1,4 @@
-"""State equivalence for registered modules, with bounded declarative state views.
+"""State equivalence for registered and source-bound ordinary tensor state.
 
 This is a functional audit, not a sandbox for untrusted Python. The mapping only
 locates candidate state; it cannot supply expected values or comparison code.
@@ -19,6 +19,7 @@ from src.validation import clone_tensors, compare_outputs, synchronize
 from .evidence import check
 from .state_audit import MODE_SEQUENCE
 from .state_audit import STATE_PROTOCOL as PROTOCOL
+from .state_paths import plain_tensors
 
 MAP_ATTRIBUTE = "kernelbench_state_map"
 MAX_STATES = 100_000
@@ -186,16 +187,27 @@ class Binding:
     reference_span: tuple | None
     target_span: tuple | None
     metadata: tuple
+    actual_kind: str
 
 
 class Bindings:
-    def __init__(self, reference, candidate):
+    def __init__(self, reference, candidate, *, policy=None, input_device=None):
         self.reference, self.candidate = reference, candidate
-        if _plain_tensors(reference):
-            raise StateContractError("Unregistered reference tensor state requires a task adapter")
+        self.policy, self.input_device = policy, input_device
         self.mapping = _declaration(candidate)
         ref_states, _ = _registered(reference)
         cand_states, _ = _registered(candidate)
+        ordinary = plain_tensors(reference)
+        rules = policy["ordinary"] if policy is not None else {
+            name: {"role": "persistent", "replacement": "reference_matched", "initial_placement": "reference"}
+            for name in ordinary}
+        if ordinary.keys() != rules.keys():
+            raise StateContractError("Reference ordinary state differs from its task policy")
+        self.ignored = [{"reference": name, **rule} for name, rule in rules.items() if rule["role"] == "unused_initialization"]
+        self.required_plain = {name for name, rule in rules.items() if rule["role"] == "persistent"}
+        self.plain_rules = rules
+        ref_states.update({name: ("tensor", ordinary[name]) for name in sorted(self.required_plain)})
+        cand_states.update({name: ("tensor", tensor) for name, tensor in plain_tensors(candidate).items()})
         if set(self.mapping) - ref_states.keys():
             raise StateContractError("State mapping contains unknown reference names")
         self.rows = []
@@ -203,26 +215,50 @@ class Bindings:
             spec = self.mapping.get(name, name)
             target_name = spec if type(spec) is str else spec.get("target") if type(spec) is dict else None
             if target_name not in cand_states:
-                raise StateContractError(f"Required {kind} {name} has no registered candidate target")
+                raise StateContractError(f"Required {kind} {name} has no registered candidate target or ordinary tensor target")
             actual_kind, target = cand_states[target_name]
-            if kind != actual_kind:
+            if kind != actual_kind and not (kind == "tensor" and actual_kind == "buffer"):
                 raise StateContractError(f"State kind differs for {name}")
             actual = _view(target, spec)
-            if expected.shape != actual.shape or expected.dtype != actual.dtype or expected.device != actual.device:
+            placement = rules.get(name, {}).get("initial_placement") == "cpu_or_input_device"
+            allowed_device = (placement and expected.device.type == "cpu" and input_device is not None
+                              and target.device == torch.device(input_device))
+            if expected.shape != actual.shape or expected.dtype != actual.dtype or expected.device != actual.device and not allowed_device:
                 raise StateContractError(f"State shape, dtype or device differs for {name}")
             if expected.requires_grad != target.requires_grad:
                 raise StateContractError(f"State requires_grad differs for {name}")
             self.rows.append(Binding(name, kind, expected, target_name, target, actual,
                                      _span(expected), _span(target),
-                                     (expected.shape, expected.dtype, expected.device, expected.requires_grad)))
+                                     (expected.shape, expected.dtype, expected.device, expected.requires_grad), actual_kind))
         self.reference_names = set(ref_states)
         self._aliases()
         alias_groups = {identity: index for index, identity in enumerate(dict.fromkeys(id(row.reference) for row in self.rows))}
         self.description = [{"reference": row.name, "kind": row.kind, "target": row.target_name,
                              "view": self.mapping.get(row.name, row.name), "shape": list(row.reference.shape),
-                             "dtype": str(row.reference.dtype), "alias_group": alias_groups[id(row.reference)]}
+                             "dtype": str(row.reference.dtype), "alias_group": alias_groups[id(row.reference)],
+                             "reference_owner": _owner(reference, row.name)[0],
+                             "target_owner": _owner(candidate, row.target_name)[0]}
                             for row in self.rows]
+        for row in self.description:
+            if row["kind"] == "tensor":
+                row["replacement"] = "reference_matched"
+                row["target_kind"] = next(item.actual_kind for item in self.rows if item.name == row["reference"])
         self.sha256 = hashlib.sha256(json.dumps(self.description, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.mode_pairs = [("", "")]
+        for row in self.rows:
+            pair = (_owner(reference, row.name)[0], _owner(candidate, row.target_name)[0])
+            if pair not in self.mode_pairs:
+                self.mode_pairs.append(pair)
+
+    def modes(self):
+        records = []
+        for ref_name, cand_name in self.mode_pairs:
+            expected = _module(self.reference, ref_name).training
+            actual = _module(self.candidate, cand_name).training
+            if type(expected) is not bool or type(actual) is not bool:
+                raise StateContractError("Required module training flags must be booleans")
+            records.append({"reference": ref_name, "target": cand_name, "expected": expected, "actual": actual})
+        return records
 
     def _aliases(self):
         # Exact tied tensors are supported. Different source tensors cannot map to
@@ -246,17 +282,41 @@ class Bindings:
 
     def issues(self, tolerance):
         issues = []
-        if _plain_tensors(self.reference):
-            return ["Unregistered reference tensor state requires a task adapter"]
         if _declaration(self.candidate) != self.mapping:
             return ["Candidate changed its state mapping during the audit"]
         ref_states, _ = _registered(self.reference)
         cand_states, _ = _registered(self.candidate)
+        plain = plain_tensors(self.reference)
+        if plain.keys() != self.plain_rules.keys():
+            return ["Reference ordinary state schema changed; task contract is incomplete"]
+        ref_states.update({name: ("tensor", plain[name]) for name in sorted(self.required_plain)})
+        cand_states.update({name: ("tensor", tensor) for name, tensor in plain_tensors(self.candidate).items()})
         if set(ref_states) != self.reference_names:
             return ["Reference registered state schema changed; contract is incomplete"]
         for row in self.rows:
             source = ref_states[row.name][1]
             pair = cand_states.get(row.target_name)
+            if row.kind == "tensor":
+                if pair is None or pair[0] != row.actual_kind:
+                    issues.append(f"Required ordinary state {row.name} was removed or changed kind")
+                    continue
+                row.reference, row.target = source, pair[1]
+                row.value = _view(pair[1], self.mapping.get(row.name, row.name))
+                value = row.value
+                if (source.shape != value.shape or source.dtype != value.dtype
+                        or source.requires_grad != pair[1].requires_grad):
+                    issues.append(f"Required ordinary state {row.name} changed representation")
+                    continue
+                placement = self.plain_rules[row.name]["initial_placement"] == "cpu_or_input_device"
+                if source.device != value.device:
+                    if not (placement and source.device.type == "cpu" and self.input_device is not None
+                            and value.device == torch.device(self.input_device)):
+                        issues.append(f"Required ordinary state {row.name} changed device")
+                        continue
+                    value = value.detach().to(device=source.device)
+                if issue := compare_outputs(source.detach(), value, tolerance, f"state.{row.name}"):
+                    issues.append(issue)
+                continue
             if (source is not row.reference or pair is None or pair[0] != row.kind
                     or pair[1] is not row.target or _span(pair[1]) != row.target_span
                     or _span(source) != row.reference_span
@@ -269,6 +329,7 @@ class Bindings:
                 continue
             if issue := compare_outputs(source.detach(), value, tolerance, f"state.{row.name}"):
                 issues.append(issue)
+        self._aliases()
         return issues
 
     def perturb(self, step):
@@ -288,6 +349,36 @@ class Bindings:
         return count
 
 
+def _snapshot_aliases(model):
+    states, _ = _registered(model)
+    values = {name: tensor for name, (_, tensor) in states.items()}
+    values.update(plain_tensors(model))
+    identities, objects, storages = {}, [], {}
+    for name in sorted(values):
+        tensor = values[name]
+        index = identities.setdefault(id(tensor), len(identities))
+        objects.append((name, index))
+        if span := _span(tensor):
+            storages.setdefault(span[0], {})[index] = (*span[1:], index)
+    overlap = []
+    for entries in storages.values():
+        component, stop = [], -1
+
+        def record():
+            if len(component) > 1:
+                base = component[0][0]
+                overlap.append(sorted((index, start - base, end - base) for start, end, index in component))
+
+        for start, end, index in sorted(entries.values()):
+            if start >= stop:
+                record()
+                component, stop = [], -1
+            component.append((start, end, index))
+            stop = max(stop, end)
+        record()
+    return objects, sorted(overlap)
+
+
 def _isolated_pair(reference, candidate):
     originals = [_registered(model) for model in (reference, candidate)]
     ref, cand = copy.deepcopy(reference), copy.deepcopy(candidate)
@@ -296,12 +387,15 @@ def _isolated_pair(reference, candidate):
     original_storage = {_storage(tensor) for states, _ in originals for _, tensor in states.values() if tensor.numel()}
     original_storage.update(_storage(tensor) for model in (reference, candidate)
                             for tensor in _plain_tensors(model).values() if tensor.numel())
+    original_storage.update(_storage(tensor) for model in (reference, candidate)
+                            for tensor in plain_tensors(model).values() if tensor.numel())
     if (snapshots[0][1] & snapshots[1][1]
             or any(modules & original_modules for _, modules in snapshots)):
         raise StateContractError("Model snapshot reused an original or peer module")
     stores = [{_storage(tensor) for _, tensor in states.values() if tensor.numel()} for states, _ in snapshots]
     for model, storage in zip((ref, cand), stores):
         storage.update(_storage(tensor) for tensor in _plain_tensors(model).values() if tensor.numel())
+        storage.update(_storage(tensor) for tensor in plain_tensors(model).values() if tensor.numel())
     if stores[0] & stores[1] or any(storage & original_storage for storage in stores):
         raise StateContractError("Model snapshot reused original or peer tensor storage")
     for (original, _), (cloned, _) in zip(originals, snapshots):
@@ -313,10 +407,41 @@ def _isolated_pair(reference, candidate):
                     or tensor.requires_grad != copied_tensor.requires_grad
                     or compare_outputs(tensor.detach(), copied_tensor.detach(), 0)):
                 raise StateContractError("Model snapshot changed registered tensor values or metadata")
+    for original, cloned in zip((reference, candidate), (ref, cand)):
+        if _snapshot_aliases(original) != _snapshot_aliases(cloned):
+            raise StateContractError("Model snapshot changed tensor object aliases or overlapping state views")
+        before, after = plain_tensors(original), plain_tensors(cloned)
+        if before.keys() != after.keys():
+            raise StateContractError("Model snapshot changed ordinary tensor paths")
+        for name, value in before.items():
+            copied = after[name]
+            if ((value.device, value.dtype, value.shape, value.stride(), value.requires_grad) !=
+                    (copied.device, copied.dtype, copied.shape, copied.stride(), copied.requires_grad)
+                    or compare_outputs(value.detach(), copied.detach(), 0)):
+                raise StateContractError("Model snapshot changed ordinary tensor values or metadata")
     return ref, cand
 
 
-def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, device):
+def _module(model, path):
+    for segment in path.split(".") if path else ():
+        model = vars(model)["_modules"][segment]
+    return model
+
+
+def _owner(model, state_name):
+    if not state_name.startswith("@"):
+        path = state_name.rpartition(".")[0]
+        return path, _module(model, path)
+    current, parts = model, []
+    for segment in state_name[1:].split("."):
+        if segment not in vars(current)["_modules"]:
+            break
+        current = vars(current)["_modules"][segment]
+        parts.append(segment)
+    return ".".join(parts), current
+
+
+def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, device, policy=None):
     """Validate state transitions and mutation on isolated copies of actual models."""
     issues, events, descriptions = [], [], []
     parameter_count = 0
@@ -327,6 +452,7 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
             raise StateContractError("train() must update and return the audited module")
         if ref.training is not training or cand.training is not training:
             raise StateContractError("Root training mode differs from the requested mode")
+        before_modes = binding.modes()
         set_seed(seed)
         expected = clone_tensors(ref(*clone_tensors(args)))
         set_seed(seed)
@@ -337,7 +463,12 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
         if issue := compare_outputs(expected, actual, tolerance):
             issues.append(f"{label}: {issue}")
         issues.extend(f"{label}: {issue}" for issue in binding.issues(tolerance))
-        events.append({"case": label, "training": training, "seed": seed})
+        after_modes = binding.modes()
+        if before_modes != after_modes or any(row["expected"] != row["actual"] for row in after_modes):
+            issues.append(f"{label}: required module modes changed or differ")
+        events.append({"case": label, "training": training, "seed": seed,
+                       "module_modes_before": before_modes, "module_modes_after": after_modes,
+                       "no_grad_after": not torch.is_grad_enabled()})
         return expected
 
     try:
@@ -346,8 +477,9 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
             raise StateContractError("State audit requires a finite nonnegative tolerance and integer seed")
         with torch.no_grad():
             ref, cand = _isolated_pair(reference, candidate)
-            binding = Bindings(ref, cand)
-            descriptions.append({"phase": "modes", "sha256": binding.sha256, "states": binding.description})
+            binding = Bindings(ref, cand, policy=policy, input_device=device)
+            descriptions.append({"phase": "modes", "sha256": binding.sha256, "states": binding.description,
+                                 "ignored_ordinary": binding.ignored})
             parameter_count = len({id(row.reference) for row in binding.rows if row.kind == "parameter"})
             issues.extend(f"initial: {issue}" for issue in binding.issues(tolerance))
             for index, training in enumerate(MODE_SEQUENCE):
@@ -355,9 +487,9 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
             if parameter_count:
                 for training in (True, False):
                     ref, cand = _isolated_pair(reference, candidate)
-                    binding = Bindings(ref, cand)
+                    binding = Bindings(ref, cand, policy=policy, input_device=device)
                     descriptions.append({"phase": f"parameters/training={training}", "sha256": binding.sha256,
-                                         "states": binding.description})
+                                         "states": binding.description, "ignored_ordinary": binding.ignored})
                     previous = observe(binding, f"parameter warmup/training={training}", training)
                     for step in range(2):
                         changed = binding.perturb(step)
@@ -368,7 +500,7 @@ def state_checks(reference, candidate, args, *, seed, set_seed, tolerance, devic
     except Exception as exc:
         issues.append(f"State audit unavailable: {type(exc).__name__}: {str(exc)[:1000]}")
     return check("failed" if issues else "passed",
-                 reason="Registered state views, persistent train/eval transitions and same-object parameter updates",
+                 reason="Declared tensor state, persistent train/eval transitions and same-object parameter updates",
                  values={"protocol": PROTOCOL, "issues": issues, "parameter_count": parameter_count,
                          "bindings": descriptions, "events": events,
                          "security_isolation_certified": False})

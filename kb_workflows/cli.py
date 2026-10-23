@@ -25,6 +25,11 @@ def main(argv=None):
                 raise ValueError("Use scripts.regrade_artifacts native-run for artifact verification; batch supports its analysis only")
         selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
         calibrated_inputs = None
+        if config.state_validation:
+            from .state_policies import plan as state_plan
+
+            for pid, path in selected.items():
+                state_plan(config.level, pid, path.read_text())
         if config.cache_validation:
             from .cache_recipes import plan as cache_plan
 

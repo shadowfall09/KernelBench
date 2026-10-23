@@ -39,6 +39,9 @@ def select_tools(value):
 
 
 def enabled(payload):
+    from .state_policies import validate_inline as validate_state
+
+    validate_state(payload)
     from .allocation_audit import validate_inline
 
     validate_inline(payload)
@@ -232,7 +235,7 @@ def derive(document, payload):
         state_document = child.get("metadata", {}).get("state_audit")
         tolerance = settings["fp32_tolerance"] if settings.get("precision") == "fp32" or settings.get("device_backend") == "neuron" else 1e-2
         checks["mode_state"] = verdict(state_document, child.get("metadata", {}).get("reliability_checks"),
-            expected_tolerance=tolerance) if control_ok else check(
+            expected_tolerance=tolerance, expected_policy=settings.get("state_policy")) if control_ok else check(
             "not_measured", reason="No complete native state-control run")
     if settings.get("numerical_validation"):
         from .numerical_audit import verdicts

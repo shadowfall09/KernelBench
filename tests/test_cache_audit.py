@@ -368,7 +368,7 @@ def test_combined_state_cache_and_throughput_receipts_remain_separate(tmp_path):
             mode = next(mode for mode, value in throughput_audit.STAGES.items() if value == stage)
             result = _execute_parent_request(child, mode)
         elif stage == "control":
-            with state_audit.audit() as collector:
+            with state_audit.audit(child) as collector:
                 result = _execute_parent_request(child)
             result["metadata"]["state_audit"] = collector.document()
         elif stage == audit.STAGE:

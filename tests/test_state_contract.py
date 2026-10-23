@@ -404,7 +404,10 @@ def test_unregistered_reference_tensor_state_cannot_silently_escape_the_contract
             self.hidden = {"states": [torch.ones(3)]}
 
     reference = Plain()
-    assert_failed(audit(reference, copy.deepcopy(reference)), "Unregistered reference tensor state")
+    assert audit(reference, copy.deepcopy(reference))["status"] == "passed"
+    candidate = copy.deepcopy(reference)
+    candidate.hidden["states"][0].zero_()
+    assert_failed(audit(reference, candidate), 'state.@hidden["states"][0]')
 
 
 @pytest.mark.parametrize("level,pid,init,args", [

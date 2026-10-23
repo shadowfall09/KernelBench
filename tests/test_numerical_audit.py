@@ -206,6 +206,9 @@ assert "torch" not in sys.modules
 def test_cpu_supervisor_preserves_native_times_and_rechecks_numerical_receipts(monkeypatch):
     request = payload()
     request["eval_config"]["state_validation"] = True
+    from kb_workflows.state_policies import plan
+
+    request["eval_config"]["state_policy"] = plan(request["level"], request["problem_id"], request["ref_arch_src"])
     request["eval_config"]["determinism_checks"] = True
     request["eval_config"]["determinism_repeats"] = 3
     import hashlib
