@@ -133,28 +133,28 @@
       "reference_sha256": "3f3571481e280fdd960ec50ca9cbda184948b86b283c62af3ea6eb971848d84c",
       "family": "activation",
       "known_reference_issue": null,
-      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+      "legal_domain": "Real tensors with frozen activation parameters. Reviewed hidden cases additionally require exact NaN and signed-infinity propagation, including all-NaN outputs; finite-value precision and reference-signal qualification remain separate."
     },
     "1/20": {
       "name": "LeakyReLU",
       "reference_sha256": "324f633b00a15888a798203317d76bd14287d50804c9b3f75f62b9e9cbda9345",
       "family": "activation",
       "known_reference_issue": null,
-      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+      "legal_domain": "Real tensors with frozen activation parameters. Reviewed hidden cases additionally require exact NaN and signed-infinity propagation, including all-NaN outputs; finite-value precision and reference-signal qualification remain separate."
     },
     "1/21": {
       "name": "Sigmoid",
       "reference_sha256": "2220654dea1baaa2be7805ae74fc072b3c0a715d3bd6eb13098077eaf1fbe90a",
       "family": "activation",
       "known_reference_issue": null,
-      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+      "legal_domain": "Real tensors with frozen activation parameters. Reviewed hidden cases additionally require exact NaN and signed-infinity propagation, including all-NaN outputs; finite-value precision and reference-signal qualification remain separate."
     },
     "1/22": {
       "name": "Tanh",
       "reference_sha256": "d72fb7d9001f9d19b712ac2030187c7f9a123963ae00ef74db083268efd12c88",
       "family": "activation",
       "known_reference_issue": null,
-      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+      "legal_domain": "Real tensors with frozen activation parameters. Reviewed hidden cases additionally require exact NaN and signed-infinity propagation, including all-NaN outputs; finite-value precision and reference-signal qualification remain separate."
     },
     "1/23": {
       "name": "Softmax",
@@ -196,7 +196,7 @@
       "reference_sha256": "e8077a6dfbf48823180676e7ad6d45c28a8b78e29d68e6daa32be339318873ea",
       "family": "activation",
       "known_reference_issue": null,
-      "legal_domain": "Finite real tensors and the frozen operator parameters; no activation approximation substitution."
+      "legal_domain": "Real tensors with frozen activation parameters. Reviewed hidden cases additionally require exact NaN and signed-infinity propagation, including all-NaN outputs; finite-value precision and reference-signal qualification remain separate."
     },
     "1/29": {
       "name": "Softplus",
@@ -230,14 +230,14 @@
       "name": "BatchNorm",
       "reference_sha256": "d91ed9ef739197df1baacc064e3fdea486add500588f7228a94bbcbeedcd9cfc",
       "family": "normalization",
-      "known_reference_issue": null,
+      "known_reference_issue": "The fixed reviewed near-constant CPU FP32 case can exceed the initial independent FP64 budget. It remains an explicit self-qualification failure; no device error distribution or threshold adjustment is inferred.",
       "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
     },
     "1/34": {
       "name": "InstanceNorm",
       "reference_sha256": "0db2fb5746f2616f306c4e1383086ab7e2cc01cb460e3b4fed556805e5d1f89b",
       "family": "normalization",
-      "known_reference_issue": null,
+      "known_reference_issue": "The fixed reviewed near-constant CPU FP32 case can exceed the initial independent FP64 budget. It remains an explicit self-qualification failure; no device error distribution or threshold adjustment is inferred.",
       "legal_domain": "Finite real tensors with legal feature/group/normalized axes; registered affine weights and observed running-state mode are retained."
     },
     "1/35": {

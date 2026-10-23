@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from _operator_evidence import attach_operator_evidence
 
 from kb_workflows import engine, paper_analysis, rl_audit, rl_evaluation, rl_plan, rl_rewards, rl_training
 from kb_workflows.baseline_variants import VARIANTS, select_baseline
@@ -99,7 +100,7 @@ def native_verifier(plan, tmp_path, monkeypatch):
             pairs = [{"reference_ms": 10, "candidate_ms": runtime, "control_ms": 10, "seed": i, "order": "RCB"} for i in range(10)]
             result["metadata"]["paired_timing"] = {**paired_summary(pairs), "baseline_variant": payload["eval_config"]["paired_baseline_variant"],
                 "output_consumed": True, "varied_inputs": True, "all_outputs_verified": True}
-        return result
+        return attach_operator_evidence(payload, result)
     return dispatch, seen
 
 

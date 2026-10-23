@@ -528,7 +528,13 @@ def test_origin_dispatch_does_not_fall_into_neuron_evaluator(monkeypatch):
     from kb_workflows import evaluate_task, origin_task
 
     monkeypatch.setattr(origin_task, "audit", lambda payload: {"origin_diagnostic": True})
-    assert evaluate_task.dispatch({"task": "origin_audit", "eval_config": {"device_backend": "neuron"}}) == {"origin_diagnostic": True}
+    from kb_workflows.config import RunConfig
+    from kb_workflows.engine import task_payload
+
+    payload = task_payload(RunConfig(start=2, end=2).validate(), 2, task="baseline")
+    payload["task"] = "origin_audit"
+    payload["eval_config"]["device_backend"] = "neuron"
+    assert evaluate_task.dispatch(payload) == {"origin_diagnostic": True}
 
 
 def test_origin_worker_rejects_hidden_and_neuron_before_sdk_import():

@@ -68,7 +68,9 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     observe(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_state(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_numerical(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
-    receipt = {"label": label, "seed": seed, "passed": False, "orders": []}
+    from kb_workflows.measurement import input_signature
+
+    receipt = {"label": label, "seed": seed, "passed": False, "orders": [], "input_signature": input_signature(inputs)}
     metadata.setdefault("reliability_checks", []).append(receipt)
     metadata["reliability_protocol"] = PROTOCOL
     for order in ("candidate_first", "reference_first"):

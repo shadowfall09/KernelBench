@@ -185,8 +185,11 @@ def analyze_paper(config):
                     status = "headroom_certificate_missing_or_invalid"
                     row["headroom_error"] = bound_issue
             if status == "verified":
-                payload = task_payload(config, pid, sid)
-                status = current_result(raw, payload) or status
+                try:
+                    payload = task_payload(config, pid, sid)
+                    status = current_result(raw, payload) or status
+                except (ValueError, KeyError, OSError):
+                    status = "reference_or_input_family_contract_changed"
             if status == "verified" and config.hidden_tests:
                 try:
                     issue = current_result(secret, task_payload(config, pid, sid, hidden=True))

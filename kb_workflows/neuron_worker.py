@@ -284,6 +284,19 @@ def _evaluate(payload, *, adapter=None):
                         if stress_enabled(hidden_path):
                             for label, changed in stress_cases(values, value):
                                 yield f"stress/{value}/{index}/{label}", changed, value
+            native_cases = cases
+            extra_rows = {}
+
+            def cases():
+                yield from native_cases()
+                if hidden:
+                    from .operator_input_policy import extra_cases
+
+                    for value in settings.get("hidden_seeds", HIDDEN_SEEDS):
+                        for row in extra_cases(ref, value):
+                            extra_rows[row["case_label"]] = row
+                            yield row["case_label"], row["inputs"], value
+
             for label, values, value in cases():
                 observed = []
                 dev = move(values)
@@ -302,6 +315,10 @@ def _evaluate(payload, *, adapter=None):
                     issue = check_paired_calls(ref, model, dev, seed=value, tolerance=settings["fp32_tolerance"],
                         device=device, set_seed=seed, metadata=metadata, label=label,
                         record_first_call=first_ms is None, clock=CLOCK, verify_pair=verify_order)
+                if label in extra_rows:
+                    from .operator_input_policy import completed
+
+                    completed(extra_rows.pop(label), dev, issue is None)
                 if issue:
                     raise ValueError(issue)
                 first_ms = metadata["first_forward_ms"]

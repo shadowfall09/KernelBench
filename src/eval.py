@@ -146,7 +146,12 @@ def _process_input_tensor(input, device, precision=torch.float32):
     input_tensor = input.to(dtype=precision) if input.is_floating_point() and not _PRESERVE_INPUT_DTYPES.get() else input
 
     # Default for all other backends and float types
-    return input_tensor.to(device=device)
+    output = input_tensor.to(device=device)
+    if output.stride() != input.stride() and all(stride > 0 for stride in input.stride()):
+        # dtype/device conversion can compact sliced inputs. Keep the reviewed
+        # positive-stride layout visible to the actual candidate, including bool.
+        output = torch.empty_strided(input.shape, input.stride(), dtype=output.dtype, device=output.device).copy_(output)
+    return output
 
 
 class KernelExecResult(BaseModel):
@@ -497,6 +502,21 @@ def run_hidden_correctness_check(
                     failed_configs.append(label)
         # Release this seed's tensors before generating the next seed's suite.
         del hidden_configs, raw_inputs, inputs
+
+        from kb_workflows.operator_input_policy import completed as operator_case_completed
+        from kb_workflows.operator_input_policy import extra_cases
+
+        for row in extra_cases(original_model_instance, seed):
+            effective = [_process_input_tensor(value, device, precision) for value in row["inputs"]]
+            passed = run_correctness_on_fixed_inputs(
+                original_model_instance, new_model_instance, effective, metadata,
+                verbose=verbose, device=device, precision=precision,
+                config_label=row["case_label"], seed=seed)
+            operator_case_completed(row, effective, passed)
+            completed += 1
+            if not passed:
+                failed_configs.append(row["case_label"])
+            del effective
     metadata["hidden_failed_configs"] = failed_configs
     metadata["hidden_completed_checks"] = completed
     metadata["hidden_correctness_trials"] = f"({completed - len(failed_configs)}/{completed} hidden configs passed)"

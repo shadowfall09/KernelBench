@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import pytest
 import torch
+from _operator_evidence import attach_operator_evidence
 
 from kb_workflows import baseline_variants, engine, final_verification, measurement
 from kb_workflows.baseline_rewrites import framework_rewrite, rewrite_for
@@ -168,10 +169,11 @@ def test_final_worker_tasks_are_distinct_resume_and_only_changed_sample_retries(
     def evaluate(config, tasks):
         seen.extend(tasks)
         for key, payload in tasks:
-            yield key, {"compiled": True, "correctness": True, "runtime": 1,
+            result = {"compiled": True, "correctness": True, "runtime": 1,
                         "metadata": {"workflow_signature": fingerprint(payload), "evaluation_config": payload["eval_config"],
                                      "reference_sha256": fingerprint({"source": payload["ref_arch_src"]}),
                                      "kernel_sha256": fingerprint({"source": payload["kernel_src"]})}}
+            yield key, attach_operator_evidence(payload, result)
 
     monkeypatch.setattr(engine, "evaluate_tasks", evaluate)
     results = final_verification.run(cfg)

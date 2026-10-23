@@ -68,6 +68,7 @@ class RunConfig:
     state_validation: bool = False
     numerical_validation: bool = False
     input_calibration: str = ""
+    input_family_memory_mb: int = 256
     oracle_memory_mb: int = 4096
     determinism_repeats: int = 5
     determinism_policy_file: str = ""
@@ -232,6 +233,8 @@ class RunConfig:
             self.numerical_validation = True
         if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level != 1):
             raise ValueError("Independent numerical validation currently requires an explicit boolean and level 1")
+        if type(self.input_family_memory_mb) is not int or not 1 <= self.input_family_memory_mb <= 1048576:
+            raise ValueError("Input-family memory envelope must be an integer from 1 to 1048576 MiB")
         if type(self.oracle_memory_mb) is not int or not 1 <= self.oracle_memory_mb <= 1048576:
             raise ValueError("Oracle host-memory envelope must be 1..1048576 MiB")
         if self.determinism_policy_file:
@@ -387,6 +390,7 @@ def parser():
         "agent_max_output_tokens",
         "sanitizer_timeout",
         "oracle_memory_mb",
+        "input_family_memory_mb",
         "determinism_repeats",
         "isolation_cpus",
         "isolation_memory_mb",

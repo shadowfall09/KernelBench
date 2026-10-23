@@ -51,6 +51,10 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
 
     if revision := binding(config.level, pid, path.read_text()):
         options["reference_revision"] = revision
+    from .operator_input_policy import plan
+
+    if config.level == 1:
+        options["operator_inputs"] = plan(config.level, pid, path.read_text(), config.input_family_memory_mb)
     if config.input_calibration:
         from .input_calibration import record_for
 

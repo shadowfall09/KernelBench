@@ -136,6 +136,11 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V26-01 参考专用输入配方选择 | 按固定顺序与三个种子检查参考FP64资格、信号和探针变化，保留失败尝试，不加载候选或采集速度 | — | [input_calibration_task.py](../kb_workflows/input_calibration_task.py), [input_calibration.py](../kb_workflows/input_calibration.py) |
 | V26-02 L1角色保持的值分布 | 100题适配保留shape/stride/离散角色；乘积随机有界前缀、概率与三角结构受约束，隐藏工厂不套用名义配方 | — | [input_profiles.py](../kb_workflows/input_profiles.py), [test_input_calibration.py](../tests/test_input_calibration.py) |
 | V26-03 冻结强数值政策与逐输出复核 | 绝对误差项收紧为零且不放宽原预算，参考和候选均须通过独立FP64；首基线、warmup及每个计时输出在计时外核对 | — | [input_calibration.py](../kb_workflows/input_calibration.py), [evaluate_task.py](../kb_workflows/evaluate_task.py), [paired_task.py](../kb_workflows/paired_task.py), [eval.py](../src/eval.py) |
+| V27-01 原L1真实初始化的隐藏输入族 | 100题使用参考实际参数构造合法形状/布局，LN固定normalized_shape及卷积通道/分组不替换，计时输入不变 | — | [operator_cases.py](../kb_workflows/operator_cases.py), [test_operator_inputs.py](../tests/test_operator_inputs.py) |
+| V27-02 算子边界、抵消与并列极值 | 矩阵耦合/结构、卷积池化空间、扫描mask/乘积、概率标签及attention独立处理，每种子632例且保留旧隐藏分布 | — | [operator_cases.py](../kb_workflows/operator_cases.py), [operator_input_policy.py](../kb_workflows/operator_input_policy.py) |
+| V27-03 显式非有限域与空数值测量 | 五种激活追加NaN/Inf及全NaN，传播严格匹配；全非有限叶子的RMS/误差为null，不能贡献参考信号 | — | [numerical.py](../kb_workflows/numerical.py), [numerical_audit.py](../kb_workflows/numerical_audit.py), [operator_oracles.json](../kb_workflows/operator_oracles.json) |
+| V27-04 转换后保留正stride布局 | 修正dtype/device转换可能压紧切片的问题，将真实正stride与离散dtype送入候选及隔离副本 | — | [eval.py](../src/eval.py), [validation.py](../src/validation.py), [test_operator_inputs.py](../tests/test_operator_inputs.py) |
+| V27-07 参考近常量失格证据保留 | BN/IN固定CPU FP32反例超过既定FP64预算，保留已知问题与失败；来源变化的旧结果在分析时明确失效 | — | [operator_oracles.json](../kb_workflows/operator_oracles.json), [paper_analysis.py](../kb_workflows/paper_analysis.py), [test_operator_inputs.py](../tests/test_operator_inputs.py) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -274,6 +279,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V26-05 多设备分布复用与实测身份 | 分别记录校准设备和执行设备；复用配方须在本设备再次数值资格，不借用性能或可达性证据 | — | [input_calibration.py](../kb_workflows/input_calibration.py), [neuron_worker.py](../kb_workflows/neuron_worker.py), [test_input_calibration.py](../tests/test_input_calibration.py) |
 | V26-06 校准文件贯穿冻结与任务桥接 | 文件内容进入最终冻结、研究/RL及重新评分；单题子任务和Harbor私有文件保持一致，公开提示词说明分布及政策 | — | [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py), [final_verification.py](../kb_workflows/final_verification.py), [rl_plan.py](../kb_workflows/rl_plan.py), [study_data.py](../kb_workflows/study_data.py) |
 | V26-07 轻量校准预览与准入回归 | 默认预览无SDK/输入/目录副作用，执行显式开启；内存超限在变换/公式前拒绝，CPU反例覆盖证据删改及所有计时输出 | — | [calibrate_inputs.py](../scripts/calibrate_inputs.py), [test_input_calibration.py](../tests/test_input_calibration.py), [INPUT_CALIBRATION.md](../docs/INPUT_CALIBRATION.md) |
+| V27-05 原生隐藏执行与覆盖复核 | CUDA及Neuron共同追加案例，逐例记录有效输入/种子/双向调用；评分恢复拒绝漏例、改布局、重复标签或缺记录 | — | [operator_input_policy.py](../kb_workflows/operator_input_policy.py), [reliability.py](../src/reliability.py), [neuron_worker.py](../kb_workflows/neuron_worker.py), [tool_checks.py](../kb_workflows/tool_checks.py) |
+| V27-06 输入内存准入与全流程冻结 | 默认256MiB输入估计在分配前检查，超限不缩尺寸；计划和额度贯穿队列、生成、Harbor、最终冻结及研究比较 | — | [config.py](../kb_workflows/config.py), [engine.py](../kb_workflows/engine.py), [cli.py](../kb_workflows/cli.py), [harbor.py](../kb_workflows/harbor.py) |
+| V27-08 全L1元数据与原生入口回归 | 真实100题初始化meta检查及CPU算式、私有seed、NaN信号、Neuron模拟、评分/RL/恢复收据回归，不运行设备实验 | — | [test_operator_inputs.py](../tests/test_operator_inputs.py), [_operator_evidence.py](../tests/_operator_evidence.py), [OPERATOR_INPUTS.md](../docs/OPERATOR_INPUTS.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -286,9 +294,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-01 生产难题与反向轨道 | 代码已实现 | M1 | 已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13 |
 | R-02 多dtype任务族与显存缩放 | 代码已实现 | M1 | 已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证 |
 | R-03 选集区分度重新验证 | 代码已实现 | M1 | 已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验 |
-| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成 |
+| R-04 FP64数值契约与精度门 | 部分实现 | M2 | 保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成；全非有限传播精确匹配但无有限误差/信号，BN/IN近常量CPU FP32失格证据保留 |
 | R-05 参考退化审计与输入校准 | 部分实现 | M2 | 已实现实际输入信号审计及原L1的参考专用名义值分布选择、固定强数值预算、逐输出FP64检查与新基线/恢复契约；隐藏分布保留。L2/L3全题适配与逐设备阈值校准仍缺；按用户要求不跑设备/模型实验 |
-| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 覆盖17道旧题附加形状及新41题角色/边界实例；扫描89–93保留原分布并追加奇数、stride、rank-3、singleton、空轴与bool mask案例，cumprod保留有效信号；旧250题其余算子输入族与特殊值适配继续实现 |
+| R-06 针对算子的输入族与隐藏形状 | 部分实现 | M2 | 原L1全部100题追加真实初始化下的算子专用形状/stride/值族，每种子632例，保留旧分布与扫描修订；新41题已有角色/边界。追加NaN/Inf仅限明确五题；L2/L3的150题、旧分布语义迁移与更完整输入族仍待实现 |
 | R-07 模式、状态、参数更新与输入敏感性 | 部分实现 | M2 | 已实现注册状态的声明式重命名/切片/转置/存储视图、共享关系、连续train/eval、非零参数修改和每个原生实例的独立复核；普通Tensor属性/任意对象状态、非线性重参数化与任务特定状态语义仍待适配 |
 | R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
 | R-09 执行完整性与缓存审计 | 部分实现 | M2 | 已接入同对象修改缓存探针、候选导入/执行环境检测与恢复；NaN预填、吞吐对照和GPU执行完整性仍待完成；Neuron路径增加冻结编译源码与首执行环境审计；来源诊断冻结配置容差并观察training/grad后置状态 |

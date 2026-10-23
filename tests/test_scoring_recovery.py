@@ -4,8 +4,9 @@ import copy
 import shutil
 
 import pytest
+from _operator_evidence import attach_operator_evidence
 
-from kb_workflows import common, engine, generation, paper_analysis
+from kb_workflows import common, engine, evaluate_task, generation, paper_analysis
 from kb_workflows.common import atomic_json, fingerprint, kernel_name, read_json
 from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.measurement import timing_stats
@@ -15,7 +16,7 @@ from kb_workflows.measurement import timing_stats
 def run(tmp_path, monkeypatch):
     reference = tmp_path / "KernelBench/level1/1_problem.py"
     reference.parent.mkdir(parents=True)
-    reference.write_text("reference source")
+    reference.write_text(common.problem_paths(1)[1].read_text())
     hidden = tmp_path / "hidden_tests/level1/1_hidden.py"
     hidden.parent.mkdir(parents=True)
     hidden.write_text("hidden source")
@@ -60,6 +61,7 @@ def run(tmp_path, monkeypatch):
                                                 "input_signature": baseline["input_signature"], "device_fingerprint": copy.deepcopy(device),
                                                 "timing_method": "synchronized_wall", "precision": "fp32", "cold_start_ms": 5,
                                                 "timing_receipt": copy.deepcopy(receipt)}}
+            attach_operator_evidence(payload, results[f"1_{sid}"])
     def save():
         atomic_json(baseline_path, {"level1": {reference.name: baseline}})
         atomic_json(config.run_dir / "eval_results.json", standard)
@@ -242,6 +244,7 @@ def test_final_and_paired_evidence_drive_scores_and_legacy_gate(run, monkeypatch
                 payload = final_verification.payload_for(config, 1, sid, repeat, hidden=hidden)
                 record = copy.deepcopy(originals[f"1_{sid}"])
                 record["metadata"].update(evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload))
+                attach_operator_evidence(payload, record)
                 final[f"1_{sid}:{repeat}:{'hidden' if hidden else 'standard'}"] = record
             payload = engine.paired_payload(config, 1, sid, repeat=repeat, variant="eager")
             summary = paired_summary([{"reference_ms": 10, "candidate_ms": 5, "control_ms": 10} for _ in range(12)])
@@ -399,7 +402,7 @@ def test_headroom_scoring_uses_reviewed_certificate_and_invalidates_external_inp
     measured = calibration.seal(baseline["device_fingerprint"],
         {"memory_bytes": calibration.probe_record(1000, [1] * 5, unit="bytes/s", parameters={})},
         [0.01] * 5, settings={"test_fixture": True}, digest="current")
-    spec = {"protocol": headroom.PROTOCOL, "layer": "F", "reference_sha256": hashlib.sha256(b"reference source").hexdigest(),
+    spec = {"protocol": headroom.PROTOCOL, "layer": "F", "reference_sha256": hashlib.sha256(engine.select_problems(1)[1].read_bytes()).hexdigest(),
             "precision": "fp32", "input_signature": baseline["input_signature"],
             "review": {"reviewer": "unit-test", "rationale": "Synthetic protocol fixture"},
             "calibration_sha256": measured["receipt_sha256"],
@@ -448,8 +451,6 @@ def test_batch_analysis_writes_gate_before_legacy_metrics(run, monkeypatch):
 
 
 def test_worker_rejects_mismatched_evaluator_version(run, monkeypatch):
-    from kb_workflows import evaluate_task
-
     config, _, _, _, _ = run
     monkeypatch.setattr(evaluate_task, "evaluator_digest", lambda: "current")
     payload = engine.task_payload(config, 1)
@@ -466,8 +467,9 @@ def test_resume_reuses_current_results_and_reruns_changed_evaluator(run, monkeyp
     def evaluate(config, tasks):
         calls.extend(tasks)
         for key, payload in tasks:
-            yield key, {"compiled": True, "correctness": True,
+            result = {"compiled": True, "correctness": True,
                         "metadata": {"workflow_signature": fingerprint(payload), "evaluation_config": payload["eval_config"]}}
+            yield key, attach_operator_evidence(payload, result)
 
     monkeypatch.setattr(engine, "evaluate_tasks", evaluate)
     engine.evaluate_run(config)

@@ -30,6 +30,14 @@ def main(argv=None):
 
             calibrated_inputs = {pid: record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())["selected_recipe"]
                                  for pid, path in selected.items()}
+        operator_input_coverage = None
+        if config.level == 1:
+            from .operator_input_policy import plan
+
+            plans = {pid: plan(config.level, pid, path.read_text(), config.input_family_memory_mb) for pid, path in selected.items()}
+            operator_input_coverage = {"protocol": next(iter(plans.values()))["protocol"],
+                "task_count": len(plans), "memory_mb": config.input_family_memory_mb,
+                "scope": "additional_hidden_correctness_only; original_initialization_preserved"}
         strict_coverage = None
         if config.strict_validation:
             from .contract_specs import coverage
@@ -56,6 +64,7 @@ def main(argv=None):
                         "problems": list(selected),
                         "suite": selection_receipt(config),
                         "strict_coverage": strict_coverage,
+                        **({"operator_input_coverage": operator_input_coverage} if operator_input_coverage else {}),
                         **({"calibrated_inputs": calibrated_inputs} if calibrated_inputs is not None else {}),
                         **({"numerical_coverage": numerical_coverage} if numerical_coverage is not None else {}),
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],

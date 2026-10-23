@@ -1310,7 +1310,7 @@
         "kb_workflows/reference_revisions.json",
         "tests/test_reference_revisions.py"
       ],
-      "reason": "保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成"
+      "reason": "保留17题附加契约，原L1全部100题有独立CPU FP64算式与实际输入复核；92题轴裁剪已作有版本修正，空输出保留null测量，低精度抵消反例保留；L2/L3独立适配与全题校准仍需完成；全非有限传播精确匹配但无有限误差/信号，BN/IN近常量CPU FP32失格证据保留"
     },
     {
       "id": "R-05",
@@ -1343,9 +1343,12 @@
         "kb_workflows/production.py",
         "kb_workflows/scan_cases.py",
         "kb_workflows/reference_revisions.json",
-        "tests/test_scan_cases.py"
+        "tests/test_scan_cases.py",
+        "kb_workflows/operator_cases.py",
+        "kb_workflows/operator_input_policy.py",
+        "docs/OPERATOR_INPUTS.md"
       ],
-      "reason": "覆盖17道旧题附加形状及新41题角色/边界实例；扫描89–93保留原分布并追加奇数、stride、rank-3、singleton、空轴与bool mask案例，cumprod保留有效信号；旧250题其余算子输入族与特殊值适配继续实现"
+      "reason": "原L1全部100题追加真实初始化下的算子专用形状/stride/值族，每种子632例，保留旧分布与扫描修订；新41题已有角色/边界。追加NaN/Inf仅限明确五题；L2/L3的150题、旧分布语义迁移与更完整输入族仍待实现"
     },
     {
       "id": "R-07",
@@ -3035,6 +3038,118 @@
         "docs/INPUT_CALIBRATION.md"
       ],
       "reason": "默认预览无SDK/输入/目录副作用，执行显式开启；内存超限在变换/公式前拒绝，CPU反例覆盖证据删改及所有计时输出"
+    },
+    {
+      "id": "V27-01",
+      "title": "原L1真实初始化的隐藏输入族",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_cases.py",
+        "tests/test_operator_inputs.py"
+      ],
+      "reason": "100题使用参考实际参数构造合法形状/布局，LN固定normalized_shape及卷积通道/分组不替换，计时输入不变"
+    },
+    {
+      "id": "V27-02",
+      "title": "算子边界、抵消与并列极值",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_cases.py",
+        "kb_workflows/operator_input_policy.py"
+      ],
+      "reason": "矩阵耦合/结构、卷积池化空间、扫描mask/乘积、概率标签及attention独立处理，每种子632例且保留旧隐藏分布"
+    },
+    {
+      "id": "V27-03",
+      "title": "显式非有限域与空数值测量",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/numerical.py",
+        "kb_workflows/numerical_audit.py",
+        "kb_workflows/operator_oracles.json"
+      ],
+      "reason": "五种激活追加NaN/Inf及全NaN，传播严格匹配；全非有限叶子的RMS/误差为null，不能贡献参考信号"
+    },
+    {
+      "id": "V27-04",
+      "title": "转换后保留正stride布局",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py",
+        "src/validation.py",
+        "tests/test_operator_inputs.py"
+      ],
+      "reason": "修正dtype/device转换可能压紧切片的问题，将真实正stride与离散dtype送入候选及隔离副本"
+    },
+    {
+      "id": "V27-05",
+      "title": "原生隐藏执行与覆盖复核",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_input_policy.py",
+        "src/reliability.py",
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/tool_checks.py"
+      ],
+      "reason": "CUDA及Neuron共同追加案例，逐例记录有效输入/种子/双向调用；评分恢复拒绝漏例、改布局、重复标签或缺记录"
+    },
+    {
+      "id": "V27-06",
+      "title": "输入内存准入与全流程冻结",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/config.py",
+        "kb_workflows/engine.py",
+        "kb_workflows/cli.py",
+        "kb_workflows/harbor.py"
+      ],
+      "reason": "默认256MiB输入估计在分配前检查，超限不缩尺寸；计划和额度贯穿队列、生成、Harbor、最终冻结及研究比较"
+    },
+    {
+      "id": "V27-07",
+      "title": "参考近常量失格证据保留",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/operator_oracles.json",
+        "kb_workflows/paper_analysis.py",
+        "tests/test_operator_inputs.py"
+      ],
+      "reason": "BN/IN固定CPU FP32反例超过既定FP64预算，保留已知问题与失败；来源变化的旧结果在分析时明确失效"
+    },
+    {
+      "id": "V27-08",
+      "title": "全L1元数据与原生入口回归",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_operator_inputs.py",
+        "tests/_operator_evidence.py",
+        "docs/OPERATOR_INPUTS.md"
+      ],
+      "reason": "真实100题初始化meta检查及CPU算式、私有seed、NaN信号、Neuron模拟、评分/RL/恢复收据回归，不运行设备实验"
     }
   ]
 }

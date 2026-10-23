@@ -98,15 +98,19 @@ def verdicts(document, cases, payload):
                 or {leaf["path"].removesuffix(".complex") for leaf in gate["leaves"]} != floating_paths):
             return missing("Numerical and signal leaves have inconsistent output coverage")
         for leaf in gate["leaves"]:
-            if leaf.get("kind") == "empty_tensor":
-                if (leaf.get("elements") != 0 or not isinstance(leaf.get("shape"), list)
+            if leaf.get("kind") in {"empty_tensor", "nonfinite_only"}:
+                count = leaf.get("elements")
+                valid_count = count == 0 if leaf["kind"] == "empty_tensor" else type(count) is int and count > 0
+                matching_signal = next((item for item in signal["leaves"] if item["path"] == leaf["path"].removesuffix(".complex")), {})
+                if (not valid_count or type(count) is not int or not isinstance(leaf.get("shape"), list)
                         or any(type(size) is not int or size < 0 for size in leaf["shape"])
-                        or math.prod(leaf["shape"]) != 0 or not isinstance(leaf.get("dtype"), str)
+                        or math.prod(leaf["shape"]) != count or not isinstance(leaf.get("dtype"), str)
+                        or (leaf["kind"] == "nonfinite_only" and (matching_signal.get("finite_elements") != 0 or matching_signal.get("informative") is not False))
                         or leaf.get("oracle_rms") is not None or leaf.get("norm_limit") is not None):
-                    return missing("Empty numerical leaf has no matching shape and null measurement contract")
+                    return missing("Non-numeric leaf has no matching shape/signal and null measurement contract")
                 for kind in ("reference", "candidate"):
                     if leaf.get(kind) != {"passed": True, "rms_error": None, "max_abs_error": None, "elements_failed": 0}:
-                        return missing("Empty output cannot invent numerical error measurements")
+                        return missing("Empty/non-finite-only output cannot invent numerical error measurements")
                 continue
             if (not isinstance(leaf, dict) or type(leaf.get("elements")) is not int or leaf["elements"] <= 0
                     or type(leaf.get("oracle_rms")) not in (int, float) or not math.isfinite(leaf["oracle_rms"])

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
 from .input_calibration import task_policy as nominal_input_policy
+from .operator_input_policy import task_policy as operator_input_policy
 from .production import task_input_policy
 from .reference_revisions import record_result
 
@@ -289,6 +290,7 @@ def qualify_small(payload):
 
 @record_result
 @nominal_input_policy
+@operator_input_policy
 def dispatch(payload):
     if payload.get("task") == "calibrate_inputs":
         from .input_calibration_task import calibrate

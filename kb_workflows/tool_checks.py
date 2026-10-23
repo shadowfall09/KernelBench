@@ -15,7 +15,7 @@ TOOLS = ("memcheck", "racecheck", "synccheck", "initcheck")
 ERROR_EXIT = 86
 MAX_LOG_BYTES = 16 * 1024**2
 DIAGNOSTIC_FIELDS = ("sanitizer_tools", "sanitizer_command", "sanitizer_timeout", "determinism_checks", "determinism_repeats",
-                     "state_validation", "numerical_validation", "oracle_memory_mb")
+                     "state_validation", "numerical_validation", "oracle_memory_mb", "input_family_memory_mb")
 
 
 def diagnostic_options(config):
@@ -267,9 +267,10 @@ def reusable(result, payload):
         return False
     from .input_calibration import issue as input_issue
     from .isolation import issue as isolation_issue
+    from .operator_input_policy import issue as family_issue
     from .reference_revisions import issue as revision_issue
 
-    if isolation_issue(result, payload) or revision_issue(result, payload) or input_issue(result, payload):
+    if isolation_issue(result, payload) or revision_issue(result, payload) or input_issue(result, payload) or family_issue(result, payload):
         return False
     if not enabled(payload) or (not result.get("metadata", {}).get("tool_checks") and result.get("correctness") is not True):
         return True
@@ -282,8 +283,11 @@ def reusable(result, payload):
 
 def issue(result, payload):
     from .input_calibration import issue as input_issue
+    from .operator_input_policy import issue as family_issue
     from .reference_revisions import issue as revision_issue
 
+    if reason := family_issue(result, payload):
+        return reason
     if reason := input_issue(result, payload):
         return reason
     if reason := revision_issue(result, payload):

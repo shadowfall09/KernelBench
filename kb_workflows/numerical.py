@@ -77,7 +77,13 @@ def precision_gate(reference, candidate, oracle, contract, *, _self_check=False)
             finite = torch.isfinite(truth)
             truth = truth[finite].double()
             if not truth.numel():
-                issues.append(f"{path}: no finite oracle values; numerical contract not informative")
+                # Masks/signs were checked above. There are no finite errors
+                # to measure; exact propagation is separate from signal.
+                empty = {"passed": True, "rms_error": None, "max_abs_error": None, "elements_failed": 0}
+                rows.append({"path": path, "kind": "nonfinite_only", "elements": ref.numel(),
+                             "shape": list(ref.shape), "dtype": str(ref.dtype),
+                             "oracle_rms": None, "norm_limit": None,
+                             "reference": dict(empty), "candidate": dict(empty)})
                 return
             scale = _rms(truth)
             limit = contract.norm_atol + contract.norm_rtol * scale

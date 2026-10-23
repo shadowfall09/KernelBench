@@ -153,6 +153,9 @@ def validate_payload(payload):
     from .input_calibration import validate_inline
 
     validate_inline(payload)
+    from .operator_input_policy import validate_inline as validate_operator_inputs
+
+    validate_operator_inputs(payload)
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):
