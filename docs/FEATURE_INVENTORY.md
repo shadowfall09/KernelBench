@@ -1266,6 +1266,31 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 
 验证：完整软件回归4726项通过（新增51项模型/采集边界回归），19条依赖/既有提示；296项跨流程定向测试通过。修改的工作流、命令与测试Ruff通过。wheel内6个改动运行时源码逐字节一致，48个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema和6个私有源码副本、motivation、skill及43份Markdown的1241个本地链接检查通过。仅实际本地Parquet读写、CPU小模型与序列化/SDK模拟，没有启动Explorer或设备实验。
 
+## 第四十五版：Neuron原始工件与Parquet的自动处理关联
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 基础提交 | `4ac18c50a41f9a19f12390e0f5b3858108c53801` |
+| 提交日期 | 2026-10-24（UTC） |
+| 提交标题 | Bind Neuron Parquet to verified native artifacts through offline Explorer processing |
+| 定位方式 | `git log --all --grep="Bind Neuron Parquet to verified native artifacts through offline Explorer processing"` |
+
+本版补齐受信控制进程的原始文件到Parquet自动处理收据，可替代V44模型的人工文件配对；资源规则仍须审核。仅实现和软件测试，没有调用Explorer或设备。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V45-01 | 采集字节与可见core清单 | 原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射 | `kb_workflows/neuron_device.py` | [M2](MOTIVATION.md#m2) |
+| V45-02 | 原始工件完整快照与资源准入 | 完整树先准入再核对捕获SHA/大小，拒绝缺项/额外/特殊文件/软链接；在独立新目录逐块校验复制为只读文件，原始目录与工作目录不得重叠 | `kb_workflows/neuron_processing.py` | [M5](MOTIVATION.md#m5) |
+| V45-03 | 固定Explorer处理工具与命令 | 版本查询前固定可执行文件路径与SHA，查询后及处理/解码后复核；仅固定view/完整Parquet命令，无capture、inspect或过滤附加参数 | `kb_workflows/neuron_processing.py` | [M2](MOTIVATION.md#m2) |
+| V45-04 | 输入输出复查与失败工件保留 | 处理和表解码后复查原始文件、快照、工具及全部输出；超时/更改/超限不产生收据，保留完整工作目录及有界日志前缀 | `kb_workflows/neuron_processing.py` | [M2](MOTIVATION.md#m2) |
+| V45-05 | 处理收据驱动Neuron模型 | 重放工具/命令/工件、capture/report和表包络后自动配对审核模型；指定无效处理证据不得退回人工模式，仍不授予执行所有权或正式资格 | `kb_workflows/neuron_work.py` | [M3](MOTIVATION.md#m3) |
+| V45-06 | 默认预览与离线处理入口 | 默认不查工具、不创建路径；显式execute只处理已有采集，超时及工件/表行数/解码估计可配，拒绝覆写，工具调用与设备工作标记分开记录 | `scripts/process_neuron_work.py` | [M5](MOTIVATION.md#m5) |
+| V45-07 | 自动处理关联与失败反例 | 真实文件/Parquet及注入runner覆盖字节/core、完整快照、工具/输入/输出/目录替换、晚到修改、超时/资源门、收据重封和模型/CLI拒绝降级；不运行Explorer或设备 | `tests/test_neuron_processing.py` | [M5](MOTIVATION.md#m5) |
+
+用法与范围见[Neuron工作分析](NEURON_WORK.md)。自动绑定仅证明控制端观察到的文件处理，不隔离工具全部外部依赖，不授予kernel所有权、L1或原生时间等价资格。与原生计时/执行来源的完整关联、正式归因门与设备硬预算仍继续实现；23项仍为20项代码已实现、3项部分实现。未运行Explorer、GPU、Trainium、真实模型、容器或采集实验，旧stash未恢复。
+
+验证：最终完整软件回归4780项通过（新增54项自动处理链回归），19条依赖/既有提示；348项跨流程定向及最终54项处理链测试通过。修改的工作流、命令和测试Ruff通过。最终wheel内7个改动运行时源码逐字节一致，50个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema和7个私有源码副本、motivation、skill及43份Markdown的1267个本地链接检查通过。仅实际本地文件/Parquet、CPU小模型和SDK/runner模拟，没有调用Explorer或设备实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

@@ -218,8 +218,10 @@ class NeuronDevice:
         del output
         from .neuron_tables import file_digest
 
+        files = {str(item.relative_to(directory)): item for item in directory.rglob("*")
+                 if item.is_file() and not item.is_symlink()}
         return {"framework_trace": str(path), "vendor_artifact_directory": str(directory),
-                "artifact_files": {str(item.relative_to(directory)): file_digest(item)
-                                   for item in directory.rglob("*") if item.is_file() and not item.is_symlink()},
+                "artifact_files": {name: file_digest(item) for name, item in files.items()},
+                "artifact_file_bytes": {name: item.stat().st_size for name, item in files.items()},
                 "output_verified": verifier is not None,
                 "exporter": "NeuronProfiler.export_trace", "timings_are_diagnostic": True, "hardware_counters_collected": False}

@@ -19,6 +19,7 @@ def main(argv=None):
     parser.add_argument("--capture", type=Path, help="Existing verifier capture receipt or profile result")
     parser.add_argument("--review", type=Path, help="Trusted review pairing this report and capture")
     parser.add_argument("--calibration", type=Path, help="Existing calibration from the capture device")
+    parser.add_argument("--processing", type=Path, help="Existing verified Explorer processing receipt or result")
     args = parser.parse_args(argv)
     try:
         if args.output.exists() or args.output.is_symlink():
@@ -26,6 +27,8 @@ def main(argv=None):
         requested = (args.capture, args.review, args.calibration)
         if any(requested) and not all(requested):
             raise ValueError("Neuron model requires capture, review and calibration together")
+        if args.processing and not all(requested):
+            raise ValueError("Processing evidence requires capture, review and calibration")
         report = load(args.profile, max_rows=args.max_rows, max_file_bytes=args.max_file_mb * 1024**2,
                       max_decoded_bytes=args.max_decoded_mb * 1024**2)
         if all(requested):
@@ -34,7 +37,14 @@ def main(argv=None):
             try:
                 capture = read_json(args.capture)
                 capture = capture.get("capture_receipt", capture)
-                report = execution_model(report, capture, read_json(args.review), read_json(args.calibration))
+                processing = read_json(args.processing) if args.processing else None
+                if args.processing:
+                    if not isinstance(processing, dict):
+                        raise ValueError("Requested processing receipt is missing or invalid; no manual fallback")
+                    processing = processing.get("processing", processing)
+                    if not isinstance(processing, dict):
+                        raise ValueError("Requested processing result has no complete receipt; no manual fallback")
+                report = execution_model(report, capture, read_json(args.review), read_json(args.calibration), processing=processing)
             except (ValueError, OSError, TypeError, KeyError, AttributeError, OverflowError) as exc:
                 atomic_json(args.output, {"report": report, "execution_model": {"status": "not_measured", "reason": str(exc)}})
                 print(f"Error: {exc}; raw work report retained at {args.output}")

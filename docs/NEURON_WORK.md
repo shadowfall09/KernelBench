@@ -1,6 +1,6 @@
 # Neuron逐指令工作与离线Parquet分析
 
-本路径读取已有的Neuron Explorer处理结果，不启动Explorer、SDK或设备。本轮仅做真实Parquet文件读写、CPU小模型和SDK模拟测试，没有运行Trainium、GPU、真实模型或采集实验。它记录逐指令工作注释与DMA包事实，并支持可信维护者审核后的资源需求模型；模型不建立执行来源或正式评分资格。
+离线读取器只读取已有Parquet，不启动工具或设备；新增处理入口默认预览，显式执行也只让Explorer处理已有文件，不启动采集或工作负载。本轮仅做真实Parquet文件读写、CPU小模型和SDK/runner模拟，没有运行Explorer、Trainium、GPU、真实模型或采集实验。逐指令工作注释可构建审核后的资源需求模型，但不建立内核执行所有权或正式评分资格。
 
 ## 输入与命令
 
@@ -38,7 +38,7 @@ DMA包的read/write/transfer字节另列。它们包含不同存储端点和host
 
 ## 审核后的资源需求模型
 
-Neuron worker的profile返回`capture_receipt`。它在冻结编译源码再次核对后生成，保留候选/参考源码、配置、输入几何、输入及注册状态探针、此前正确性用例、实际设备/软件、模式、seed、比较政策和原生工件哈希。探针只覆盖每Tensor最多256点，不能代表完整内容或普通Python状态哈希。输入隔离复制在采集区间前完成；采集中只有候选前向及完成屏障。CPU/注入适配器收据保留模拟标记，不能建真实设备模型。
+Neuron worker的profile返回`capture_receipt`。它在冻结编译源码再次核对后生成，保留候选/参考源码、配置、输入几何、输入及注册状态探针、此前正确性用例、实际设备/软件、模式、seed、比较政策和原生工件哈希/字节数，并记录原生worker的可见core清单。探针只覆盖每Tensor最多256点，不能代表完整内容或普通Python状态哈希。输入隔离复制在采集区间前完成；采集中只有候选前向及完成屏障。CPU/注入适配器收据保留模拟标记，不能建真实设备模型。
 
 模型需要可信控制端维护者提供`kernelbench_pro_neuron_work_review_v1`审核。`coverage`必须是`reviewed_complete_workload`；保留非空`reviewer`与`rationale`，不能由候选自行声明。审核同时包含：
 
@@ -50,7 +50,7 @@ Neuron worker的profile返回`capture_receipt`。它在冻结编译源码再次�
 
 dtype标签按报告原值填写，不猜拼写或用输出存储dtype推导全部算术。每条指令的`raw_flops/hbm_read_bytes/hbm_write_bytes`必须是已报告的非负精确整数；null不能由审核补零。正FLOPs还要求三个dtype都有明确值。只用原始FLOPs，BF16等价的adjusted计数不参与加总；DMA包继续保留，不再叠加。所有指令须关联execution，所有执行的NEFF名称须对应采集工件；硬件声明、显式空Error和Warning表也都是前置条件。
 
-审核中的report/capture配对是**维护者人工核对的关联**。名称相同、hash配对和当前收据重放，都不是自动证明Parquet来自那次NTFF处理，更不是源码执行所有权或密码学认证。自动处理链和正式来源门仍待接入；没有审核不能启用模型。
+未提供处理收据时，以上report/capture配对仍是**维护者人工核对的关联**。名称相同或hash配对不是自动NTFF处理证据。使用下一节的处理链时，`pairing`改为仅包含`processing_receipt_sha256`，由处理收据核对输入和报告；资源规则及完整工作量仍须可信维护者审核。两条路径都不证明源码执行所有权或密码学认证。
 
 对已有文件增加三个选项即可离线构建：
 
@@ -64,4 +64,33 @@ python -m scripts.analyze_neuron_work ./profile_parquet --output ./new-neuron-mo
 
 `neuron_work.execution_model()`将正资源需求除以同设备实测速率，取各分量最大值；`validate_model()`从完整证据重算。`performance.decomposition(...,counters=model)`可据此拆A/E，但标注`work_evidence_kind=reviewed_neuron_instruction_annotations`、`hardware_counters_collected=false`，不能称为硬件计数器。缺证据仍只给AE/O；分解也不替代原生计分时间或把实测率当物理定理。
 
-R-16继续保持部分实现：自动跨捕获关联与正式来源/评分门尚未完成。CUDA现有模型见[工作计数器](WORK_COUNTERS.md)。实现及回归分别位于[表读取器](../kb_workflows/neuron_tables.py)、[审核模型](../kb_workflows/neuron_work.py)、[命令](../scripts/analyze_neuron_work.py)、[表测试](../tests/test_neuron_tables.py)和[模型测试](../tests/test_neuron_work.py)。
+## 从原始工件自动关联处理结果
+
+已有真实原生profile结果和工件时，先预览：
+
+```bash
+python -m scripts.process_neuron_work --capture ./profile-result.json \
+  --artifacts /path/to/native-profile --output ./new-processing.json
+```
+
+预览读取收据并检查声明，不查找/运行工具、不读取整个工件目录、不创建路径。只有明确需要处理时才增加`--execute`；本轮没有执行。可用`--binary`选择已安装Explorer，默认`neuron-explorer`。该入口仅执行固定的`view --session-dir INPUT --output-format parquet --output-file OUTPUT`，不提供capture、inspect、用户附加参数或过滤选项。
+
+自动路径要求收据有完整字节清单，且可见core清单只有已核对的那个物理core。它不猜供应商`neuroncore_idx`与全局/局部编号的换算；设备关联范围是这次单core原生采集提供的全部工件。原始工件目录与工作目录必须分离，不能借用或覆写已有工作目录。
+
+执行先按收据逐文件核对完整树的哈希、大小和NEFF/NTFF，拒绝额外/缺失文件、软链接、特殊文件与超限；再复制到独立`input/`，复制时逐字节验证摘要，文件设为只读。工具路径解析为绝对路径，版本查询前冻结二进制SHA，查询后和处理后再核对。完成表读取后还会复查工具、原始输入、快照及全部输出，晚到的修改也不能生成收据。
+
+默认工作目录是输出同级的`<output-stem>-processing/`，可用`--work-dir`指定新目录。原始快照、全部Parquet（包括未投影的Summary等表）、版本日志与处理日志均保留。处理收据保存完整输入/输出文件描述、选中表投影、命令、工具身份、进程退出/超时状态、评测器与capture/report摘要。失败退出2，保存`not_measured`原因及每日志最多64 KiB的可校验前缀；已有部分Parquet仍留在工作目录，不变成部分通过。
+
+默认原始/输出工件各最多4096个文件、每文件128 MiB、合计512 MiB，可用`--max-artifact-file-mb`和`--max-artifact-mb`调整；目录项另有限制。表读取仍默认200,000行、单表文件64 MiB和解码估计256 MiB，对应`--max-rows`、`--max-table-file-mb`、`--max-decoded-mb`。`--timeout`默认120秒，涵盖步骤间剩余额度检查和子进程超时；文件/估计门不是进程RSS、实时调度或文件写入时的磁盘硬配额。
+
+处理成功后，在前面的模型命令中增加：
+
+```bash
+--processing ./new-processing.json
+```
+
+同时把可信审核的`pairing`设为该处理收据的`processing_receipt_sha256`。模型重放处理清单、工具和命令、capture/report及逐指令需求。指定的处理证据缺失、无效、模拟、超时或被改写时，拒绝自动绑定并保留原始报告，**不会退回人工配对**。模型记录`automatic_capture_report_binding=true`，仍保持`formal_origin_qualified=false`及`hardware_counters_collected=false`。
+
+这里自动关联的是受信控制进程所观察的文件处理。它没有隔离供应商工具的所有外部依赖，也不是对候选或设备驱动的密码学认证；更不证明与未插桩原生计时路径、全部状态或隐藏用例等价。R-16继续保持部分实现：与原生时间/执行来源的完整关联及正式评分门尚未完成。
+
+CUDA现有模型见[工作计数器](WORK_COUNTERS.md)。实现及回归分别位于[表读取器](../kb_workflows/neuron_tables.py)、[审核模型](../kb_workflows/neuron_work.py)、[读取命令](../scripts/analyze_neuron_work.py)、[自动处理器](../kb_workflows/neuron_processing.py)、[处理命令](../scripts/process_neuron_work.py)、[表测试](../tests/test_neuron_tables.py)、[模型测试](../tests/test_neuron_work.py)和[处理链测试](../tests/test_neuron_processing.py)。

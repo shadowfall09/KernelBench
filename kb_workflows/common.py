@@ -93,6 +93,7 @@ def evaluator_digest():
         "kb_workflows/resource_budgets.py", "kb_workflows/local_model.py",
         "kb_workflows/devices.py", "kb_workflows/neuron_device.py", "kb_workflows/neuron_worker.py", "kb_workflows/neuron_profile.py",
         "kb_workflows/neuron_tables.py", "kb_workflows/neuron_work.py", "scripts/analyze_neuron_work.py",
+        "kb_workflows/neuron_processing.py", "scripts/process_neuron_work.py",
         "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
         "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
         "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",

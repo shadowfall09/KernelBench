@@ -387,6 +387,7 @@ def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(
         events.append("verified")
     receipt = instance.profile(lambda: "profiled_output", directory=directory, verifier=verify)
     assert set(receipt["artifact_files"]) == {"framework_trace.json", "fixture.neff", "fixture.ntff"}
+    assert receipt["artifact_file_bytes"] == {name: (directory / name).stat().st_size for name in receipt["artifact_files"]}
     assert observed[0]["experimental_config"]["modes"] == ["device", "runtime"]
     assert observed[0]["experimental_config"]["neff_cache_dir"] == str(tmp_path / "source_cache")
     assert receipt["output_verified"] and events == ["capture_closed", "verified"]

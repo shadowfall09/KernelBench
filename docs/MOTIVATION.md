@@ -200,6 +200,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V43-06 推理模式统一与梯度设置恢复 | Neuron统一no_grad；环境守卫检测并恢复候选泄漏的梯度模式，包括异常退出，合法局部梯度上下文仍保留 | — | [strict_validation.py](../kb_workflows/strict_validation.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/test_device_adapters.py) |
 | V44-01 Neuron采集来源与调用收据 | 编译文件复核后封装源码/参考、配置、输入与注册状态探针、此前用例、政策、设备/软件、模式和工件；模拟收据不能建真实设备模型 | M3 | [neuron_work.py](../kb_workflows/neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/test_device_adapters.py) |
 | V44-04 显式execution身份核对 | 优先验证Instruction.execution_index存在且时间包含；缺字段才用唯一包含区间，不能借其他execution修复矛盾 | M3 | [neuron_tables.py](../kb_workflows/neuron_tables.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
+| V45-01 采集字节与可见core清单 | 原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射 | — | [neuron_device.py](../kb_workflows/neuron_device.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/test_device_adapters.py) |
+| V45-03 固定Explorer处理工具与命令 | 版本查询前固定可执行文件路径与SHA，查询后及处理/解码后复核；仅固定view/完整Parquet命令，无capture、inspect或过滤附加参数 | M5 | [neuron_processing.py](../kb_workflows/neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
+| V45-04 输入输出复查与失败工件保留 | 处理和表解码后复查原始文件、快照、工具及全部输出；超时/更改/超限不产生收据，保留完整工作目录及有界日志前缀 | M5 | [neuron_processing.py](../kb_workflows/neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -259,6 +262,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V44-02 逐指令审核与完整资源工作模型 | 可信维护者配对审核report/capture并逐行精确匹配engine/opcode/dtype，缺raw FLOPs/HBM拒绝建模；DMA不叠加，来源仍未知 | M2 | [neuron_work.py](../kb_workflows/neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V44-03 Neuron同设备校准与A/E | 原始资源需求除以同物理core及软件校准率取最大值，重放全部分量再拆A/E；明确为指令注释模型且hardware_counters_collected为false | — | [performance.py](../kb_workflows/performance.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V44-05 采集前输入隔离 | 候选输入隔离复制在profile区间前完成，采集中保留候选前向与完成屏障，不把验证器复制计入执行工作 | M2 | [neuron_worker.py](../kb_workflows/neuron_worker.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/test_device_adapters.py) |
+| V45-05 处理收据驱动Neuron模型 | 重放工具/命令/工件、capture/report和表包络后自动配对审核模型；指定无效处理证据不得退回人工模式，仍不授予执行所有权或正式资格 | M2 | [neuron_work.py](../kb_workflows/neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -400,6 +404,9 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V43-07 Parquet与Neuron模拟回归 | 实际Parquet读写覆盖分片、大整数、缺失、重叠、准入与重封篡改；CPU状态随机模型和SDK模拟验证输出门，不运行设备实验 | M2, M3 | [test_neuron_tables.py](../tests/test_neuron_tables.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/test_device_adapters.py) |
 | V44-06 离线模型命令与失败门 | 已有Parquet可选联合capture/review/calibration构建模型，全程不启动工具或设备；模型失格仍保存完整原始报告与原因 | M3 | [analyze_neuron_work.py](../scripts/analyze_neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V44-07 注释模型与篡改回归 | CPU与实际Parquet回归覆盖审核缺项、精确关联、非空质量表、设备/校准/源码/汇总重封篡改、模拟收据和失败持久化，不运行设备实验 | M2, M3 | [test_neuron_work.py](../tests/test_neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/test_device_adapters.py) |
+| V45-02 原始工件完整快照与资源准入 | 完整树先准入再核对捕获SHA/大小，拒绝缺项/额外/特殊文件/软链接；在独立新目录逐块校验复制为只读文件，原始目录与工作目录不得重叠 | M2 | [neuron_processing.py](../kb_workflows/neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
+| V45-06 默认预览与离线处理入口 | 默认不查工具、不创建路径；显式execute只处理已有采集，超时及工件/表行数/解码估计可配，拒绝覆写，工具调用与设备工作标记分开记录 | — | [process_neuron_work.py](../scripts/process_neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
+| V45-07 自动处理关联与失败反例 | 真实文件/Parquet及注入runner覆盖字节/core、完整快照、工具/输入/输出/目录替换、晚到修改、超时/资源门、收据重封和模型/CLI拒绝降级；不运行Explorer或设备 | M2, M3 | [test_neuron_processing.py](../tests/test_neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -424,7 +431,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-13 扩展基线组合 | 代码已实现 | M3 | 291题来源清单已覆盖论文指定的SDPA、LayerNorm/var_mean、卷积benchmark/布局和cuBLASLt偏好；六基础组合及每个改写/策略的Graph对应共2750个分题声明。逐输出验证、失败保留、政策收据、冷成本/稳态选择与恢复/配对/评分门已实现；最强指声明且通过的集合，非全库最优性证明；不运行硬件实验 |
 | R-14 设备实测上限与边界证书 | 代码已实现 | M3 | 已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理 |
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
-| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet逐指令注释/DMA分账、来源检查后的采集收据、维护者配对审核资源模型与同物理设备校准A/E已有软件实现。自动跨捕获/完整来源关联及正式归因门继续实现，没有运行设备或模型实验 |
+| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet注释/DMA、来源检查后的采集字节/core收据、完整快照与固定Explorer自动处理关联、审核资源模型及同设备A/E已有软件实现。与原生时间/执行所有权的完整关联和正式归因门继续实现，未运行设备、模型或Explorer实验 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明，模型CLI内层超时清理嵌套子进程的竞态也已修复；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |

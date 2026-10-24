@@ -250,6 +250,10 @@ def _evaluate(payload, *, adapter=None):
                     "reference_sha256": fingerprint({"source": source}), "timing_method": "synchronized_wall",
                     "runtime_kind": "native_torch_neuron_NKI", "cpu_fallback_allowed": False,
                     "simulated_execution": simulated, "security_isolation_certified": False, "candidate_setup_ms": setup_ms}
+        if not simulated:
+            from .neuron_device import core_ids
+
+            metadata["neuron_core_allocation"] = core_ids(os.environ.get("NEURON_RT_VISIBLE_CORES", ""))
         if instance:
             metadata["production_instance"] = instance
         if phase != "baseline":

@@ -1,7 +1,8 @@
 """Reviewed Neuron instruction-demand models, distinct from hardware counters.
 
-The trusted reviewer pairs an offline report with a verifier capture. This is
-an explicit manual association, not an automatically proven cross-capture join.
+The reviewer supplies resource rules. Report/capture binding is either explicit
+manual review or replay of a verifier-owned offline Explorer processing record.
+Neither path establishes kernel ownership or equivalence to native timing.
 """
 
 from __future__ import annotations
@@ -61,9 +62,11 @@ def capture_record(payload, result):
                 "evaluator_sha256": evaluator_digest(),
                 "binding": binding,
                 "device": metadata["device_fingerprint"],
+                "neuron_core_allocation": metadata.get("neuron_core_allocation"),
                 "call": call,
                 "compiler_source_sha256": sources,
                 "artifact_files": result.get("artifact_files", {}),
+                "artifact_file_bytes": result.get("artifact_file_bytes"),
                 "output_verified": result.get("output_verified") is True,
                 "exporter": result.get("exporter"),
                 "simulated": metadata["simulated_execution"],
@@ -149,12 +152,27 @@ def validate_capture(value, *, allow_simulated=False):
             basenames[path.name] = checksum
     if not basenames or not any(PurePosixPath(name).suffix == ".ntff" for name in files):
         raise ValueError("Neuron capture has no native NEFF/NTFF artifacts")
+    sizes = value.get("artifact_file_bytes")
+    if sizes is not None and (
+        not isinstance(sizes, dict) or set(sizes) != set(files) or any(not integer(v) for v in sizes.values())
+    ):
+        raise ValueError("Neuron capture has an inconsistent artifact byte inventory")
     return value
 
 
-def review_valid(review, report, capture):
+def review_valid(review, report, capture, processing=None):
     from .precision_calibration import numeric_class
 
+    pairing = (
+        {"processing_receipt_sha256": processing["receipt_sha256"]}
+        if processing is not None
+        else {
+            "capture_receipt_sha256": capture["receipt_sha256"],
+            "report_receipt_sha256": report["receipt_sha256"],
+            "physical_device_sha256": fingerprint(capture["device"]["physical_device"]),
+            **{key: report["metadata"].get(key) for key in ("neuron_device_idx", "neuroncore_idx")},
+        }
+    )
     if (
         not isinstance(review, dict)
         or review.get("protocol") != REVIEW
@@ -163,13 +181,7 @@ def review_valid(review, report, capture):
         or review.get("memory_accounting") != MEMORY
         or review.get("numeric_class_sha256") != numeric_class(capture["device"])
         or review.get("workload_contract") != capture["binding"]
-        or review.get("pairing")
-        != {
-            "capture_receipt_sha256": capture["receipt_sha256"],
-            "report_receipt_sha256": report["receipt_sha256"],
-            "physical_device_sha256": fingerprint(capture["device"]["physical_device"]),
-            **{key: report["metadata"].get(key) for key in ("neuron_device_idx", "neuroncore_idx")},
-        }
+        or review.get("pairing") != pairing
         or any(not integer(report["metadata"].get(key)) for key in ("neuron_device_idx", "neuroncore_idx"))
     ):
         raise ValueError("Neuron work needs reviewed report/capture pairing, workload, device class and memory policy")
@@ -195,20 +207,24 @@ def review_valid(review, report, capture):
     return selectors
 
 
-def execution_model(report, capture, review, calibration):
+def execution_model(report, capture, review, calibration, *, processing=None):
     from .calibration import validate as validate_calibration
     from .headroom import sol
     from .neuron_tables import validate as validate_report
 
     validate_report(report)
     validate_capture(capture)
+    if processing is not None:
+        from .neuron_processing import validate as validate_processing
+
+        validate_processing(processing, report, capture)
     validate_calibration(calibration, capture["device"])
     if any(
         calibration["device"].get(key) != capture["device"].get(key)
         for key in ("device_backend", "physical_device", "software_versions")
     ):
         raise ValueError("Neuron calibration topology/software differs from the verified capture")
-    selectors = review_valid(review, report, capture)
+    selectors = review_valid(review, report, capture, processing)
     if (
         report["capture_declares_hardware"] is not True
         or report["unassigned_instruction_count"]
@@ -253,13 +269,19 @@ def execution_model(report, capture, review, calibration):
                 "capture": capture,
                 "review": review,
                 "calibration": calibration,
+                "processing": processing,
                 "work": work,
                 "per_engine_work": engines,
                 "sol_execution_ms": latency,
                 "components_ms": components,
                 "work_evidence_kind": "reviewed_neuron_instruction_annotations",
                 "hardware_counters_collected": False,
-                "association": "trusted_reviewer_pairs_complete_report_and_verifier_capture; not_automatic_cross_capture_proof",
+                "automatic_capture_report_binding": processing is not None,
+                "association": (
+                    "verified_Explorer_view_of_complete_capture_snapshot; not_source_ownership_or_native_equivalence_proof"
+                    if processing is not None
+                    else "trusted_reviewer_pairs_complete_report_and_verifier_capture; not_automatic_cross_capture_proof"
+                ),
                 "formal_origin_qualified": False,
                 "scored_wall_times_replaced": False,
                 "interpretation": "reviewed_resource_demand_over_attained_rates; not_a_physical_lower_bound",
@@ -276,7 +298,13 @@ def validate_model(value):
         != fingerprint({key: item for key, item in value.items() if key != "receipt_sha256"})
     ):
         raise ValueError("Neuron execution model is missing or changed")
-    expected = execution_model(value.get("report"), value.get("capture"), value.get("review"), value.get("calibration"))
+    expected = execution_model(
+        value.get("report"),
+        value.get("capture"),
+        value.get("review"),
+        value.get("calibration"),
+        processing=value.get("processing"),
+    )
     if expected != value:
         raise ValueError("Neuron execution work or SOL differs from its complete evidence")
     return expected

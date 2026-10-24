@@ -1559,9 +1559,12 @@
         "kb_workflows/neuron_tables.py",
         "docs/NEURON_WORK.md",
         "kb_workflows/neuron_work.py",
-        "tests/test_neuron_work.py"
+        "tests/test_neuron_work.py",
+        "kb_workflows/neuron_processing.py",
+        "scripts/process_neuron_work.py",
+        "tests/test_neuron_processing.py"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet逐指令注释/DMA分账、来源检查后的采集收据、维护者配对审核资源模型与同物理设备校准A/E已有软件实现。自动跨捕获/完整来源关联及正式归因门继续实现，没有运行设备或模型实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet注释/DMA、来源检查后的采集字节/core收据、完整快照与固定Explorer自动处理关联、审核资源模型及同设备A/E已有软件实现。与原生时间/执行所有权的完整关联和正式归因门继续实现，未运行设备、模型或Explorer实验"
     },
     {
       "id": "R-17",
@@ -4907,6 +4910,109 @@
         "tests/test_device_adapters.py"
       ],
       "reason": "CPU与实际Parquet回归覆盖审核缺项、精确关联、非空质量表、设备/校准/源码/汇总重封篡改、模拟收据和失败持久化，不运行设备实验"
+    },
+    {
+      "id": "V45-01",
+      "title": "采集字节与可见core清单",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_device.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射"
+    },
+    {
+      "id": "V45-02",
+      "title": "原始工件完整快照与资源准入",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_processing.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "完整树先准入再核对捕获SHA/大小，拒绝缺项/额外/特殊文件/软链接；在独立新目录逐块校验复制为只读文件，原始目录与工作目录不得重叠"
+    },
+    {
+      "id": "V45-03",
+      "title": "固定Explorer处理工具与命令",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_processing.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "版本查询前固定可执行文件路径与SHA，查询后及处理/解码后复核；仅固定view/完整Parquet命令，无capture、inspect或过滤附加参数"
+    },
+    {
+      "id": "V45-04",
+      "title": "输入输出复查与失败工件保留",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_processing.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "处理和表解码后复查原始文件、快照、工具及全部输出；超时/更改/超限不产生收据，保留完整工作目录及有界日志前缀"
+    },
+    {
+      "id": "V45-05",
+      "title": "处理收据驱动Neuron模型",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_work.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "重放工具/命令/工件、capture/report和表包络后自动配对审核模型；指定无效处理证据不得退回人工模式，仍不授予执行所有权或正式资格"
+    },
+    {
+      "id": "V45-06",
+      "title": "默认预览与离线处理入口",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/process_neuron_work.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "默认不查工具、不创建路径；显式execute只处理已有采集，超时及工件/表行数/解码估计可配，拒绝覆写，工具调用与设备工作标记分开记录"
+    },
+    {
+      "id": "V45-07",
+      "title": "自动处理关联与失败反例",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_neuron_processing.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "真实文件/Parquet及注入runner覆盖字节/core、完整快照、工具/输入/输出/目录替换、晚到修改、超时/资源门、收据重封和模型/CLI拒绝降级；不运行Explorer或设备"
     }
   ]
 }
