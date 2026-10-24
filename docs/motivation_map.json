@@ -1555,9 +1555,11 @@
         "kb_workflows/counter_worker.py",
         "scripts/audit_work_counters.py",
         "tests/test_work_counters.py",
-        "docs/WORK_COUNTERS.md"
+        "docs/WORK_COUNTERS.md",
+        "kb_workflows/neuron_tables.py",
+        "docs/NEURON_WORK.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、部分来源诊断与launch_only，现补Nsight计数器采集软件、原始值/单位重放、审核实例契约及同设备校准A/E模型；Neuron工作计数器、跨捕获完整来源关联与正式归因门继续实现，没有运行设备或模型实验"
+      "reason": "已实现CUDA/Neuron busy并集、部分来源诊断与launch_only、Nsight计数器采集/重放和审核实例及同设备校准A/E；现补Neuron完整Parquet逐指令工作注释、DMA分账与execution/NKI联结。Neuron审核执行模型、跨捕获完整来源及正式归因门继续实现，没有运行设备或模型实验"
     },
     {
       "id": "R-17",
@@ -4694,6 +4696,108 @@
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验"
+    },
+    {
+      "id": "V43-01",
+      "title": "Schema12分片完整读取与资源准入",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_tables.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "完整读取12.0.1必需表和可选质量表，分片连续且不混用；全部文件先准入再解码，保留SHA、字段投影与读取后复查，不用UI采样或Summary替代"
+    },
+    {
+      "id": "V43-02",
+      "title": "Neuron逐指令工作与DMA分账",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_tables.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "精确整数保留raw/adjusted FLOPs、HBM缺失行和引擎busy并集；DMA包独立计账，不与HBM注释或聚合表重复相加"
+    },
+    {
+      "id": "V43-03",
+      "title": "Execution与NKI调用点联结",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_tables.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "唯一包含区间联结execution，NKI同时匹配execution/site/NEFF；含糊保留未知，标签不授予源码或硬件计数资格"
+    },
+    {
+      "id": "V43-04",
+      "title": "Neuron采集导出与源码缓存",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_device.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "接当前SDK的NeuronProfiler.export_trace回调，在编译前设置私有NEFF缓存并恢复环境，流式保留NEFF/NTFF与框架trace摘要"
+    },
+    {
+      "id": "V43-05",
+      "title": "Profile输出与调用前票据验证",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_worker.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "相同seed与连续状态下先冻结参考输出及可选oracle票据，关闭profiler后验证采集的候选输出，拒绝模式或环境变化"
+    },
+    {
+      "id": "V43-06",
+      "title": "推理模式统一与梯度设置恢复",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/strict_validation.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "Neuron统一no_grad；环境守卫检测并恢复候选泄漏的梯度模式，包括异常退出，合法局部梯度上下文仍保留"
+    },
+    {
+      "id": "V43-07",
+      "title": "Parquet与Neuron模拟回归",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_neuron_tables.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "实际Parquet读写覆盖分片、大整数、缺失、重叠、准入与重封篡改；CPU状态随机模型和SDK模拟验证输出门，不运行设备实验"
     }
   ]
 }

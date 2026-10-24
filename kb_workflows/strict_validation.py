@@ -36,6 +36,7 @@ def _backend_flags():
 def environment_guard(changes):
     """Record names only, restore process state, and never serialize env values."""
     env, dtype, threads = dict(os.environ), torch.get_default_dtype(), torch.get_num_threads()
+    grad = torch.is_grad_enabled()
     flags = _backend_flags()
     try:
         with preserve_backend_settings():
@@ -44,6 +45,9 @@ def environment_guard(changes):
             finally:
                 changes.extend(f"backend.{name}" for obj, name, value in flags if getattr(obj, name) != value)
     finally:
+        if torch.is_grad_enabled() != grad:
+            changes.append("grad_enabled")
+            torch.set_grad_enabled(grad)
         changes.extend(f"env.{name}" for name in env.keys() | os.environ.keys() if env.get(name) != os.environ.get(name))
         if torch.get_default_dtype() != dtype:
             changes.append("default_dtype")

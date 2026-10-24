@@ -5,9 +5,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import importlib.util
+import os
 import sys
 import uuid
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 
 from .common import ROOT, fingerprint
 from .devices import adapter as device_adapter
@@ -84,8 +85,29 @@ def prepare_variant(model, variant, *, level=None, pid=None):
     raise ValueError("Neuron baseline variant must be neuron_eager or neuron_compile")
 
 
+@contextmanager
+def profile_source_cache(payload):
+    if payload.get("task") != "profile":
+        yield
+        return
+    directory = ROOT / "cache/workflow" / fingerprint(payload) / "neff_cache"
+    directory.mkdir(parents=True, exist_ok=True)
+    previous = os.environ.get("TORCH_NEURONX_NEFF_CACHE_DIR")
+    os.environ["TORCH_NEURONX_NEFF_CACHE_DIR"] = str(directory)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("TORCH_NEURONX_NEFF_CACHE_DIR", None)
+        else:
+            os.environ["TORCH_NEURONX_NEFF_CACHE_DIR"] = previous
+
+
 def evaluate(payload, *, adapter=None):
-    result = _evaluate(payload, adapter=adapter)
+    import torch
+
+    with torch.no_grad(), profile_source_cache(payload):
+        result = _evaluate(payload, adapter=adapter)
     build = ROOT / "cache/workflow" / fingerprint(payload)
     hashes = {}
     for key, name in (("ref_arch_src", "reference.py"), ("kernel_src", "candidate.py")):
@@ -357,8 +379,39 @@ def _evaluate(payload, *, adapter=None):
             if changes:
                 raise ValueError("Candidate changed process settings")
             if phase == "profile":
+                from .determinism import preserve_rng
+                from .input_calibration import prepare_output
+
+                profile_args = move(args)
+                profile_seed = settings.get("evaluation_seed", 42)
+                training = bool(ref.training)
+                if bool(model.training) != training:
+                    raise ValueError("Neuron profile candidate changed the reference training mode")
+                with preserve_rng(device):
+                    seed(profile_seed)
+                    profile_ticket = prepare_output(ref, profile_args, scope="control")
+                    expected_profile = clone_tensors(ref(*move(profile_args)))
+                    adapter.synchronize()
+                seed(profile_seed)
+
+                def profiled_forward():
+                    with environment_guard(changes):
+                        output = model(*move(profile_args))
+                        if bool(model.training) != training:
+                            changes.append("candidate_training_mode")
+                        return output
+
+                def verify_profile(output):
+                    verify(profile_args, output, expected=expected_profile, prepared=profile_ticket)
+                    if changes:
+                        raise ValueError("Neuron profile candidate changed execution settings")
+
                 directory = ROOT / "cache/workflow" / fingerprint(payload) / "neuron_profile" / uuid.uuid4().hex
-                report = adapter.profile(lambda: model(*move(args)), directory=directory)
+                report = adapter.profile(profiled_forward, directory=directory, verifier=verify_profile)
+                metadata["profile_call"] = {"seed": profile_seed, "input_signature": input_signature(profile_args),
+                    "training": training, "no_grad": True, "output_verified": True,
+                    "independent_oracle_ticket": profile_ticket is not None,
+                    "state_scope": "continuous_state; pre_forward_reference_snapshot"}
                 return {"status": "ok", "purpose": "development_diagnostics_only", "metadata": metadata, **report}
             if strict and not all(accepted(row) for row in strict.values()):
                 raise ValueError("Required Neuron auxiliary contract failed or is unavailable")

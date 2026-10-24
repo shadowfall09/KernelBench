@@ -352,19 +352,26 @@ def test_native_caps_bind_compiler_versions_and_physical_core_without_sdk_execut
 
 
 def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(tmp_path, monkeypatch):
-    directory, observed = tmp_path / "profile", []
+    directory, observed, events = tmp_path / "profile", [], []
+    monkeypatch.setenv("TORCH_NEURONX_NEFF_CACHE_DIR", str(tmp_path / "source_cache"))
     class Capture:
         def __enter__(self):
             return self
         def __exit__(self, *args):
-            pass
+            observed[-1]["on_trace_ready"](self)
+            events.append("capture_closed")
         def export_chrome_trace(self, path):
             Path(path).write_text('{"traceEvents":[]}')
+    class Exporter:
+        def __init__(self, config):
+            self.config = config
+        def export_trace(self, capture):
             (directory / "fixture.neff").write_bytes(b"SIMULATED NEFF")
             (directory / "fixture.ntff").write_bytes(b"SIMULATED NTFF")
     vendor, profiling = ModuleType("torch_neuronx"), ModuleType("torch_neuronx.profiling")
     vendor.__path__ = []
     profiling.NeuronConfig = lambda **options: options
+    profiling.NeuronProfiler = Exporter
     profiling.ProfileMode = SimpleNamespace(DEVICE="device", RUNTIME="runtime")
     monkeypatch.setitem(sys.modules, "torch_neuronx", vendor)
     monkeypatch.setitem(sys.modules, "torch_neuronx.profiling", profiling)
@@ -375,12 +382,92 @@ def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(
                                                     ProfilerActivity=SimpleNamespace(CPU="cpu", PrivateUse1="neuron")))
     instance = neuron_device.NeuronDevice.__new__(neuron_device.NeuronDevice)
     instance.device, instance.torch, instance._sync = "neuron:0", stub, lambda device: None
-    receipt = instance.profile(lambda: None, directory=directory)
+    def verify(output):
+        assert events == ["capture_closed"] and output == "profiled_output"
+        events.append("verified")
+    receipt = instance.profile(lambda: "profiled_output", directory=directory, verifier=verify)
     assert set(receipt["artifact_files"]) == {"framework_trace.json", "fixture.neff", "fixture.ntff"}
     assert observed[0]["experimental_config"]["modes"] == ["device", "runtime"]
+    assert observed[0]["experimental_config"]["neff_cache_dir"] == str(tmp_path / "source_cache")
+    assert receipt["output_verified"] and events == ["capture_closed", "verified"]
     assert not receipt["hardware_counters_collected"] and receipt["timings_are_diagnostic"]
     with pytest.raises(ValueError, match="fresh artifact"):
         instance.profile(lambda: None, directory=directory)
+
+
+class ProfiledSimulatedNeuron(SimulatedNeuron):
+    def __init__(self, *, corrupt=False):
+        self.corrupt = corrupt
+
+    def profile(self, function, *, directory, verifier):
+        assert not torch.is_grad_enabled()
+        output = function()
+        if self.corrupt:
+            output = neuron_worker.map_tensors(output, lambda value: value + 1)
+        verifier(output)
+        return {"output_verified": True, "timings_are_diagnostic": True}
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_neuron_profile_checks_the_captured_output_and_restores_cache(payload, monkeypatch, corrupt):
+    _, request = payload
+    request["task"] = "profile"
+    monkeypatch.setenv("TORCH_NEURONX_NEFF_CACHE_DIR", "previous_cache")
+    import os
+
+    if corrupt:
+        with pytest.raises(ValueError, match="mismatch|contract"):
+            neuron_worker.evaluate(request, adapter=ProfiledSimulatedNeuron(corrupt=True))
+    else:
+        result = neuron_worker.evaluate(request, adapter=ProfiledSimulatedNeuron())
+        assert result["output_verified"] and result["metadata"]["profile_call"]["output_verified"]
+        assert result["metadata"]["profile_call"]["no_grad"]
+    assert os.environ["TORCH_NEURONX_NEFF_CACHE_DIR"] == "previous_cache"
+
+
+def test_neuron_profile_uses_pre_forward_state_and_matching_rng(payload, monkeypatch):
+    from kb_workflows import evaluate_task
+
+    _, request = payload
+    source = '''import torch
+class Model(torch.nn.Module):
+ def __init__(self):
+  super().__init__()
+  self.calls=0
+ def forward(self,x):
+  self.calls+=1
+  assert not torch.is_grad_enabled()
+  return x+self.calls+torch.rand_like(x)
+def get_init_inputs(): return []
+def get_inputs(): return [torch.randn(2,3)]
+'''
+    request.update(task="profile", level=1, problem_id=1, ref_arch_src=source,
+                   kernel_src=source.replace("class Model(", "class ModelNew("))
+    request["eval_config"].update(num_correct_trials=3, precision="fp32")
+    request["eval_config"].pop("production", None)
+    monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: payload["ref_arch_src"])
+    result = neuron_worker.evaluate(request, adapter=ProfiledSimulatedNeuron())
+    assert result["output_verified"]
+    assert result["metadata"]["profile_call"]["state_scope"] == "continuous_state; pre_forward_reference_snapshot"
+    assert not result["metadata"]["profile_call"]["independent_oracle_ticket"]
+
+
+@pytest.mark.parametrize("throws", [False, True])
+def test_environment_guard_restores_grad_mode_even_after_candidate_failure(throws):
+    from kb_workflows.strict_validation import environment_guard
+
+    previous = torch.is_grad_enabled()
+    changes = []
+    with torch.no_grad():
+        try:
+            with environment_guard(changes):
+                torch.set_grad_enabled(True)
+                if throws:
+                    raise ValueError("candidate failed")
+        except ValueError:
+            assert throws
+        assert not torch.is_grad_enabled()
+    assert changes == ["grad_enabled"] and torch.is_grad_enabled() == previous
 
 
 @pytest.mark.parametrize("kind", ["environment", "source_file"])

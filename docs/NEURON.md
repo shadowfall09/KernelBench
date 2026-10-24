@@ -68,7 +68,11 @@ python scripts/run_batch.py --config configs/trainium2.toml --dry-run
 
 Neuron校准保留copy、FP32/FP16/BF16编译GEMM的原始样本和全部尺寸扫描，以及同步启动代理；缺少真实FP64能力不会生成FP64速率。计时是含dispatch/输出消费的同步墙钟，单独标明，不能冒充CUDA events。缓存拓扑未知时`flush()`要求显式scratch字节数，记录已写字节且不声称完全驱逐。
 
-开发profile使用原生`NeuronConfig`与`PrivateUse1`活动收集框架trace、NEFF/NTFF并保存文件哈希。设备指令JSON可由官方[neuron-profile工具](https://awsdocs-neuron.readthedocs-hosted.com/en/v2.26.0/general/nki/neuron_profile_for_nki.html)导出；已有文件的离线分析不启动设备：
+开发profile使用原生`NeuronConfig`与`PrivateUse1`活动，并按[当前SDK采集接口](https://awsdocs-neuron.readthedocs-hosted.com/en/v2.33.0/tools/neuron-explorer/how-to-profile-workload.html)设置`NeuronProfiler.export_trace`回调，收集框架trace、NEFF/NTFF并保存文件哈希。worker在导入和编译前设置本次私有NEFF缓存，结束或异常后恢复原环境；所有Neuron评测统一使用no_grad，合法的局部enable_grad仍须自行恢复。环境守卫记录并恢复候选泄漏的梯度模式。
+
+采集前从参考当前状态和相同seed冻结预期输出；启用独立数值验证时，先准备参考前向前的oracle票据。采集只执行对应的候选调用，关闭profiler后验证该次输出及模式/环境，没有从已经推进的参考状态再算真值。profile仍是开发诊断，不替代正式时间或隐藏测试。上述SDK接法仅模拟验证，未实机采集。
+
+新[Parquet工作分析](NEURON_WORK.md)读取schema 12.0.1完整分片、逐指令FLOPs/HBM注释和独立DMA包，并保留未知来源。旧版本设备指令JSON可由官方[neuron-profile工具](https://awsdocs-neuron.readthedocs-hosted.com/en/v2.26.0/general/nki/neuron_profile_for_nki.html)导出；其已有文件仍使用下面的独立离线入口，不启动设备：
 
 ```bash
 python -m scripts.analyze_device_trace profile.json --backend neuron --timestamp-unit ns --window START END --output profile_summary.json

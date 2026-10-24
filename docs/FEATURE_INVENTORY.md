@@ -1216,6 +1216,31 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 
 验证：完整软件回归4627项通过（新增63项计数器回归），19条依赖/既有提示；220项跨流程定向集成通过。修改的工作流/命令与新增测试Ruff通过，wheel内9个改动运行时源码逐字节核对，45个模块脱离设备/模型SDK导入；Harbor 0.24真实Task schema及9个私有源码副本、motivation、skill和42份Markdown的1180个本地链接检查通过。仅CPU小矩阵、格式夹具和模拟runner，没有执行ncu或设备/模型实验。
 
+## 第四十三版：Neuron逐指令工作与采集输出校验
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 基础提交 | `da0bceb841d0c983c5428659f9592237f7c08003` |
+| 提交日期 | 2026-10-24（UTC） |
+| 提交标题 | Read Neuron executed-work tables and verify profiled forwards |
+| 定位方式 | `git log --all --grep="Read Neuron executed-work tables and verify profiled forwards"` |
+
+本版继续R-16的Neuron工作证据基础：读取供应商完整Parquet表并重放逐指令工作注释，修复采集导出和该次输出验证。只实现和软件测试，未运行设备采集。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V43-01 | Schema12分片完整读取与资源准入 | 完整读取12.0.1必需表和可选质量表，分片连续且不混用；全部文件先准入再解码，保留SHA、字段投影与读取后复查，不用UI采样或Summary替代 | `kb_workflows/neuron_tables.py` | [M5](MOTIVATION.md#m5) |
+| V43-02 | Neuron逐指令工作与DMA分账 | 精确整数保留raw/adjusted FLOPs、HBM缺失行和引擎busy并集；DMA包独立计账，不与HBM注释或聚合表重复相加 | `kb_workflows/neuron_tables.py` | [M3](MOTIVATION.md#m3) |
+| V43-03 | Execution与NKI调用点联结 | 唯一包含区间联结execution，NKI同时匹配execution/site/NEFF；含糊保留未知，标签不授予源码或硬件计数资格 | `kb_workflows/neuron_tables.py` | [M2](MOTIVATION.md#m2) |
+| V43-04 | Neuron采集导出与源码缓存 | 接当前SDK的NeuronProfiler.export_trace回调，在编译前设置私有NEFF缓存并恢复环境，流式保留NEFF/NTFF与框架trace摘要 | `kb_workflows/neuron_device.py` | [M5](MOTIVATION.md#m5) |
+| V43-05 | Profile输出与调用前票据验证 | 相同seed与连续状态下先冻结参考输出及可选oracle票据，关闭profiler后验证采集的候选输出，拒绝模式或环境变化 | `kb_workflows/neuron_worker.py` | [M2](MOTIVATION.md#m2) |
+| V43-06 | 推理模式统一与梯度设置恢复 | Neuron统一no_grad；环境守卫检测并恢复候选泄漏的梯度模式，包括异常退出，合法局部梯度上下文仍保留 | `kb_workflows/strict_validation.py` | [M2](MOTIVATION.md#m2) |
+| V43-07 | Parquet与Neuron模拟回归 | 实际Parquet读写覆盖分片、大整数、缺失、重叠、准入与重封篡改；CPU状态随机模型和SDK模拟验证输出门，不运行设备实验 | `tests/test_neuron_tables.py` | [M5](MOTIVATION.md#m5) |
+
+格式、用法与证据边界见[Neuron工作分析](NEURON_WORK.md)。逐指令注释不是已采集硬件计数，execution/NKI标签联结不是执行来源。Neuron审核工作模型、跨捕获来源与正式归因门仍待完成；23项仍为20项代码已实现、3项部分实现。没有运行GPU、Trainium、真实模型、容器或采集实验，旧stash未恢复。
+
+验证：完整软件回归4675项通过（新增48项Parquet/profile/梯度模式回归），19条依赖/既有提示；此前305项跨流程定向回归通过。修改的工作流、命令与测试Ruff通过。wheel内6个改动运行时源码逐字节一致，47个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema及6个私有源码副本、motivation、skill和43份Markdown的1214个本地链接检查通过。仅CPU小模型、真实本地Parquet读写和SDK模拟，没有启动Explorer或设备实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

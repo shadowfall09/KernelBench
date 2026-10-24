@@ -74,6 +74,6 @@ factors = decomposition(wall_ms, busy_ms, sol_algorithm_ms, counters=model)
 
 执行 SOL 从原始计数器换算的各资源需求除以相同物理设备的实测率，取最大值；零需求不虚构工作，缺率或单位不同拒绝。分解自动使用该 SOL，重新核对完整记录、审核范围、校准原样本和资源分量。仅有 `status="measured"`/来源字符串或手填 `sol_execution_ms` 不能启用 A/E；缺证据时继续只给 AE/O。与模型不一致的结果保留标记，不判作弊。所用实测率不是已证明的物理极限。
 
-这是数值分析接口，调用者给出的 wall/busy/SOL_alg 尚未被一条完整正式归因门连接到原生结果和执行来源。Neuron 工作计数器、跨捕获关联和正式计分门仍由 R-16/R-08 继续实现。设备实验按用户要求不运行，不能用软件回归冒充这些证据。
+这是数值分析接口，调用者给出的 wall/busy/SOL_alg 尚未被一条完整正式归因门连接到原生结果和执行来源。另有[Neuron Parquet分析](NEURON_WORK.md)，可离线重放逐指令工作注释、独立DMA包及execution/NKI调用点；它不把注释当作硬件计数器，也未接成审核后的Neuron执行工作模型。该模型、跨捕获关联和正式计分门仍由 R-16/R-08 继续实现。设备实验按用户要求不运行，不能用软件回归冒充这些证据。
 
 实现见[原始记录与工作模型](../kb_workflows/work_counters.py)、[父采集器](../kb_workflows/counter_task.py)、[单次前向](../kb_workflows/counter_worker.py)、[命令](../scripts/audit_work_counters.py)、[分解](../kb_workflows/performance.py)和[回归](../tests/test_work_counters.py)。

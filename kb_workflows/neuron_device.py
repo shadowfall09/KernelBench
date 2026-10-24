@@ -7,7 +7,6 @@ paths. XLA-based torch-neuronx and CPU fallback are not interchangeable backends
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 import os
 import re
@@ -49,6 +48,7 @@ def inventory_record(rows, *, core, sysfs=Path("/sys/devices/virtual/neuron_devi
     if not serial or not name or not loaded_driver or not positive(row.get("memory_size")):
         raise ValueError("Neuron device identity, loaded driver or memory size is unknown")
     return {"serial_number": serial, "physical_core": core, "neuron_device": row["neuron_device"],
+            "core_index_within_device": row["neuroncore_ids"].index(core),
             "bdf": row.get("bdf"), "name": name, "total_memory": row["memory_size"],
             "logical_neuroncore_config": row.get("logical_neuroncore_config"), "driver_version": loaded_driver}
 
@@ -193,8 +193,8 @@ class NeuronDevice:
 
         return timeline(trace, **settings)
 
-    def profile(self, function, *, directory):
-        from torch_neuronx.profiling import NeuronConfig, ProfileMode
+    def profile(self, function, *, directory, verifier=None):
+        from torch_neuronx.profiling import NeuronConfig, NeuronProfiler, ProfileMode
 
         torch = self.torch
         directory = Path(directory)
@@ -202,16 +202,24 @@ class NeuronDevice:
             raise ValueError("Neuron capture must use a fresh artifact directory")
         directory.mkdir(parents=True, exist_ok=True)
         self.synchronize()
-        options = NeuronConfig(modes=[ProfileMode.DEVICE, ProfileMode.RUNTIME], profile_output_dir=str(directory))
+        cache = os.environ.get("TORCH_NEURONX_NEFF_CACHE_DIR")
+        options = NeuronConfig(modes=[ProfileMode.DEVICE, ProfileMode.RUNTIME], profile_output_dir=str(directory),
+                               **({"neff_cache_dir": cache} if cache else {}))
+        exporter = NeuronProfiler(options)
         with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.PrivateUse1],
-                                    experimental_config=options) as capture:
+                                    experimental_config=options, on_trace_ready=exporter.export_trace) as capture:
             with torch.profiler.record_function("kernelbench_profile"):
                 output = function()
                 self.synchronize()
+        if verifier is not None:
+            verifier(output)
         path = directory / "framework_trace.json"
         capture.export_chrome_trace(str(path))
         del output
+        from .neuron_tables import file_digest
+
         return {"framework_trace": str(path), "vendor_artifact_directory": str(directory),
-                "artifact_files": {str(item.relative_to(directory)): hashlib.sha256(item.read_bytes()).hexdigest()
+                "artifact_files": {str(item.relative_to(directory)): file_digest(item)
                                    for item in directory.rglob("*") if item.is_file() and not item.is_symlink()},
-                "timings_are_diagnostic": True, "hardware_counters_collected": False}
+                "output_verified": verifier is not None,
+                "exporter": "NeuronProfiler.export_trace", "timings_are_diagnostic": True, "hardware_counters_collected": False}
