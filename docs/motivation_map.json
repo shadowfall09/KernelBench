@@ -1422,9 +1422,10 @@
         "kb_workflows/origin_graphs.py",
         "kb_workflows/triton_origin.py",
         "kb_workflows/cpp_origin.py",
-        "tests/test_compiler_origins.py"
+        "tests/test_compiler_origins.py",
+        "tests/test_graph_updates.py"
       ],
-      "reason": "已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过"
+      "reason": "已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++ object、受信wheel cubin、Graph快照及两类核参数API的v1/v2更新重绑定诊断；未关联Runtime/其他loader、动态编译器、整体/其他Graph更新、CUkernel、Neuron与正式资格门继续实现，未知不通过"
     },
     {
       "id": "R-09",
@@ -4513,6 +4514,77 @@
         "docs/PRECISION_CALIBRATION.md"
       ],
       "reason": "小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览"
+    },
+    {
+      "id": "V41-01",
+      "title": "Graph模板核函数参数更新",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/origin_graphs.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "观察cuGraphKernelNodeSetParams的v1/v2参数前缀及匹配CUPTI事件，更新模板代次，保留已实例化可执行Graph"
+    },
+    {
+      "id": "V41-02",
+      "title": "可执行Graph更新与克隆别名",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/origin_graphs.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "可执行Graph核参数更新只修改目标实例的后续提交；原模板、其他实例和旧调用快照保留，克隆节点沿原节点身份更新"
+    },
+    {
+      "id": "V41-03",
+      "title": "Graph更新事件与代次复核",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "v4来源收据重放API、函数与context、节点/实例事件、前后代次和调用边界，拒绝回滚节点或借用其他实例的更新"
+    },
+    {
+      "id": "V41-04",
+      "title": "含糊更新失效与有界重放",
+      "primary": "M2",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/origin_graphs.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "成功却缺事件、错绑事件或失败伴更新事件使后续关联未知；原始代次及失效边界保留，有界重放超额拒绝而不省略证据"
+    },
+    {
+      "id": "V41-05",
+      "title": "Graph更新反例与主机ABI核对",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_graph_updates.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA"
     }
   ]
 }

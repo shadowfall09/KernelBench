@@ -661,13 +661,13 @@ def build_graph(capture, descriptors, *, clone=False, memory_kind=None):
     capture.callback(None, 1, 0, data)
 
 
-def replay_graph(capture, *, correlation=50, runtime_correlation=None, return_code=0):
+def replay_graph(capture, *, correlation=50, runtime_correlation=None, return_code=0, executable=99):
     runtime = None
     if runtime_correlation is not None:
-        runtime = driver_data("cudaGraphLaunch", C.c_void_p(99), runtime_correlation)
+        runtime = driver_data("cudaGraphLaunch", C.c_void_p(executable), runtime_correlation)
         capture.callback(None, 2, 0, runtime)
     capture.active_calls[__import__("threading").get_ident()] = 1
-    data = driver_data("cuGraphLaunch", C.c_void_p(99), correlation, return_code=return_code)
+    data = driver_data("cuGraphLaunch", C.c_void_p(executable), correlation, return_code=return_code)
     capture.callback(None, 1, 0, data)
     data.callback_site = 1
     capture.callback(None, 1, 0, data)
@@ -735,7 +735,7 @@ def test_destroying_graph_template_does_not_erase_instantiated_execution_origin(
     assert kernel_origin.summarize(graph_fixture(capture))["status"] == "passed"
 
 
-@pytest.mark.parametrize("operation", ["cuGraphExecDestroy", "cuGraphExecKernelNodeSetParams", "cuGraphKernelNodeSetParams", "cuGraphExecUpdate"])
+@pytest.mark.parametrize("operation", ["cuGraphExecDestroy", "cuGraphExecNodeSetParams", "cuGraphNodeSetParams", "cuGraphExecUpdate"])
 def test_destroyed_or_updated_executable_does_not_reuse_previous_function_origin(operation):
     capture, descriptors, _ = graph_capture()
     build_graph(capture, descriptors)

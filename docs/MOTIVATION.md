@@ -10,7 +10,7 @@
 
 当前支持 Level 1–3 范围、多样本，以及从研究包接入的 KernelBench-105 固定选集：105 道主集、5 道审查探针、140 道扩展题。三种角色独立运行。I/F/D 是研究者给出的暂定分类，不是算法最优性或可达性证书；原始输入尚未按论文的退化审计重新校准。用法和选择规则见[研究索引](../research/headroom/README.md)。
 
-第十二版已新增独立Level 5的Production-41：12设计、6数值设计、12固定格式与11反向题；支持逐角色dtype、合法输入与隐藏形状、按设备容量的确定性显存计划。11个反向家族有FP64 gradcheck与有限差分回归，四轨分开评分；软件实现不等于GPU可达性或区分度实验已完成。旧题的完整输入校准仍需推进；第十三版已实现当前协议下的选集分析与独立研究runner，实际区分度实验按用户范围不运行。历史 7 模型原始结果未在压缩包中提供；论文声称的精确排名一致性不能在本仓库独立重现。
+第十二版已新增独立Level 5的Production-41：12设计、6数值设计、12固定格式与11反向题；支持逐角色dtype、合法输入与隐藏形状、按设备容量的确定性显存计划。11个反向家族有FP64 gradcheck与有限差分回归，四轨分开评分；软件实现不等于GPU可达性或区分度实验已完成。原250题名义配方、候选前资格集合和阈值拟合代码已实现，设备实测未运行；第十三版已实现当前协议下的选集分析与独立研究runner，实际区分度实验按用户范围不运行。历史 7 模型原始结果未在压缩包中提供；论文声称的精确排名一致性不能在本仓库独立重现。
 
 <a id="m2"></a>
 
@@ -190,6 +190,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V40-01 固定预算内的误差使用比例 | 从实际存储值与未舍入FP64真值计算逐叶RMS和逐元素最大预算使用比例；原上限失格不能通过拟合加宽 | M3 | [numerical.py](../kb_workflows/numerical.py) |
 | V40-02 参考专用阈值拟合与验证 | 原L1/L2/L3按题目/dtype使用三个拟合种子和三个不重叠验证种子，固定构造/前向RNG、隔离状态，不加载候选、不采性能时间 | M5 | [precision_calibration_task.py](../kb_workflows/precision_calibration_task.py) |
 | V40-03 五项预算统一缩放与禁止重拟合 | 固定margin4/floor1e-6且factor最多1，五项预算一同收紧；独立种子验证失败保留原政策，离散输出精确且不虚构浮点拟合 | M3 | [precision_calibration.py](../kb_workflows/precision_calibration.py) |
+| V41-01 Graph模板核函数参数更新 | 观察cuGraphKernelNodeSetParams的v1/v2参数前缀及匹配CUPTI事件，更新模板代次，保留已实例化可执行Graph | — | [origin_graphs.py](../kb_workflows/origin_graphs.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
+| V41-02 可执行Graph更新与克隆别名 | 可执行Graph核参数更新只修改目标实例的后续提交；原模板、其他实例和旧调用快照保留，克隆节点沿原节点身份更新 | M3 | [origin_graphs.py](../kb_workflows/origin_graphs.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
+| V41-03 Graph更新事件与代次复核 | v4来源收据重放API、函数与context、节点/实例事件、前后代次和调用边界，拒绝回滚节点或借用其他实例的更新 | M3 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
+| V41-04 含糊更新失效与有界重放 | 成功却缺事件、错绑事件或失败伴更新事件使后续关联未知；原始代次及失效边界保留，有界重放超额拒绝而不省略证据 | — | [origin_graphs.py](../kb_workflows/origin_graphs.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -374,6 +378,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V40-05 校准与执行设备分离核对 | 校准设备保持来源身份，同硬件/软件类别可复用契约且逐次当前设备FP64自资格；异类拒绝，运行记录不能冒充新设备已校准 | M2 | [precision_calibration.py](../kb_workflows/precision_calibration.py), [numerical_audit.py](../kb_workflows/numerical_audit.py), [timed_numerics.py](../kb_workflows/timed_numerics.py) |
 | V40-07 私有阈值贯通Agent与重评分 | 子任务携带本题/dtype记录，公开提示只给有效政策；Harbor/RL/评分恢复、研究导出及重新评分绑定内容和实际执行收据 | M2, M4 | [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py), [rl_plan.py](../kb_workflows/rl_plan.py), [regrade.py](../kb_workflows/regrade.py), [tool_checks.py](../kb_workflows/tool_checks.py) |
 | V40-08 拟合反例与批量传递回归 | 小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览 | M2, M3 | [test_precision_calibration.py](../tests/test_precision_calibration.py), [PRECISION_CALIBRATION.md](../docs/PRECISION_CALIBRATION.md) |
+| V41-05 Graph更新反例与主机ABI核对 | CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA | M2 | [test_graph_updates.py](../tests/test_graph_updates.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -390,7 +395,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-05 参考退化审计与输入校准 | 代码已实现 | M2 | 原250题来源绑定名义配方与参考专用FP64选择、输入/输出变化审计、固定RNG、程序/mask收据和新基线已接入；统一入口在候选前冻结合格参考集合和全部失败/排除账本，未解决记录不能缩小题集，冻结后所有候选失败保留分母。子任务/预算/评分/恢复/重新评分绑定父集合。有限软件范围已完成，阈值校准归R-04；按要求不运行设备/模型实验 |
 | R-06 针对算子的输入族与隐藏形状 | 代码已实现 | M2 | 原250题来源绑定输入族每种子2551例：角色/形状、异号与实际权重抵消、GELU/有限极值/索引、offset与33题共享存储；转移和双向隔离副本逐项核对布局与实际系数。291题另有生产角色及模式/参数/重复检查。有限模板不保证内部传播或全部错误检出，原尺寸只做meta，按用户要求不运行实验 |
 | R-07 模式、状态、参数更新与输入敏感性 | 代码已实现 | M2 | 原始逐题模式/BN/参数/输入域软件契约已实现：291来源绑定政策、注册与普通Tensor状态/容器/对象、参考对应替换、逐状态所有者模式、同对象规范参数更新及R-06/R-09输入变化。L3/33持久hidden与41未使用self.h0分别审核；任意表示/非线性解码不作为通用证明，候选须保留可映射规范参数；按用户要求不跑实验 |
-| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++字面量/Ninja/CUDA object观察、受信wheel cubin及不可变Graph诊断；未关联Runtime/其他loader、动态编译器、Graph更新重绑定、Neuron与正式资格门继续实现，未知不通过 |
+| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++ object、受信wheel cubin、Graph快照及两类核参数API的v1/v2更新重绑定诊断；未关联Runtime/其他loader、动态编译器、整体/其他Graph更新、CUkernel、Neuron与正式资格门继续实现，未知不通过 |
 | R-09 执行完整性与缓存审计 | 代码已实现 | M2 | 原始四项已提供可选软件路径：候选分配双预填、全实际正确性实例同对象更新、公开同步/连续提交对照、候选导入/构造/调用运行设置拒绝与恢复。来源/设备/覆盖收据贯穿评分恢复；不支持路径不通过。完整GPU/线程/Graph证明不是原设计验收条件，来源与正式归因仍归R-08/R-16；按用户要求不运行实验 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |

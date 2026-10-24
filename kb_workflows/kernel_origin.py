@@ -12,10 +12,11 @@ import re
 from .common import fingerprint
 from .cpp_origin import Extensions
 from .origin_binaries import binary_owners
+from .origin_graphs import validate_updates
 from .performance import interval_union
 from .triton_origin import EMISSION_PROTOCOL, Frontend
 
-PROTOCOL = "kernelbench_pro_cuda_origin_v3"
+PROTOCOL = "kernelbench_pro_cuda_origin_v4"
 MAX_RECORDS = 200_000
 KINDS = {"kernel", "memcpy", "memset"}
 
@@ -122,12 +123,13 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
         proven[row["function"]] = row
     launches = _launch_index(raw.get("launches", []))
     graph_nodes = _index(raw.get("graph_nodes", []), "graph node")
+    graph_updates = _index(raw.get("graph_updates", []), "graph update")
     graph_launches = _launch_index(raw.get("graph_launches", []))
     memory_calls = _launch_index(raw.get("memory_calls", []))
     for node in graph_nodes.values():
         if (not _integer(node.get("node_id"), positive=True) or not _integer(node.get("graph_id"), positive=True)
                 or node.get("kind") not in {"kernel", "memcpy", "memset", "other"}
-                or node.get("creation") not in {"driver_kernel", "driver_memory", "clone"}
+                or node.get("creation") not in {"driver_kernel", "driver_memory", "clone", "template_kernel_update", "exec_kernel_update"}
                 or type(node.get("creation_success")) is not bool
                 or (node.get("function") is not None and (node["function"] not in functions or node["kind"] != "kernel"))
                 or (node.get("creation") == "clone" and node.get("original") is None and node.get("function") is not None)):
@@ -148,6 +150,7 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
             if (not isinstance(uid, str) or not uid.isdecimal() or str(int(uid)) != uid
                     or record not in graph_nodes or graph_nodes[record]["node_id"] != int(uid)):
                 raise ValueError("Graph launch snapshot has a mismatched node generation")
+    validate_updates(graph_updates, graph_nodes, functions, raw.get("graph_launches", []), limit=MAX_RECORDS)
     activities = raw.get("activities")
     if not isinstance(activities, list) or len(activities) > MAX_RECORDS or len(launches) > MAX_RECORDS:
         raise ValueError("Missing or excessive activity/launch records")

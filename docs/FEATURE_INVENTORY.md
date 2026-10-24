@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第四十版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第四十一版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -1167,6 +1167,29 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 原误差上限、任务源码、尺寸和隐藏分布保持不变。契约可在同类多GPU批量运行中复用，但每个实际输出仍强制独立验证，不声称新设备已做校准。23项现为20项代码已实现、3项部分实现，继续完成R-08/R-16/R-18。没有运行GPU、Trainium、真实模型、容器、校准或训练实验；原stash未恢复。
 
 验证：完整软件回归4526项通过（含49项新增校准回归），19条依赖/既有提示；修改的运行时代码与新增测试Ruff通过。wheel内27个改动的运行时源码逐字节核对，35个流程模块脱离设备/模型SDK导入通过；真实Harbor 0.24任务schema、motivation清单、skill和41份Markdown的1133个本地链接检查通过。仅CPU小配置、meta元数据、格式夹具和显式模拟，没有运行设备或模型实验。
+
+## 第四十一版：Graph核参数更新的执行来源重绑定
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 基础提交 | `21252bf4b02093170536d10d03df7e64bcb92fb1` |
+| 提交日期 | 2026-10-24（UTC） |
+| 提交标题 | Track CUDA Graph kernel parameter updates without losing launch provenance |
+| 定位方式 | `git log --all --grep="Track CUDA Graph kernel parameter updates without losing launch provenance"` |
+
+本版继续实现R-08：为模板和可执行Graph的核参数更新建立新函数代次，同时保存历史调用。它仍是来源诊断；正式轨道、其余loader/编译器、整体Graph更新和Neuron来源继续实现，23项状态仍为20项代码已实现、3项部分实现。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V41-01 | Graph模板核函数参数更新 | 观察cuGraphKernelNodeSetParams的v1/v2参数前缀及匹配CUPTI事件，更新模板代次，保留已实例化可执行Graph | `kb_workflows/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
+| V41-02 | 可执行Graph更新与克隆别名 | 可执行Graph核参数更新只修改目标实例的后续提交；原模板、其他实例和旧调用快照保留，克隆节点沿原节点身份更新 | `kb_workflows/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
+| V41-03 | Graph更新事件与代次复核 | v4来源收据重放API、函数与context、节点/实例事件、前后代次和调用边界，拒绝回滚节点或借用其他实例的更新 | `kb_workflows/kernel_origin.py` | [M2](MOTIVATION.md#m2) |
+| V41-04 | 含糊更新失效与有界重放 | 成功却缺事件、错绑事件或失败伴更新事件使后续关联未知；原始代次及失效边界保留，有界重放超额拒绝而不省略证据 | `kb_workflows/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
+| V41-05 | Graph更新反例与主机ABI核对 | CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA | `tests/test_graph_updates.py` | [M5](MOTIVATION.md#m5) |
+
+支持范围和失效规则见[执行来源诊断](KERNEL_ORIGIN.md)。未知来源不转为custom/library通过，不授予L1，不替换原生性能时间。未运行CUPTI、nvcc、cuobjdump、GPU、Trainium、模型或容器实验；原搁置stash未恢复。
+
+验证：完整软件回归4564项通过（新增38项Graph更新回归），19条依赖/既有提示；当前工作流和新增测试Ruff通过。仅主机C程序核对供应商头文件的11个大小/offset，wheel内3个改动运行时源码逐字节一致，41个流程模块脱离设备/模型SDK导入；Harbor 0.24真实Task schema和私有副本、motivation、skill及41份Markdown的1149个本地链接检查通过。没有运行设备或模型实验。
 
 ## 维护方式
 

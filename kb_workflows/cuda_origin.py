@@ -64,7 +64,7 @@ class Capture:
         self.cupti = bindings
         self.raw = {"protocol": PROTOCOL, "candidate_sha256": sha256(candidate_source.encode()),
                     "modules": [], "functions": [], "proofs": [], "launches": [], "activities": [], "windows": [],
-                    "graph_nodes": [], "graph_launches": [], "memory_calls": [],
+                    "graph_nodes": [], "graph_launches": [], "graph_updates": [], "memory_calls": [],
                     "capture_complete": False, "source_intact": False, "hooks_intact": False,
                     "dropped_records": 0, "errors": [], "simulated": bindings is not None}
         self.lock = threading.RLock()
@@ -92,7 +92,7 @@ class Capture:
         if len(rows) >= MAX_RECORDS:
             self.error(f"{label} record limit exceeded")
             return None
-        if label in {"modules", "functions", "proofs", "windows", "graph_nodes"}:
+        if label in {"modules", "functions", "proofs", "windows", "graph_nodes", "graph_updates"}:
             item = {**item, "id": len(rows) + 1}
         rows.append(item)
         return item

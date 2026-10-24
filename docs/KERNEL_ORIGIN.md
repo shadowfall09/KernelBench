@@ -1,6 +1,6 @@
 # 设备执行来源诊断
 
-R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUDA Graph replay以及有原生调用/节点证据的复制与memset。现增加Triton实际前端依赖/编译产物冻结和CUDA C++ object观察。仍是独立进程诊断：未关联的CUDA Runtime注册路径、其他编译器/loader、Graph参数更新后的重新绑定、Neuron来源和正式轨道资格尚需完成。诊断结果不能写入正式`kernel_origin`证据，也不能替换原生墙钟、冷启动、配对或最终重复测量。
+R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUDA Graph replay以及有原生调用/节点证据的复制与memset。现支持Triton实际前端依赖/编译产物冻结、CUDA C++ object观察，以及模板/可执行Graph核参数更新的v1/v2重绑定。仍是独立进程诊断：未关联的CUDA Runtime注册路径、其他编译器/loader、整体/其他Graph更新、CUkernel、Neuron来源和正式轨道资格尚需完成。诊断结果不能写入正式`kernel_origin`证据，也不能替换原生墙钟、冷启动、配对或最终重复测量。
 
 ## 源码、产物与实际执行
 
@@ -36,11 +36,21 @@ Torch 2.12.0的`load_inline`/`load`有可选编译观察器。只有实际loader
 
 未完成提取、特殊文件、缺工具、错绑、模拟runner及冲突所有权不建立来源。相同设备二进制若同时有已验证的库身份和候选root身份，优先保守地记为非自写；多个受信来源冲突则明确保持未知，不回退到custom。这个清单证明的是当前受信安装镜像中的文件完整性，不是供应商签名认证，也不证明完整的Python/JIT依赖闭包。
 
-## CUDA Graph与原生内存操作
+## CUDA Graph快照、核参数更新与内存操作
 
 通过真实创建API、CUPTI `GRAPHNODE_CREATED`、`GRAPHNODE_CLONED`与成功instantiate保留节点到函数的关联。每个graph launch保存独立快照，之后的修改不改变旧测量。源模板销毁不抹除已经实例化的快照；可执行graph销毁、未适配参数更新或未知节点会使后续来源保持未知。克隆必须继承已观察到的旧节点代次；设备activity同时匹配本次graph、node、context和launch。
 
 直接memcpy/memset必须匹配同一调用内成功的原生driver/runtime API；Graph内存活动必须匹配实际节点类型和成功launch。满足这些条件记为runtime，进入总设备时间分母，不计入自写内核时间。无法关联的内存活动、后台线程活动、设备发起的child graph和不支持的更新路径继续保持未知。
+
+### 核参数更新的范围
+
+现支持`cuGraphKernelNodeSetParams`、`cuGraphExecKernelNodeSetParams`及二者的`_v2`版本，另识别`cuGraphAddKernelNode_v2`的共同参数前缀。模板setter创建新模板节点代次，既有可执行实例保持原快照；executable setter只改变该实例后续提交的快照，同时处理从原节点继承的clone别名，不修改模板、相邻实例或已提交调用。这遵循[CUDA Graph API](https://docs.nvidia.com/cuda/cuda-driver-api/cuda_driver_api/group__CUDA__GRAPH.html)的更新语义。
+
+关联须同时满足：进入API时复制的非空CUfunction能对应已观察的函数代次；CUPTI `GRAPH_NODE_UPDATED`或`GRAPH_NODE_SET_PARAMS`事件的节点、executable和context匹配本次API；退出API返回成功。v2的非空`func`沿用v1前缀；`func=NULL`时的CUkernel/ctx路径仍未知，不凭kernel名称猜测。事件字段依据[CUPTI 13.3 Python绑定](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html)，布局与已安装供应商`cuda.h`/`generated_cuda_meta.h`由仅主机C程序核对，未链接或调用CUDA。
+
+v4原始收据新增`graph_updates`：保留API/context/correlation、目标节点、函数、资源事件、前后实例代次、替换关系及调用边界。复核要求后续snapshot实际使用最新替换节点，并核对clone祖先、代次和实例，不允许复制旧节点、借用其他实例更新或将未来更新套到旧调用。重放工作量有显式包络，超额拒绝，不跳过节点取得通过。
+
+成功却缺匹配事件、事件错绑，或失败API伴随更新事件时，保留失效边界，后续旧实例来源未知；失败且没有更新事件时保留原快照。`cuGraphExecUpdate`整体更新、其他节点setter、设备发起Graph以及尚未关联的CUkernel继续使后续来源未知。当前只有CPU夹具、序列化篡改反例及主机ABI核对，没有执行CUPTI、GPU、nvcc或设备实验；这些更新记录仍不授予正式轨道资格。
 
 ## 调用、模式与轨道诊断
 
