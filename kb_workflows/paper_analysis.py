@@ -76,6 +76,12 @@ def bootstrap_ci(problem_scores, trials=1000):
 
 
 def measurement_evidence(result, candidate=False):
+    options = result.get("metadata", {}).get("evaluation_config", {})
+    if options.get("numerical_validation"):
+        # Candidate/current-result and baseline gates additionally validate the
+        # complete source-bound payload; this keeps legacy metric imports gated.
+        if not isinstance(result.get("metadata", {}).get("timed_numerical_audit"), dict):
+            return "timed_numerical_evidence_missing"
     metadata = result.get("metadata", {}) if candidate else result
     if metadata.get("simulated_execution") is True or result.get("metadata", {}).get("simulated_execution") is True:
         return "simulated_device_execution_cannot_qualify"
@@ -221,9 +227,10 @@ def analyze_paper(config):
                 from .baseline_rewrites import baseline_issue as recipe_baseline_issue
                 from .input_calibration import baseline_issue as calibrated_baseline_issue
                 from .isolation import baseline_issue
+                from .timed_numerics import baseline_issue as timed_baseline_issue
 
                 status = (baseline_issue(config, baseline, pid) or calibrated_baseline_issue(config, baseline, pid)
-                          or recipe_baseline_issue(config, baseline, pid) or status)
+                          or recipe_baseline_issue(config, baseline, pid) or timed_baseline_issue(config, baseline, pid) or status)
             if status == "verified":
                 expected_baseline = fingerprint(task_payload(config, pid, task="baseline"))
                 if baseline.get("metadata", {}).get("workflow_signature") != expected_baseline:

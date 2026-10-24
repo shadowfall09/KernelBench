@@ -1322,9 +1322,12 @@
         "tests/test_model_oracles.py",
         "kb_workflows/reference_oracles.py",
         "kb_workflows/input_calibration.py",
-        "tests/test_model_input_profiles.py"
+        "tests/test_model_input_profiles.py",
+        "kb_workflows/timed_numerics.py",
+        "tests/test_timed_numerics.py",
+        "docs/TIMED_NUMERICS.md"
       ],
-      "reason": "原250题独立CPU FP64公式/模型算法覆盖实际原生实例；校准cohort现有基线/候选/配对/Neuron调用前真值与RNG/状态复核，保持所有原误差预算。完整阈值校准代码和未配置输入校准时的计时数值门仍待完成，不运行设备/模型实验"
+      "reason": "原250题独立CPU FP64公式/模型算法覆盖实际原生实例；有无输入配方均在原生/Neuron基线、候选和配对的首次、预热与每次正式输出上验证参考和候选，持久化逐次误差/信号/程序/mask证据并绑定评分恢复。配对复用调用前真值且不额外推进状态/RNG，所有原误差预算保持。完整阈值校准代码仍待完成；按要求不运行设备/模型实验"
     },
     {
       "id": "R-05",
@@ -4272,6 +4275,114 @@
         "tests/test_agent_loop.py"
       ],
       "reason": "模型CLI自身先超时时先清理包括独立session的后代再终止父进程，避免外层控制器已无法找到孤儿；直接与外层墙钟两种超时均做CPU子进程回归，未启动模型"
+    },
+    {
+      "id": "V39-01",
+      "title": "不依赖值校准的逐次FP64门",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/timed_numerics.py",
+        "kb_workflows/evaluate_task.py",
+        "kb_workflows/input_calibration.py",
+        "src/eval.py"
+      ],
+      "reason": "启用数值验证后，原250题的原生计时自动采用独立实际输入真值，不再要求输入配方；实际冷调用/双向正确性输出、预热与每次正式输出均核对参考和候选"
+    },
+    {
+      "id": "V39-02",
+      "title": "逐输出持久化数值证据",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/timed_numerics.py"
+      ],
+      "reason": "记录每次输出的类别、序号、RMS/全元素门、参考信号、内存与模型/随机mask收据；独立核对覆盖数、固定政策和源身份，不虚构前向seed"
+    },
+    {
+      "id": "V39-03",
+      "title": "配对共用调用前状态真值",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paired_task.py",
+        "kb_workflows/neuron_worker.py"
+      ],
+      "reason": "每轮先计算一次参考调用前真值，再逐一验证三方输出；验证不额外推进普通Tensor/注册状态或随机流，保持原同步墙钟样本"
+    },
+    {
+      "id": "V39-04",
+      "title": "原生与Neuron数值路径一致",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/evaluate_task.py",
+        "kb_workflows/paired_task.py"
+      ],
+      "reason": "未配置输入配方也启用Neuron双向/首次/预热/正式/配对强门；数值模式的FP32非组合基线关闭TF32，不改原尺寸和误差政策"
+    },
+    {
+      "id": "V39-05",
+      "title": "评分恢复要求计时数值证据",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/tool_checks.py",
+        "kb_workflows/engine.py",
+        "kb_workflows/paper_analysis.py"
+      ],
+      "reason": "基线记录/缓存、候选恢复、配对、最终重测和普通评分核对完整逐次收据；缺检查、改预算或篡改误差计数不能取得正分"
+    },
+    {
+      "id": "V39-06",
+      "title": "验证失败时恢复真实调用后RNG",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/measurement.py"
+      ],
+      "reason": "数值或其他验证回调抛错时，finally仍恢复候选实际调用后的CPU/CUDA/Neuron随机状态，不把参考诊断的消耗带出计时器"
+    },
+    {
+      "id": "V39-07",
+      "title": "无配方的模型与状态计时回归",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_timed_numerics.py",
+        "docs/TIMED_NUMERICS.md"
+      ],
+      "reason": "小CPU原构造验证L1/L2/L3票据、旧容差漏错、首/预热/正式覆盖、收据重封篡改和连续随机状态；模拟Neuron验证三阶段，不建立设备测量资格"
     }
   ]
 }

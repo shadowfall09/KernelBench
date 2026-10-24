@@ -15,6 +15,7 @@ from .input_calibration import task_policy as nominal_input_policy
 from .operator_input_policy import task_policy as operator_input_policy
 from .production import task_input_policy
 from .reference_revisions import record_result
+from .timed_numerics import task_policy as timed_numerical_policy
 
 
 def configure_tf32(torch, enabled):
@@ -174,7 +175,7 @@ def baseline(payload: dict):
     os.environ["KB_FP32_TOL"] = str(settings["fp32_tolerance"])
     variant = settings.get("baseline_variant", "eager")
     baseline_plan = plan_for(payload["level"], payload["problem_id"], reference, variant)
-    tf32 = settings["precision"] == "fp32" and not settings.get("baseline_suite", False) and not settings.get("input_profile")
+    tf32 = settings["precision"] == "fp32" and not settings.get("baseline_suite", False) and not settings.get("input_profile") and not settings.get("numerical_validation")
     configure_tf32(torch, tf32)
     device = torch.device("cuda:0")
     dtype = get_torch_dtype_from_string(settings["precision"])
@@ -189,7 +190,7 @@ def baseline(payload: dict):
         set_seed(42)
         from .input_calibration import prepare_output, verify_output
 
-        prepared = prepare_output(oracle, args)
+        prepared = prepare_output(oracle, args, scope="first")
         expected = clone_tensors(oracle(*copy_inputs(args)))
         synchronize(device)
         configure_tf32(torch, tf32)
@@ -295,6 +296,7 @@ def qualify_small(payload):
 
 
 @record_result
+@timed_numerical_policy
 @nominal_input_policy
 @operator_input_policy
 def dispatch(payload):

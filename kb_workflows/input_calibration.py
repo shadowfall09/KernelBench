@@ -199,11 +199,11 @@ def comparison(policy):
     return compare
 
 
-def prepare_output(reference, inputs):
+def prepare_output(reference, inputs, *, scope="timing"):
     """Freeze truth before a reference forward, without advancing its state/RNG."""
-    from .input_profiles import ACTIVE
+    from .timed_numerics import active_state
 
-    state = ACTIVE.get()
+    state = active_state()
     if state is None or "payload" not in state:
         return
     import torch
@@ -222,14 +222,15 @@ def prepare_output(reference, inputs):
         truth = prepared.execute()
     return {"truth": truth, "input_signature": input_signature(inputs), "reference_id": id(reference),
             "level": payload["level"], "problem_id": payload["problem_id"], "oracle_spec_sha256": fingerprint(spec),
-            "pre_reference_forward": True}
+            "pre_reference_forward": True, "scope": scope, "source_device": str(device),
+            "estimated_host_bytes": prepared.estimated_host_bytes, "oracle_receipt": getattr(prepared, "receipt", lambda: None)()}
 
 
 def verify_output(reference, inputs, expected, actual, *, prepared=None):
     """Independent formula checks outside timing; inert without a frozen profile."""
-    from .input_profiles import ACTIVE
+    from .timed_numerics import active_state
 
-    state = ACTIVE.get()
+    state = active_state()
     if state is None or "payload" not in state:
         return
     import torch
@@ -259,11 +260,20 @@ def verify_output(reference, inputs, expected, actual, *, prepared=None):
             return {key: host(child) for key, child in value.items()}
         return value
 
-    report = precision_gate(host(expected), host(actual), truth,
-                            PrecisionContract(**payload["eval_config"]["input_profile"]["precision_contract"]))
+    policy = state.get("policy") or payload["eval_config"]["input_profile"]["precision_contract"]
+    expected, actual = host(expected), host(actual)
+    report = precision_gate(expected, actual, truth, PrecisionContract(**policy))
+    from .timed_numerics import observe
+
+    observe(reference, inputs, expected, actual, prepared, report)
     if not report["passed"] or not report["reference_qualified"]:
         raise ValueError("Calibrated timed output or reference failed its independent FP64 budget")
     state["independent_outputs_verified"] += 1
+    from .input_profiles import ACTIVE as NOMINAL
+
+    nominal = NOMINAL.get()
+    if nominal is not None and nominal is not state and "payload" in nominal:
+        nominal["independent_outputs_verified"] += 1
 
 
 def task_policy(function):

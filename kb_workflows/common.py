@@ -112,6 +112,7 @@ def evaluator_digest():
         "kb_workflows/model_stress.py", "kb_workflows/input_layouts.py",
         "kb_workflows/input_profiles.py", "kb_workflows/input_calibration.py", "kb_workflows/input_calibration_task.py",
         "kb_workflows/model_input_profiles.py", "kb_workflows/reference_oracles.py",
+        "kb_workflows/timed_numerics.py",
         "kb_workflows/reference_population.py", "scripts/freeze_reference_population.py",
         "scripts/calibrate_inputs.py",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",

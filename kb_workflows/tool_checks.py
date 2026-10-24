@@ -367,8 +367,9 @@ def reusable(result, payload):
     from .isolation import issue as isolation_issue
     from .operator_input_policy import issue as family_issue
     from .reference_revisions import issue as revision_issue
+    from .timed_numerics import issue as timed_issue
 
-    if isolation_issue(result, payload) or revision_issue(result, payload) or input_issue(result, payload) or family_issue(result, payload):
+    if isolation_issue(result, payload) or revision_issue(result, payload) or input_issue(result, payload) or family_issue(result, payload) or timed_issue(result, payload):
         return False
     if not enabled(payload) or (not result.get("metadata", {}).get("tool_checks") and result.get("correctness") is not True):
         return True
@@ -380,6 +381,10 @@ def reusable(result, payload):
 
 
 def issue(result, payload):
+    from .timed_numerics import issue as timed_issue
+
+    if reason := timed_issue(result, payload):
+        return reason
     from .input_calibration import issue as input_issue
     from .operator_input_policy import issue as family_issue
     from .reference_revisions import issue as revision_issue

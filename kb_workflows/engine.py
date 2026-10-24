@@ -273,6 +273,7 @@ def record_baseline(config):
     freeze_run(config)
     from .input_calibration import issue as calibrated_input_issue
     from .isolation import issue as isolation_issue
+    from .timed_numerics import issue as timed_issue
 
     if not config.hardware:
         raise ValueError("Specify --hardware when recording a baseline (use the actual verifier GPU name)")
@@ -287,7 +288,8 @@ def record_baseline(config):
         payload = task_payload(config, pid, task="baseline")
         signature = fingerprint(payload)
         if (config.resume and (level.get(path.name) or {}).get("metadata", {}).get("workflow_signature") == signature
-                and not isolation_issue(level[path.name], payload) and not calibrated_input_issue(level[path.name], payload)):
+                and not isolation_issue(level[path.name], payload) and not calibrated_input_issue(level[path.name], payload)
+                and not timed_issue(level[path.name], payload)):
             continue
         key = f"baseline-{pid}"
         names[key] = path.name
@@ -295,6 +297,8 @@ def record_baseline(config):
     for key, result in evaluate_tasks(config, tasks):
         expected = next(payload for task_key, payload in tasks if task_key == key)
         if reason := calibrated_input_issue(result, expected):
+            result = failure(reason)
+        if reason := timed_issue(result, expected):
             result = failure(reason)
         level[names[key]] = result
         atomic_json(target, results)
@@ -334,6 +338,8 @@ def record_baseline_suite(config):
     from .input_calibration import baseline_issue as calibrated_baseline_issue
     from .input_calibration import issue as calibrated_input_issue
     from .isolation import baseline_issue
+    from .timed_numerics import baseline_issue as timed_baseline_issue
+    from .timed_numerics import issue as timed_issue
 
     target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
     results = read_json(target, {})
@@ -345,7 +351,7 @@ def record_baseline_suite(config):
         previous = level.get(path.name, {})
         if (config.resume and previous.get("suite_complete") and previous.get("metadata", {}).get("workflow_signature") == signature
                 and not baseline_issue(config, previous, pid) and not calibrated_baseline_issue(config, previous, pid)
-                and not recipe_baseline_issue(config, previous, pid)):
+                and not recipe_baseline_issue(config, previous, pid) and not timed_baseline_issue(config, previous, pid)):
             continue
         signatures[path.name] = signature
         variants[path.name] = {}
@@ -360,6 +366,8 @@ def record_baseline_suite(config):
         name, variant, pid = names[key]
         expected = next(payload for task_key, payload in tasks if task_key == key)
         if reason := calibrated_input_issue(result, expected):
+            result = failure(reason)
+        if reason := timed_issue(result, expected):
             result = failure(reason)
         if reason := recipe_issue(result, expected):
             result = {**result, "baseline_correctness": False, "metadata": {**result.get("metadata", {}), "error": reason}}
@@ -378,11 +386,12 @@ def record_baseline_suite(config):
 def paired_variant(config, pid):
     from .baseline_rewrites import baseline_issue as recipe_baseline_issue
     from .measurement import amortized
+    from .timed_numerics import baseline_issue as timed_baseline_issue
 
     reference = select_problems(config.level, problem_ids=[pid])[pid]
     data = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
     baseline = data.get(f"level{config.level}", {}).get(reference.name, {})
-    if recipe_baseline_issue(config, baseline, pid):
+    if recipe_baseline_issue(config, baseline, pid) or timed_baseline_issue(config, baseline, pid):
         raise ValueError("Paired timing requires current source-bound baseline recipe receipts")
     options = baseline.get("variants", {"eager": baseline})
     valid = {name: value for name, value in options.items() if value.get("baseline_correctness") is True

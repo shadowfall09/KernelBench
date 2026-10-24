@@ -247,6 +247,8 @@ def _evaluate(payload, *, adapter=None):
             cpu_args = host(cpu_args)
             if expected is None:
                 expected = host(copy.deepcopy(cpu)(*clone_tensors(cpu_args))) if contract else host(ref(*move(cpu_args)))
+            else:
+                expected = host(expected)
             actual = host(actual)
             if prepared is not None:
                 verify_output(ref, dev_args, expected, actual, prepared=prepared)
@@ -328,7 +330,7 @@ def _evaluate(payload, *, adapter=None):
 
                     with preserve_rng(device):
                         seed(value)
-                        prepared_pair = prepare_output(ref, dev)
+                        prepared_pair = prepare_output(ref, dev, scope="first" if phase in {"baseline", "evaluate"} and first_ms is None else "control")
 
                 def verify_order(dev_inputs, outputs):
                     expected = host(outputs["reference"])
@@ -342,7 +344,7 @@ def _evaluate(payload, *, adapter=None):
                     issue = check_paired_calls(ref, model, dev, seed=value, tolerance=settings["fp32_tolerance"],
                         device=device, set_seed=seed, metadata=metadata, label=label,
                         record_first_call=first_ms is None, clock=CLOCK, verify_pair=verify_order,
-                        **({"prepare_pair": prepare_pair} if settings.get("input_profile") else {}))
+                        **({"prepare_pair": prepare_pair} if settings.get("input_profile") or settings.get("numerical_validation") else {}))
                 if label in extra_rows:
                     from .operator_input_policy import completed
 
@@ -380,9 +382,12 @@ def _evaluate(payload, *, adapter=None):
                 winner = settings["paired_baseline_variant"]
                 baseline = prepare_variant(copy.deepcopy(ref), winner, level=payload["level"], pid=payload["problem_id"])
                 control = prepare_variant(copy.deepcopy(ref), winner, level=payload["level"], pid=payload["problem_id"])
+                from .input_calibration import prepare_output
+
                 paired = collect_pairs(baseline, model, control, factory, ref, device=device,
                     trials=settings["paired_trials"], seed=settings.get("evaluation_seed", 42), set_seed=seed,
-                    tolerance=settings["fp32_tolerance"], verifier=verify if contract or settings.get("input_profile") else None)
+                    tolerance=settings["fp32_tolerance"], verifier=verify if contract or settings.get("input_profile") or settings.get("numerical_validation") else None,
+                    prepare_verifier=(lambda values: prepare_output(ref, values)) if settings.get("numerical_validation") else None)
                 metadata["paired_timing"] = {**paired, "baseline_variant": winner,
                     "output_consumed": True, "varied_inputs": True, "all_outputs_verified": True}
                 return {"compiled": True, "correctness": True, "runtime": paired["candidate_mean_ms"], "metadata": metadata}

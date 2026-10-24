@@ -87,12 +87,14 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
                     torch.cuda.set_rng_state(cuda_rng, device)
                 if neuron_rng is not None:
                     torch.neuron.set_rng_state(neuron_rng, device)
-                verifier(verification_args, output)
-                torch.set_rng_state(after_rng)
-                if after_cuda_rng is not None:
-                    torch.cuda.set_rng_state(after_cuda_rng, device)
-                if after_neuron_rng is not None:
-                    torch.neuron.set_rng_state(after_neuron_rng, device)
+                try:
+                    verifier(verification_args, output)
+                finally:
+                    torch.set_rng_state(after_rng)
+                    if after_cuda_rng is not None:
+                        torch.cuda.set_rng_state(after_cuda_rng, device)
+                    if after_neuron_rng is not None:
+                        torch.neuron.set_rng_state(after_neuron_rng, device)
             if trial == 0 and receipt is not None:
                 receipt["first_timed_call_ms"] = elapsed
                 receipt["output_bytes"] = tensor_bytes(output)

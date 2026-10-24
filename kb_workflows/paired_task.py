@@ -15,7 +15,7 @@ from .strict_validation import environment_guard
 
 
 def collect_pairs(reference, candidate, control, input_factory, oracle, *, device, trials, seed,
-                  reset=None, set_seed=None, tolerance=1e-3, warmup=3, clock=CLOCK, verifier=None):
+                  reset=None, set_seed=None, tolerance=1e-3, warmup=3, clock=CLOCK, verifier=None, prepare_verifier=None):
     import torch
 
     if type(trials) is not int or trials < 10:
@@ -41,6 +41,7 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                 reset("oracle")
             if set_seed:
                 set_seed(case_seed)
+            prepared = prepare_verifier(args) if prepare_verifier is not None else None
             expected = clone_tensors(oracle(*copy_inputs(args)))
             synchronize(device)
             samples = {}
@@ -67,13 +68,16 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                     with preserve_rng(device):
                         if set_seed:
                             set_seed(case_seed)
-                        verifier(args, output)
+                        if prepare_verifier is None:
+                            verifier(args, output)
+                        else:
+                            verifier(args, output, expected=expected, prepared=prepared)
                 samples[name] = elapsed
                 del output, consumed, fresh
             if trial >= warmup:
                 rows.append({"reference_ms": samples["R"], "candidate_ms": samples["C"],
                              "control_ms": samples["B"], "seed": case_seed, "order": order})
-            del args, expected
+            del args, expected, prepared
     if changes:
         raise ValueError(f"Candidate changed process settings during paired timing: {sorted(set(changes))}")
     return paired_summary(rows)
@@ -107,7 +111,7 @@ def evaluate_paired(payload):
     if settings.get("use_hidden_tests"):
         raise ValueError("Paired timing uses the public performance workload, never hidden feedback")
     source = validate_sources(payload)
-    configure_tf32(torch, settings["precision"] == "fp32" and not settings.get("baseline_suite", True) and not settings.get("input_profile"))
+    configure_tf32(torch, settings["precision"] == "fp32" and not settings.get("baseline_suite", True) and not settings.get("input_profile") and not settings.get("numerical_validation"))
     dtype, device = get_torch_dtype_from_string(settings["precision"]), torch.device("cuda:0")
     seed = settings.get("evaluation_seed", 42)
     variant = settings.get("paired_baseline_variant", "eager")
@@ -151,19 +155,21 @@ def evaluate_paired(payload):
     def reset(name):
         models[name].load_state_dict(snapshots[name])
 
-    def verify(args, output):
-        from .input_calibration import prepare_output, verify_output
+    def prepare_verify(args):
+        from .input_calibration import prepare_output
 
-        # Reset oracle state before every output's untimed reference check.
-        reset("oracle")
-        prepared = prepare_output(models["oracle"], args)
-        expected = clone_tensors(models["oracle"](*copy_inputs(args)))
+        return prepare_output(models["oracle"], args)
+
+    def verify(args, output, *, expected, prepared):
+        from .input_calibration import verify_output
+
         verify_output(models["oracle"], args, expected, output, prepared=prepared)
 
     result = collect_pairs(functions["R"], models["C"], functions["B"], factory, models["oracle"],
                            device=device, trials=settings.get("paired_trials", 30), seed=seed,
                            reset=reset, set_seed=set_seed, tolerance=get_tolerance_for_precision(dtype),
-                           verifier=verify if settings.get("input_profile") else None)
+                           verifier=verify if settings.get("input_profile") or settings.get("numerical_validation") else None,
+                           prepare_verifier=prepare_verify if settings.get("input_profile") or settings.get("numerical_validation") else None)
     result.update(baseline_variant=variant, baseline_plan=baseline_plan, input_signature=input_signature(nominal), output_consumed=True,
                   varied_inputs=True, all_outputs_verified=True)
     return {"compiled": True, "correctness": True, "runtime": result["candidate_mean_ms"],

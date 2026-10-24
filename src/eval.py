@@ -448,12 +448,16 @@ def run_correctness_on_fixed_inputs(
     This is used for hidden test configs where inputs are fixed and deterministic.
     """
     inputs = _process_input_group(raw_inputs, device, precision)
+    from kb_workflows.timed_numerics import pair_hooks
+
     with torch.no_grad():
+        reference = move_model(original_model_instance, device, precision)
         issue = check_paired_calls(
-            move_model(original_model_instance, device, precision),
+            reference,
             move_model(new_model_instance, device, precision), inputs,
             seed=seed, tolerance=get_tolerance_for_precision(precision), device=device,
             set_seed=set_seed, metadata=metadata, label=config_label,
+            **pair_hooks(reference, inputs, seed=seed, device=device, set_seed=set_seed),
         )
     if issue:
         metadata["hidden_correctness_issue"] = issue
@@ -916,11 +920,14 @@ def run_and_check_correctness(
         for trial, trial_seed in enumerate(seeds):
             set_seed(trial_seed)
             inputs = _process_input_group(get_inputs_fn(), device, precision)
+            from kb_workflows.timed_numerics import pair_hooks
+
             issue = check_paired_calls(
                 model, model_new, inputs, seed=trial_seed,
                 tolerance=get_tolerance_for_precision(precision), device=device,
                 set_seed=set_seed, metadata=metadata, label=f"standard_{trial + 1}",
                 record_first_call=trial == 0, clock=CLOCK,
+                **pair_hooks(model, inputs, seed=trial_seed, device=device, set_seed=set_seed, first=trial == 0),
             )
             if issue:
                 metadata["correctness_issue"] = issue
