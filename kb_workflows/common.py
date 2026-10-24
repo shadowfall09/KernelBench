@@ -112,6 +112,7 @@ def evaluator_digest():
         "kb_workflows/model_stress.py", "kb_workflows/input_layouts.py",
         "kb_workflows/input_profiles.py", "kb_workflows/input_calibration.py", "kb_workflows/input_calibration_task.py",
         "kb_workflows/model_input_profiles.py", "kb_workflows/reference_oracles.py",
+        "kb_workflows/reference_population.py", "scripts/freeze_reference_population.py",
         "scripts/calibrate_inputs.py",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
         "kb_workflows/submission_source.py", "kb_workflows/kernel_origin.py", "kb_workflows/cuda_origin.py",
@@ -216,7 +217,7 @@ def apply_score_gate(results, run_dir):
             if capped:
                 required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
-            for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
+            for option in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
                 declared = config.get(option)
                 if declared:
                     path = Path(declared)

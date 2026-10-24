@@ -2,11 +2,12 @@
 
 import json
 import os
+import subprocess
 import sys
 
 import pytest
 
-from kb_workflows import agent_loop, agent_task, engine, generation
+from kb_workflows import agent_loop, agent_models, agent_task, engine, generation
 from kb_workflows.common import atomic_json, kernel_name, read_json
 from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.experiment import compare_runs, existing_budget, protocol, write_budget_report
@@ -323,6 +324,20 @@ def test_wall_timeout_stops_nested_model_children(config, tmp_path, monkeypatch)
     assert nested.exists(), (directory / "agent.log").read_text()
     try:
         child = psutil.Process(int(nested.read_text()))
+        assert not child.is_running() or child.status() == psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        pass
+
+
+def test_model_call_timeout_stops_nested_children_before_controller_timeout(config, tmp_path, monkeypatch):
+    import psutil
+
+    fake_claude(tmp_path, monkeypatch, sleepy=True)
+    with pytest.raises(subprocess.TimeoutExpired):
+        agent_models.claude_response([{"role": "user", "content": "public reference"}], config, tmp_path, timeout=2)
+    pid = int((tmp_path / "nested.pid").read_text())
+    try:
+        child = psutil.Process(pid)
         assert not child.is_running() or child.status() == psutil.STATUS_ZOMBIE
     except psutil.NoSuchProcess:
         pass

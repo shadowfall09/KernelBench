@@ -11,6 +11,7 @@ from pathlib import Path
 from statistics import mean
 
 from .common import atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
+from .reference_population import select_run_problems
 from .tool_checks import diagnostic_options, reusable
 
 PROTOCOL = "frozen_final_remeasurement_v1"
@@ -29,6 +30,10 @@ def _options(config):
     options.update(diagnostic_options(config))
     if config.input_calibration:
         options["input_calibration_sha256"] = fingerprint(read_json(Path(config.input_calibration)))
+    from .reference_population import receipt
+
+    if population := receipt(config):
+        options["reference_population"] = population
     if config.task_dimensions:
         options["task_dimensions_sha256"] = fingerprint({"dimensions": read_json(Path(config.task_dimensions))})
     if config.determinism_policy_file:
@@ -37,7 +42,7 @@ def _options(config):
 
 
 def _slots(config):
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+    selected = select_run_problems(config)
     slots = {}
     for pid, reference in selected.items():
         for sid in range(config.num_samples):
@@ -49,6 +54,9 @@ def _slots(config):
 
 
 def freeze(config):
+    from .reference_population import freeze_run
+
+    freeze_run(config)
     if config.final_repeats < 1:
         raise ValueError("Final remeasurement is not enabled")
     expected = _slots(config)

@@ -7,9 +7,10 @@ import copy
 import json
 from pathlib import Path
 
-from kb_workflows.common import atomic_json, fingerprint, select_problems
+from kb_workflows.common import atomic_json, fingerprint
 from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
+from kb_workflows.reference_population import select_run_problems
 
 
 def prepare(config, problem, sample, *, seeds, minimum_custom_fraction):
@@ -17,8 +18,7 @@ def prepare(config, problem, sample, *, seeds, minimum_custom_fraction):
         raise ValueError("CUDA origin diagnostics cannot substitute for Neuron binary attribution")
     if config.regrade_manifest:
         raise ValueError("Origin diagnostics are separate from frozen artifact regrading")
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite,
-                               suite_role=config.suite_role, track=config.task_track)
+    selected = select_run_problems(config)
     if problem not in selected or not 0 <= sample < config.num_samples:
         raise ValueError("Requested candidate is outside the configured task/sample population")
     if (not seeds or len(seeds) > 100 or len(set(seeds)) != len(seeds)

@@ -8,9 +8,10 @@ import random
 from pathlib import Path
 from statistics import mean
 
-from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
+from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json
 from .evidence import score_issue
 from .measurement import amortized
+from .reference_population import select_run_problems
 from .suites import selection_receipt, suite_rows
 
 DEVICE_FIELDS = ("name", "capability", "total_memory", "multiprocessors", "l2_bytes", "torch_version", "cuda_version", "hip_version")
@@ -118,6 +119,9 @@ def current_result(result, payload):
 
 
 def analyze_paper(config):
+    from .reference_population import freeze_run
+
+    freeze_run(config)
     from .aggregation import sensitivity
     from .engine import task_payload
     from .experiment import existing_budget, protocol
@@ -125,7 +129,7 @@ def analyze_paper(config):
     from .resource_budgets import active
     from .resource_budgets import score_issue as resource_score_issue
 
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+    selected = select_run_problems(config)
     standard = read_json(config.run_dir / "eval_results.json", {})
     hidden = read_json(config.run_dir / "eval_results_hidden.json", {}) if config.hidden_tests else standard
     baselines = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
@@ -137,7 +141,7 @@ def analyze_paper(config):
     digest = evaluator_digest()
     groups, bounded_groups, track_groups, rows, scored, certificate_coverage = {}, {}, {}, [], {}, {}
     external_files = {option: fingerprint(read_json(Path(getattr(config, option))))
-                      for option in ("problem_specs", "device_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)}
+                      for option in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)}
     auxiliary_files = {}
     for name in ((["final_manifest.json", "final_results.json"] if config.final_repeats else [])
                  + (["paired_results.json"] if config.paired_timing else [])

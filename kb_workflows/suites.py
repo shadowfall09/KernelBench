@@ -55,6 +55,15 @@ def suite_rows(level, role, suite="kernelbench105", track="all"):
 
 
 def selection_receipt(config):
+    result = _selection_receipt(config)
+    from .reference_population import receipt
+
+    if population := receipt(config):
+        result["reference_population"] = population
+    return result
+
+
+def _selection_receipt(config):
     if config.suite == "full":
         from .reference_revisions import REGISTRY, registry
 

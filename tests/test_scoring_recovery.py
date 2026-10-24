@@ -6,7 +6,7 @@ import shutil
 import pytest
 from _operator_evidence import attach_operator_evidence
 
-from kb_workflows import common, engine, evaluate_task, generation, paper_analysis
+from kb_workflows import cli, common, engine, evaluate_task, final_verification, generation, paper_analysis, study_data
 from kb_workflows.common import atomic_json, fingerprint, kernel_name, read_json
 from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.measurement import timing_stats
@@ -29,7 +29,8 @@ def run(tmp_path, monkeypatch):
     def select(*args, **kwargs):
         return {1: reference}
     monkeypatch.setattr(engine, "select_problems", select)
-    monkeypatch.setattr(paper_analysis, "select_problems", select)
+    monkeypatch.setattr(engine, "select_run_problems", lambda config: select())
+    monkeypatch.setattr(paper_analysis, "select_run_problems", lambda config: select())
     monkeypatch.setattr(engine, "evaluator_digest", lambda: "current")
     monkeypatch.setattr(common, "evaluator_digest", lambda: "current")
     monkeypatch.setattr(paper_analysis, "evaluator_digest", lambda: "current")
@@ -118,7 +119,7 @@ def test_rl_public_hidden_gap_regrades_identical_saved_sources_without_execution
     save()
     monkeypatch.setattr(study_data, "ROOT", common.ROOT)
     monkeypatch.setattr(study_data, "evaluator_digest", lambda: "current")
-    monkeypatch.setattr(study_data, "select_problems", engine.select_problems)
+    monkeypatch.setattr(study_data, "select_run_problems", engine.select_run_problems)
     monkeypatch.setattr(engine, "evaluate_tasks", lambda *a, **k: pytest.fail("Audit launched an evaluator"))
     public = replace(config, hidden_tests=False, run_name="public")
     shutil.copytree(config.run_dir, public.run_dir)
@@ -179,7 +180,6 @@ def test_resource_budget_proof_is_required_and_invalidates_both_score_gates(run,
 def test_study_export_recomputes_current_qualification_without_running_workloads(run, monkeypatch):
     import hashlib
 
-    from kb_workflows import study_data
     from kb_workflows.experiment import write_budget_report
 
     config, _, _, _, _ = run
@@ -187,7 +187,7 @@ def test_study_export_recomputes_current_qualification_without_running_workloads
     atomic_json(config.run_dir / "run_config.json", config.to_dict())
     monkeypatch.setattr(study_data, "ROOT", common.ROOT)
     monkeypatch.setattr(study_data, "evaluator_digest", lambda: "current")
-    monkeypatch.setattr(study_data, "select_problems", engine.select_problems)
+    monkeypatch.setattr(study_data, "select_run_problems", engine.select_run_problems)
     monkeypatch.setattr(engine, "evaluate_tasks", lambda *a, **k: pytest.fail("Analysis started evaluation"))
     monkeypatch.setattr(generation, "generate_run", lambda *a, **k: pytest.fail("Analysis started generation"))
     receipts = {}
@@ -241,7 +241,6 @@ def test_persisted_strict_evidence_is_required_at_scoring_boundary(run, damage):
 
 @pytest.mark.parametrize("damage", ["none", "final_missing", "final_hidden", "frozen", "paired_missing", "paired_summary"])
 def test_final_and_paired_evidence_drive_scores_and_legacy_gate(run, monkeypatch, damage):
-    from kb_workflows import final_verification
     from kb_workflows.paired_statistics import paired_summary
 
     config, baseline, standard, secret, save = run
@@ -507,7 +506,6 @@ def test_resume_reuses_current_results_and_reruns_changed_evaluator(run, monkeyp
 
 
 def test_full_pipeline_rerecords_stale_existing_baseline(run, monkeypatch):
-    from kb_workflows import cli
 
     config, baseline, _, _, save = run
     config.stage, config.generation, config.evaluation = "all", "local", "queue"
@@ -516,7 +514,7 @@ def test_full_pipeline_rerecords_stale_existing_baseline(run, monkeypatch):
     calls = []
     monkeypatch.setattr(cli, "ROOT", common.ROOT)
     monkeypatch.setattr(cli, "parse_config", lambda argv: config)
-    monkeypatch.setattr(cli, "select_problems", engine.select_problems)
+    monkeypatch.setattr(cli, "select_run_problems", engine.select_run_problems)
     monkeypatch.setattr(cli, "evaluator_digest", lambda: "current")
     monkeypatch.setattr(engine, "record_baseline", lambda config: calls.append("baseline"))
     monkeypatch.setattr(engine, "evaluate_run", lambda config: None)
@@ -550,6 +548,7 @@ def test_changed_measurement_code_invalidates_resume_digest(tmp_path, monkeypatc
     shutil.copyfile(source_root / "scripts/regrade_artifacts.py", tmp_path / "scripts/regrade_artifacts.py")
     shutil.copyfile(source_root / "scripts/audit_kernel_origin.py", tmp_path / "scripts/audit_kernel_origin.py")
     shutil.copyfile(source_root / "scripts/calibrate_inputs.py", tmp_path / "scripts/calibrate_inputs.py")
+    shutil.copyfile(source_root / "scripts/freeze_reference_population.py", tmp_path / "scripts/freeze_reference_population.py")
     for name in ("requirements.txt", "requirements-neuron-worker.txt"):
         shutil.copyfile(source_root / name, tmp_path / name)
     monkeypatch.setattr(common, "ROOT", tmp_path)

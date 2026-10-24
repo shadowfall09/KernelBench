@@ -10,12 +10,13 @@ from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
 
-from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, safe_name, select_problems
+from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, safe_name
 from .config import RunConfig
+from .reference_population import select_run_problems
 
 PROTOCOL = "kernelbench_pro_artifact_regrade_v1"
-EXTERNAL = ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file")
-HISTORY = ("run_config.json", "paper_analysis.json", "generation_budget.json", "generation_attempts.json", "generation_summary.json",
+EXTERNAL = ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file")
+HISTORY = ("run_config.json", "reference_population.json", "paper_analysis.json", "generation_budget.json", "generation_attempts.json", "generation_summary.json",
            "eval_results.json", "eval_results_hidden.json", "final_manifest.json", "regrade_manifest.json", "baseline_snapshot.json")
 MAX_SOURCE_BYTES = 8 * 1024**2
 
@@ -80,13 +81,14 @@ def prepare(source, verifier, *, output):
     history_hashes = {name: digest(path) for name, path in history_paths.items()}
     ids, samples = population(source, saved)
     workload = {name: saved[name] for name in ("level", "suite", "suite_role", "task_track") if name in saved}
-    config = replace(verifier, **workload, start=min(ids), end=max(ids), num_samples=samples,
+    config = replace(verifier, **workload, start=saved.get("start", min(ids)) if verifier.reference_population else min(ids),
+        end=saved.get("end", max(ids)) if verifier.reference_population else max(ids), num_samples=samples,
         runs_dir=str(output.parent), run_name=output.name, stage="evaluate", generation="local", resume=False,
         model="", small_model="", profile="", bedrock=False, agent_token_limit=0, agent_output_token_limit=0,
         agent_device_seconds=0, baseline=verifier.baseline + "-regrade-" + fingerprint({"output": str(output)})[:12],
         regrade_manifest=str(output / "regrade_manifest.json")).validate()
     config.require_gpu_target()
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+    selected = select_run_problems(config)
     if list(selected) != ids:
         raise ValueError("Current selection differs from the recorded source population; no silent task omission or addition")
     candidates = {}
@@ -136,6 +138,9 @@ def prepare(source, verifier, *, output):
             target.chmod(0o444)
             setattr(config, name, str(target))
             external[name] = digest(target)
+    from .reference_population import freeze_run
+
+    freeze_run(config)
     artifacts = output / "frozen_candidates"
     artifacts.mkdir()
     for row in candidates.values():
@@ -177,7 +182,7 @@ def validate(plan):
             or read_json(root / "run_config.json") != config.to_dict()
             or read_json(root / "regrade_manifest.json") != plan):
         raise ValueError("Regrade plan/configuration moved or changed")
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+    selected = select_run_problems(config)
     if list(selected) != plan["source_population"] or config.num_samples != plan["declared_samples"]:
         raise ValueError("Regrade denominator changed")
     if set(plan["slots"]) != {f"{pid}_{sid}" for pid in selected for sid in range(config.num_samples)}:

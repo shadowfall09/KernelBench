@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from .common import ROOT, evaluator_digest, fingerprint, read_json, select_problems
+from .common import ROOT, evaluator_digest, fingerprint, read_json
 from .config import RunConfig
 from .experiment import existing_budget, protocol
+from .reference_population import select_run_problems
 from .study_statistics import finite
 
 PROTOCOL = "kernelbench_pro_study_snapshot_v1"
@@ -38,7 +39,11 @@ def evaluation_contract(config):
     path = ROOT / "results/timing" / config.hardware / f"{config.baseline}.json"
     result["baseline_dataset_sha256"] = fingerprint(read_json(path, {}))
     result["external_files"] = {key: fingerprint(read_json(Path(getattr(config, key)), {}))
-                                for key in ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, key)}
+                                for key in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, key)}
+    from .reference_population import receipt
+
+    if population := receipt(config):
+        result["reference_population"] = population
     return result
 
 
@@ -72,8 +77,7 @@ def collect_run(directory, *, session, label=None, metric="score", speedup_thres
     config.stage = "analyze"
     config.validate()
     report = analyze_paper(config)
-    selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role,
-                               track=config.task_track)
+    selected = select_run_problems(config)
     if report.get("problem_ids") != list(selected) or report.get("declared_samples") != config.num_samples:
         raise ValueError("Analysis population does not match the declared run")
     budget = existing_budget(config)

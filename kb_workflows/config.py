@@ -75,6 +75,8 @@ class RunConfig:
     throughput_repeats: int = 4
     throughput_memory_mb: int = 1024
     input_calibration: str = ""
+    reference_population: str = ""
+    reference_population_scope: str = "run"
     input_family_memory_mb: int = 256
     oracle_memory_mb: int = 4096
     determinism_repeats: int = 5
@@ -246,6 +248,16 @@ class RunConfig:
             self.input_calibration = str(Path(self.input_calibration).expanduser().resolve())
             read_bundle(self.input_calibration)
             self.numerical_validation = True
+        if self.reference_population_scope not in {"run", "task"} or (self.reference_population_scope == "task" and not self.reference_population):
+            raise ValueError("Reference population task delegation requires a frozen population file")
+        if self.reference_population:
+            if not isinstance(self.reference_population, str) or not self.input_calibration:
+                raise ValueError("Reference population requires a file and input calibration")
+            self.reference_population = str(Path(self.reference_population).expanduser().resolve())
+        if self.reference_population or self.input_calibration:
+            from .reference_population import manifest_for
+
+            manifest_for(self)
         if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level not in {1, 2, 3}):
             raise ValueError("Independent numerical validation requires an explicit boolean and level 1, 2 or 3")
         if type(self.input_family_memory_mb) is not int or not 1 <= self.input_family_memory_mb <= 1048576:
@@ -438,11 +450,14 @@ def parser():
         "harbor_reward": ("correctness", "bounded_gain"),
         "generation_mode": ("one-shot", "feedback", "external"),
         "agent_backend": ("claude-code", "litellm", "local-transformers"),
+        "reference_population_scope": ("run", "task"),
     }
     for name in (
         "score_mode",
         "device_calibration",
         "input_calibration",
+        "reference_population",
+        "reference_population_scope",
         "baseline_portfolio",
         "evidence_level",
         "suite",
@@ -528,7 +543,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value

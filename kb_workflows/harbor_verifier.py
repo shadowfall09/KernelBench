@@ -43,6 +43,9 @@ def verify(manifest, candidate, logs):
         if config.run_dir.exists():
             shutil.rmtree(config.run_dir)
         config.run_dir.mkdir(parents=True)
+        from .reference_population import freeze_run
+
+        freeze_run(config)
         destination = config.run_dir / kernel_name(config.level, config.start)
         submission = Path(candidate)
         if submission.is_symlink() or not submission.is_file() or not submission.stat().st_size:

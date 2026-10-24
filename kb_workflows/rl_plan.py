@@ -80,16 +80,19 @@ def implementation_digest():
 def task_config(plan, key, *, directory, samples=1):
     row = plan["tasks"][key]
     options = dict(plan["verifier_config"])
+    population_contract = {name: options[name] for name in ("suite", "suite_role", "task_track")} if options.get("reference_population") else {}
     options.update(level=row["level"], suite="production41" if row["level"] == 5 else "full", suite_role="scored",
                    task_track=row.get("track", "all"), start=row["problem_id"], end=row["problem_id"], num_samples=samples,
                    run_name=Path(directory).name, runs_dir=str(Path(directory).resolve().parent), stage="evaluate", resume=False,
                    generation_mode=plan["training"]["mode"], optimization_rounds=options["optimization_rounds"])
+    if population_contract:
+        options.update(**population_contract, reference_population_scope="task")
     return RunConfig(**options).validate()
 
 
 def verifier_inputs(options):
     return {name: fingerprint({"document": read_json(Path(options[name]))}) for name in
-            ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest") if options.get(name)}
+            ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest") if options.get(name)}
 
 
 def _task(row, base):
@@ -143,7 +146,7 @@ def make_plan(specification, *, directory, base_directory=None):
         options = file_options(path if path.is_absolute() else root / path, parser())
     else:
         options = dict(options)
-        for name in ("problem_specs", "device_calibration", "input_calibration", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
+        for name in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
             if options.get(name) and not Path(options[name]).is_absolute():
                 options[name] = str((root / options[name]).resolve())
     defaults = dict(generation="local", evaluation="local", strict_validation=True, evidence_level="L0",

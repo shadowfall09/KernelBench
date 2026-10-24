@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, kernel_name, select_problems
 from .generation import agent_environment, prompt_source
+from .reference_population import select_run_problems
 from .suites import selection_receipt
 from .transports import terminate
 
@@ -85,6 +86,11 @@ def _compose(device=None, *, restrictions=None):
 
 def write_task(directory, config, pid, sid=0, device=None):
     """Create a self-contained task; trusted evaluation code is verifier-only."""
+    from .reference_population import freeze_run
+
+    population = freeze_run(config)
+    if pid not in select_run_problems(config):
+        raise ValueError("Harbor task is outside the declared reference population")
     if not config.hidden_tests:
         raise ValueError("Harbor tasks require hidden tests")
     reference = select_problems(config.level, problem_ids=[pid])[pid]
@@ -143,6 +149,8 @@ def write_task(directory, config, pid, sid=0, device=None):
                     queue_url="http://127.0.0.1:8000", harbor_command="harbor")
     # The outer Harbor Docker sandbox owns these restrictions, rather than a nested Docker daemon.
     child.isolation_mode = "standard"
+    child.reference_population = ""
+    child.reference_population_scope = "run"
     # Reviewed models and calibration are verifier-only data, never agent inputs.
     if config.problem_specs:
         document = json.loads(Path(config.problem_specs).read_text())
@@ -152,7 +160,7 @@ def write_task(directory, config, pid, sid=0, device=None):
     if config.input_calibration:
         from .input_calibration import subset
 
-        atomic_json(tests / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source))
+        atomic_json(tests / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source, population=population))
         child.input_calibration = "/tests/input_calibration.json"
     if config.device_calibration:
         shutil.copy2(config.device_calibration, tests / "device_calibration.json")
@@ -251,7 +259,7 @@ def export_tasks(config):
         staged = Path(temporary) / "tasks"
         staged.mkdir()
         tasks = []
-        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
+        for pid in select_run_problems(config):
             for sid in range(config.num_samples):
                 name = task_name(config.level, pid, sid)
                 write_task(staged / name, config, pid, sid)

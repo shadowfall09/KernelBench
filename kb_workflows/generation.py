@@ -15,6 +15,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 from .common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
+from .reference_population import select_run_problems
 from .transports import resolve_devices, terminate
 
 
@@ -113,6 +114,11 @@ Profiler timings are diagnostic, not final benchmark timings. Do not change the 
 
 
 def prepare_job(config, pid, sid):
+    from .reference_population import freeze_run
+
+    population = freeze_run(config)
+    if pid not in select_run_problems(config):
+        raise ValueError("Agent task is outside the declared reference population")
     directory = config.run_dir / "work" / f"p{pid}_s{sid}"
     directory.mkdir(parents=True, exist_ok=True)
     for stale in (directory / "agent_result.json", directory / "best_candidate.json", directory / "development_history.json",
@@ -143,6 +149,8 @@ def prepare_job(config, pid, sid):
         problem_specs="",  # Layer specifications are used only by parent analysis.
         score_mode="bounded_gain",
         device_calibration="",
+        reference_population="",
+        reference_population_scope="run",
     )
     # Evaluation inside a GPU container/sandbox uses its allocated device 0.
     if config.generation == "docker" and config.evaluation == "docker":
@@ -162,7 +170,7 @@ def prepare_job(config, pid, sid):
     if config.input_calibration:
         from .input_calibration import subset
 
-        atomic_json(directory / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source))
+        atomic_json(directory / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source, population=population))
         job["input_calibration"] = ("/work/input_calibration.json" if config.generation in {"docker", "modal"}
                                     else str(directory / "input_calibration.json"))
     if config.determinism_policy_file:
@@ -346,7 +354,10 @@ def generation_signature(config, pid, sid):
 
 
 def generate_run(config):
+    from .reference_population import freeze_run
     from .resource_budgets import active
+
+    freeze_run(config)
 
     config.run_dir.mkdir(parents=True, exist_ok=True)
     target = config.run_dir / "generation_summary.json"
@@ -355,7 +366,7 @@ def generate_run(config):
     history_path = config.run_dir / "generation_attempts.json"
     history = read_json(history_path, {"slots": {}, "historical_attempts_unknown": bool(previous)})
     tasks = []
-    for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track):
+    for pid in select_run_problems(config):
         for sid in range(config.num_samples):
             key = f"{pid}_{sid}"
             path = config.run_dir / kernel_name(config.level, pid, sid)
@@ -434,6 +445,6 @@ def generate_run(config):
     write_budget_report(config, summary)
     return all(
         summary.get(f"{pid}_{sid}", {}).get("status") == "success"
-        for pid in select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+        for pid in select_run_problems(config)
         for sid in range(config.num_samples)
     )

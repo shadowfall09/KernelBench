@@ -161,13 +161,21 @@ def record_for(path, level, pid, precision, source, *, allow_simulated=False):
     return validate_record(row, source, allow_simulated=allow_simulated)
 
 
-def subset(path, level, pid, precision, source):
+def subset(path, level, pid, precision, source, *, population=None):
     record = record_for(path, level, pid, precision, source)
-    return {"protocol": BUNDLE, "records": {f"{level}/{pid}/{precision}": record}}
+    key = f"{level}/{pid}/{precision}"
+    result = {"protocol": BUNDLE, "records": {key: record}}
+    population = population or read_bundle(path).get("population_manifest")
+    if population is not None:
+        result.update(population_manifest=population, delegated_task=key)
+    return result
 
 
 def validate_inline(payload, *, allow_simulated=False):
     row = payload["eval_config"].get("input_profile")
+    from .reference_population import validate_inline as validate_population
+
+    validate_population(payload, row)
     if row is None:
         return None
     if not isinstance(row, dict) or (row.get("level"), row.get("problem_id"), row.get("precision")) != (
@@ -288,6 +296,9 @@ def task_policy(function):
             "nominal_input_signature_sha256": signature, "shapes_resized": False,
             "transfer_scope": "input_distribution_only; current_device_numerical_qualification_required",
             "comparison_reference": "native_output_plus_independent_FP64_actual_inputs"}
+        from .reference_population import validate_inline as validate_population
+
+        result["metadata"]["input_calibration"]["reference_population_sha256"] = validate_population(payload, row)
         return result
     return wrapped
 
@@ -297,6 +308,9 @@ def issue(result, payload):
         return None
     try:
         row = validate_inline(payload)
+        from .reference_population import validate_inline as validate_population
+
+        population_sha = validate_population(payload, row)
         receipt = result.get("metadata", {}).get("input_calibration", {})
         positive = result.get("correctness") is True or result.get("baseline_correctness") is True
         if not positive:
@@ -312,6 +326,7 @@ def issue(result, payload):
         elif phase == "evaluate" and settings.get("measure_performance", not settings.get("use_hidden_tests")):
             required = settings["num_perf_trials"] + 3
         if (receipt.get("record_sha256") != row["receipt_sha256"] or receipt.get("recipe") != row["selected_recipe"]
+                or receipt.get("reference_population_sha256") != population_sha
                 or receipt.get("shapes_resized") is not False
                 or receipt.get("calibration_device_identity_sha256") != row["device_identity_sha256"]
                 or receipt.get("execution_device_identity_sha256") != identity(result.get("device_fingerprint", result.get("metadata", {}).get("device_fingerprint", {})))

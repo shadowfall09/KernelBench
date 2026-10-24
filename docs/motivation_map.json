@@ -1331,7 +1331,7 @@
       "title": "参考退化审计与输入校准",
       "primary": "M2",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/strict_validation.py",
@@ -1345,9 +1345,12 @@
         "kb_workflows/model_input_profiles.py",
         "kb_workflows/reference_oracles.py",
         "kb_workflows/input_calibration_task.py",
-        "tests/test_model_input_profiles.py"
+        "tests/test_model_input_profiles.py",
+        "kb_workflows/reference_population.py",
+        "scripts/freeze_reference_population.py",
+        "tests/test_reference_population.py"
       ],
-      "reason": "原250题均有来源绑定名义配方与参考专用FP64选择，1039个分题菜单、固定前向RNG下输入/输出探针变化、极值量化修复和程序/mask收据；不改参数/尺寸/隐藏分布，恒零与非零常量保留不合格。预先冻结合格参考子集及排除清单的统一入口仍需补齐，阈值代码归R-04；不运行实验"
+      "reason": "原250题来源绑定名义配方与参考专用FP64选择、输入/输出变化审计、固定RNG、程序/mask收据和新基线已接入；统一入口在候选前冻结合格参考集合和全部失败/排除账本，未解决记录不能缩小题集，冻结后所有候选失败保留分母。子任务/预算/评分/恢复/重新评分绑定父集合。有限软件范围已完成，阈值校准归R-04；按要求不运行设备/模型实验"
     },
     {
       "id": "R-06",
@@ -1563,9 +1566,11 @@
       "evidence": [
         "kb_workflows/resource_budgets.py",
         "kb_workflows/local_model.py",
-        "docs/RESOURCE_BUDGETS.md"
+        "docs/RESOURCE_BUDGETS.md",
+        "kb_workflows/agent_models.py",
+        "tests/test_agent_loop.py"
       ],
-      "reason": "已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验"
+      "reason": "已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明，模型CLI内层超时清理嵌套子进程的竞态也已修复；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验"
     },
     {
       "id": "R-19",
@@ -4139,6 +4144,134 @@
         "docs/INPUT_CALIBRATION.md"
       ],
       "reason": "150原构造的所有配方仅做meta；小CPU输入验证三精度别名、常量/全零、固定mask、连续状态/RNG和模拟Neuron三阶段"
+    },
+    {
+      "id": "V38-01",
+      "title": "冻结参考资格与排除清单",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/reference_population.py"
+      ],
+      "reason": "按预定原题范围核对完整参考校准，固定第一个合格配方、每个失败配方的原因和case摘要；候选和时间不参与选择"
+    },
+    {
+      "id": "V38-02",
+      "title": "未解决失败不缩小题集",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/reference_population.py",
+        "tests/test_reference_population.py"
+      ],
+      "reason": "缺项、未测完菜单、资源/worker错误、模拟或来源漂移拒绝冻结；没有合格题目不能产生空集得分"
+    },
+    {
+      "id": "V38-03",
+      "title": "候选前冻结固定评分分母",
+      "primary": "M3",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/reference_population.py",
+        "kb_workflows/generation.py",
+        "kb_workflows/engine.py"
+      ],
+      "reason": "在生成、导出和评测前保存集合及样本数，已有候选/结果不能补选集合；冻结后失败和缺失样本保留零分"
+    },
+    {
+      "id": "V38-04",
+      "title": "工作流与恢复共用题集",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/cli.py",
+        "kb_workflows/paper_analysis.py",
+        "kb_workflows/common.py",
+        "kb_workflows/final_verification.py"
+      ],
+      "reason": "生成、基线、最终/配对验证、评分和研究分析统一选择器；全校准文件及清单绑定执行/评分/恢复指纹"
+    },
+    {
+      "id": "V38-05",
+      "title": "父集合与单题委托绑定",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_calibration.py",
+        "kb_workflows/harbor.py",
+        "kb_workflows/rl_plan.py",
+        "kb_workflows/regrade.py"
+      ],
+      "reason": "私有子任务保留父清单与当前题校准，运行收据校验父摘要；Harbor、RL、预算、研究和重新评分保留完整排除账本与实际子范围"
+    },
+    {
+      "id": "V38-06",
+      "title": "无执行的集合冻结命令",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/freeze_reference_population.py",
+        "kb_workflows/config.py",
+        "docs/INPUT_CALIBRATION.md"
+      ],
+      "reason": "读取已有校准预览，显式write只写新清单；TOML/CLI路径和任务委托可配置，不导入设备SDK或启动实验"
+    },
+    {
+      "id": "V38-07",
+      "title": "资格集合的失败与传递回归",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_reference_population.py"
+      ],
+      "reason": "小CPU与不计分的序列化夹具覆盖缺项/篡改/未解决、固定分母、零分保留、私有委托、运行收据和轻量命令；不建立实测资格"
+    },
+    {
+      "id": "V38-08",
+      "title": "内层模型超时清理嵌套进程",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agent_models.py",
+        "kb_workflows/generation.py",
+        "tests/test_agent_loop.py"
+      ],
+      "reason": "模型CLI自身先超时时先清理包括独立session的后代再终止父进程，避免外层控制器已无法找到孤儿；直接与外层墙钟两种超时均做CPU子进程回归，未启动模型"
     }
   ]
 }

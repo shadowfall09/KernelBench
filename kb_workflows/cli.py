@@ -7,8 +7,9 @@ import time
 from contextlib import nullcontext
 from pathlib import Path
 
-from .common import ROOT, atomic_json, evaluator_digest, read_json, select_problems
+from .common import ROOT, atomic_json, evaluator_digest, read_json
 from .config import parse_config
+from .reference_population import select_run_problems
 from .suites import selection_receipt
 
 
@@ -23,7 +24,7 @@ def main(argv=None):
             matches_config(config, plan)
             if config.stage != "analyze":
                 raise ValueError("Use scripts.regrade_artifacts native-run for artifact verification; batch supports its analysis only")
-        selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role, track=config.task_track)
+        selected = select_run_problems(config)
         calibrated_inputs = None
         baseline_variants = None
         if config.baseline_suite and config.baseline_portfolio == "extended":
@@ -91,6 +92,9 @@ def main(argv=None):
                 )
             )
             return 0
+        from .reference_population import freeze_run
+
+        freeze_run(config)
         if (strict_coverage and strict_coverage["unsupported"]
                 and config.stage in {"all", "generate", "evaluate", "export-harbor"}):
             raise ValueError(f"Strict contracts unavailable for level {config.level} IDs {strict_coverage['unsupported']}; choose reviewed tasks")

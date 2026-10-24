@@ -98,6 +98,7 @@ def execute_regrade(training_plan, plan, *, execute=False, resume=False, group_e
 
 def heldout_plan(training_plan, checkpoints, *, directory, sessions=3, samples=1):
     """Use ordinary one-shot/feedback final evaluation, without optimizer access to held-out tasks."""
+    from .reference_population import receipt
     from .study_data import study_digest
     from .study_plan import PROTOCOL as STUDY_PROTOCOL
 
@@ -121,6 +122,7 @@ def heldout_plan(training_plan, checkpoints, *, directory, sessions=3, samples=1
                 config.validate()
                 jobs.append({"config": config.to_dict(), "session": f"session_{session:03}", "method": config.generation_mode,
                              "problem_ids": [config.start], "declared_budget": config.agent_timeout,
+                             "reference_population": receipt(config),
                              "path": str(config.run_dir), "config_sha256": fingerprint(config.to_dict())})
     plan = {"protocol": STUDY_PROTOCOL, "name": "rl_heldout", "vary": "wall", "jobs": jobs, "skipped_points": [],
             "plan_implementation_sha256": study_digest(), "evaluator_sha256": evaluator_digest(), "experiments_started": False,

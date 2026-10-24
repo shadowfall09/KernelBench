@@ -48,6 +48,13 @@ def claude_response(messages, config, directory, timeout, remaining_cost=None):
                                    start_new_session=True)
         try:
             output, _ = process.communicate(json.dumps(messages), timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Kill descendants before their parent exits and they are reparented.
+            # They may have created their own sessions, outside Claude's group.
+            from .generation import terminate_agent_tree
+
+            terminate_agent_tree(process)
+            raise
         finally:
             terminate(process)
     response = json.loads(output)

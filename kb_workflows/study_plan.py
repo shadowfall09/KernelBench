@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .budget_curves import VARY
-from .common import atomic_json, evaluator_digest, fingerprint, read_json, safe_name, select_problems
+from .common import atomic_json, evaluator_digest, fingerprint, read_json, safe_name
 from .config import RunConfig, file_options, parser
 from .study_data import study_digest
 
@@ -27,7 +27,7 @@ def make_plan(specification, *, directory, base_directory=None):
     if not isinstance(options, dict):
         raise ValueError("base_config must be a RunConfig object or TOML path")
     options = dict(options)
-    for field in ("problem_specs", "device_calibration"):
+    for field in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file"):
         if options.get(field) and not Path(options[field]).is_absolute():
             options[field] = str((base_directory / options[field]).resolve())
     base = RunConfig(**options)
@@ -73,10 +73,14 @@ def make_plan(specification, *, directory, base_directory=None):
                                 config.optimization_rounds, config.agent_profile = 1, False
                         config.validate()
                         config.require_gpu_target()
-                        selected = select_problems(level, config.start, config.end, suite=config.suite, suite_role=config.suite_role,
-                                                   track=config.task_track)
+                        from .reference_population import select_run_problems
+
+                        selected = select_run_problems(config)
+                        from .reference_population import receipt
+
                         jobs.append({"config": config.to_dict(), "session": f"session_{si:03}", "method": method,
                                      "problem_ids": list(selected), "declared_budget": budget,
+                                     "reference_population": receipt(config),
                                      "path": str(config.run_dir), "config_sha256": fingerprint(config.to_dict())})
     if not jobs:
         raise ValueError("The study grid has no executable protocol points")
@@ -129,7 +133,9 @@ def execute_plan(path, *, execute=False, runner=None, keep_going=False):
 
             validate_experiment(plan["reward_experiment"])
     if not execute:
+        _validate_populations(plan)
         return {"experiments_started": False, "job_count": len(plan["jobs"]), "plan_sha256": plan["plan_sha256"]}
+    _validate_populations(plan)
     if runner is None:
         from .cli import main as runner
     results = []
@@ -160,3 +166,12 @@ def execute_plan(path, *, execute=False, runner=None, keep_going=False):
         if code and not keep_going:
             break
     return {"plan_sha256": plan["plan_sha256"], "experiments_started": True, "jobs": results}
+
+
+def _validate_populations(plan):
+    from .reference_population import receipt
+
+    for job in plan["jobs"]:
+        config = RunConfig(**job["config"])
+        if receipt(config) != job.get("reference_population"):
+            raise ValueError("Study job reference population changed after preregistration")
