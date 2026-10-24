@@ -202,10 +202,10 @@ def test_audit_and_selection_artifacts_match_provenance_and_totals():
 def test_every_change_has_a_current_motivation_and_real_local_evidence():
     report = validate()
     assert report["historical_changes"] == 67
-    assert report["implemented_changes"] == 277
+    assert report["implemented_changes"] == 285
     assert report["planned_designs"] == 0
-    assert report["in_progress_designs"] == 4
-    assert report["completed_designs"] == 19
+    assert report["in_progress_designs"] == 3
+    assert report["completed_designs"] == 20
 
 
 def test_motivation_validation_detects_inventory_drift(tmp_path):

@@ -13,6 +13,7 @@ from pathlib import Path
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, json_safe, problem_paths
 from .input_calibration import task_policy as nominal_input_policy
 from .operator_input_policy import task_policy as operator_input_policy
+from .precision_calibration import task_policy as calibrated_precision_policy
 from .production import task_input_policy
 from .reference_revisions import record_result
 from .timed_numerics import task_policy as timed_numerical_policy
@@ -297,6 +298,7 @@ def qualify_small(payload):
 
 @record_result
 @timed_numerical_policy
+@calibrated_precision_policy
 @nominal_input_policy
 @operator_input_policy
 def dispatch(payload):
@@ -314,6 +316,10 @@ def dispatch(payload):
     validate_state(payload)
     if payload.get("task") == "calibrate_inputs":
         from .input_calibration_task import calibrate
+
+        return calibrate(payload)
+    if payload.get("task") == "calibrate_precision":
+        from .precision_calibration_task import calibrate
 
         return calibrate(payload)
     if payload.get("task") == "origin_audit":

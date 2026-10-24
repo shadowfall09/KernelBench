@@ -15,8 +15,8 @@ from .config import RunConfig
 from .reference_population import select_run_problems
 
 PROTOCOL = "kernelbench_pro_artifact_regrade_v1"
-EXTERNAL = ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file")
-HISTORY = ("run_config.json", "reference_population.json", "paper_analysis.json", "generation_budget.json", "generation_attempts.json", "generation_summary.json",
+EXTERNAL = ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file")
+HISTORY = ("run_config.json", "reference_population.json", "precision_calibration_manifest.json", "paper_analysis.json", "generation_budget.json", "generation_attempts.json", "generation_summary.json",
            "eval_results.json", "eval_results_hidden.json", "final_manifest.json", "regrade_manifest.json", "baseline_snapshot.json")
 MAX_SOURCE_BYTES = 8 * 1024**2
 

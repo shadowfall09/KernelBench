@@ -64,6 +64,10 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
         from .input_calibration import record_for
 
         options["input_profile"] = record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())
+    if config.precision_calibration:
+        from .precision_calibration import record_for
+
+        options["precision_profile"] = record_for(config.precision_calibration, config.level, pid, config.precision, path.read_text(), options.get("input_profile"))
     if config.numerical_validation:
         from .operator_specs import spec_for
 

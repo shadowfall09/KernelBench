@@ -279,6 +279,9 @@ def verify_output(reference, inputs, expected, actual, *, prepared=None):
 def task_policy(function):
     @wraps(function)
     def wrapped(payload, *args, **kwargs):
+        if payload.get("task") == "calibrate_precision":
+            # The reference-only fitter applies the selected recipe exactly once.
+            return function(payload, *args, **kwargs)
         row = validate_inline(payload)
         if row is None:
             return function(payload, *args, **kwargs)

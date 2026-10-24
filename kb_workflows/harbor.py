@@ -162,6 +162,11 @@ def write_task(directory, config, pid, sid=0, device=None):
 
         atomic_json(tests / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source, population=population))
         child.input_calibration = "/tests/input_calibration.json"
+    if config.precision_calibration:
+        from .precision_calibration import subset_for_config
+
+        atomic_json(tests / "precision_calibration.json", subset_for_config(config, pid, source))
+        child.precision_calibration = "/tests/precision_calibration.json"
     if config.device_calibration:
         shutil.copy2(config.device_calibration, tests / "device_calibration.json")
         child.device_calibration = "/tests/device_calibration.json"
@@ -201,6 +206,11 @@ exec python -m kb_workflows.harbor_verifier --manifest /tests/config.json \\
         calibrated_instruction = (f"Nominal value distribution: {row['selected_recipe']}; frozen FP64 error policy: "
                                   f"{row['precision_contract']}. Shapes and discrete roles are unchanged. "
                                   "Both reference and candidate must qualify; hidden distributions remain separate.\n")
+    if config.precision_calibration:
+        from .precision_calibration import for_config
+
+        row = for_config(config, pid, source)
+        calibrated_instruction += f"Effective device-fitted FP64 error policy: {row['policy']}; both reference and candidate must pass.\n"
     (directory / "instruction.md").write_text(f"""# KernelBench Pro: level {config.level}, problem {pid}
 
 Implement ModelNew in /app/solution.py using custom GPU kernels.

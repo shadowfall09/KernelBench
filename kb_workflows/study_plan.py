@@ -27,7 +27,7 @@ def make_plan(specification, *, directory, base_directory=None):
     if not isinstance(options, dict):
         raise ValueError("base_config must be a RunConfig object or TOML path")
     options = dict(options)
-    for field in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file"):
+    for field in ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file"):
         if options.get(field) and not Path(options[field]).is_absolute():
             options[field] = str((base_directory / options[field]).resolve())
     base = RunConfig(**options)
@@ -81,6 +81,7 @@ def make_plan(specification, *, directory, base_directory=None):
                         jobs.append({"config": config.to_dict(), "session": f"session_{si:03}", "method": method,
                                      "problem_ids": list(selected), "declared_budget": budget,
                                      "reference_population": receipt(config),
+                                     "precision_calibration_sha256": fingerprint(read_json(Path(config.precision_calibration))) if config.precision_calibration else None,
                                      "path": str(config.run_dir), "config_sha256": fingerprint(config.to_dict())})
     if not jobs:
         raise ValueError("The study grid has no executable protocol points")
@@ -175,3 +176,6 @@ def _validate_populations(plan):
         config = RunConfig(**job["config"])
         if receipt(config) != job.get("reference_population"):
             raise ValueError("Study job reference population changed after preregistration")
+        precision = fingerprint(read_json(Path(config.precision_calibration))) if config.precision_calibration else None
+        if precision != job.get("precision_calibration_sha256"):
+            raise ValueError("Study job precision calibration changed after preregistration")

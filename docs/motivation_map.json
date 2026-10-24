@@ -1298,7 +1298,7 @@
       "title": "FP64数值契约与精度门",
       "primary": "M2",
       "secondary": [],
-      "status": "in_progress",
+      "status": "implemented",
       "source": "paper_design",
       "evidence": [
         "kb_workflows/numerical.py",
@@ -1325,9 +1325,14 @@
         "tests/test_model_input_profiles.py",
         "kb_workflows/timed_numerics.py",
         "tests/test_timed_numerics.py",
-        "docs/TIMED_NUMERICS.md"
+        "docs/TIMED_NUMERICS.md",
+        "kb_workflows/precision_calibration.py",
+        "kb_workflows/precision_calibration_task.py",
+        "scripts/calibrate_precision.py",
+        "tests/test_precision_calibration.py",
+        "docs/PRECISION_CALIBRATION.md"
       ],
-      "reason": "原250题独立CPU FP64公式/模型算法覆盖实际原生实例；有无输入配方均在原生/Neuron基线、候选和配对的首次、预热与每次正式输出上验证参考和候选，持久化逐次误差/信号/程序/mask证据并绑定评分恢复。配对复用调用前真值且不额外推进状态/RNG，所有原误差预算保持。完整阈值校准代码仍待完成；按要求不运行设备/模型实验"
+      "reason": "原250题独立FP64公式/模型算法、实际正确性/冷调用/逐次计时门及评分恢复已交付；现有按题目/dtype/校准设备的参考专用阈值拟合，固定上限内五项收紧、分离种子验证不重拟合，保存原始证据并在候选前冻结。当前设备必须独立自资格，记录和预算/Agent/Harbor/RL/研究/重新评分绑定。有限软件范围已完成；用户要求不运行设备/模型/阈值实验，未产生实测阈值或泛化/硬件认证"
     },
     {
       "id": "R-05",
@@ -4383,6 +4388,131 @@
         "docs/TIMED_NUMERICS.md"
       ],
       "reason": "小CPU原构造验证L1/L2/L3票据、旧容差漏错、首/预热/正式覆盖、收据重封篡改和连续随机状态；模拟Neuron验证三阶段，不建立设备测量资格"
+    },
+    {
+      "id": "V40-01",
+      "title": "固定预算内的误差使用比例",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/numerical.py"
+      ],
+      "reason": "从实际存储值与未舍入FP64真值计算逐叶RMS和逐元素最大预算使用比例；原上限失格不能通过拟合加宽"
+    },
+    {
+      "id": "V40-02",
+      "title": "参考专用阈值拟合与验证",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/precision_calibration_task.py"
+      ],
+      "reason": "原L1/L2/L3按题目/dtype使用三个拟合种子和三个不重叠验证种子，固定构造/前向RNG、隔离状态，不加载候选、不采性能时间"
+    },
+    {
+      "id": "V40-03",
+      "title": "五项预算统一缩放与禁止重拟合",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/precision_calibration.py"
+      ],
+      "reason": "固定margin4/floor1e-6且factor最多1，五项预算一同收紧；独立种子验证失败保留原政策，离散输出精确且不虚构浮点拟合"
+    },
+    {
+      "id": "V40-04",
+      "title": "阈值预览与单次配方应用",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/calibrate_precision.py",
+        "kb_workflows/config.py",
+        "kb_workflows/cli.py"
+      ],
+      "reason": "预览不导入设备SDK或创建输出，显式execute才运行参考；TOML/CLI路径、有效政策和缺项拒绝接入，名义配方仅变换一次"
+    },
+    {
+      "id": "V40-05",
+      "title": "校准与执行设备分离核对",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/precision_calibration.py",
+        "kb_workflows/numerical_audit.py",
+        "kb_workflows/timed_numerics.py"
+      ],
+      "reason": "校准设备保持来源身份，同硬件/软件类别可复用契约且逐次当前设备FP64自资格；异类拒绝，运行记录不能冒充新设备已校准"
+    },
+    {
+      "id": "V40-06",
+      "title": "模型生成前冻结阈值政策",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/precision_calibration.py",
+        "kb_workflows/reference_population.py"
+      ],
+      "reason": "冻结校准文件、类别、范围与样本数，候选出现后不能补选/替换阈值；预算、最终冻结和研究计划识别文件变化"
+    },
+    {
+      "id": "V40-07",
+      "title": "私有阈值贯通Agent与重评分",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/generation.py",
+        "kb_workflows/harbor.py",
+        "kb_workflows/rl_plan.py",
+        "kb_workflows/regrade.py",
+        "kb_workflows/tool_checks.py"
+      ],
+      "reason": "子任务携带本题/dtype记录，公开提示只给有效政策；Harbor/RL/评分恢复、研究导出及重新评分绑定内容和实际执行收据"
+    },
+    {
+      "id": "V40-08",
+      "title": "拟合反例与批量传递回归",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_precision_calibration.py",
+        "docs/PRECISION_CALIBRATION.md"
+      ],
+      "reason": "小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览"
     }
   ]
 }

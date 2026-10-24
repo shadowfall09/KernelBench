@@ -123,6 +123,7 @@ def heldout_plan(training_plan, checkpoints, *, directory, sessions=3, samples=1
                 jobs.append({"config": config.to_dict(), "session": f"session_{session:03}", "method": config.generation_mode,
                              "problem_ids": [config.start], "declared_budget": config.agent_timeout,
                              "reference_population": receipt(config),
+                             "precision_calibration_sha256": fingerprint(read_json(Path(config.precision_calibration))) if config.precision_calibration else None,
                              "path": str(config.run_dir), "config_sha256": fingerprint(config.to_dict())})
     plan = {"protocol": STUDY_PROTOCOL, "name": "rl_heldout", "vary": "wall", "jobs": jobs, "skipped_points": [],
             "plan_implementation_sha256": study_digest(), "evaluator_sha256": evaluator_digest(), "experiments_started": False,

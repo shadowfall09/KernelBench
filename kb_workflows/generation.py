@@ -95,6 +95,13 @@ def build_prompt(config, pid):
         contract += (f"\nNominal value distribution: {row['selected_recipe']}; shapes and discrete roles stay unchanged. "
                      f"Frozen RMS/all-element FP64 error policy: {row['precision_contract']}. "
                      "Both the reference and submission must qualify. Hidden distributions remain separate.\n")
+    if config.precision_calibration:
+        from .precision_calibration import for_config
+
+        source = select_problems(config.level, problem_ids=[pid])[pid].read_text()
+        row = for_config(config, pid, source)
+        contract += (f"\nEffective device-fitted RMS/all-element FP64 policy: {row['policy']}. "
+                     "This tightens the published cap; the reference and submission must both pass.\n")
     implementation = ("real NKI kernels using import nki and native torch_neuronx.nki_op registration, taking neuron tensors; keep the ModelNew torch.nn.Module interface"
                       if config.device_backend == "neuron" else "real CUDA/Triton kernels")
     return f"""Implement ModelNew for KernelBench Pro level {config.level}, problem {pid}.
@@ -173,6 +180,12 @@ def prepare_job(config, pid, sid):
         atomic_json(directory / "input_calibration.json", subset(config.input_calibration, config.level, pid, config.precision, source, population=population))
         job["input_calibration"] = ("/work/input_calibration.json" if config.generation in {"docker", "modal"}
                                     else str(directory / "input_calibration.json"))
+    if config.precision_calibration:
+        from .precision_calibration import subset_for_config
+
+        atomic_json(directory / "precision_calibration.json", subset_for_config(config, pid, source))
+        job["precision_calibration"] = ("/work/precision_calibration.json" if config.generation in {"docker", "modal"}
+                                        else str(directory / "precision_calibration.json"))
     if config.determinism_policy_file:
         from .determinism import POLICY_PROTOCOL, read_policies
 

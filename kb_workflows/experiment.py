@@ -46,6 +46,7 @@ def protocol(config):
         "profiling": config.agent_profile if not external and config.generation_mode == "feedback" else False,
         "diagnostic_contract": diagnostic_options(config),
         "input_calibration_sha256": fingerprint(read_json(Path(config.input_calibration))) if config.input_calibration else None,
+        "precision_calibration_sha256": fingerprint(read_json(Path(config.precision_calibration))) if config.precision_calibration else None,
         "reference_population": receipt(config),
         "determinism_policy_sha256": fingerprint(read_json(Path(config.determinism_policy_file))) if config.determinism_policy_file else None,
         "held_out_feedback": False if not external else None,
@@ -117,7 +118,7 @@ def compare_runs(directories):
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,
                         final_repeats=config.final_repeats, baseline_portfolio=config.baseline_portfolio)
         contract.update(score_mode=config.score_mode, score_external_files={option: fingerprint(read_json(Path(getattr(config, option)), {}))
-                        for option in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)})
+                        for option in ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest") if getattr(config, option)})
         contract.update(task_profile=config.task_profile, task_memory_mb=config.task_memory_mb)
         key = json.dumps(contract, sort_keys=True)
         entry = groups.setdefault(key, {"contract": contract, "runs": []})
@@ -150,7 +151,8 @@ def existing_budget(config):
             current[f"{pid}_{sid}"] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     expected = report.get("kernel_sha256", {})
     report["provenance_valid"] = (all(key in expected and expected[key] == value for key, value in current.items())
-        and report.get("protocol", {}).get("reference_population") == protocol(config).get("reference_population"))
+        and report.get("protocol", {}).get("reference_population") == protocol(config).get("reference_population")
+        and report.get("protocol", {}).get("precision_calibration_sha256") == protocol(config).get("precision_calibration_sha256"))
     if not report["provenance_valid"]:
         report["declared_protocol"] = report.get("protocol")
         report["protocol"] = {"mode": "unattributed", "reason": "Generation receipts do not match current candidate sources"}

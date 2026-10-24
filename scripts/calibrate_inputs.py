@@ -15,7 +15,7 @@ from kb_workflows.input_profiles import recipes
 
 
 def prepare(config):
-    if config.level not in {1, 2, 3} or config.input_calibration:
+    if config.level not in {1, 2, 3} or config.input_calibration or config.precision_calibration:
         raise ValueError("Calibrate original L1/L2/L3 inputs without an existing input calibration file")
     selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
     tasks = []

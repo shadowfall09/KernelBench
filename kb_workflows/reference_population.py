@@ -197,8 +197,11 @@ def _run_snapshot(config, paths, manifest):
 
 def freeze_run(config):
     """Persist before generation/export/evaluation, never adopt an existing run."""
+    from .precision_calibration import freeze_run as freeze_precision
+
     manifest = manifest_for(config)
-    select_run_problems(config)
+    selected = select_run_problems(config)
+    freeze_precision(config, selected)
     if manifest is None or config.dry_run:
         return manifest
     snapshot = config.run_dir / SNAPSHOT

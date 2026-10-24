@@ -33,6 +33,47 @@ def to_oracle(value):
     return value
 
 
+def reference_utilization(reference, oracle, contract):
+    """Dimensionless use of the fixed RMS/all-element budgets, before fitting."""
+    gate = precision_gate(reference, reference, oracle, contract)
+    if not gate["passed"] or not gate["reference_qualified"]:
+        raise ValueError("Reference exceeds its fixed precision cap; calibration cannot widen it")
+    rows = []
+
+    def visit(value, truth, path):
+        if isinstance(value, torch.Tensor):
+            if not (value.is_floating_point() or value.is_complex()):
+                return
+            if value.is_complex():
+                visit(torch.view_as_real(value), torch.view_as_real(truth), path + ".complex")
+                return
+            finite = torch.isfinite(truth)
+            if not bool(finite.any()):
+                return
+            truth, value = truth[finite].double(), value[finite].double()
+            error = (value - truth).abs()
+            scale = float(_rms(truth))
+            rms = float(_rms(error))
+            norm_limit = contract.norm_atol + contract.norm_rtol * scale
+            element_limit = contract.element_atol + contract.element_rtol * truth.abs() + contract.element_scale_rtol * scale
+            ratios = torch.where(element_limit > 0, error / element_limit, torch.zeros_like(error))
+            rows.append({"path": path, "elements": truth.numel(), "oracle_rms": scale, "rms_error": rms,
+                         "max_abs_error": float(error.max()),
+                         "norm_limit": norm_limit, "norm_utilization": rms / norm_limit if norm_limit else 0.0,
+                         "element_utilization": float(ratios.max())})
+        elif isinstance(value, dict):
+            for key in value:
+                visit(value[key], truth[key], f"{path}.{key}")
+        elif isinstance(value, (tuple, list)):
+            for i, item in enumerate(value):
+                visit(item, truth[i], f"{path}[{i}]")
+
+    visit(reference, oracle, "output")
+    return {"norm_max": max((row["norm_utilization"] for row in rows), default=0.0),
+            "element_max": max((row["element_utilization"] for row in rows), default=0.0),
+            "floating_elements": sum(row["elements"] for row in rows), "leaves": rows}
+
+
 def _rms(values):
     scale = values.abs().max()
     if not torch.isfinite(scale) or scale == 0:

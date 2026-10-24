@@ -75,6 +75,7 @@ class RunConfig:
     throughput_repeats: int = 4
     throughput_memory_mb: int = 1024
     input_calibration: str = ""
+    precision_calibration: str = ""
     reference_population: str = ""
     reference_population_scope: str = "run"
     input_family_memory_mb: int = 256
@@ -247,6 +248,14 @@ class RunConfig:
                 raise ValueError("Input calibration requires a file and original level 1, 2 or 3")
             self.input_calibration = str(Path(self.input_calibration).expanduser().resolve())
             read_bundle(self.input_calibration)
+            self.numerical_validation = True
+        if self.precision_calibration:
+            from .precision_calibration import read_bundle
+
+            if not isinstance(self.precision_calibration, str) or self.level not in {1, 2, 3}:
+                raise ValueError("Precision calibration requires a file and original level 1, 2 or 3")
+            self.precision_calibration = str(Path(self.precision_calibration).expanduser().resolve())
+            read_bundle(self.precision_calibration)
             self.numerical_validation = True
         if self.reference_population_scope not in {"run", "task"} or (self.reference_population_scope == "task" and not self.reference_population):
             raise ValueError("Reference population task delegation requires a frozen population file")
@@ -456,6 +465,7 @@ def parser():
         "score_mode",
         "device_calibration",
         "input_calibration",
+        "precision_calibration",
         "reference_population",
         "reference_population_scope",
         "baseline_portfolio",
@@ -543,7 +553,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
             candidate = Path(value).expanduser()
             value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value

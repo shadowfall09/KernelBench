@@ -25,6 +25,11 @@ def _spec(payload):
     from .input_calibration import validate_inline
 
     profile = validate_inline(payload)
+    from .precision_calibration import validate_inline as precision_profile
+
+    calibrated = precision_profile(payload)
+    if calibrated is not None:
+        return spec, calibrated["policy"]
     return spec, profile["precision_contract"] if profile is not None else spec["precision"][precision]
 
 

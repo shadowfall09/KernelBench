@@ -78,7 +78,7 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
     frozen_population = freeze_run(config)
     atomic_json(directory / "run_config.json", config.to_dict())
     external_inputs = {}
-    for name in ("problem_specs", "device_calibration", "input_calibration", "reference_population", "task_dimensions", "determinism_policy_file"):
+    for name in ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file"):
         filename = getattr(config, name)
         data = read_json(Path(filename)) if filename else {}
         atomic_json(directory / f"input_{name}.json", data)
@@ -225,8 +225,9 @@ def evaluate_group(plan, task_key, completions, *, directory, split="train", pur
               "source_files": {name: document_digest(read_json(directory / name, {})) for name in
                     ("run_config.json", "small_results.json", "eval_results.json", "eval_results_hidden.json",
                      "final_manifest.json", "final_results.json", "paired_results.json", "paper_analysis.json", "reward_schedule.json", "reward_baseline.json",
-                     "input_problem_specs.json", "input_device_calibration.json", "input_input_calibration.json", "input_reference_population.json",
-                     "input_task_dimensions.json", "input_determinism_policy_file.json") + (("reference_population.json",) if frozen_population else ())},
+                     "input_problem_specs.json", "input_device_calibration.json", "input_input_calibration.json", "input_precision_calibration.json", "input_reference_population.json",
+                     "input_task_dimensions.json", "input_determinism_policy_file.json") + (("reference_population.json",) if frozen_population else ())
+                     + (("precision_calibration_manifest.json",) if config.precision_calibration else ())},
               "request_wall_seconds": sum(row["request_wall_seconds"] for row in schedule) + certificate_seconds,
               "certificate_request_wall_seconds": certificate_seconds, "gpu_execution_seconds": None,
               "candidate_count": len(sources), "development_feedback_contains_hidden_results": False}

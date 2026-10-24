@@ -30,6 +30,8 @@ def _options(config):
     options.update(diagnostic_options(config))
     if config.input_calibration:
         options["input_calibration_sha256"] = fingerprint(read_json(Path(config.input_calibration)))
+    if config.precision_calibration:
+        options["precision_calibration_sha256"] = fingerprint(read_json(Path(config.precision_calibration)))
     from .reference_population import receipt
 
     if population := receipt(config):

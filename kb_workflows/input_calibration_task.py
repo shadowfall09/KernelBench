@@ -71,7 +71,7 @@ def calibrate(payload, *, adapter=None, loader=None):
     from .numerical import PrecisionContract, precision_gate, signal_audit
     from .reference_oracles import prepare
 
-    if "kernel_src" in payload or payload["level"] not in {1, 2, 3} or payload["eval_config"].get("input_profile"):
+    if "kernel_src" in payload or payload["level"] not in {1, 2, 3} or payload["eval_config"].get("input_profile") or payload["eval_config"].get("precision_profile"):
         raise ValueError("Input calibration accepts original L1/L2/L3 references, with no candidate or existing profile")
     source = validate_sources(payload)
     spec = spec_for(payload["level"], payload["problem_id"], source)

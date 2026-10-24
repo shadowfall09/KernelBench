@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第三十九版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第四十版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -1141,6 +1141,32 @@ R-06按原设计的有限软件范围记为代码已实现；复杂模型中目�
 R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实现。没有运行GPU、Trainium、模型、容器、校准或训练实验，旧stash未恢复。
 
 验证：Python 3.12.12 / Torch 2.12.0下4,477项CPU/模拟/meta回归通过，保留19条框架/环境warning；本版新增31项。小输入保留实际原构造参数，覆盖L1/L2/L3、实际原生双向入口、首次冷调用漏错、配对连续状态/RNG、基线变体绑定、收据重封篡改、缺失验证和模拟Neuron三阶段。Ruff、src/eval.py既有10项诊断等价、277项motivation映射、40份Markdown的1089个本地链接、skill及177包依赖检查通过。最终wheel为652073字节，11个改动代码文件逐字节一致，32个安装后轻量入口不导入设备SDK；无输入配方的导出通过实际Harbor 0.24 Task schema并传递当前逐次门与原生钩子。没有执行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验；阈值仍为公布的初始政策。
+
+## 第四十版：参考专用阈值校准与冻结预算
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 基础提交 | `f4e3a549d2f3a0182a4f3e41038caa9bd7ededbf` |
+| 提交日期 | 2026-10-24（UTC） |
+| 提交标题 | Calibrate reference precision budgets within frozen published caps |
+| 定位方式 | `git log --all --grep="Calibrate reference precision budgets within frozen published caps"` |
+
+本版补齐R-04的阈值校准代码：仅从参考误差拟合，不超过已有上限，再用分离种子验证；不因验证失败反向改政策。预览、设备范围、冻结与证据边界见[精度校准](PRECISION_CALIBRATION.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V40-01 | 固定预算内的误差使用比例 | 从实际存储值与未舍入FP64真值计算逐叶RMS和逐元素最大预算使用比例；原上限失格不能通过拟合加宽 | `kb_workflows/numerical.py` | [M2](MOTIVATION.md#m2) |
+| V40-02 | 参考专用阈值拟合与验证 | 原L1/L2/L3按题目/dtype使用三个拟合种子和三个不重叠验证种子，固定构造/前向RNG、隔离状态，不加载候选、不采性能时间 | `kb_workflows/precision_calibration_task.py` | [M2](MOTIVATION.md#m2) |
+| V40-03 | 五项预算统一缩放与禁止重拟合 | 固定margin4/floor1e-6且factor最多1，五项预算一同收紧；独立种子验证失败保留原政策，离散输出精确且不虚构浮点拟合 | `kb_workflows/precision_calibration.py` | [M2](MOTIVATION.md#m2) |
+| V40-04 | 阈值预览与单次配方应用 | 预览不导入设备SDK或创建输出，显式execute才运行参考；TOML/CLI路径、有效政策和缺项拒绝接入，名义配方仅变换一次 | `scripts/calibrate_precision.py` | [M5](MOTIVATION.md#m5) |
+| V40-05 | 校准与执行设备分离核对 | 校准设备保持来源身份，同硬件/软件类别可复用契约且逐次当前设备FP64自资格；异类拒绝，运行记录不能冒充新设备已校准 | `kb_workflows/precision_calibration.py` | [M5](MOTIVATION.md#m5) |
+| V40-06 | 模型生成前冻结阈值政策 | 冻结校准文件、类别、范围与样本数，候选出现后不能补选/替换阈值；预算、最终冻结和研究计划识别文件变化 | `kb_workflows/precision_calibration.py` | [M3](MOTIVATION.md#m3) |
+| V40-07 | 私有阈值贯通Agent与重评分 | 子任务携带本题/dtype记录，公开提示只给有效政策；Harbor/RL/评分恢复、研究导出及重新评分绑定内容和实际执行收据 | `kb_workflows/generation.py` | [M5](MOTIVATION.md#m5) |
+| V40-08 | 拟合反例与批量传递回归 | 小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览 | `tests/test_precision_calibration.py` | [M5](MOTIVATION.md#m5) |
+
+原误差上限、任务源码、尺寸和隐藏分布保持不变。契约可在同类多GPU批量运行中复用，但每个实际输出仍强制独立验证，不声称新设备已做校准。23项现为20项代码已实现、3项部分实现，继续完成R-08/R-16/R-18。没有运行GPU、Trainium、真实模型、容器、校准或训练实验；原stash未恢复。
+
+验证：完整软件回归4526项通过（含49项新增校准回归），19条依赖/既有提示；修改的运行时代码与新增测试Ruff通过。wheel内27个改动的运行时源码逐字节核对，35个流程模块脱离设备/模型SDK导入通过；真实Harbor 0.24任务schema、motivation清单、skill和41份Markdown的1133个本地链接检查通过。仅CPU小配置、meta元数据、格式夹具和显式模拟，没有运行设备或模型实验。
 
 ## 维护方式
 

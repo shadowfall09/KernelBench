@@ -68,6 +68,10 @@ def observe(reference, inputs, expected, actual, prepared, report):
     scope = prepared["scope"]
     if scope not in {"first", "timing", "control"}:
         raise ValueError("Unknown independent numerical output scope")
+    record = state["payload"]["eval_config"].get("precision_profile")
+    if record is not None and scope in {"first", "timing"}:
+        if fingerprint({"signature": input_signature(inputs)}) != record["fit"][0]["input_signature_sha256"]:
+            raise ValueError("Nominal dimensions/dtype differ from the device-fitted precision contract")
     state["rows"].append({"label": f"output/{len(state['rows'])}", "seed": None,
         "scope": scope, "input_signature": input_signature(inputs), "status": "passed" if report["passed"] else "failed",
         "errors": [], "estimated_host_bytes": prepared["estimated_host_bytes"], "precision_gate": report,
@@ -94,6 +98,10 @@ def _document(state):
 
 
 def issue(result, payload):
+    from .precision_calibration import issue as precision_issue
+
+    if reason := precision_issue(result, payload):
+        return reason
     if not payload["eval_config"].get("numerical_validation"):
         return None
     if result.get("correctness") is not True and result.get("baseline_correctness") is not True:
@@ -142,7 +150,7 @@ def issue(result, payload):
 def task_policy(function):
     @wraps(function)
     def wrapped(payload, *args, **kwargs):
-        if not payload["eval_config"].get("numerical_validation") or payload.get("task") in {"calibrate_inputs", "origin_audit"}:
+        if not payload["eval_config"].get("numerical_validation") or payload.get("task") in {"calibrate_inputs", "calibrate_precision", "origin_audit"}:
             return function(payload, *args, **kwargs)
         from .numerical_audit import _spec
 
@@ -172,7 +180,8 @@ def baseline_issue(config, baseline, pid):
     base = task_payload(config, pid, task="baseline")
     if config.baseline_suite:
         for variant, result in baseline.get("variants", {}).items():
-            if reason := issue(result, {**base, "eval_config": {**base["eval_config"], "baseline_variant": variant}}):
+            expected = {**base, "eval_config": {**base["eval_config"], "baseline_variant": variant}}
+            if reason := issue(result, expected):
                 return reason
         base = {**base, "eval_config": {**base["eval_config"], "baseline_variant": baseline.get("winning_baseline")}}
     return issue(baseline, base)

@@ -7,7 +7,7 @@ import time
 from contextlib import nullcontext
 from pathlib import Path
 
-from .common import ROOT, atomic_json, evaluator_digest, read_json
+from .common import ROOT, atomic_json, evaluator_digest, fingerprint, read_json
 from .config import parse_config
 from .reference_population import select_run_problems
 from .suites import selection_receipt
@@ -26,6 +26,7 @@ def main(argv=None):
                 raise ValueError("Use scripts.regrade_artifacts native-run for artifact verification; batch supports its analysis only")
         selected = select_run_problems(config)
         calibrated_inputs = None
+        calibrated_precision = None
         baseline_variants = None
         if config.baseline_suite and config.baseline_portfolio == "extended":
             from .baseline_variants import variants_for
@@ -47,6 +48,10 @@ def main(argv=None):
 
             calibrated_inputs = {pid: record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())["selected_recipe"]
                                  for pid, path in selected.items()}
+        if config.precision_calibration:
+            from .precision_calibration import for_config
+
+            calibrated_precision = {pid: for_config(config, pid, path.read_text())["policy"] for pid, path in selected.items()}
         operator_input_coverage = None
         if config.level in {1, 2, 3}:
             from .operator_input_policy import plan
@@ -83,6 +88,7 @@ def main(argv=None):
                         "strict_coverage": strict_coverage,
                         **({"operator_input_coverage": operator_input_coverage} if operator_input_coverage else {}),
                         **({"calibrated_inputs": calibrated_inputs} if calibrated_inputs is not None else {}),
+                        **({"calibrated_precision": calibrated_precision} if calibrated_precision is not None else {}),
                         **({"numerical_coverage": numerical_coverage} if numerical_coverage is not None else {}),
                         **({"baseline_variants": baseline_variants} if baseline_variants is not None else {}),
                         "evaluation_phases": ["standard", "hidden"] if config.hidden_tests else ["standard"],
@@ -116,7 +122,7 @@ def main(argv=None):
                 raise ValueError("Claude Code CLI is missing; install it or select --agent-backend litellm")
         if config.stage in {"all", "analyze", "baseline"} and not config.hardware:
             raise ValueError("Specify --hardware for the actual verifier GPU to select/record its baseline")
-        from .engine import analyze_run, evaluate_run, record_baseline
+        from .engine import analyze_run, evaluate_run, record_baseline, task_payload
         from .generation import build_docker_image, generate_run
 
         needs_image = (config.generation == "docker" and config.stage in {"all", "generate"}) or (
@@ -152,8 +158,9 @@ def main(argv=None):
                 not isinstance(baseline_data.get(path.name), dict)
                 or not (baseline_data[path.name].get("mean") or 0) > 0
                 or baseline_data[path.name].get("metadata", {}).get("evaluation_config", {}).get("evaluator_sha256") != evaluator_digest()
+                or baseline_data[path.name].get("metadata", {}).get("workflow_signature") != fingerprint(task_payload(config, pid, task="baseline"))
                 or (config.baseline_suite and not baseline_data[path.name].get("suite_complete"))
-                for path in selected.values()
+                for pid, path in selected.items()
             )
             if config.stage == "baseline" or config.record_baseline or (config.stage == "all" and missing_baseline):
                 print("[baseline] Recording the requested problems on the verifier hardware", flush=True)
