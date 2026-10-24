@@ -89,6 +89,12 @@ def verdicts(document, cases, payload):
         if any(not isinstance(row.get("source_device"), str) or not receipt_valid(row.get("composite_receipt"), spec,
                 precision=settings["precision"], source_device=row["source_device"]) for row in rows):
             return missing("Composite arithmetic graph or native stochastic-mask replay evidence is incomplete")
+    elif spec.get("family") == "model_block":
+        from .model_specs import receipt_valid
+
+        if any(not isinstance(row.get("source_device"), str) or not receipt_valid(row.get("model_receipt"), spec,
+                precision=settings["precision"], source_device=row["source_device"]) for row in rows):
+            return missing("Model architecture/arithmetic or native stochastic-mask replay evidence is incomplete")
     for row in rows:
         gate, signal = row.get("precision_gate", {}), row.get("reference_signal", {})
         if (not isinstance(gate, dict) or not _signal_valid(signal, policy["element_atol"])
@@ -150,6 +156,12 @@ class Collector:
             from .composite_oracles import Prepared
 
             self.composite_preparer = Prepared
+        elif self.spec.get("family") == "model_block":
+            from functools import partial
+
+            from .model_oracles import Prepared
+
+            self.composite_preparer = partial(Prepared, problem_id=payload["problem_id"])
 
     def observe(self, reference, candidate, inputs, *, seed, device, set_seed, tolerance, label):
         import torch
@@ -171,7 +183,7 @@ class Collector:
         try:
             with torch.no_grad(), preserve_rng(device), environment_guard(changes):
                 prepared = None
-                if self.spec.get("family") == "composite":
+                if self.spec.get("family") in {"composite", "model_block"}:
                     prepared = self.composite_preparer(reference, inputs, expected_program=self.spec["program_sha256"])
                     estimate = prepared.estimated_host_bytes
                 else:
@@ -185,7 +197,8 @@ class Collector:
                 set_seed(seed)
                 truth = prepared.execute() if prepared else execute(self.payload["problem_id"], reference, inputs)
                 if prepared:
-                    row.update(source_device=str(prepared.input_device), composite_receipt=prepared.receipt())
+                    row["source_device"] = str(prepared.input_device)
+                    row["model_receipt" if self.spec.get("family") == "model_block" else "composite_receipt"] = prepared.receipt()
                 ref, cand = _isolated_pair(reference, candidate)
                 set_seed(seed)
                 expected = clone_tensors(ref(*copy_inputs(inputs)))

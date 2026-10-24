@@ -1041,6 +1041,31 @@ R-06按原设计的有限软件范围记为代码已实现；复杂模型中目�
 
 验证：Python 3.12.12 / Torch 2.12.0下3,996项CPU/模拟/meta回归通过，本版新增338项；保留13条框架/环境warning。覆盖250题真实构造的meta转移/隔离布局、实际权重抵消与参数不变、三精度有限激活、精确/近似GELU、单个边界极值、共享写入和storage-base错误、缺存储API/压紧/收据删改及原生/Neuron入口、评分/恢复/RL。Ruff、src/eval.py既有诊断等价、248项动机映射、38份Markdown的965个本地链接、skill及177包依赖兼容性检查通过；离线wheel逐字节核对14个改动代码/清单文件，30个安装后轻量入口不导入设备SDK。没有运行GPU、Trainium、真实模型、容器、编译器调优或训练实验。
 
+## 第三十六版：完整L3模型的独立FP64算式
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Add independent source-bound FP64 model oracles for all L3 tasks |
+| 日期 | 2026-10-24 |
+| 基础提交 | `fa9240d` |
+| 状态 | CPU小构造、原生小输入与原尺寸meta检查；不运行实验 |
+
+本版补上R-04的L3适配，独立数值入口覆盖原L1/L2/L3全部250题。50题原构造/名义形状只在meta上检查，数值真值使用逐层解释器或专门模型算式。完整范围与边界见[模型数值参考](MODEL_NUMERICS.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V36-01 | 全L3来源与构造冻结 | 50题绑定来源、完整module树、标量属性、状态几何与算式；保留精度/模式/物理参数布局变化，拒绝缩小正式构造 | `kb_workflows/model_programs.json` | [M2](MOTIVATION.md#m2) |
+| V36-02 | 独立attention与encoder算术 | 显式投影、分头、mask、softmax、残差、前馈及norm，保持源码batch-first方向；原内置随机概率为零 | `kb_workflows/model_layers.py` | [M2](MOTIVATION.md#m2) |
+| V36-03 | 循环网络与普通状态算术 | RNN逐步递推、LSTM/GRU门公式、多层双向和h/c返回，保持33的状态copy舍入；不调用融合RNN | `kb_workflows/model_math.py` | [M2](MOTIVATION.md#m2) |
+| V36-04 | Swin、GPT、VLAD与SSD算术 | 窗口/shift、两类patch合并、余弦/因果/ReLU注意力、ghost残差及块内外状态递推分别实现，保持未使用层语义 | `kb_workflows/model_math.py` | [M2](MOTIVATION.md#m2) |
+| V36-05 | meta准入与条件随机掩码 | meta仅给形状/布局；全尺寸输入/状态与attention workspace先准入，原生值无关mask保留dtype/stride/RNG；闭包指向隔离meta模块 | `kb_workflows/model_oracles.py` | [M2](MOTIVATION.md#m2) |
+| V36-06 | 模型证据与统一数值入口 | L3配置、SDK轻量预览、逐原生实例收据、内部FX图和mask复核贯通已有控制worker、评分/恢复与打包 | `kb_workflows/model_specs.py` | [M5](MOTIVATION.md#m5) |
+| V36-07 | 小构造对照与参考缺陷保留 | 36个小配置的两模式算式、融合forward禁用、50题双meta计划、随机/可选状态/收据反例；35省略状态的FP32默认不被暗改 | `tests/test_model_oracles.py` | [M5](MOTIVATION.md#m5) |
+
+初始误差政策没有放宽，参考与候选都须通过独立门；非FP32的35题参考、过内存或未知算式保留失败/未测量。全题输入配方、阈值校准代码和更完整计时数值资格继续实现，R-04/R-05保持部分实现。23项仍为18项代码已实现、5项部分实现。旧stash保持原样；按用户要求不运行设备、原尺寸模型或训练实验。
+
+验证：Python 3.12.12 / Torch 2.12.0下4,226项CPU/模拟/meta回归通过，本版新增230项；保留18条框架/环境warning。36个小构造的两种模式、独立算式与融合forward禁用、50题原尺寸/隐藏BF16的双meta计划、原生随机mask、可选状态、参考默认dtype缺陷、内存准入、逐例收据及原生隐藏入口均有回归。原200题规格和全部精度政策逐项保持原值。Ruff、255项动机映射、39份Markdown的996个本地链接、skill及177包依赖检查通过；wheel逐字节核对11个改动代码/清单文件，31个安装后轻量入口不导入设备SDK。L3导出通过实际Harbor 0.24 Task schema，验证包内6个新增模型代码/清单与源码一致。没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

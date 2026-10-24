@@ -1312,9 +1312,16 @@
         "kb_workflows/composite_math.py",
         "kb_workflows/composite_oracles.py",
         "kb_workflows/composite_programs.json",
-        "docs/COMPOSITE_NUMERICS.md"
+        "docs/COMPOSITE_NUMERICS.md",
+        "kb_workflows/model_oracles.py",
+        "kb_workflows/model_math.py",
+        "kb_workflows/model_layers.py",
+        "kb_workflows/model_specs.py",
+        "kb_workflows/model_programs.json",
+        "docs/MODEL_NUMERICS.md",
+        "tests/test_model_oracles.py"
       ],
-      "reason": "保留17题附加契约，原L1全部100题显式公式与原L2全部100题来源/构造绑定的复合FP64算术覆盖实际原生输入；随机掩码条件下数值参考不切换eval。参考失格、空/全非有限null和L2恒零信号证据保留；L3、全题/设备阈值校准及更完整计时数值资格仍待完成"
+      "reason": "原L1/L2/L3全部250题有来源绑定的独立CPU FP64公式/模型算法和实际原生实例复核；50题冻结完整构造，31题逐层图与19题专用算法覆盖attention/循环/Swin/VLAD/SSD。参考自身同门、随机mask和已知默认dtype问题保留；全题阈值校准代码和更完整计时数值资格仍待完成，不运行设备/模型实验"
     },
     {
       "id": "R-05",
@@ -1333,7 +1340,7 @@
         "scripts/calibrate_inputs.py",
         "docs/INPUT_CALIBRATION.md"
       ],
-      "reason": "参考信号审计已覆盖L1/L2实际原生输入；原L1有参考专用名义值分布选择、固定强预算及新基线/恢复契约。L2恒零公式保留信号失败；L2/L3输入配方、全题适配和逐设备阈值校准仍缺，按用户要求不跑设备/模型实验"
+      "reason": "参考信号审计随独立数值入口覆盖原250题；L1已有参考专用名义值分布选择、固定强预算及新基线/恢复契约，L2恒零公式保留失败。L2/L3名义配方、完整阈值校准及全题计时资格代码仍待补齐，按用户要求不跑实验"
     },
     {
       "id": "R-06",
@@ -3916,6 +3923,109 @@
         "tests/test_input_layouts.py"
       ],
       "reason": "全250题转移及隔离的meta布局、小输入权重抵消/参数不变、GELU近似与BF16反例、边界极值及收据删改"
+    },
+    {
+      "id": "V36-01",
+      "title": "全L3来源与构造冻结",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_programs.json"
+      ],
+      "reason": "50题绑定来源、完整module树、标量属性、状态几何与算式；保留精度/模式/物理参数布局变化，拒绝缩小正式构造"
+    },
+    {
+      "id": "V36-02",
+      "title": "独立attention与encoder算术",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_layers.py"
+      ],
+      "reason": "显式投影、分头、mask、softmax、残差、前馈及norm，保持源码batch-first方向；原内置随机概率为零"
+    },
+    {
+      "id": "V36-03",
+      "title": "循环网络与普通状态算术",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_math.py"
+      ],
+      "reason": "RNN逐步递推、LSTM/GRU门公式、多层双向和h/c返回，保持33的状态copy舍入；不调用融合RNN"
+    },
+    {
+      "id": "V36-04",
+      "title": "Swin、GPT、VLAD与SSD算术",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_math.py"
+      ],
+      "reason": "窗口/shift、两类patch合并、余弦/因果/ReLU注意力、ghost残差及块内外状态递推分别实现，保持未使用层语义"
+    },
+    {
+      "id": "V36-05",
+      "title": "meta准入与条件随机掩码",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_oracles.py"
+      ],
+      "reason": "meta仅给形状/布局；全尺寸输入/状态与attention workspace先准入，原生值无关mask保留dtype/stride/RNG；闭包指向隔离meta模块"
+    },
+    {
+      "id": "V36-06",
+      "title": "模型证据与统一数值入口",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_specs.py",
+        "kb_workflows/numerical_audit.py",
+        "kb_workflows/config.py",
+        "pyproject.toml"
+      ],
+      "reason": "L3配置、SDK轻量预览、逐原生实例收据、内部FX图和mask复核贯通已有控制worker、评分/恢复与打包"
+    },
+    {
+      "id": "V36-07",
+      "title": "小构造对照与参考缺陷保留",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_model_oracles.py",
+        "tests/_model_cases.py",
+        "docs/MODEL_NUMERICS.md"
+      ],
+      "reason": "36个小配置的两模式算式、融合forward禁用、50题双meta计划、随机/可选状态/收据反例；35省略状态的FP32默认不被暗改"
     }
   ]
 }

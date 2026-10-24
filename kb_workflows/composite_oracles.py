@@ -46,11 +46,11 @@ class Tracer(torch.fx.Tracer):
         return super().is_leaf_module(module, name)
 
 
-def trace(model):
+def trace(model, *, extra_modules=()):
     clone = meta_copy(model)
     graph = torch.fx.GraphModule(clone, Tracer().trace(clone))
     for node in graph.graph.nodes:
-        if node.op == "call_module" and type(graph.get_submodule(node.target)) not in arithmetic.MODULES:
+        if node.op == "call_module" and type(graph.get_submodule(node.target)) not in arithmetic.MODULES | set(extra_modules):
             raise ValueError(f"No reviewed module arithmetic: {type(graph.get_submodule(node.target)).__name__}")
         if node.op == "call_function" and node.target not in arithmetic.FUNCTIONS:
             raise ValueError(f"No reviewed function arithmetic: {node.target}")
@@ -124,9 +124,10 @@ def _tensor_metadata(value):
 
 
 class Prepared:
-    def __init__(self, model, inputs, *, expected_program=None):
+    def __init__(self, model, inputs, *, expected_program=None, extra_modules=(), extra_module_call=None):
         self.model, self.inputs = model, inputs
-        self.graph = trace(model)
+        self.extra_modules, self.extra_module_call = set(extra_modules), extra_module_call
+        self.graph = trace(model, extra_modules=extra_modules)
         self.description = describe(self.graph)
         self.program_sha256 = fingerprint(self.description)
         if expected_program is not None and expected_program != self.program_sha256:
@@ -171,6 +172,8 @@ class Prepared:
 
             def call_module(self, target, args, kwargs):
                 layer = owner.model.get_submodule(target)
+                if type(layer) in owner.extra_modules:
+                    return owner.extra_module_call(layer, args, kwargs)
                 if type(layer) is torch.nn.Dropout:
                     owner.dropout_states.append({"node": self.current.name, "training": layer.training,
                         "probability": layer.p, "inplace": layer.inplace,

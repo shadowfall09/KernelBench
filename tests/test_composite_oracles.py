@@ -178,7 +178,7 @@ def test_changed_initialization_and_unreviewed_operation_never_fall_back_to_refe
     with pytest.raises(ValueError, match="No reviewed function arithmetic"):
         Prepared(Unsupported(), [torch.ones(2)])
     with pytest.raises(ValueError, match="No independent"):
-        spec_for(3, 1, "not supported")
+        spec_for(4, 1, "not supported")
 
 
 def test_l2_preview_is_sdk_light_and_does_not_create_an_oracle_or_allocate_inputs(tmp_path):
@@ -191,8 +191,8 @@ assert not {{"torch","triton","nki","torch_neuronx"}} & sys.modules.keys()
     result = subprocess.run([sys.executable, "-I", "-c", script], capture_output=True, text=True, check=True)
     assert len(json.loads(result.stdout)["numerical_coverage"]["supported"]) == 100
     assert not (tmp_path / "absent").exists()
-    with pytest.raises(ValueError, match="level 1 or 2"):
-        RunConfig(level=3, numerical_validation=True).validate()
+    with pytest.raises(ValueError, match="level 1, 2 or 3"):
+        RunConfig(level=5, suite="production41", numerical_validation=True).validate()
 
 
 @pytest.mark.parametrize("damage", [None, "mask_missing", "shape", "dtype", "probability", "kept", "hash", "mode", "identity", "meta_forward"])

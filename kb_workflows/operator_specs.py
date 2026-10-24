@@ -1,4 +1,4 @@
-"""Frozen L1 oracle selection and error policies; imports no tensor SDK."""
+"""Frozen L1/L2/L3 oracle selection and error policies; imports no tensor SDK."""
 
 import hashlib
 import json
@@ -19,6 +19,10 @@ def spec_for(level, pid, source):
         raise ValueError("Independent operator oracle reference changed; review the formula and domain")
     if result.get("family") == "composite":
         from .composite_specs import program_for
+
+        program_for(result)
+    elif result.get("family") == "model_block":
+        from .model_specs import program_for
 
         program_for(result)
     return {**{key: document[key] for key in ("oracle", "precision", "scope", "native_input_roles_preserved")}, **result}
