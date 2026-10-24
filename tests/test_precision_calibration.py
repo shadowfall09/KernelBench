@@ -368,9 +368,10 @@ def test_harbor_exports_private_precision_data_and_only_the_effective_policy(fit
     assert "device-fitted" in instruction and "SIMULATED" not in instruction
 
 
-def test_regrade_archives_and_rebinds_the_precision_fit_without_running_workers(fitted, tmp_path):
+def test_regrade_archives_and_rebinds_the_precision_fit_without_running_workers(fitted, tmp_path, monkeypatch):
     from kb_workflows import regrade
 
+    monkeypatch.setattr(regrade, "ROOT", ROOT)
     config, _, _ = fitted
     config.hardware, config.gpu, config.gpu_arch = "RTX_A6000", "A6000", "Ampere"
     reference_population.freeze_run(config)

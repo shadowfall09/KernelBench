@@ -1549,9 +1549,15 @@
         "kb_workflows/profile_task.py",
         "kb_workflows/neuron_device.py",
         "kb_workflows/neuron_profile.py",
-        "kb_workflows/kernel_origin.py"
+        "kb_workflows/kernel_origin.py",
+        "kb_workflows/work_counters.py",
+        "kb_workflows/counter_task.py",
+        "kb_workflows/counter_worker.py",
+        "scripts/audit_work_counters.py",
+        "tests/test_work_counters.py",
+        "docs/WORK_COUNTERS.md"
       ],
-      "reason": "已实现CUDA busy并集与部分源码/库/Graph来源诊断、Neuron框架/NEFF/NTFF及每引擎指令并集、缺计数器时AE/O与launch_only；硬件工作计数器、完整来源与正式归因门待实现，没有运行设备实验"
+      "reason": "已实现CUDA/Neuron busy并集、部分来源诊断与launch_only，现补Nsight计数器采集软件、原始值/单位重放、审核实例契约及同设备校准A/E模型；Neuron工作计数器、跨捕获完整来源关联与正式归因门继续实现，没有运行设备或模型实验"
     },
     {
       "id": "R-17",
@@ -4585,6 +4591,109 @@
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA"
+    },
+    {
+      "id": "V42-01",
+      "title": "原始工作计数器逐核重放",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "逐launch解析Nsight原始CSV的PID/context/stream/device、精确uint64计数与单位，缺指标、重复、错绑、截断和缩放值不转为零"
+    },
+    {
+      "id": "V42-02",
+      "title": "审核资源映射与完整实例契约",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "仅完整审核规则可建执行模型，绑定来源/参考、输入几何、精度政策、dtype与设备类别；部分资源计数保留诊断范围"
+    },
+    {
+      "id": "V42-03",
+      "title": "计数器驱动的A/E分解",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/performance.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "从原始计数与同物理设备校准率重算资源最大值SOL并自动填A/E；拒绝measured字符串、手填SOL或篡改分量，缺证据只给AE/O"
+    },
+    {
+      "id": "V42-04",
+      "title": "独立Nsight参考与候选采集",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/counter_worker.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改"
+    },
+    {
+      "id": "V42-05",
+      "title": "计数器父校验与失败工件保存",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/counter_task.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "固定ncu参数和工具身份，重查源码/配置/输入/政策/实际设备及报告PID，超时或失格保留有界原始失败前缀，不产生部分通过"
+    },
+    {
+      "id": "V42-06",
+      "title": "计数器路由与精度校准队列修复",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/audit_work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "默认SDK轻量预览、显式execute及独立输出，local/Docker/Modal/队列路由；修复队列遗漏calibrate_precision并禁止参考校准带候选"
+    },
+    {
+      "id": "V42-07",
+      "title": "计数器反例与软件集成回归",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验"
     }
   ]
 }

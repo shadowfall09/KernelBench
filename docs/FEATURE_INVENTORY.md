@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第四十一版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第四十二版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -1190,6 +1190,31 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 支持范围和失效规则见[执行来源诊断](KERNEL_ORIGIN.md)。未知来源不转为custom/library通过，不授予L1，不替换原生性能时间。未运行CUPTI、nvcc、cuobjdump、GPU、Trainium、模型或容器实验；原搁置stash未恢复。
 
 验证：完整软件回归4564项通过（新增38项Graph更新回归），19条依赖/既有提示；当前工作流和新增测试Ruff通过。仅主机C程序核对供应商头文件的11个大小/offset，wheel内3个改动运行时源码逐字节一致，41个流程模块脱离设备/模型SDK导入；Harbor 0.24真实Task schema和私有副本、motivation、skill及41份Markdown的1149个本地链接检查通过。没有运行设备或模型实验。
+
+## 第四十二版：可重放工作计数器与审核后的 A/E 模型
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 基础提交 | `4e6c8bf3c835619d7fc7e3857410b3f0d92e34a2` |
+| 提交日期 | 2026-10-24（UTC） |
+| 提交标题 | Collect replayable CUDA work counters for reviewed A/E decomposition |
+| 定位方式 | `git log --all --grep="Collect replayable CUDA work counters for reviewed A/E decomposition"` |
+
+本版继续R-16：从供应商原始计数构建审核工作模型，替换此前可凭measured字符串启用A/E的弱接口。默认只预览，显式采集才调用ncu；本轮只实现与软件测试，未运行采集。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V42-01 | 原始工作计数器逐核重放 | 逐launch解析Nsight原始CSV的PID/context/stream/device、精确uint64计数与单位，缺指标、重复、错绑、截断和缩放值不转为零 | `kb_workflows/work_counters.py` | [M3](MOTIVATION.md#m3) |
+| V42-02 | 审核资源映射与完整实例契约 | 仅完整审核规则可建执行模型，绑定来源/参考、输入几何、精度政策、dtype与设备类别；部分资源计数保留诊断范围 | `kb_workflows/work_counters.py` | [M3](MOTIVATION.md#m3) |
+| V42-03 | 计数器驱动的A/E分解 | 从原始计数与同物理设备校准率重算资源最大值SOL并自动填A/E；拒绝measured字符串、手填SOL或篡改分量，缺证据只给AE/O | `kb_workflows/performance.py` | [M3](MOTIVATION.md#m3) |
+| V42-04 | 独立Nsight参考与候选采集 | 初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改 | `kb_workflows/counter_worker.py` | [M3](MOTIVATION.md#m3) |
+| V42-05 | 计数器父校验与失败工件保存 | 固定ncu参数和工具身份，重查源码/配置/输入/政策/实际设备及报告PID，超时或失格保留有界原始失败前缀，不产生部分通过 | `kb_workflows/counter_task.py` | [M2](MOTIVATION.md#m2) |
+| V42-06 | 计数器路由与精度校准队列修复 | 默认SDK轻量预览、显式execute及独立输出，local/Docker/Modal/队列路由；修复队列遗漏calibrate_precision并禁止参考校准带候选 | `scripts/audit_work_counters.py` | [M5](MOTIVATION.md#m5) |
+| V42-07 | 计数器反例与软件集成回归 | CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验 | `tests/test_work_counters.py` | [M5](MOTIVATION.md#m5) |
+
+用法与证据边界见[工作计数器](WORK_COUNTERS.md)。部分计数不能冒充完整工作量，初始公开实例不能冒充全部原生/隐藏或连续状态覆盖。Neuron计数器、跨捕获来源与正式归因门仍待完成；23项仍为20项代码已实现、3项部分实现。未运行GPU、Trainium、模型、容器、ncu或校准实验，原stash未恢复。
+
+验证：完整软件回归4627项通过（新增63项计数器回归），19条依赖/既有提示；220项跨流程定向集成通过。修改的工作流/命令与新增测试Ruff通过，wheel内9个改动运行时源码逐字节核对，45个模块脱离设备/模型SDK导入；Harbor 0.24真实Task schema及9个私有源码副本、motivation、skill和42份Markdown的1180个本地链接检查通过。仅CPU小矩阵、格式夹具和模拟runner，没有执行ncu或设备/模型实验。
 
 ## 维护方式
 

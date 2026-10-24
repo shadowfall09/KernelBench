@@ -139,12 +139,12 @@ def validate_payload(payload):
         raise ValueError("eval_config must be a dictionary and ref_arch_src a string")
     if not isinstance(payload["request_id"], str) or not payload["request_id"]:
         raise ValueError("request_id must be a nonempty string")
-    if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing", "qualify_small", "origin_audit", "calibrate_inputs"}:
+    if payload.get("task", "evaluate") not in {"evaluate", "baseline", "profile", "paired_timing", "qualify_small", "origin_audit", "calibrate_inputs", "calibrate_precision", "counter_audit"}:
         raise ValueError("Unknown task")
-    if payload.get("task", "evaluate") in {"evaluate", "profile", "paired_timing", "qualify_small", "origin_audit"} and not isinstance(payload.get("kernel_src"), str):
+    if payload.get("task", "evaluate") in {"evaluate", "profile", "paired_timing", "qualify_small", "origin_audit", "counter_audit"} and not isinstance(payload.get("kernel_src"), str):
         raise ValueError("kernel_src must be provided")
-    if payload.get("task") == "calibrate_inputs" and "kernel_src" in payload:
-        raise ValueError("Reference input calibration accepts no candidate")
+    if payload.get("task") in {"calibrate_inputs", "calibrate_precision"} and "kernel_src" in payload:
+        raise ValueError("Reference calibration accepts no candidate")
     if payload["eval_config"].get("timeout", 0) <= 0:
         raise ValueError("Evaluation timeout must be positive")
     from .reference_revisions import validate_payload as validate_revision
@@ -153,6 +153,13 @@ def validate_payload(payload):
     from .input_calibration import validate_inline
 
     validate_inline(payload)
+    from .precision_calibration import validate_inline as validate_precision
+
+    validate_precision(payload)
+    if payload.get("task") == "counter_audit":
+        from .work_counters import recipe
+
+        recipe(payload["eval_config"].get("counter_recipe"))
     from .operator_input_policy import validate_inline as validate_operator_inputs
 
     validate_operator_inputs(payload)

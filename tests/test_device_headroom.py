@@ -280,9 +280,9 @@ def test_unmeasured_work_is_not_fabricated_and_launch_only_is_explicit():
     assert (result["A"], result["E"], result["AE"], result["O"]) == (None, None, 4, 1.25)
     with pytest.raises(ValueError, match="source-bound work counters"):
         performance.decomposition(10, 8, 2, sol_execution_ms=4)
-    result = performance.decomposition(10, 8, 2, sol_execution_ms=4,
-        counters={"status": "measured", "source_sha256": "source"})
-    assert 2 * result["A"] * result["E"] * result["O"] == 10
+    with pytest.raises(ValueError, match="source-bound work counters"):
+        performance.decomposition(10, 8, 2, sol_execution_ms=4,
+            counters={"status": "measured", "source_sha256": "source"})
     ref = {"wall_ms": 10, "device_busy_ms": 8, "kernel_count": 10}
     cand = {"wall_ms": 9, "device_busy_ms": 8, "kernel_count": 2}
     assert performance.launch_only(ref, cand, launch_ms=0.2, speedup_ci95=[1.1, 1.2], noise_ci95=[0.99, 1.01])["launch_only"]

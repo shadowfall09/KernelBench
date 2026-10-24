@@ -121,6 +121,7 @@ def evaluator_digest():
         "kb_workflows/origin_binaries.py", "kb_workflows/origin_graphs.py",
         "kb_workflows/triton_origin.py", "kb_workflows/cpp_origin.py",
         "kb_workflows/origin_task.py", "scripts/audit_kernel_origin.py",
+        "kb_workflows/work_counters.py", "kb_workflows/counter_worker.py", "kb_workflows/counter_task.py", "scripts/audit_work_counters.py",
         "kb_workflows/isolation.py", "kb_workflows/isolated_worker.py", "kb_workflows/restricted_transport.py",
         "kb_workflows/regrade.py", "kb_workflows/harbor_regrade.py", "scripts/regrade_artifacts.py",
         "kb_workflows/verification_contracts.json",

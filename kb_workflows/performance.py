@@ -76,14 +76,27 @@ def timeline(trace, *, device, marker="kernelbench_profile", origins=None):
 def decomposition(wall_ms, busy_ms, sol_algorithm_ms, *, sol_execution_ms=None, counters=None):
     if not all(map(positive, (wall_ms, busy_ms, sol_algorithm_ms))) or busy_ms > wall_ms * (1 + 1e-9):
         raise ValueError("Decomposition needs positive times and busy time no greater than wall")
-    measured = bool(counters and counters.get("status") == "measured" and counters.get("source_sha256"))
+    measured, issue = False, None
+    if counters is not None:
+        from .work_counters import validate_model
+
+        try:
+            model = validate_model(counters)
+            if sol_execution_ms is not None and sol_execution_ms != model["sol_execution_ms"]:
+                raise ValueError("Supplied execution SOL differs from its raw work counters")
+            sol_execution_ms, measured = model["sol_execution_ms"], True
+        except (ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
+            issue = str(exc)
+            if sol_execution_ms is not None:
+                raise ValueError("Separate A/E factors require replayable source-bound work counters and calibration") from exc
     if sol_execution_ms is not None and (not measured or not positive(sol_execution_ms)):
-        raise ValueError("Separate A/E factors require measured, source-bound work counters")
+        raise ValueError("Separate A/E factors require replayable source-bound work counters and calibration")
     algorithm = sol_execution_ms / sol_algorithm_ms if sol_execution_ms is not None else None
     efficiency = busy_ms / sol_execution_ms if sol_execution_ms is not None else None
     return {"A": algorithm, "E": efficiency, "AE": busy_ms / sol_algorithm_ms, "O": wall_ms / busy_ms,
             "sol_algorithm_ms": sol_algorithm_ms, "wall_ms": wall_ms, "device_busy_ms": busy_ms,
-            "counters": counters, "model_consistent": sol_algorithm_ms <= busy_ms and (sol_execution_ms is None or
+            "counters": counters, "counter_issue": issue,
+            "model_consistent": sol_algorithm_ms <= busy_ms and (sol_execution_ms is None or
                 sol_algorithm_ms <= sol_execution_ms <= busy_ms), "hardware_counters_collected": measured}
 
 

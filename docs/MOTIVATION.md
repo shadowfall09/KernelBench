@@ -32,7 +32,7 @@
 
 当前默认比较四个经过正确性验证的基线变体，保留原始墙钟样本、设备与软件信息、冷成本及 K 次摊销结果。评分要求当前源码和测量证据匹配，按声明题目和样本计入失败；先按题求均值，再分层宏平均，并报告 bootstrap 区间。I/F/D 可由规格文件或选集暂定分类提供。不同设备、协议和预算分开比较。
 
-聚合报告已新增同一批槽位上的mean/median/best-of-N消融，正式均值口径不变。当前 bounded gain 的分母为 `ln(1.25)`；没有设备实测上限时，它**不是论文提出的 headroom 分数**。第十版已实现交替计时、参考控制噪声、冻结后的独立重测、扩展Graph组合和部分框架等价改写。第十一版实现显式设备校准、工作量证书、D类独立可达性见证及可选Headroom评分；缺证据不能计分。开发profiler增加设备活动并集，A/E缺计数器时保持null，launch_only只作为诊断；正式来源归因与实际硬件计数器采集仍需实现。按用户要求不运行校准、GPU/Trainium、模型或训练实验，结果保持未采集。
+聚合报告已新增同一批槽位上的mean/median/best-of-N消融，正式均值口径不变。当前 bounded gain 的分母为 `ln(1.25)`；没有设备实测上限时，它**不是论文提出的 headroom 分数**。第十版已实现交替计时、参考控制噪声、冻结后的独立重测、扩展Graph组合和部分框架等价改写。第十一版实现显式设备校准、工作量证书、D类独立可达性见证及可选Headroom评分；缺证据不能计分。开发profiler增加设备活动并集，A/E缺计数器时保持null，launch_only只作为诊断；第四十二版补Nsight采集软件、原始计数与单位重放、审核实例和同设备校准A/E模型，拒绝仅凭measured字符串取得资格；Neuron计数器、完整来源关联与正式归因门仍需实现。按用户要求不运行校准、GPU/Trainium、模型或训练实验，结果保持未采集。
 
 <a id="m4"></a>
 
@@ -194,6 +194,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V41-02 可执行Graph更新与克隆别名 | 可执行Graph核参数更新只修改目标实例的后续提交；原模板、其他实例和旧调用快照保留，克隆节点沿原节点身份更新 | M3 | [origin_graphs.py](../kb_workflows/origin_graphs.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 | V41-03 Graph更新事件与代次复核 | v4来源收据重放API、函数与context、节点/实例事件、前后代次和调用边界，拒绝回滚节点或借用其他实例的更新 | M3 | [kernel_origin.py](../kb_workflows/kernel_origin.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 | V41-04 含糊更新失效与有界重放 | 成功却缺事件、错绑事件或失败伴更新事件使后续关联未知；原始代次及失效边界保留，有界重放超额拒绝而不省略证据 | — | [origin_graphs.py](../kb_workflows/origin_graphs.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
+| V42-05 计数器父校验与失败工件保存 | 固定ncu参数和工具身份，重查源码/配置/输入/政策/实际设备及报告PID，超时或失格保留有界原始失败前缀，不产生部分通过 | M3, M5 | [counter_task.py](../kb_workflows/counter_task.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -245,6 +246,10 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V38-03 候选前冻结固定评分分母 | 在生成、导出和评测前保存集合及样本数，已有候选/结果不能补选集合；冻结后失败和缺失样本保留零分 | M4 | [reference_population.py](../kb_workflows/reference_population.py), [generation.py](../kb_workflows/generation.py), [engine.py](../kb_workflows/engine.py) |
 | V39-05 评分恢复要求计时数值证据 | 基线记录/缓存、候选恢复、配对、最终重测和普通评分核对完整逐次收据；缺检查、改预算或篡改误差计数不能取得正分 | M2, M5 | [tool_checks.py](../kb_workflows/tool_checks.py), [engine.py](../kb_workflows/engine.py), [paper_analysis.py](../kb_workflows/paper_analysis.py) |
 | V40-06 模型生成前冻结阈值政策 | 冻结校准文件、类别、范围与样本数，候选出现后不能补选/替换阈值；预算、最终冻结和研究计划识别文件变化 | M2, M4 | [precision_calibration.py](../kb_workflows/precision_calibration.py), [reference_population.py](../kb_workflows/reference_population.py) |
+| V42-01 原始工作计数器逐核重放 | 逐launch解析Nsight原始CSV的PID/context/stream/device、精确uint64计数与单位，缺指标、重复、错绑、截断和缩放值不转为零 | — | [work_counters.py](../kb_workflows/work_counters.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
+| V42-02 审核资源映射与完整实例契约 | 仅完整审核规则可建执行模型，绑定来源/参考、输入几何、精度政策、dtype与设备类别；部分资源计数保留诊断范围 | M2 | [work_counters.py](../kb_workflows/work_counters.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
+| V42-03 计数器驱动的A/E分解 | 从原始计数与同物理设备校准率重算资源最大值SOL并自动填A/E；拒绝measured字符串、手填SOL或篡改分量，缺证据只给AE/O | — | [performance.py](../kb_workflows/performance.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
+| V42-04 独立Nsight参考与候选采集 | 初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改 | M2 | [counter_worker.py](../kb_workflows/counter_worker.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -379,6 +384,8 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V40-07 私有阈值贯通Agent与重评分 | 子任务携带本题/dtype记录，公开提示只给有效政策；Harbor/RL/评分恢复、研究导出及重新评分绑定内容和实际执行收据 | M2, M4 | [generation.py](../kb_workflows/generation.py), [harbor.py](../kb_workflows/harbor.py), [rl_plan.py](../kb_workflows/rl_plan.py), [regrade.py](../kb_workflows/regrade.py), [tool_checks.py](../kb_workflows/tool_checks.py) |
 | V40-08 拟合反例与批量传递回归 | 小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览 | M2, M3 | [test_precision_calibration.py](../tests/test_precision_calibration.py), [PRECISION_CALIBRATION.md](../docs/PRECISION_CALIBRATION.md) |
 | V41-05 Graph更新反例与主机ABI核对 | CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA | M2 | [test_graph_updates.py](../tests/test_graph_updates.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
+| V42-06 计数器路由与精度校准队列修复 | 默认SDK轻量预览、显式execute及独立输出，local/Docker/Modal/队列路由；修复队列遗漏calibrate_precision并禁止参考校准带候选 | M3 | [audit_work_counters.py](../scripts/audit_work_counters.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
+| V42-07 计数器反例与软件集成回归 | CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验 | M2, M3 | [test_work_counters.py](../tests/test_work_counters.py), [WORK_COUNTERS.md](../docs/WORK_COUNTERS.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额
@@ -403,7 +410,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-13 扩展基线组合 | 代码已实现 | M3 | 291题来源清单已覆盖论文指定的SDPA、LayerNorm/var_mean、卷积benchmark/布局和cuBLASLt偏好；六基础组合及每个改写/策略的Graph对应共2750个分题声明。逐输出验证、失败保留、政策收据、冷成本/稳态选择与恢复/配对/评分门已实现；最强指声明且通过的集合，非全库最优性证明；不运行硬件实验 |
 | R-14 设备实测上限与边界证书 | 代码已实现 | M3 | 已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理 |
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
-| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA busy并集与部分源码/库/Graph来源诊断、Neuron框架/NEFF/NTFF及每引擎指令并集、缺计数器时AE/O与launch_only；硬件工作计数器、完整来源与正式归因门待实现，没有运行设备实验 |
+| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、部分来源诊断与launch_only，现补Nsight计数器采集软件、原始值/单位重放、审核实例契约及同设备校准A/E模型；Neuron工作计数器、跨捕获完整来源关联与正式归因门继续实现，没有运行设备或模型实验 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明，模型CLI内层超时清理嵌套子进程的竞态也已修复；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |

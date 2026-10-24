@@ -326,6 +326,10 @@ def dispatch(payload):
         from .origin_task import audit
 
         return audit(payload)
+    if payload.get("task") == "counter_audit":
+        from .counter_task import audit
+
+        return audit(payload)
     if payload.get("eval_config", {}).get("device_backend", "cuda") == "neuron":
         from .neuron_worker import evaluate as evaluate_neuron
 
@@ -419,7 +423,9 @@ def main():
         from .allocation_audit import STAGES
         from .throughput_audit import STAGES as THROUGHPUT_STAGES
 
-        if native_worker and settings.get("diagnostic_stage") == "input_cache":
+        if payload.get("task") == "counter_audit":
+            result = dispatch(payload)  # NCU runs separately from sanitizer/repeat workers.
+        elif native_worker and settings.get("diagnostic_stage") == "input_cache":
             result = cache_control(payload)
         elif native_worker and settings.get("diagnostic_stage") in STAGES.values():
             result = allocation_control(payload)
