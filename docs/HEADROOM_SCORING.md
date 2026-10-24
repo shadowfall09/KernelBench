@@ -90,6 +90,6 @@ python -m scripts.analyze_device_trace trace.json --device 0 --output activity.j
 
 `performance.decomposition()` 在没有可信、来源绑定的工作计数器时，只给出 `AE=T_dev/SOL_alg`、`O=T_wall/T_dev`，A/E 为 null。现在必须提供可重放原始计数、完整审核实例契约与同物理设备校准模型才能分开计算A/E；执行SOL自动重算，`status="measured"`字符串或手填数值不能启用。模型不一致会保留标记，见[工作计数器](WORK_COUNTERS.md)。`launch_only()` 还要求配对区间超出参考控制噪声、核数减少、busy 时间基本不变，且墙钟收益不超过校准启动成本解释的范围；这是诊断分类，不自动提供计分资格。
 
-来源关联图只接受可信 verifier 的 correlation 映射，未知保持 unknown，不能根据 kernel 名字宣称自写。Nsight采集入口和计数器重放已有软件路径，未运行设备采集；[Neuron Parquet分析](NEURON_WORK.md)已有完整分片、逐指令工作注释和DMA分账软件，来源仍未知。Neuron执行工作模型、完整来源关联和正式计分归因门仍需后续实现。
+来源关联图只接受可信 verifier 的 correlation 映射，未知保持 unknown，不能根据 kernel 名字宣称自写。Nsight采集入口和计数器重放已有软件路径，未运行设备采集；[Neuron Parquet分析与审核模型](NEURON_WORK.md)可从完整逐指令注释、维护者配对审核及同设备校准重算A/E，但不提升硬件计数或来源资格。自动跨捕获关联、完整来源关联和正式计分归因门仍需后续实现。
 
 实现依据：[PyTorch profiler](https://docs.pytorch.org/docs/2.12/profiler.html)、[数值精度说明](https://docs.pytorch.org/docs/2.12/notes/numerical_accuracy.html)、[NVIDIA nvidia-smi](https://docs.nvidia.com/deploy/nvidia-smi/index.html)。

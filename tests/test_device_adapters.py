@@ -452,6 +452,48 @@ def get_inputs(): return [torch.randn(2,3)]
     assert not result["metadata"]["profile_call"]["independent_oracle_ticket"]
 
 
+def test_neuron_profile_isolates_inputs_before_the_captured_interval(payload, monkeypatch):
+    from kb_workflows import evaluate_task
+
+    _, request = payload
+    source = '''import torch
+class Model(torch.nn.Module):
+ def forward(self,x): return x+1
+def get_init_inputs(): return []
+def get_inputs(): return [torch.randn(2,3)]
+'''
+    request.update(task="profile", level=1, problem_id=1, ref_arch_src=source,
+                   kernel_src=source.replace("class Model(", "class ModelNew("))
+    request["eval_config"].update(precision="fp32")
+    request["eval_config"].pop("production", None)
+    monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: payload["ref_arch_src"])
+    active, captured_clones = False, []
+    original = torch.Tensor.clone
+
+    def clone(tensor, *args, **kwargs):
+        if active:
+            captured_clones.append(tuple(tensor.shape))
+        return original(tensor, *args, **kwargs)
+
+    class IntervalAdapter(ProfiledSimulatedNeuron):
+        def profile(self, function, *, directory, verifier):
+            def captured():
+                nonlocal active
+                active = True
+                try:
+                    return function()
+                finally:
+                    active = False
+            return super().profile(captured, directory=directory, verifier=verifier)
+
+    monkeypatch.setattr(torch.Tensor, "clone", clone)
+    result = neuron_worker.evaluate(request, adapter=IntervalAdapter())
+    assert captured_clones == [] and result["output_verified"]
+    capture = result["capture_receipt"]
+    assert capture["simulated"] and capture["binding"]["input_probe_sha256"]
+    assert capture["compiler_source_sha256"] == result["metadata"]["compiler_source_sha256"]
+
+
 @pytest.mark.parametrize("throws", [False, True])
 def test_environment_guard_restores_grad_mode_even_after_candidate_failure(throws):
     from kb_workflows.strict_validation import environment_guard

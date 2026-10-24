@@ -122,6 +122,10 @@ def evaluate(payload, *, adapter=None):
         if hashlib.sha256(path.read_bytes()).hexdigest() != payload["eval_config"]["hidden_source_sha256"]:
             raise ValueError("Hidden sources changed during Neuron execution")
     result.setdefault("metadata", {})["compiler_source_sha256"] = hashes
+    if payload.get("task") == "profile":
+        from .neuron_work import capture_record
+
+        result["capture_receipt"] = capture_record(payload, result)
     return result
 
 
@@ -384,6 +388,10 @@ def _evaluate(payload, *, adapter=None):
 
                 profile_args = move(args)
                 profile_seed = settings.get("evaluation_seed", 42)
+                from .input_calibration_task import probe
+
+                input_probe = fingerprint({"probe": probe(profile_args)})
+                state_probe = fingerprint({"probe": probe(dict(ref.state_dict()))})
                 training = bool(ref.training)
                 if bool(model.training) != training:
                     raise ValueError("Neuron profile candidate changed the reference training mode")
@@ -393,10 +401,11 @@ def _evaluate(payload, *, adapter=None):
                     expected_profile = clone_tensors(ref(*move(profile_args)))
                     adapter.synchronize()
                 seed(profile_seed)
+                candidate_profile_args = move(profile_args)
 
                 def profiled_forward():
                     with environment_guard(changes):
-                        output = model(*move(profile_args))
+                        output = model(*candidate_profile_args)
                         if bool(model.training) != training:
                             changes.append("candidate_training_mode")
                         return output
@@ -411,6 +420,12 @@ def _evaluate(payload, *, adapter=None):
                 metadata["profile_call"] = {"seed": profile_seed, "input_signature": input_signature(profile_args),
                     "training": training, "no_grad": True, "output_verified": True,
                     "independent_oracle_ticket": profile_ticket is not None,
+                    "input_probe_sha256": input_probe, "registered_state_probe_sha256": state_probe,
+                    "preceding_cases_sha256": fingerprint({"cases": checked}),
+                    "precision_policy": {"native_tolerance": settings["fp32_tolerance"],
+                        "production_contract": vars(contract) if contract else None,
+                        "oracle_spec_sha256": profile_ticket.get("oracle_spec_sha256") if profile_ticket else None,
+                        "independent_numerical": profile_ticket is not None},
                     "state_scope": "continuous_state; pre_forward_reference_snapshot"}
                 return {"status": "ok", "purpose": "development_diagnostics_only", "metadata": metadata, **report}
             if strict and not all(accepted(row) for row in strict.values()):

@@ -1557,9 +1557,11 @@
         "tests/test_work_counters.py",
         "docs/WORK_COUNTERS.md",
         "kb_workflows/neuron_tables.py",
-        "docs/NEURON_WORK.md"
+        "docs/NEURON_WORK.md",
+        "kb_workflows/neuron_work.py",
+        "tests/test_neuron_work.py"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、部分来源诊断与launch_only、Nsight计数器采集/重放和审核实例及同设备校准A/E；现补Neuron完整Parquet逐指令工作注释、DMA分账与execution/NKI联结。Neuron审核执行模型、跨捕获完整来源及正式归因门继续实现，没有运行设备或模型实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet逐指令注释/DMA分账、来源检查后的采集收据、维护者配对审核资源模型与同物理设备校准A/E已有软件实现。自动跨捕获/完整来源关联及正式归因门继续实现，没有运行设备或模型实验"
     },
     {
       "id": "R-17",
@@ -4798,6 +4800,113 @@
         "tests/test_device_adapters.py"
       ],
       "reason": "实际Parquet读写覆盖分片、大整数、缺失、重叠、准入与重封篡改；CPU状态随机模型和SDK模拟验证输出门，不运行设备实验"
+    },
+    {
+      "id": "V44-01",
+      "title": "Neuron采集来源与调用收据",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_work.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "编译文件复核后封装源码/参考、配置、输入与注册状态探针、此前用例、政策、设备/软件、模式和工件；模拟收据不能建真实设备模型"
+    },
+    {
+      "id": "V44-02",
+      "title": "逐指令审核与完整资源工作模型",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_work.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "可信维护者配对审核report/capture并逐行精确匹配engine/opcode/dtype，缺raw FLOPs/HBM拒绝建模；DMA不叠加，来源仍未知"
+    },
+    {
+      "id": "V44-03",
+      "title": "Neuron同设备校准与A/E",
+      "primary": "M3",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/performance.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "原始资源需求除以同物理core及软件校准率取最大值，重放全部分量再拆A/E；明确为指令注释模型且hardware_counters_collected为false"
+    },
+    {
+      "id": "V44-04",
+      "title": "显式execution身份核对",
+      "primary": "M2",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_tables.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "优先验证Instruction.execution_index存在且时间包含；缺字段才用唯一包含区间，不能借其他execution修复矛盾"
+    },
+    {
+      "id": "V44-05",
+      "title": "采集前输入隔离",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/neuron_worker.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "候选输入隔离复制在profile区间前完成，采集中保留候选前向与完成屏障，不把验证器复制计入执行工作"
+    },
+    {
+      "id": "V44-06",
+      "title": "离线模型命令与失败门",
+      "primary": "M5",
+      "secondary": [
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "scripts/analyze_neuron_work.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "已有Parquet可选联合capture/review/calibration构建模型，全程不启动工具或设备；模型失格仍保存完整原始报告与原因"
+    },
+    {
+      "id": "V44-07",
+      "title": "注释模型与篡改回归",
+      "primary": "M5",
+      "secondary": [
+        "M2",
+        "M3"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_neuron_work.py",
+        "docs/NEURON_WORK.md",
+        "tests/test_device_adapters.py"
+      ],
+      "reason": "CPU与实际Parquet回归覆盖审核缺项、精确关联、非空质量表、设备/校准/源码/汇总重封篡改、模拟收据和失败持久化，不运行设备实验"
     }
   ]
 }

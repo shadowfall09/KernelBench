@@ -16,7 +16,7 @@ TABLES = {
     "Metadata": ("profile_schema_version", "capture_type", "num_physical_cores", "vnc_enabled", "explorer_version",
                  "neuron_device_idx", "neuroncore_idx", "first_hw_timestamp", "last_hw_timestamp"),
     "ExecutionInfo": ("execution_index", "neff_name", "execution_start_ts", "execution_end_ts"),
-    "Instruction": ("id", "start_ts", "end_ts", "duration_ns", "engine", "engine_instance_idx", "execution_unit",
+    "Instruction": ("id", "execution_index", "start_ts", "end_ts", "duration_ns", "engine", "engine_instance_idx", "execution_unit",
                     "pcore_idx", "opcode", "pc", "compiler_pc", "nki_call_site_id", "raw_flops", "adjusted_flops",
                     "hbm_read_bytes", "hbm_write_bytes", "src1_dtype", "src2_dtype", "dst_dtype", "tensor_instruction_type"),
     "DmaPacket": ("id", "start_ts", "end_ts", "duration_ns", "pcore_idx", "packet_idx", "packet_aggregation_id",
@@ -232,7 +232,16 @@ def analyze(tables):
             all_intervals.append((start, end))
         group = engines.setdefault(row["engine"], [])
         group.append(row)
-        execution = execution_index.find(start, end)
+        declared_execution = row.get("execution_index")
+        if declared_execution is not None:
+            if not integer(declared_execution) or declared_execution not in executions:
+                raise ValueError("Instruction declares an absent or invalid execution")
+            owner = executions[declared_execution]
+            if not owner["execution_start_ts"] <= start <= end <= owner["execution_end_ts"]:
+                raise ValueError("Instruction timestamps contradict its declared execution")
+            execution = declared_execution
+        else:
+            execution = execution_index.find(start, end)
         site = row.get("nki_call_site_id")
         if site is not None and not integer(site):
             raise ValueError("NKI instruction has an invalid call-site ID")

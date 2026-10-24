@@ -1241,6 +1241,31 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 
 验证：完整软件回归4675项通过（新增48项Parquet/profile/梯度模式回归），19条依赖/既有提示；此前305项跨流程定向回归通过。修改的工作流、命令与测试Ruff通过。wheel内6个改动运行时源码逐字节一致，47个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema及6个私有源码副本、motivation、skill和43份Markdown的1214个本地链接检查通过。仅CPU小模型、真实本地Parquet读写和SDK模拟，没有启动Explorer或设备实验。
 
+## 第四十四版：审核后的Neuron资源需求与A/E模型
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 基础提交 | `75f617b9f17d42e4fc9d524c4755922371b562bc` |
+| 提交日期 | 2026-10-24（UTC） |
+| 提交标题 | Model reviewed Neuron instruction demand with verified capture receipts |
+| 定位方式 | `git log --all --grep="Model reviewed Neuron instruction demand with verified capture receipts"` |
+
+本版把Neuron逐指令事实接入审核资源模型与同设备校准。report/capture配对属于可信维护者人工审核，尚非自动处理链或正式执行来源证明；本轮只实现和软件测试。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V44-01 | Neuron采集来源与调用收据 | 编译文件复核后封装源码/参考、配置、输入与注册状态探针、此前用例、政策、设备/软件、模式和工件；模拟收据不能建真实设备模型 | `kb_workflows/neuron_work.py` | [M2](MOTIVATION.md#m2) |
+| V44-02 | 逐指令审核与完整资源工作模型 | 可信维护者配对审核report/capture并逐行精确匹配engine/opcode/dtype，缺raw FLOPs/HBM拒绝建模；DMA不叠加，来源仍未知 | `kb_workflows/neuron_work.py` | [M3](MOTIVATION.md#m3) |
+| V44-03 | Neuron同设备校准与A/E | 原始资源需求除以同物理core及软件校准率取最大值，重放全部分量再拆A/E；明确为指令注释模型且hardware_counters_collected为false | `kb_workflows/performance.py` | [M3](MOTIVATION.md#m3) |
+| V44-04 | 显式execution身份核对 | 优先验证Instruction.execution_index存在且时间包含；缺字段才用唯一包含区间，不能借其他execution修复矛盾 | `kb_workflows/neuron_tables.py` | [M2](MOTIVATION.md#m2) |
+| V44-05 | 采集前输入隔离 | 候选输入隔离复制在profile区间前完成，采集中保留候选前向与完成屏障，不把验证器复制计入执行工作 | `kb_workflows/neuron_worker.py` | [M3](MOTIVATION.md#m3) |
+| V44-06 | 离线模型命令与失败门 | 已有Parquet可选联合capture/review/calibration构建模型，全程不启动工具或设备；模型失格仍保存完整原始报告与原因 | `scripts/analyze_neuron_work.py` | [M5](MOTIVATION.md#m5) |
+| V44-07 | 注释模型与篡改回归 | CPU与实际Parquet回归覆盖审核缺项、精确关联、非空质量表、设备/校准/源码/汇总重封篡改、模拟收据和失败持久化，不运行设备实验 | `tests/test_neuron_work.py` | [M5](MOTIVATION.md#m5) |
+
+用法和审核字段见[Neuron工作分析](NEURON_WORK.md)。模型不将注释改称硬件计数，不提升L1/正式轨道资格或替换原生计时；自动跨捕获关联与正式归因门仍继续实现。23项仍为20项代码已实现、3项部分实现。没有运行GPU、Trainium、真实模型、容器或Explorer实验，原stash未恢复。
+
+验证：完整软件回归4726项通过（新增51项模型/采集边界回归），19条依赖/既有提示；296项跨流程定向测试通过。修改的工作流、命令与测试Ruff通过。wheel内6个改动运行时源码逐字节一致，48个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema和6个私有源码副本、motivation、skill及43份Markdown的1241个本地链接检查通过。仅实际本地Parquet读写、CPU小模型与序列化/SDK模拟，没有启动Explorer或设备实验。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

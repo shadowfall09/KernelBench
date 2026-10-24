@@ -76,15 +76,20 @@ def timeline(trace, *, device, marker="kernelbench_profile", origins=None):
 def decomposition(wall_ms, busy_ms, sol_algorithm_ms, *, sol_execution_ms=None, counters=None):
     if not all(map(positive, (wall_ms, busy_ms, sol_algorithm_ms))) or busy_ms > wall_ms * (1 + 1e-9):
         raise ValueError("Decomposition needs positive times and busy time no greater than wall")
-    measured, issue = False, None
+    measured, issue, evidence_kind, hardware_counters = False, None, None, False
     if counters is not None:
+        from .neuron_work import MODEL as NEURON_MODEL
+        from .neuron_work import validate_model as validate_neuron_model
         from .work_counters import validate_model
 
         try:
-            model = validate_model(counters)
+            neuron = isinstance(counters, dict) and counters.get("protocol") == NEURON_MODEL
+            model = validate_neuron_model(counters) if neuron else validate_model(counters)
             if sol_execution_ms is not None and sol_execution_ms != model["sol_execution_ms"]:
                 raise ValueError("Supplied execution SOL differs from its raw work counters")
             sol_execution_ms, measured = model["sol_execution_ms"], True
+            evidence_kind = "reviewed_neuron_instruction_annotations" if neuron else "reviewed_Nsight_hardware_counters"
+            hardware_counters = not neuron
         except (ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
             issue = str(exc)
             if sol_execution_ms is not None:
@@ -97,7 +102,8 @@ def decomposition(wall_ms, busy_ms, sol_algorithm_ms, *, sol_execution_ms=None, 
             "sol_algorithm_ms": sol_algorithm_ms, "wall_ms": wall_ms, "device_busy_ms": busy_ms,
             "counters": counters, "counter_issue": issue,
             "model_consistent": sol_algorithm_ms <= busy_ms and (sol_execution_ms is None or
-                sol_algorithm_ms <= sol_execution_ms <= busy_ms), "hardware_counters_collected": measured}
+                sol_algorithm_ms <= sol_execution_ms <= busy_ms), "hardware_counters_collected": hardware_counters,
+            "execution_model_replayed": measured, "work_evidence_kind": evidence_kind}
 
 
 def launch_only(reference, candidate, *, launch_ms, speedup_ci95, noise_ci95, relative_busy_tolerance=0.05):
