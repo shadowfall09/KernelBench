@@ -11,18 +11,42 @@ PROTOCOL = "kernelbench_pro_nominal_input_profiles_v1"
 ACTIVE = ContextVar("kernelbench_nominal_input_profile", default=None)
 
 
-def recipes(pid):
-    if type(pid) is not int or not 1 <= pid <= 100:
+def recipes(pid, level=1):
+    if level in {2, 3}:
+        from .model_input_profiles import policy
+
+        return tuple(policy(level, pid)["recipes"])
+    if level != 1 or type(pid) is not int or not 1 <= pid <= 100:
         raise ValueError("Nominal input distribution adapters currently cover original L1 only")
     if pid == 98:
         return ("identity", "probability_peaks")
     extra = ("bounded_product_walk",) if pid == 90 else ("separated_triplets",) if pid == 99 else ()
-    return ("identity", *extra, "signed", "positive")
+    extrema = ("normal",) if pid in {41, 42, 43, 49, 51, 52, 53} else ()
+    return ("identity", *extra, "signed", "positive", *extrema)
 
 
-def transform(inputs, pid, recipe):
+def selection_policy(level, pid, source=None):
+    if level == 1:
+        minimum = .4 if pid in {14, 15, 19} else .9
+        family = "reviewed_operator"
+    else:
+        from .model_input_profiles import policy
+
+        model = policy(level, pid, source)
+        minimum, family = model["minimum_fraction"], model["family"]
+    return {"level": level, "problem_id": pid, "family": family, "recipes": list(recipes(pid, level)),
+            "minimum_fraction": minimum, "forward_seed": 42,
+            "output_variation": "at_least_two_distinct_bounded_output_probes_at_fixed_forward_seed",
+            "selection": "first_reference_qualified_recipe; no_candidate_or_timing_feedback"}
+
+
+def transform(inputs, pid, recipe, *, level=1):
     """Change values only; keep shapes, strides, discrete roles and parameters."""
-    if recipe not in recipes(pid):
+    if level in {2, 3}:
+        from .model_input_profiles import transform as model_transform
+
+        return model_transform(inputs, level, pid, recipe)
+    if level != 1 or recipe not in recipes(pid):
         raise ValueError("Unreviewed nominal input distribution")
     import torch
 
@@ -67,7 +91,7 @@ def transform(inputs, pid, recipe):
     for index, value in enumerate(result):
         if not isinstance(value, torch.Tensor) or not value.is_floating_point() or (pid == 100 and index == 1):
             continue
-        updated = value * 2 - 1 if recipe == "signed" else value.abs() + 0.5
+        updated = torch.randn_like(value) if recipe == "normal" else value * 2 - 1 if recipe == "signed" else value.abs() + 0.5
         if pid == 14:
             updated = updated.triu()
         elif pid == 15:
@@ -89,7 +113,7 @@ def wrap_factory(source, factory):
 
         values = factory()
         before = input_signature(values)
-        output = transform(values, active["problem_id"], active["recipe"])
+        output = transform(values, active["problem_id"], active["recipe"], level=active["level"])
         if input_signature(output) != before:
             raise ValueError("Calibrated input distribution changed shapes, strides or storage roles")
         active["factory_calls"] += 1
@@ -102,10 +126,14 @@ def wrap_factory(source, factory):
 
 
 @contextmanager
-def context(source, pid, recipe):
-    if recipe not in recipes(pid):
+def context(source, pid, recipe, *, level=1):
+    if recipe not in recipes(pid, level):
         raise ValueError("Unknown calibrated input distribution")
-    state = {"source_sha256": hashlib.sha256(source.encode()).hexdigest(), "problem_id": pid,
+    if level in {2, 3}:
+        from .model_input_profiles import policy
+
+        policy(level, pid, source)
+    state = {"source_sha256": hashlib.sha256(source.encode()).hexdigest(), "problem_id": pid, "level": level,
              "recipe": recipe, "factory_calls": 0, "input_signature": None}
     token = ACTIVE.set(state)
     try:

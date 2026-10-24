@@ -8,7 +8,7 @@ from contextlib import contextmanager
 
 from .common import evaluator_digest, fingerprint, json_safe
 from .input_calibration import PROTOCOL, SEEDS, precision_policy, selected_attempt
-from .input_profiles import recipes, transform
+from .input_profiles import recipes, selection_policy, transform
 from .operator_specs import spec_for
 
 
@@ -53,12 +53,14 @@ def calibrate(payload, *, adapter=None, loader=None):
     import torch
 
     from src.eval import (
+        _process_input_group,
         _process_input_tensor,
         get_torch_dtype_from_string,
         load_original_model_and_inputs,
         move_model,
         set_seed,
     )
+    from src.input_groups import copy_inputs
     from src.validation import clone_tensors, synchronize
 
     from .calibration import identity
@@ -67,10 +69,10 @@ def calibrate(payload, *, adapter=None, loader=None):
     from .evaluate_task import validate_sources
     from .measurement import input_signature
     from .numerical import PrecisionContract, precision_gate, signal_audit
-    from .operator_oracles import estimate_bytes, execute
+    from .reference_oracles import prepare
 
-    if "kernel_src" in payload or payload["level"] != 1 or payload["eval_config"].get("input_profile"):
-        raise ValueError("Input calibration accepts original L1 references only, with no candidate or existing profile")
+    if "kernel_src" in payload or payload["level"] not in {1, 2, 3} or payload["eval_config"].get("input_profile"):
+        raise ValueError("Input calibration accepts original L1/L2/L3 references, with no candidate or existing profile")
     source = validate_sources(payload)
     spec = spec_for(payload["level"], payload["problem_id"], source)
     settings = payload["eval_config"]
@@ -78,7 +80,8 @@ def calibrate(payload, *, adapter=None, loader=None):
     adapter = adapter or device_adapter(settings.get("device_backend", "cuda"), "0")
     device, caps = adapter.device, adapter.caps()
     policy = precision_policy(spec, settings["precision"])
-    record = {"protocol": PROTOCOL, "level": 1, "problem_id": payload["problem_id"], "precision": settings["precision"],
+    selection = selection_policy(payload["level"], payload["problem_id"], source)
+    record = {"protocol": PROTOCOL, "level": payload["level"], "problem_id": payload["problem_id"], "precision": settings["precision"],
         "source_sha256": hashlib.sha256(source.encode()).hexdigest(), "evaluator_sha256": evaluator_digest(),
         "device": caps, "device_identity_sha256": identity(caps), "precision_contract": policy,
         "simulated_execution": simulated or bool(getattr(adapter, "simulated", False)),
@@ -86,6 +89,7 @@ def calibrate(payload, *, adapter=None, loader=None):
         "attempts": [], "selected_recipe": None, "qualified": False,
         "input_probe_scope": "up_to_256_deterministic_positions_per_tensor; not_a_full_content_hash",
         "oracle_memory_mb": settings["oracle_memory_mb"]}
+    record.update(oracle_spec=spec, oracle_spec_sha256=fingerprint(spec), selection_policy=selection)
     dtype = get_torch_dtype_from_string(settings["precision"])
     Model, init, inputs = (loader or load_original_model_and_inputs)(source, {})
 
@@ -99,33 +103,38 @@ def calibrate(payload, *, adapter=None, loader=None):
         seed(settings.get("evaluation_seed", 42))
         initial = [_process_input_tensor(value, device, dtype) for value in init()]
         model = move_model(Model(*initial), device, dtype)
-        for recipe in recipes(payload["problem_id"]):
+        for recipe in recipes(payload["problem_id"], payload["level"]):
             attempt = {"recipe": recipe, "cases": []}
             record["attempts"].append(attempt)
             for value in SEEDS:
-                row = {"seed": value, "status": "not_measured", "errors": []}
+                row = {"seed": value, "forward_seed": selection["forward_seed"], "status": "not_measured", "errors": []}
                 attempt["cases"].append(row)
                 try:
                     seed(value)
                     raw = inputs()
                     raw_signature = input_signature(raw)
                     row["raw_input_signature_sha256"] = fingerprint({"signature": raw_signature})
-                    estimate = estimate_bytes(payload["problem_id"], model, raw)
+                    estimate = prepare(model, raw, spec=spec, problem_id=payload["problem_id"]).estimated_host_bytes
                     row["estimated_host_bytes"] = estimate
                     if estimate > settings["oracle_memory_mb"] * 1024**2:
                         row["input_signature_sha256"] = row["raw_input_signature_sha256"]
                         row["errors"].append("Original-size calibration exceeds the host-memory estimate envelope; no resizing")
                         continue
-                    values = transform(raw, payload["problem_id"], recipe)
+                    values = transform(raw, payload["problem_id"], recipe, level=payload["level"])
                     if input_signature(values) != raw_signature:
                         raise ValueError("Input calibration changed nominal shape, stride or storage roles")
-                    args = [_process_input_tensor(item, device, dtype) for item in values]
+                    args = _process_input_group(values, device, dtype)
                     row["input_signature_sha256"] = fingerprint({"signature": input_signature(args)})
                     row["input_probe_sha256"] = fingerprint({"probe": probe(args)})
-                    truth = execute(payload["problem_id"], model, args)
+                    prepared = prepare(model, args, spec=spec, problem_id=payload["problem_id"])
+                    if prepared.estimated_host_bytes > settings["oracle_memory_mb"] * 1024**2:
+                        raise ValueError("Actual stored precision crossed the full-size oracle memory estimate")
+                    seed(selection["forward_seed"])
+                    truth = prepared.execute()
+                    row.update(oracle_receipt=prepared.receipt(), source_device=str(device))
                     reference = copy.deepcopy(model)
-                    seed(value)
-                    expected = clone_tensors(reference(*clone_tensors(args)))
+                    seed(selection["forward_seed"])
+                    expected = clone_tensors(reference(*copy_inputs(args)))
                     synchronize(device)
                     def host(item):
                         if isinstance(item, torch.Tensor):
@@ -136,6 +145,7 @@ def calibrate(payload, *, adapter=None, loader=None):
                             return {key: host(child) for key, child in item.items()}
                         return item
                     expected = host(expected)
+                    row["output_probe_sha256"] = fingerprint({"probe": probe(expected)})
                     row["reference_gate"] = precision_gate(expected, clone_tensors(expected), truth, PrecisionContract(**policy))
                     row["signal"] = signal_audit(expected, absolute_tolerance=0.0)
                     row["status"] = "passed" if row["reference_gate"]["passed"] else "failed"

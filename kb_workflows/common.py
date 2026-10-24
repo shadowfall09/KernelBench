@@ -111,6 +111,7 @@ def evaluator_digest():
         "kb_workflows/model_input_cases.py", "kb_workflows/model_input_families.json",
         "kb_workflows/model_stress.py", "kb_workflows/input_layouts.py",
         "kb_workflows/input_profiles.py", "kb_workflows/input_calibration.py", "kb_workflows/input_calibration_task.py",
+        "kb_workflows/model_input_profiles.py", "kb_workflows/reference_oracles.py",
         "scripts/calibrate_inputs.py",
         "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
         "kb_workflows/submission_source.py", "kb_workflows/kernel_origin.py", "kb_workflows/cuda_origin.py",

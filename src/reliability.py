@@ -56,7 +56,7 @@ def stress_cases(inputs, seed):
 
 
 def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
-                       set_seed, metadata, label, record_first_call=False, clock=None, verify_pair=None):
+                       set_seed, metadata, label, record_first_call=False, clock=None, verify_pair=None, prepare_pair=None):
     """Compare C→R and R→C pairs, advancing both models equally, with RNG replay.
 
     Snapshot each output before the other implementation can reuse its storage.
@@ -79,6 +79,8 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     metadata["reliability_protocol"] = PROTOCOL
     for order in ("candidate_first", "reference_first"):
         outputs = {}
+        if prepare_pair:
+            prepare_pair()
         names = ("candidate", "reference") if order == "candidate_first" else ("reference", "candidate")
         for name in names:
             try:

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .calibration import identity
 from .common import evaluator_digest, fingerprint
-from .input_profiles import recipes
+from .input_profiles import recipes, selection_policy
 from .operator_specs import spec_for
 
 PROTOCOL = "kernelbench_pro_reference_input_calibration_v1"
@@ -65,8 +65,11 @@ def _qualified(row, policy, minimum_fraction):
 
 def selected_attempt(record):
     """Select the first complete qualifying distribution, never the fastest one."""
-    minimum = 0.4 if record["problem_id"] in {14, 15, 19} else 0.9
-    allowed = recipes(record["problem_id"])
+    policy = selection_policy(record["level"], record["problem_id"])
+    minimum = policy["minimum_fraction"]
+    allowed = recipes(record["problem_id"], record["level"])
+    if record.get("selection_policy") != policy:
+        raise ValueError("Input calibration changed its reviewed selection policy")
     attempts = record.get("attempts", [])
     if (not isinstance(attempts, list) or not attempts
             or any(not isinstance(item, dict) for item in attempts)
@@ -76,7 +79,8 @@ def selected_attempt(record):
         rows = attempt.get("cases", [])
         if (not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
                 or any(type(row.get("seed")) is not int for row in rows)
-                or [row.get("seed") for row in rows] != list(SEEDS)):
+                or [row.get("seed") for row in rows] != list(SEEDS)
+                or any(type(row.get("forward_seed")) is not int or row["forward_seed"] != policy["forward_seed"] for row in rows)):
             raise ValueError("Input calibration omitted or changed reference seeds")
         signatures = [row.get("input_signature_sha256") for row in rows]
         raw_signatures = [row.get("raw_input_signature_sha256") for row in rows]
@@ -90,6 +94,18 @@ def selected_attempt(record):
             samples = [row.get("input_probe_sha256") for row in rows]
             if any(not isinstance(value, str) or len(value) != 64 for value in samples) or len(set(samples)) != len(SEEDS):
                 continue
+            outputs = [row.get("output_probe_sha256") for row in rows]
+            if any(not isinstance(value, str) or len(value) != 64 for value in outputs) or len(set(outputs)) < 2:
+                continue
+            spec = record.get("oracle_spec", {})
+            if spec.get("family") in {"composite", "model_block"}:
+                from .composite_specs import receipt_valid as composite_receipt
+                from .model_specs import receipt_valid as model_receipt
+
+                replay = model_receipt if spec["family"] == "model_block" else composite_receipt
+                if any(not isinstance(row.get("source_device"), str) or not replay(row.get("oracle_receipt"), spec,
+                        precision=record["precision"], source_device=row["source_device"]) for row in rows):
+                    raise ValueError("Calibration lacks independent graph/model stochastic evidence")
             if index != len(attempts) - 1:
                 raise ValueError("Calibration ran extra distributions after selecting a qualifying one")
             return attempt
@@ -99,7 +115,7 @@ def selected_attempt(record):
 def validate_record(record, source, *, allow_simulated=False, require_qualified=True):
     if (not isinstance(record, dict) or record.get("protocol") != PROTOCOL
             or record.get("receipt_sha256") != fingerprint({key: value for key, value in record.items() if key != "receipt_sha256"})
-            or type(record.get("level")) is not int or record["level"] != 1 or record.get("source_sha256") != hashlib.sha256(source.encode()).hexdigest()
+            or type(record.get("level")) is not int or record["level"] not in {1, 2, 3} or record.get("source_sha256") != hashlib.sha256(source.encode()).hexdigest()
             or record.get("evaluator_sha256") != evaluator_digest()
             or record.get("device_identity_sha256") != identity(record.get("device", {}))
             or record.get("selection_basis") != "reference_precision_and_signal_only"
@@ -109,10 +125,14 @@ def validate_record(record, source, *, allow_simulated=False, require_qualified=
         raise ValueError("Input calibration is missing, changed, stale or bound to another task/device")
     if record.get("simulated_execution") is not False and not allow_simulated:
         raise ValueError("Simulated input calibration cannot define a measured cohort")
-    if (type(record.get("problem_id")) is not int or not 1 <= record["problem_id"] <= 100
+    if (type(record.get("problem_id")) is not int or not 1 <= record["problem_id"] <= (50 if record["level"] == 3 else 100)
             or record.get("precision") not in {"fp32", "fp16", "bf16"}):
         raise ValueError("Invalid input calibration task or precision")
-    spec = spec_for(1, record["problem_id"], source)
+    spec = spec_for(record["level"], record["problem_id"], source)
+    if record.get("oracle_spec") != spec or record.get("oracle_spec_sha256") != fingerprint(spec):
+        raise ValueError("Input calibration changed its independent oracle specification")
+    if record.get("selection_policy") != selection_policy(record["level"], record["problem_id"], source):
+        raise ValueError("Input calibration changed its reviewed nominal input roles")
     if record.get("precision_contract") != precision_policy(spec, record["precision"]):
         raise ValueError("Input calibration cannot widen the declared numerical budget")
     winner = selected_attempt(record)
@@ -171,7 +191,33 @@ def comparison(policy):
     return compare
 
 
-def verify_output(reference, inputs, expected, actual):
+def prepare_output(reference, inputs):
+    """Freeze truth before a reference forward, without advancing its state/RNG."""
+    from .input_profiles import ACTIVE
+
+    state = ACTIVE.get()
+    if state is None or "payload" not in state:
+        return
+    import torch
+
+    from .determinism import preserve_rng
+    from .measurement import input_signature
+    from .reference_oracles import prepare
+
+    payload = state["payload"]
+    spec = spec_for(payload["level"], payload["problem_id"], payload["ref_arch_src"])
+    device = next(value.device for value in inputs if isinstance(value, torch.Tensor))
+    with torch.no_grad(), preserve_rng(device):
+        prepared = prepare(reference, inputs, spec=spec, problem_id=payload["problem_id"])
+        if prepared.estimated_host_bytes > payload["eval_config"]["oracle_memory_mb"] * 1024**2:
+            raise ValueError("Full-size timed-output oracle exceeds the host-memory estimate envelope; no resizing")
+        truth = prepared.execute()
+    return {"truth": truth, "input_signature": input_signature(inputs), "reference_id": id(reference),
+            "level": payload["level"], "problem_id": payload["problem_id"], "oracle_spec_sha256": fingerprint(spec),
+            "pre_reference_forward": True}
+
+
+def verify_output(reference, inputs, expected, actual, *, prepared=None):
     """Independent formula checks outside timing; inert without a frozen profile."""
     from .input_profiles import ACTIVE
 
@@ -180,13 +226,21 @@ def verify_output(reference, inputs, expected, actual):
         return
     import torch
 
+    from .measurement import input_signature
     from .numerical import PrecisionContract, precision_gate
-    from .operator_oracles import estimate_bytes, execute
 
     payload = state["payload"]
-    if estimate_bytes(payload["problem_id"], reference, inputs) > payload["eval_config"]["oracle_memory_mb"] * 1024**2:
-        raise ValueError("Full-size timed-output oracle exceeds the host-memory estimate envelope; no resizing")
-    truth = execute(payload["problem_id"], reference, inputs)
+    if prepared is None:
+        if payload["level"] != 1:
+            raise ValueError("Model timed-output verification needs a pre-forward independent oracle ticket")
+        prepared = prepare_output(reference, inputs)
+    if (not isinstance(prepared, dict) or prepared.get("reference_id") != id(reference)
+            or prepared.get("input_signature") != input_signature(inputs)
+            or prepared.get("pre_reference_forward") is not True
+            or (prepared.get("level"), prepared.get("problem_id")) != (payload["level"], payload["problem_id"])
+            or prepared.get("oracle_spec_sha256") != fingerprint(spec_for(payload["level"], payload["problem_id"], payload["ref_arch_src"]))):
+        raise ValueError("Timed-output oracle ticket belongs to another reference/input plan")
+    truth = prepared["truth"]
 
     def host(value):
         if isinstance(value, torch.Tensor):
@@ -217,7 +271,7 @@ def task_policy(function):
 
         backend = payload["eval_config"].get("device_backend", "cuda")
         observed = identity(device_fingerprint(f"{backend}:0"))
-        with context(payload["ref_arch_src"], payload["problem_id"], row["selected_recipe"]) as state:
+        with context(payload["ref_arch_src"], payload["problem_id"], row["selected_recipe"], level=payload["level"]) as state:
             state.update(payload=payload, independent_outputs_verified=0)
             with output_comparison_policy(comparison(row["precision_contract"])):
                 result = function(payload, *args, **kwargs)

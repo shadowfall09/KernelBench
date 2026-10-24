@@ -144,6 +144,7 @@ def baseline(payload: dict):
     import torch
 
     from src.eval import (
+        _process_input_group,
         _process_input_tensor,
         get_memory_stats,
         get_timing_stats,
@@ -153,6 +154,7 @@ def baseline(payload: dict):
         move_model,
         set_seed,
     )
+    from src.input_groups import copy_inputs
     from src.validation import clone_tensors, compare_outputs
 
     from .baseline_rewrites import plan_for, rewrite_for
@@ -181,11 +183,14 @@ def baseline(payload: dict):
     with torch.no_grad():
         init_inputs = [_process_input_tensor(x, device, dtype) for x in init()]
         set_seed(42)
-        args = [_process_input_tensor(x, device, dtype) for x in inputs()]
+        args = _process_input_group(inputs(), device, dtype)
         set_seed(42)
         oracle = move_model(Model(*init_inputs), device, dtype)
         set_seed(42)
-        expected = clone_tensors(oracle(*clone_tensors(args)))
+        from .input_calibration import prepare_output, verify_output
+
+        prepared = prepare_output(oracle, args)
+        expected = clone_tensors(oracle(*copy_inputs(args)))
         synchronize(device)
         configure_tf32(torch, tf32)
         set_seed(42)
@@ -199,15 +204,13 @@ def baseline(payload: dict):
         synchronize(device)
         setup_ms = (CLOCK() - started) * 1000
         set_seed(42)
-        fresh = clone_tensors(args)
+        fresh = copy_inputs(args)
         synchronize(device)
         started = CLOCK()
         actual = model(*fresh)
         synchronize(device)
         first_forward_ms = (CLOCK() - started) * 1000
-        from .input_calibration import verify_output
-
-        verify_output(oracle, args, expected, actual)
+        verify_output(oracle, args, expected, actual, prepared=prepared)
         issue = compare_outputs(expected, actual, get_tolerance_for_precision(dtype))
         del expected, actual, fresh
         if issue:
@@ -218,12 +221,13 @@ def baseline(payload: dict):
             seed = fresh_seed()
             timing_receipt.setdefault("input_seeds", []).append(seed)
             set_seed(seed)
-            return [_process_input_tensor(x, device, dtype) for x in inputs()]
+            return _process_input_group(inputs(), device, dtype)
 
         def verifier(fresh, output):
-            expected = clone_tensors(oracle(*fresh))
+            prepared = prepare_output(oracle, fresh)
+            expected = clone_tensors(oracle(*copy_inputs(fresh)))
             synchronize(device)
-            verify_output(oracle, fresh, expected, output)
+            verify_output(oracle, fresh, expected, output, prepared=prepared)
             issue = compare_outputs(expected, output, get_tolerance_for_precision(dtype))
             if issue:
                 raise RuntimeError(f"Baseline varied-input correctness failed: {issue}")

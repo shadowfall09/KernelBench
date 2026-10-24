@@ -10,7 +10,8 @@ from time import perf_counter
 
 import torch
 
-from src.validation import clone_tensors, preserve_backend_settings
+from src.input_groups import copy_inputs
+from src.validation import preserve_backend_settings
 
 CLOCK = perf_counter
 _SYNC = torch.cuda.synchronize
@@ -65,8 +66,8 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
     times = []
     with torch.no_grad():
         for trial in range(num_warmup + num_trials):
-            fresh = input_factory(trial) if input_factory else clone_tensors(args)
-            verification_args = clone_tensors(fresh) if verifier else None
+            fresh = input_factory(trial) if input_factory else copy_inputs(args)
+            verification_args = copy_inputs(fresh) if verifier else None
             rng = torch.get_rng_state() if verifier else None
             cuda_rng = torch.cuda.get_rng_state(device) if verifier and torch.device(device).type == "cuda" else None
             neuron_rng = torch.neuron.get_rng_state(device) if verifier and str(device).split(":")[0] == "neuron" else None

@@ -787,7 +787,7 @@ def eval_kernel_against_ref(
                 torch.cuda.synchronize(device=device)
                 set_seed(seed_num)
                 inputs = get_inputs()
-                inputs = [_process_input_tensor(x, device, precision) for x in inputs]
+                inputs = _process_input_group(inputs, device, precision)
                 model_new = move_model(custom_model, device, precision)
                 torch.cuda.synchronize(device=device)
 
@@ -798,14 +798,17 @@ def eval_kernel_against_ref(
                     seed = fresh_seed()
                     timing_receipt.setdefault("input_seeds", []).append(seed)
                     set_seed(seed)
-                    return [_process_input_tensor(x, device, precision) for x in get_inputs()]
+                    return _process_input_group(get_inputs(), device, precision)
 
                 def verifier(fresh, actual):
-                    from kb_workflows.input_calibration import verify_output
+                    from kb_workflows.input_calibration import prepare_output, verify_output
 
-                    expected = clone_tensors(original_model(*fresh))
+                    from .input_groups import copy_inputs
+
+                    prepared = prepare_output(original_model, fresh)
+                    expected = clone_tensors(original_model(*copy_inputs(fresh)))
                     synchronize(device)
-                    verify_output(original_model, fresh, expected, actual)
+                    verify_output(original_model, fresh, expected, actual, prepared=prepared)
                     issue = compare_outputs(expected, actual, get_tolerance_for_precision(precision))
                     if issue:
                         raise RuntimeError(f"Timed output did not match varied input: {issue}")

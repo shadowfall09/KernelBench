@@ -232,20 +232,24 @@ def _evaluate(payload, *, adapter=None):
         checked, first_ms, strict = [], None, {}
         oracle_cpu = copy.deepcopy(cpu).to(device="cpu", dtype=torch.float64) if contract else None
 
-        def verify(cpu_args, actual, expected=None):
+        def verify(cpu_args, actual, expected=None, prepared=None):
+            from .input_calibration import prepare_output, verify_output
+
             def on_device(tensor):
                 if tensor.device != torch.device(device):
                     raise ValueError("Submission output is not materialized on its declared Neuron device")
                 return tensor
 
             map_tensors(actual, on_device)
+            if expected is None:
+                prepared = prepare_output(ref, cpu_args)
+            dev_args = cpu_args
             cpu_args = host(cpu_args)
             if expected is None:
                 expected = host(copy.deepcopy(cpu)(*clone_tensors(cpu_args))) if contract else host(ref(*move(cpu_args)))
             actual = host(actual)
-            from .input_calibration import verify_output
-
-            verify_output(ref, cpu_args, expected, actual)
+            if prepared is not None:
+                verify_output(ref, dev_args, expected, actual, prepared=prepared)
             if issue := compare_outputs(expected, actual, settings["fp32_tolerance"]):
                 raise ValueError(f"Neuron output mismatch: {issue}")
             if contract:
@@ -315,19 +319,30 @@ def _evaluate(payload, *, adapter=None):
                 dev = move(values)
                 if instance and input_signature(dev) != input_signature(values):
                     raise ValueError("Device transfer changed a production input's dtype, shape or stride")
+                prepared_pair = None
+
+                def prepare_pair():
+                    nonlocal prepared_pair
+                    from .determinism import preserve_rng
+                    from .input_calibration import prepare_output
+
+                    with preserve_rng(device):
+                        seed(value)
+                        prepared_pair = prepare_output(ref, dev)
 
                 def verify_order(dev_inputs, outputs):
                     expected = host(outputs["reference"])
                     if contract:
                         expected = host(copy.deepcopy(cpu)(*host(dev_inputs)))
                     for actual in outputs.values():
-                        verify(dev_inputs, actual, expected=expected)
+                        verify(dev_inputs, actual, expected=expected, prepared=prepared_pair)
                     observed.append(expected)
 
                 with environment_guard(changes):
                     issue = check_paired_calls(ref, model, dev, seed=value, tolerance=settings["fp32_tolerance"],
                         device=device, set_seed=seed, metadata=metadata, label=label,
-                        record_first_call=first_ms is None, clock=CLOCK, verify_pair=verify_order)
+                        record_first_call=first_ms is None, clock=CLOCK, verify_pair=verify_order,
+                        **({"prepare_pair": prepare_pair} if settings.get("input_profile") else {}))
                 if label in extra_rows:
                     from .operator_input_policy import completed
 

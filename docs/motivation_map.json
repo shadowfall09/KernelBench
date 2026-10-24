@@ -1319,9 +1319,12 @@
         "kb_workflows/model_specs.py",
         "kb_workflows/model_programs.json",
         "docs/MODEL_NUMERICS.md",
-        "tests/test_model_oracles.py"
+        "tests/test_model_oracles.py",
+        "kb_workflows/reference_oracles.py",
+        "kb_workflows/input_calibration.py",
+        "tests/test_model_input_profiles.py"
       ],
-      "reason": "原L1/L2/L3全部250题有来源绑定的独立CPU FP64公式/模型算法和实际原生实例复核；50题冻结完整构造，31题逐层图与19题专用算法覆盖attention/循环/Swin/VLAD/SSD。参考自身同门、随机mask和已知默认dtype问题保留；全题阈值校准代码和更完整计时数值资格仍待完成，不运行设备/模型实验"
+      "reason": "原250题独立CPU FP64公式/模型算法覆盖实际原生实例；校准cohort现有基线/候选/配对/Neuron调用前真值与RNG/状态复核，保持所有原误差预算。完整阈值校准代码和未配置输入校准时的计时数值门仍待完成，不运行设备/模型实验"
     },
     {
       "id": "R-05",
@@ -1338,9 +1341,13 @@
         "kb_workflows/input_calibration.py",
         "kb_workflows/input_profiles.py",
         "scripts/calibrate_inputs.py",
-        "docs/INPUT_CALIBRATION.md"
+        "docs/INPUT_CALIBRATION.md",
+        "kb_workflows/model_input_profiles.py",
+        "kb_workflows/reference_oracles.py",
+        "kb_workflows/input_calibration_task.py",
+        "tests/test_model_input_profiles.py"
       ],
-      "reason": "参考信号审计随独立数值入口覆盖原250题；L1已有参考专用名义值分布选择、固定强预算及新基线/恢复契约，L2恒零公式保留失败。L2/L3名义配方、完整阈值校准及全题计时资格代码仍待补齐，按用户要求不跑实验"
+      "reason": "原250题均有来源绑定名义配方与参考专用FP64选择，1039个分题菜单、固定前向RNG下输入/输出探针变化、极值量化修复和程序/mask收据；不改参数/尺寸/隐藏分布，恒零与非零常量保留不合格。预先冻结合格参考子集及排除清单的统一入口仍需补齐，阈值代码归R-04；不运行实验"
     },
     {
       "id": "R-06",
@@ -4026,6 +4033,112 @@
         "docs/MODEL_NUMERICS.md"
       ],
       "reason": "36个小配置的两模式算式、融合forward禁用、50题双meta计划、随机/可选状态/收据反例；35省略状态的FP32默认不被暗改"
+    },
+    {
+      "id": "V37-01",
+      "title": "L2/L3来源绑定的名义菜单",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/model_input_profiles.py"
+      ],
+      "reason": "七类模型角色共731个配方声明，保留实际特征/显式初始状态、尺寸、参数和隐藏分布"
+    },
+    {
+      "id": "V37-02",
+      "title": "按存储组生成值与极值修复",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_profiles.py"
+      ],
+      "reason": "共享backing仅采样一次并保持视图/精度；七个L1极值题增加正态配方，修复FP16 uniform max恒值"
+    },
+    {
+      "id": "V37-03",
+      "title": "固定前向RNG与输出变化审计",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_calibration.py"
+      ],
+      "reason": "三个输入种子共享前向seed 42，同时要求输入探针变化和输出至少两次不同；恒零/非零常量不合格"
+    },
+    {
+      "id": "V37-04",
+      "title": "全题参考专用校准器",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/input_calibration_task.py"
+      ],
+      "reason": "L1公式/L2复合/L3模型算式统一准入，保留程序与mask收据；候选、时间样本和误差放宽不参与选择"
+    },
+    {
+      "id": "V37-05",
+      "title": "当前状态的调用前真值票据",
+      "primary": "M2",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/reference_oracles.py",
+        "kb_workflows/input_calibration.py"
+      ],
+      "reason": "计时参考调用前计算独立真值并恢复RNG，绑定参考/输入计划；模型路径拒绝缺票据的事后计算"
+    },
+    {
+      "id": "V37-06",
+      "title": "原生与Neuron计时顺序统一",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/paired_task.py",
+        "src/eval.py",
+        "src/reliability.py",
+        "kb_workflows/measurement.py",
+        "kb_workflows/neuron_worker.py",
+        "kb_workflows/evaluate_task.py",
+        "kb_workflows/baseline_variants.py"
+      ],
+      "reason": "基线/候选/配对/Neuron逐对票据，回调重放trial RNG，转移/快照/Graph输入保持别名；诊断不替换原始时间"
+    },
+    {
+      "id": "V37-07",
+      "title": "角色、退化与连续状态回归",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "tests/test_model_input_profiles.py",
+        "docs/INPUT_CALIBRATION.md"
+      ],
+      "reason": "150原构造的所有配方仅做meta；小CPU输入验证三精度别名、常量/全零、固定mask、连续状态/RNG和模拟Neuron三阶段"
     }
   ]
 }

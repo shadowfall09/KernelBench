@@ -1066,6 +1066,31 @@ R-06按原设计的有限软件范围记为代码已实现；复杂模型中目�
 
 验证：Python 3.12.12 / Torch 2.12.0下4,226项CPU/模拟/meta回归通过，本版新增230项；保留18条框架/环境warning。36个小构造的两种模式、独立算式与融合forward禁用、50题原尺寸/隐藏BF16的双meta计划、原生随机mask、可选状态、参考默认dtype缺陷、内存准入、逐例收据及原生隐藏入口均有回归。原200题规格和全部精度政策逐项保持原值。Ruff、255项动机映射、39份Markdown的996个本地链接、skill及177包依赖检查通过；wheel逐字节核对11个改动代码/清单文件，31个安装后轻量入口不导入设备SDK。L3导出通过实际Harbor 0.24 Task schema，验证包内6个新增模型代码/清单与源码一致。没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验。
 
+## 第三十七版：全250题名义输入配方与调用前数值校验
+
+| 项目 | 版本信息 |
+| --- | --- |
+| 提交标题 | Extend reference input calibration to all original task levels |
+| 日期 | 2026-10-24 |
+| 基础提交 | `a14d5eb` |
+| 状态 | CPU小输入、Neuron模拟和原尺寸meta；不运行实验 |
+
+本版继续R-05，配方选择扩到原250题，并修复状态/随机模型的计时真值时序。完整菜单、选择条件、固定前向RNG和剩余范围见[输入校准](INPUT_CALIBRATION.md)。
+
+| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
+| --- | --- | --- | --- | --- |
+| V37-01 | L2/L3来源绑定的名义菜单 | 七类模型角色共731个配方声明，保留实际特征/显式初始状态、尺寸、参数和隐藏分布 | `kb_workflows/model_input_profiles.py` | [M2](MOTIVATION.md#m2) |
+| V37-02 | 按存储组生成值与极值修复 | 共享backing仅采样一次并保持视图/精度；七个L1极值题增加正态配方，修复FP16 uniform max恒值 | `kb_workflows/input_profiles.py` | [M2](MOTIVATION.md#m2) |
+| V37-03 | 固定前向RNG与输出变化审计 | 三个输入种子共享前向seed 42，同时要求输入探针变化和输出至少两次不同；恒零/非零常量不合格 | `kb_workflows/input_calibration.py` | [M2](MOTIVATION.md#m2) |
+| V37-04 | 全题参考专用校准器 | L1公式/L2复合/L3模型算式统一准入，保留程序与mask收据；候选、时间样本和误差放宽不参与选择 | `kb_workflows/input_calibration_task.py` | [M2](MOTIVATION.md#m2) |
+| V37-05 | 当前状态的调用前真值票据 | 计时参考调用前计算独立真值并恢复RNG，绑定参考/输入计划；模型路径拒绝缺票据的事后计算 | `kb_workflows/reference_oracles.py` | [M2](MOTIVATION.md#m2) |
+| V37-06 | 原生与Neuron计时顺序统一 | 基线/候选/配对/Neuron逐对票据，回调重放trial RNG，转移/快照/Graph输入保持别名；诊断不替换原始时间 | `kb_workflows/paired_task.py` | [M5](MOTIVATION.md#m5) |
+| V37-07 | 角色、退化与连续状态回归 | 150原构造的所有配方仅做meta；小CPU输入验证三精度别名、常量/全零、固定mask、连续状态/RNG和模拟Neuron三阶段 | `tests/test_model_input_profiles.py` | [M5](MOTIVATION.md#m5) |
+
+菜单总计1039个分题声明：L1为308，L2为500，L3为231；它不是实验次数或校准成功数。预先冻结合格参考子集/排除清单的统一入口、阈值校准代码及未配置输入校准时的完整计时数值门仍需推进。23项保持18项代码已实现、5项部分实现。原尺寸设备/模型实验不运行，旧stash保持原样。
+
+验证：Python 3.12.12 / Torch 2.12.0下4,405项CPU/模拟/meta回归通过，本版新增179项；保留19条框架/环境warning。150个原始模型构造的全部配方只做meta；小输入覆盖三精度存储别名、L2/L3校准、恒零/非零常量、FP16极值修复、固定mask、连续状态/RNG、逐对票据与模拟Neuron的标准/基线/配对三阶段。Ruff、src/eval.py既有诊断等价、262项动机映射、39份Markdown的1023个本地链接、skill及177包依赖检查通过；wheel逐字节核对15个改动代码文件，33个安装后轻量入口不导入设备SDK。带L3校准格式夹具的导出通过实际Harbor 0.24 Task schema，oracle/选择政策与4个新配方文件完整传递。没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验；CPU夹具不能建立实测校准资格。
+
 ## 维护方式
 
 1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。

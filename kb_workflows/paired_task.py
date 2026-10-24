@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import random
 
+from src.input_groups import copy_inputs
 from src.validation import clone_tensors, compare_outputs, preserve_backend_settings
 
 from .measurement import CLOCK, consume_output, synchronize
@@ -40,11 +41,11 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                 reset("oracle")
             if set_seed:
                 set_seed(case_seed)
-            expected = clone_tensors(oracle(*clone_tensors(args)))
+            expected = clone_tensors(oracle(*copy_inputs(args)))
             synchronize(device)
             samples = {}
             for name in order:
-                fresh = clone_tensors(args)
+                fresh = copy_inputs(args)
                 if reset:
                     reset(name)
                 if set_seed:
@@ -61,7 +62,12 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                 if issue:
                     raise ValueError(f"Paired trial {trial}/{name}: {issue}")
                 if verifier:
-                    verifier(args, output)
+                    from .determinism import preserve_rng
+
+                    with preserve_rng(device):
+                        if set_seed:
+                            set_seed(case_seed)
+                        verifier(args, output)
                 samples[name] = elapsed
                 del output, consumed, fresh
             if trial >= warmup:
@@ -78,6 +84,7 @@ def evaluate_paired(payload):
     import torch
 
     from src.eval import (
+        _process_input_group,
         _process_input_tensor,
         get_tolerance_for_precision,
         get_torch_dtype_from_string,
@@ -129,7 +136,7 @@ def evaluate_paired(payload):
         raise ValueError(f"Candidate import changed process settings: {sorted(set(changes))}")
     snapshots = {name: clone_tensors(model.state_dict()) for name, model in models.items()}
     set_seed(seed)
-    nominal = [_process_input_tensor(value, device, dtype) for value in inputs()]
+    nominal = _process_input_group(inputs(), device, dtype)
     rewrite = rewrite_for(payload["level"], payload["problem_id"], source)
     baseline_plan = plan_for(payload["level"], payload["problem_id"], source, variant)
     functions = {}
@@ -139,18 +146,19 @@ def evaluate_paired(payload):
                                                 mode=settings.get("compile_mode", "default"), rewrite=rewrite, plan=baseline_plan)
 
     def factory(index):
-        return [_process_input_tensor(value, device, dtype) for value in inputs()]
+        return _process_input_group(inputs(), device, dtype)
 
     def reset(name):
         models[name].load_state_dict(snapshots[name])
 
     def verify(args, output):
-        from .input_calibration import verify_output
+        from .input_calibration import prepare_output, verify_output
 
         # Reset oracle state before every output's untimed reference check.
         reset("oracle")
-        expected = clone_tensors(models["oracle"](*clone_tensors(args)))
-        verify_output(models["oracle"], args, expected, output)
+        prepared = prepare_output(models["oracle"], args)
+        expected = clone_tensors(models["oracle"](*copy_inputs(args)))
+        verify_output(models["oracle"], args, expected, output, prepared=prepared)
 
     result = collect_pairs(functions["R"], models["C"], functions["B"], factory, models["oracle"],
                            device=device, trials=settings.get("paired_trials", 30), seed=seed,

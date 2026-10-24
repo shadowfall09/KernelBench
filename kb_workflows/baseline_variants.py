@@ -82,9 +82,10 @@ def select_baseline(variants, cold_calls=10000):
 def cuda_graph_model(model, args, device):
     import torch
 
+    from src.input_groups import copy_inputs
     from src.validation import clone_tensors
 
-    static = clone_tensors(args)
+    static = copy_inputs(args)
     stream = torch.cuda.Stream(device=device)
     stream.wait_stream(torch.cuda.current_stream(device))
     with torch.cuda.stream(stream), torch.no_grad():

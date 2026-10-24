@@ -241,8 +241,8 @@ class RunConfig:
         if self.input_calibration:
             from .input_calibration import read_bundle
 
-            if not isinstance(self.input_calibration, str) or self.level != 1:
-                raise ValueError("Input calibration currently requires a file and original level 1")
+            if not isinstance(self.input_calibration, str) or self.level not in {1, 2, 3}:
+                raise ValueError("Input calibration requires a file and original level 1, 2 or 3")
             self.input_calibration = str(Path(self.input_calibration).expanduser().resolve())
             read_bundle(self.input_calibration)
             self.numerical_validation = True

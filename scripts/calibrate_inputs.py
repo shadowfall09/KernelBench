@@ -15,8 +15,8 @@ from kb_workflows.input_profiles import recipes
 
 
 def prepare(config):
-    if config.level != 1 or config.input_calibration:
-        raise ValueError("Calibrate original L1 inputs without an existing input calibration file")
+    if config.level not in {1, 2, 3} or config.input_calibration:
+        raise ValueError("Calibrate original L1/L2/L3 inputs without an existing input calibration file")
     selected = select_problems(config.level, config.start, config.end, suite=config.suite, suite_role=config.suite_role)
     tasks = []
     for pid in selected:
@@ -39,7 +39,7 @@ def main(argv=None):
         if args.output.exists() or args.output.is_symlink():
             raise ValueError("Input calibration output must be a new path")
         preview = {"task": "calibrate_inputs", "problems": [payload["problem_id"] for _, payload in tasks],
-            "recipes": {payload["problem_id"]: recipes(payload["problem_id"]) for _, payload in tasks},
+            "recipes": {payload["problem_id"]: recipes(payload["problem_id"], payload["level"]) for _, payload in tasks},
             "seeds": SEEDS, "oracle_memory_mb": config.oracle_memory_mb, "output": str(args.output.resolve()),
             "candidate_executed": False, "timings_collected": False, "experiments_started": False}
         if not args.execute:
