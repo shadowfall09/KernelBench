@@ -265,7 +265,7 @@ def test_checkpoint_asset_changes_invalidate_generation_resume(config):
 
 
 @pytest.mark.parametrize("options", [
-    {"agent_token_limit": 10}, {"agent_output_token_limit": 10}, {"agent_device_seconds": 10, "evaluation": "modal"},
+    {"agent_token_limit": 10}, {"agent_output_token_limit": 10},
     {"agent_device_seconds": 10, "generation": "harbor"}, {"agent_device_seconds": float("nan")},
     {"agent_output_token_limit": True}, {"agent_backend": "local-transformers", "model": ""},
 ])
@@ -354,3 +354,131 @@ def test_queue_budget_requires_capability_and_cancels_a_lost_submission(config, 
     result = budgets.record_device_lease(broken_cleanup)(payload)
     assert result["metadata"]["resource_usage_unknown"] and "device_lease_receipt" not in result["metadata"]
     assert not budgets.settle_device_lease(ledger, lease, result) and ledger.spent == 8.25
+
+
+def test_modal_budget_runs_the_native_loop_with_remote_parent_receipts(config, monkeypatch):
+    import sys
+    from contextlib import nullcontext
+
+    from kb_workflows.runtime import modal_backend, transports
+
+    start_session = modal_backend.modal_session
+    config.evaluation, config.agent_device_seconds = "modal", 6.2
+    config.validate()
+    requests, options, executed = [], [], []
+    admitted = {}
+
+    def put(nonce, signature, *, skip_if_exists):
+        assert skip_if_exists
+        if nonce in admitted:
+            return False
+        admitted[nonce] = signature
+        return True
+
+    leases = SimpleNamespace(put=put)
+
+    @budgets.record_device_lease
+    def remote_parent(payload):
+        executed.append(fingerprint(payload))
+        # Simulate the isolated candidate returning an invented receipt. The
+        # existing remote parent must replace it before cloud serialization.
+        return {"compiled": True, "correctness": True, "runtime": 1,
+                "metadata": {"device_lease_receipt": {"elapsed_seconds": 0}}}
+
+    class Function:
+        def with_options(self, **kwargs):
+            options.append(kwargs)
+            return self
+
+        async def submit(self, payload, store):
+            requests.append(payload)
+
+            async def get(*, timeout):
+                assert timeout > 0
+                return modal_backend._remote_evaluate(payload, store)
+
+            async def cancel(**kwargs):
+                pytest.fail("Successful remote execution must not be cancelled")
+
+            return SimpleNamespace(get=SimpleNamespace(aio=get), cancel=SimpleNamespace(aio=cancel))
+
+        @property
+        def spawn(self):
+            return SimpleNamespace(aio=self.submit)
+
+    monkeypatch.setattr(transports, "local_evaluate", remote_parent)
+    monkeypatch.setattr(modal_backend, "_SESSION", (None, Function(), None, leases))
+    monkeypatch.setattr(modal_backend, "modal_session", lambda config: nullcontext())
+    _, result = loop(config, response)
+    assert result["status"] == "success" and result["selected"]["round"] == 1
+    assert len(requests) == config.optimization_rounds == len(options)
+    assert all(row["retries"] == 0 and 0 < row["timeout"] <= 7 for row in options)
+    record = result["budget"]["resource_budgets"]["device_lease"]
+    assert 0 < record["charged"] < 6.2 and budgets.validate_snapshot(record, 6.2, "device_lease_seconds")
+    assert len({row["eval_config"]["device_lease"]["nonce"] for row in requests}) == len(requests)
+    assert admitted == {row["eval_config"]["device_lease"]["nonce"]: fingerprint(row) for row in requests}
+    replay = modal_backend._remote_evaluate(requests[0], leases)
+    assert replay["result"]["metadata"]["resource_usage_unknown"]
+    assert "device_lease_receipt" not in replay["result"]["metadata"]
+    assert len(executed) == len(requests)
+    for fields in ({"worker_python": "/client/python"}, {"eval_config": {"device_backend": "neuron"}}):
+        with pytest.raises(ValueError, match="server-owned interpreter"):
+            modal_backend._remote_evaluate({**requests[0], **fields})
+    # Exercise the actual session wiring with an inert SDK, including nested
+    # restoration. Nothing may build an image, contact Modal or allocate a GPU.
+    function_options = {}
+    def decorate(**kwargs):
+        function_options.update(kwargs)
+        return lambda handler: Function()
+    app = SimpleNamespace(function=decorate, run=lambda: nullcontext())
+    monkeypatch.setitem(sys.modules, "modal", SimpleNamespace(App=lambda name: app, enable_output=lambda: nullcontext(),
+                        Dict=SimpleNamespace(ephemeral=lambda: nullcontext(leases))))
+    monkeypatch.setattr(modal_backend, "make_image", lambda **kwargs: "simulated-image")
+    previous = modal_backend._SESSION
+    with start_session(config):
+        assert modal_backend._SESSION[0] is app and modal_backend._SESSION[3] is leases
+    assert modal_backend._SESSION is previous and function_options["retries"] == 0
+
+
+def test_modal_unknown_submission_binding_and_cleanup_burn_the_reservation(config, monkeypatch):
+    import asyncio
+
+    from kb_workflows.runtime import modal_backend
+
+    monkeypatch.setattr(modal_backend, "CLEANUP_SECONDS", 0.02)
+    config.queue_wait_timeout = 0.02
+    for mode in ("lost_submit", "blocked_submit", "blocked_cleanup", "wrong_request", "missing_receipt"):
+        ledger = budgets.Ledger(7, "device_lease_seconds")
+        lease = budgets.device_lease(ledger, 1, 7)
+        payload = {"eval_config": {"timeout": 1, "device_lease": lease}}
+        cancellations = []
+
+        async def submit(payload, store):
+            if mode == "lost_submit":
+                raise ConnectionError("Submission reply lost after possible admission")
+            if mode == "blocked_submit":
+                await asyncio.sleep(3600)
+
+            async def get(*, timeout):
+                if mode == "blocked_cleanup":
+                    await asyncio.sleep(3600)
+                return {"protocol": modal_backend.LEASE_PROTOCOL, "nonce": lease["nonce"],
+                        "request_sha256": "another-task" if mode == "wrong_request" else fingerprint(payload),
+                        "device_backend": "cuda", "result": {"compiled": True, "correctness": True}}
+
+            async def cancel(*, terminate_containers):
+                cancellations.append(terminate_containers)
+                if mode == "blocked_cleanup":
+                    await asyncio.sleep(3600)
+                raise OSError("Cancellation reply lost")
+
+            return SimpleNamespace(get=SimpleNamespace(aio=get), cancel=SimpleNamespace(aio=cancel))
+
+        function = SimpleNamespace(spawn=SimpleNamespace(aio=submit))
+        function.with_options = lambda **kwargs: function
+        monkeypatch.setattr(modal_backend, "_SESSION", (None, function, None, object()))
+        result = modal_backend.modal_evaluate(payload, config)
+        assert not budgets.settle_device_lease(ledger, lease, result) and ledger.spent == lease["reserved_seconds"]
+        if mode != "missing_receipt":
+            assert not result["correctness"] and result["metadata"]["resource_usage_unknown"]
+        assert cancellations == ([True] if mode in {"blocked_cleanup", "wrong_request"} else [])

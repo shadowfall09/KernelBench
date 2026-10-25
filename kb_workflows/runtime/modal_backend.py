@@ -2,21 +2,45 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import math
 import os
 import shlex
 import subprocess
-from contextlib import contextmanager
+import time
+from contextlib import contextmanager, nullcontext
 
-from ..common import ROOT, atomic_json, kernel_name
+from ..agents.resource_budgets import CLEANUP_SECONDS, record_device_lease, validate_device_lease
+from ..common import ROOT, atomic_json, failure, fingerprint, kernel_name
 
 _SESSION = None
+LEASE_PROTOCOL = "kernelbench_pro_modal_lease_v1"
 
 
-def _remote_evaluate(payload):
+def _remote_evaluate(payload, leases=None):
     from .transports import local_evaluate
 
-    return local_evaluate(payload)
+    lease = validate_device_lease(payload)
+    if "worker_python" in payload or payload["eval_config"].get("device_backend", "cuda") != "cuda":
+        raise ValueError("Modal verification requires CUDA and the server-owned interpreter")
+    signature = fingerprint(payload)
+
+    @record_device_lease
+    def execute(payload):
+        if lease:
+            if leases is None:
+                raise ValueError("Modal device leases require a shared admission store")
+            if leases.put(lease["nonce"], signature, skip_if_exists=True) is not True:
+                return failure("Modal device lease was already admitted; execution will not be replayed",
+                               resource_usage_unknown=True)
+        return local_evaluate(payload)
+
+    result = execute(payload)
+    if lease is None:
+        return result
+    return {"protocol": LEASE_PROTOCOL, "request_sha256": signature, "nonce": lease["nonce"],
+            "device_backend": "cuda", "result": result}
 
 
 def make_image(agent=False):
@@ -45,22 +69,57 @@ def modal_session(config):
     import modal
 
     app = modal.App("kernelbench-pro")
-    evaluate = app.function(image=make_image(), gpu=config.gpu, timeout=config.timeout + 60, cpu=4.0, memory=32768)(
+    evaluate = app.function(image=make_image(), gpu=config.gpu, timeout=config.timeout + 60, cpu=4.0, memory=32768, retries=0)(
         _remote_evaluate
     )
     agent_image = make_image(agent=True) if config.generation == "modal" else None
-    with modal.enable_output(), app.run():
-        _SESSION = (app, evaluate, agent_image)
+    lease_context = modal.Dict.ephemeral() if config.agent_device_seconds else nullcontext(None)
+    with modal.enable_output(), lease_context as leases, app.run():
+        previous, _SESSION = _SESSION, (app, evaluate, agent_image, leases)
         try:
             yield
         finally:
-            _SESSION = None
+            _SESSION = previous
 
 
 def modal_evaluate(payload, config):
     if _SESSION is None:
         raise RuntimeError("Modal evaluation must run within modal_session")
-    return _SESSION[1].remote(payload)
+    lease = validate_device_lease(payload)
+    if lease is None:
+        return _SESSION[1].remote(payload)
+    # Queue/cold-start waiting is bounded separately from the remote worker's
+    # monotonic receipt. A lost submission may still have admitted work: never
+    # resubmit or refund unknown usage, even if cancellation was acknowledged.
+    signature = fingerprint(payload)
+    session = _SESSION
+    deadline = time.monotonic() + min(config.queue_wait_timeout, lease["execution_timeout_seconds"])
+
+    async def invoke():
+        call = None
+        try:
+            function = session[1].with_options(timeout=max(1, math.ceil(lease["reserved_seconds"])), retries=0)
+            call = await asyncio.wait_for(function.spawn.aio(payload, session[3]), timeout=max(0, deadline - time.monotonic()))
+            remaining = max(0, deadline - time.monotonic())
+            response = await asyncio.wait_for(call.get.aio(timeout=remaining), timeout=remaining)
+            if time.monotonic() > deadline:
+                raise TimeoutError("Modal development wait deadline expired")
+            if (not isinstance(response, dict) or response.get("protocol") != LEASE_PROTOCOL
+                    or response.get("request_sha256") != signature or response.get("nonce") != lease["nonce"]
+                    or response.get("device_backend") != "cuda" or not isinstance(response.get("result"), dict)):
+                raise ValueError("Modal response does not bind the requested task and device lease")
+            return response["result"]
+        except Exception as exc:
+            result = failure(str(exc), error_name=type(exc).__name__, resource_usage_unknown=True)
+            if call is not None:
+                try:
+                    await asyncio.wait_for(call.cancel.aio(terminate_containers=True), timeout=CLEANUP_SECONDS)
+                    result["metadata"]["modal_cancel_requested"] = True
+                except Exception as cancel_error:
+                    result["metadata"]["modal_cancel_error"] = type(cancel_error).__name__
+            return result
+
+    return asyncio.run(invoke())
 
 
 def sandbox_secrets(config):

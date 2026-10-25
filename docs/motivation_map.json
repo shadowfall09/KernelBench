@@ -1597,9 +1597,10 @@
         "tests/agents/test_agent_loop.py",
         "kb_workflows/runtime/queue_worker.py",
         "kb_workflows/runtime/transports.py",
-        "tests/evaluation/test_workflows.py"
+        "tests/evaluation/test_workflows.py",
+        "kb_workflows/runtime/modal_backend.py"
       ],
-      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列现有请求/nonce绑定、服务端到期、取消/进程组清理及未知用量拒绝，重启不重花租约；纯GPU busy时间物理硬限与其他远端后端资源契约继续实现，未运行设备或模型实验"
+      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证增加共享nonce准入、禁重试、远端结算与有界取消；未知用量拒绝且不重花。纯GPU busy时间物理硬限及Modal/Harbor生成资源契约继续实现，未运行设备、云函数或模型实验"
     },
     {
       "id": "R-19",
@@ -5175,6 +5176,24 @@
         "docs/RESOURCE_BUDGETS.md"
       ],
       "reason": "补齐Neuron队列实际启动入口，以统一设备配置选择服务端环境，保留venv路径；状态与请求绑定后端，预算握手拒绝错设备轨道和旧协议，避免客户端选择服务端解释器"
+    },
+    {
+      "id": "V53-01",
+      "title": "Modal开发预算与单次租约执行",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/runtime/modal_backend.py",
+        "kb_workflows/config.py",
+        "kb_workflows/agents/resource_budgets.py",
+        "tests/agents/test_resource_budgets.py",
+        "docs/RESOURCE_BUDGETS.md"
+      ],
+      "reason": "补齐原生agent使用Modal验证的资源契约：共享nonce准入阻止重放，远端父进程记录实际worker墙钟，客户端绑定请求并有界等待/取消，未知不退款且不继续花费；复用现有预算与恢复，避免再造远端账本"
     }
   ]
 }

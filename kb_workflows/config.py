@@ -191,13 +191,13 @@ class RunConfig:
         from .agents.resource_budgets import active
 
         if active(self) and self.generation not in {"local", "docker"}:
-            raise ValueError("Resource reservations require native local/docker generation; remote/Harbor enforcement is unavailable")
+            raise ValueError("Resource reservations require native local/docker generation; Modal/Harbor generation enforcement is unavailable")
         if self.agent_token_limit and self.agent_backend != "local-transformers":
             raise ValueError("Exact total-token caps require local-transformers; provider token estimates cannot certify this cap")
         if self.agent_output_token_limit and self.agent_backend not in {"local-transformers", "litellm"}:
             raise ValueError("Output-token reservations require local-transformers or a supported single-call LiteLLM provider")
-        if self.agent_device_seconds and self.evaluation not in {"local", "docker", "queue"}:
-            raise ValueError("Device lease reservations require local/docker or a bounded-lease queue")
+        if self.agent_device_seconds and self.evaluation not in {"local", "docker", "queue", "modal"}:
+            raise ValueError("Device lease reservations require a supported native verification transport")
         if self.agent_backend == "local-transformers":
             if self.generation != "local":
                 raise ValueError("Local checkpoints currently require generation=local; container checkpoint mounting is unavailable")

@@ -296,6 +296,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V17-07 NKI提示与coding skill | 保留ModelNew接口并提示现代NKI/native注册，skill复用设备配置与vendor解释器；客户端模型环境与可信验证环境分开 | M5 | [generation.py](../kb_workflows/agents/generation.py), [SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md), [trainium2.toml](../configs/trainium2.toml) |
 | V38-08 内层模型超时清理嵌套进程 | 模型CLI自身先超时时先清理包括独立session的后代再终止父进程，避免外层控制器已无法找到孤儿；直接与外层墙钟两种超时均做CPU子进程回归，未启动模型 | M5 | [agent_models.py](../kb_workflows/agents/agent_models.py), [generation.py](../kb_workflows/agents/generation.py), [test_agent_loop.py](../tests/agents/test_agent_loop.py) |
 | V47-01 远端队列租约、取消与未知用量拒绝 | 阻止客户端超时或重启后后台继续重花预留；以服务端到期和确认清理后的用量结算，未知用量扣除整笔并停止后续执行 | M5 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py), [transports.py](../kb_workflows/runtime/transports.py), [resource_budgets.py](../kb_workflows/agents/resource_budgets.py), [agent_loop.py](../kb_workflows/agents/agent_loop.py), [RESOURCE_BUDGETS.md](../docs/RESOURCE_BUDGETS.md), [test_workflows.py](../tests/evaluation/test_workflows.py), [test_resource_budgets.py](../tests/agents/test_resource_budgets.py) |
+| V53-01 Modal开发预算与单次租约执行 | 补齐原生agent使用Modal验证的资源契约：共享nonce准入阻止重放，远端父进程记录实际worker墙钟，客户端绑定请求并有界等待/取消，未知不退款且不继续花费；复用现有预算与恢复，避免再造远端账本 | M5 | [modal_backend.py](../kb_workflows/runtime/modal_backend.py), [config.py](../kb_workflows/config.py), [resource_budgets.py](../kb_workflows/agents/resource_budgets.py), [test_resource_budgets.py](../tests/agents/test_resource_budgets.py), [RESOURCE_BUDGETS.md](../docs/RESOURCE_BUDGETS.md) |
 
 ### M5：可复现且可部署的基础设施的改动
 
@@ -440,7 +441,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
 | R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列现含真实显存探针的验证/峰值关联，三进程逐次NVTX/输出/模式/launch核对、配对参考角色、按调用审核SOL及离线A/E/O已接入。Neuron Parquet/DMA、字节/core、快照/Explorer及资源模型已有软件实现；其他诊断/非kernel工作、Neuron原生所有权及正式归因门继续实现，未运行设备或工具实验 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
-| R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列现有请求/nonce绑定、服务端到期、取消/进程组清理及未知用量拒绝，重启不重花租约；纯GPU busy时间物理硬限与其他远端后端资源契约继续实现，未运行设备或模型实验 |
+| R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证增加共享nonce准入、禁重试、远端结算与有界取消；未知用量拒绝且不重花。纯GPU busy时间物理硬限及Modal/Harbor生成资源契约继续实现，未运行设备、云函数或模型实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |
 | R-20 RL训练与奖励验证 | 代码已实现 | M4 | 已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果 |
 | R-21 Trainium/NKI与设备通用接口 | 代码已实现 | M5 | 已实现五方法设备接口、原生TorchNeuron/NKI worker、平台基线/校准、core与物理/软件身份、CPU FP64与原生最终/配对重测、每引擎轨迹诊断；40个存储接口仅CPU前端回归，FP8存储明确拒绝，SDK部署、算子覆盖和设备实验未验证 |
