@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import math
 import os
 import sys
@@ -15,9 +16,10 @@ from functools import wraps
 from pathlib import Path
 
 from ..common import atomic_json, evaluator_digest, failure, fingerprint, read_json
-from .kernel_origin import MAX_RECORDS, summarize
+from .kernel_origin import MAX_RECORDS, _sha, summarize
 
 NATIVE_PROTOCOL = "kernelbench_pro_native_origin_v1"
+NATIVE_SCOPE = "native_correctness_both_orders_warmups_timing_and_paired; memory_probe_and_other_diagnostics_excluded"
 _ACTIVE = ContextVar("kernelbench_native_origin_calls", default=None)
 MAX_REPORT_BYTES = 64 * 1024**2
 
@@ -56,6 +58,7 @@ class _Calls:
     def __init__(self, capture, seeds):
         self.capture, self.seeds = capture, seeds
         self.rows, self.windows, self.changes = [], {}, []
+        self.timings = []
         self.cursor, self.last_seed = 0, None
 
     def next_seed(self):
@@ -126,6 +129,12 @@ def snapshot_output(row, output):
         from ..evaluation.determinism import signature
 
         row["output_content_sha256"] = fingerprint({"value": signature(output, typed=True)})
+
+
+def record_elapsed(row, milliseconds):
+    """Keep the native timer outside cross-process observable comparisons."""
+    if row is not None:
+        _ACTIVE.get().timings.append((row, milliseconds))
 
 
 def confirm(row):
@@ -216,9 +225,11 @@ def _run_native(payload, invoke):
     binding = {"native_request_sha256": fingerprint(canonical),
                "evaluator_sha256": payload["eval_config"].get("evaluator_sha256"),
                "device_fingerprint": result.get("metadata", {}).get("device_fingerprint"),
-               "scope": "native_correctness_both_orders_warmups_timing_and_paired; memory_probe_and_other_diagnostics_excluded"}
+               "scope": NATIVE_SCOPE}
     document = {"protocol": NATIVE_PROTOCOL, "stage": payload["_origin_stage"], "binding": binding,
                 "native_result": result, "calls": state.rows, "seeds_consumed": state.cursor,
+                "native_timings": [{"id": row["id"], "native_call_sha256": fingerprint(row), "wall_ms": elapsed}
+                                   for row, elapsed in state.timings],
                 "environment_changes": sorted(set(state.changes))}
     if capture:
         if capture.extensions is not None:
@@ -282,18 +293,105 @@ def _coverage(document, payload):
             raise ValueError("Paired native results do not match the captured seed/order schedule")
     rows = document["calls"]
     if ([(row["phase"], row["seed"], row["label"], row["order"]) for row in rows] != expected
+            or [row["id"] for row in rows] != list(range(1, len(expected) + 1))
             or document["seeds_consumed"] != len(seeds) or document["environment_changes"]
-            or any(not row["called"] or not row["verified"] or not row.get("no_grad")
-                   or row.get("training_after") != row.get("training") or not row.get("output_content_sha256") for row in rows)):
+            or any(row["called"] is not True or row["verified"] is not True or row.get("no_grad") is not True
+                   or type(row.get("training")) is not bool or row.get("training_after") != row["training"]
+                   or any(not _sha(row.get(key)) for key in ("input_content_sha256", "input_signature_sha256",
+                                                             "input_layout_sha256", "output_content_sha256")) for row in rows)):
         raise ValueError("Missing, changed, unverified or mode-unbound native candidate calls")
+    timed = [row for row in rows if row["phase"] in {"warmup", "timing", "paired_warmup", "paired"}]
+    timings = document["native_timings"]
+    if (not isinstance(timings, list) or len(timings) != len(timed)
+            or any(item.get("id") != row["id"] or item.get("native_call_sha256") != fingerprint(row)
+                   or type(item.get("wall_ms")) not in (int, float) or not math.isfinite(item["wall_ms"]) or item["wall_ms"] <= 0
+                   for item, row in zip(timings, timed))):
+        raise ValueError("Native timer omitted or rebound a measured/warmup call")
+    measured = [item["wall_ms"] for item, row in zip(timings, timed) if row["phase"] in {"timing", "paired"}]
+    if target == "evaluate" and seeds:
+        receipt = metadata["timing_receipt"]
+        if (result.get("runtime_stats", {}).get("samples_ms") != measured
+                or receipt.get("first_timed_call_ms") != timings[0]["wall_ms"]
+                or not math.isclose(receipt.get("warmup_total_ms", -1), sum(item["wall_ms"] for item in timings[:3]), rel_tol=1e-12)):
+            raise ValueError("Native performance samples differ from their observed candidate calls")
+    if target == "paired_timing" and [pair["candidate_ms"] for pair in metadata["paired_timing"]["pairs"]] != measured:
+        raise ValueError("Native paired samples differ from their observed candidate calls")
     return rows
+
+
+def _replay_parts(payload, stages, raw, *, simulated):
+    """One verifier for collection and saved-report analysis; no cached verdicts."""
+    target, _, threshold = _validate(payload)
+    if type(simulated) is not bool:
+        raise ValueError("Native origin simulation state must be explicit")
+    simulated = simulated or raw.get("simulated") is not False
+    canonical = copy.deepcopy(payload)
+    canonical.update(task=target)
+    for key in ("_origin_target", "_origin_stage", "request_id", "build_root"):
+        canonical.pop(key, None)
+    if set(stages) != {"control", "profile"} or payload["eval_config"].get("evaluator_sha256") != evaluator_digest():
+        raise ValueError("Native origin stages or evaluator version differ")
+    for stage, document in stages.items():
+        binding = document["binding"]
+        metadata = document["native_result"]["metadata"]
+        if (document.get("protocol") != NATIVE_PROTOCOL or document.get("stage") != stage
+                or binding.get("native_request_sha256") != fingerprint(canonical)
+                or binding.get("evaluator_sha256") != evaluator_digest()
+                or binding.get("scope") != NATIVE_SCOPE
+                or not isinstance(binding.get("device_fingerprint"), dict)
+                or binding["device_fingerprint"] != metadata.get("device_fingerprint")
+                or metadata.get("reference_sha256") != fingerprint({"source": payload["ref_arch_src"]})
+                or metadata.get("kernel_sha256") != fingerprint({"source": payload["kernel_src"]})
+                or metadata.get("precision") != payload["eval_config"]["precision"]):
+            raise ValueError("Native origin stage changed its source, device or request binding")
+        if not simulated:
+            from ..analysis.calibration import identity
+
+            identity(binding["device_fingerprint"])
+    control, profiled = (_coverage(stages[stage], payload) for stage in ("control", "profile"))
+    if control != profiled or stages["control"]["binding"] != stages["profile"]["binding"]:
+        raise ValueError("Control/profile native input, output, mode observations or device differ")
+    if (raw.get("candidate_sha256") != hashlib.sha256(payload["kernel_src"].encode()).hexdigest()
+            or raw.get("candidate_windows_only") is not True or raw.get("binding") != stages["profile"]["binding"]
+            or len(raw.get("windows", [])) != len(profiled)
+            or any(window.get("id") != row["id"] or window.get("native_call_sha256") != fingerprint(row)
+                   or window.get("seed") != row["seed"] or window.get("output_verified") is not True
+                   or fingerprint({"signature": window.get("input_signature")}) != row["input_signature_sha256"]
+                   or any(window.get(key) != row[key] for key in ("training", "training_after", "no_grad"))
+                   for window, row in zip(raw["windows"], profiled))):
+        raise ValueError("CUPTI windows do not bind every validated native candidate call")
+    coverage = {"status": "passed", "candidate_calls": len(control), "bitwise_observable_replay": True,
+                "simulated": simulated,
+                "memory_probe_included": False, "uninstrumented_path_equivalence_proven": False}
+    return coverage, summarize(raw, minimum_custom_fraction=threshold)
+
+
+def replay(report, *, allow_simulated=False):
+    """Recompute a saved native report without starting a collector or workload."""
+    from ..evaluation.evaluate_task import validate_sources
+
+    try:
+        if (not isinstance(report, dict) or report.get("protocol") != NATIVE_PROTOCOL or report.get("status") != "ok"
+                or report.get("purpose") != "native_execution_origin_diagnostics_only"
+                or report.get("formal_qualification_implemented") is not False or report.get("scored_wall_times_replaced") is not False
+                or report.get("receipt_sha256") != fingerprint({k: v for k, v in report.items() if k not in {"receipt_sha256", "metadata"}})):
+            raise ValueError("Native origin report is missing, changed or uses an unsupported scope")
+        payload = report["native_request"]
+        validate_sources(payload)
+        coverage, summary = _replay_parts(payload, report["native_runs"], report["raw"], simulated=report["native_coverage"]["simulated"])
+        if (coverage != report["native_coverage"] or summary != report["summary"]
+                or coverage["simulated"] and not allow_simulated):
+            raise ValueError("Saved origin coverage or summary is stale, changed or simulated")
+        return summary
+    except (KeyError, TypeError, AttributeError, OverflowError) as exc:
+        raise ValueError("Incomplete or invalid native origin report") from exc
 
 
 def audit(payload, *, run=None):
     from ..evaluation.evaluate_task import validate_sources
     from ..evaluation.tool_runner import environment, process
 
-    target, _, threshold = _validate(payload)
+    target, _, _ = _validate(payload)
     validate_sources(payload)
     if run is None:
         from importlib.metadata import version
@@ -351,24 +449,16 @@ def audit(payload, *, run=None):
             return failed("Profile worker omitted its raw source/launch capture", root / "profile")
     raw = stages["profile"].pop("raw")
     try:
-        control, profiled = (_coverage(stages[stage], {**payload, "task": target}) for stage in ("control", "profile"))
-        if control != profiled or stages["control"]["binding"] != stages["profile"]["binding"]:
-            raise ValueError("Control/profile native input, output, mode observations or device differ")
-        if (raw.get("candidate_windows_only") is not True or raw.get("binding") != stages["profile"]["binding"]
-                or len(raw.get("windows", [])) != len(profiled)
-                or any(window.get("id") != row["id"] or window.get("native_call_sha256") != fingerprint(row)
-                       or window.get("seed") != row["seed"] or window.get("output_verified") is not True
-                       or fingerprint({"signature": window.get("input_signature")}) != row["input_signature_sha256"]
-                       or any(window.get(key) != row[key] for key in ("training", "training_after", "no_grad"))
-                       for window, row in zip(raw["windows"], profiled))):
-            raise ValueError("CUPTI windows do not bind every validated native candidate call")
-        coverage = {"status": "passed", "candidate_calls": len(control), "bitwise_observable_replay": True,
-                    "simulated": run is not None, "memory_probe_included": False, "uninstrumented_path_equivalence_proven": False}
-        summary = summarize(raw, minimum_custom_fraction=threshold)
+        coverage, summary = _replay_parts(payload, stages, raw, simulated=run is not None)
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         coverage = {"status": "not_measured", "reason": str(exc)}
         summary = {"status": "not_measured", "reason": str(exc), "timings_are_diagnostic": True,
                    "formal_qualification_implemented": False}
-    return {"status": "ok", "purpose": "native_execution_origin_diagnostics_only", "raw": raw,
-            "native_runs": stages, "native_coverage": coverage, "summary": summary,
-            "scored_wall_times_replaced": False, "formal_qualification_implemented": False}
+    request = copy.deepcopy(payload)
+    request.pop("request_id", None)
+    request.pop("build_root", None)
+    report = {"protocol": NATIVE_PROTOCOL, "status": "ok", "purpose": "native_execution_origin_diagnostics_only", "raw": raw,
+              "native_request": request, "native_runs": stages, "native_coverage": coverage, "summary": summary,
+              "scored_wall_times_replaced": False, "formal_qualification_implemented": False}
+    report["receipt_sha256"] = fingerprint(report)
+    return report

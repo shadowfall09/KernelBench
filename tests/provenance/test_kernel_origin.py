@@ -863,7 +863,7 @@ def native_origin_runner(tmp_path, monkeypatch):
     class FakeCapture(cuda_origin.Capture):
         def __init__(self, source, **options):
             sdk, _ = fake_sdk()
-            ticks = iter(range(1, 100_000))
+            ticks = iter(range(1000, 100_000_000, 1000))
             sdk.get_timestamp = lambda: next(ticks)
             super().__init__(source, bindings=sdk, **options)
 
@@ -883,7 +883,7 @@ def native_origin_runner(tmp_path, monkeypatch):
 
     hidden = tmp_path / "private_hidden.py"
     hidden.write_text("import torch\ndef get_hidden_inputs():\n    return [[torch.rand(4)]]\n")
-    action = {"damage": None}
+    action = {"damage": None, "activities": False}
     monkeypatch.setenv("TORCH_EXTENSIONS_DIR", str(tmp_path))
     monkeypatch.setenv("TORCH_USE_CUDA_DSA", "1")
     monkeypatch.setenv("KB_FP32_TOL", "0.0001")
@@ -896,7 +896,9 @@ def native_origin_runner(tmp_path, monkeypatch):
         build = Path(payload["build_root"]) / fingerprint(payload)
         os.environ.update(TORCH_EXTENSIONS_DIR=str(build), TORCH_USE_CUDA_DSA="1", KB_FP32_TOL="0.0001")
         Candidate = native.load_custom_model(payload["kernel_src"], {}, str(build))
-        metadata = {"device_fingerprint": {"available": False, "name": "SIMULATED"}}
+        metadata = {"device_fingerprint": {"available": False, "name": "SIMULATED"},
+                    "reference_sha256": fingerprint({"source": payload["ref_arch_src"]}),
+                    "kernel_sha256": fingerprint({"source": payload["kernel_src"]}), "precision": "fp32"}
         with torch.no_grad():
             candidate, reference = Candidate(), Reference()
             if payload["task"] == "paired_timing":
@@ -920,14 +922,23 @@ def native_origin_runner(tmp_path, monkeypatch):
                     issue = compare_outputs(reference(*copy_inputs(args)), actual, 1e-4)
                     if issue:
                         raise ValueError(issue)
-                measurement.synchronized_times(candidate, [torch.zeros(4)], "cpu", num_trials=2, input_factory=inputs,
-                                               verifier=verify, receipt=receipt, origin_candidate=True)
+                times = measurement.synchronized_times(candidate, [torch.zeros(4)], "cpu", num_trials=2, input_factory=inputs,
+                                                      verifier=verify, receipt=receipt, origin_candidate=True)
+                return {"compiled": True, "correctness": outcome.correctness, "metadata": metadata,
+                        "runtime_stats": measurement.timing_stats(times)}
             return {"compiled": True, "correctness": outcome.correctness, "metadata": metadata}
 
     def runner(command, timeout, log, *, environment):
         payload = json.loads(Path(command[3]).read_text())
         document = origin_task._run_native(payload, lambda: invoke(payload))
         if payload["_origin_stage"] == "profile":
+            if action["activities"]:
+                # Deliberately unknown overlapping device intervals, never real capture.
+                document["raw"]["activities"] = [
+                    {"kind": "kernel", "start_ns": window["start_ns"] + left, "end_ns": window["start_ns"] + right,
+                     "device": 0, "stream": stream, "context_id": 1, "correlation": window["id"] * 10 + stream,
+                     "graph_id": 0, "graph_node_id": 0}
+                    for window in document["raw"]["windows"] for left, right, stream in ((100, 700, 1), (400, 900, 2))]
             if action["damage"] == "raw_window":
                 document["raw"]["windows"].pop()
             elif action["damage"] == "output":
@@ -938,8 +949,8 @@ def native_origin_runner(tmp_path, monkeypatch):
         Path(log).write_text("Explicit CPU process simulation; no device collector loaded")
         return {"exit_code": 0, "timed_out": False, "request_wall_seconds": 0.01}
 
-    def audit(*, target="evaluate", hidden=False, mutation="", damage=None):
-        action["damage"] = damage
+    def audit(*, target="evaluate", hidden=False, mutation="", damage=None, activities=False):
+        action.update(damage=damage, activities=activities)
         source = ("import torch\nclass ModelNew(torch.nn.Module):\n"
                   "    def __init__(self):\n        super().__init__()\n        self.calls = 0\n"
                   f"    def forward(self, x):\n        self.calls += 1\n{mutation}"
@@ -955,6 +966,8 @@ def native_origin_runner(tmp_path, monkeypatch):
 
 
 def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(native_origin_runner):
+    from kb_workflows.provenance.origin_task import replay
+
     for target, hidden, expected in (("evaluate", False, 7), ("evaluate", True, 8), ("paired_timing", False, 13)):
         result = native_origin_runner(target=target, hidden=hidden)
         assert result["native_coverage"]["status"] == "passed", result.get("native_coverage")
@@ -962,6 +975,73 @@ def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(nati
         assert result["native_coverage"]["simulated"] and not result["formal_qualification_implemented"]
         assert not result["scored_wall_times_replaced"] and result["summary"]["status"] == "not_measured"
         assert all(row["output_verified"] and row["native_call_sha256"] for row in result["raw"]["windows"])
+        assert replay(result, allow_simulated=True) == result["summary"]
+
+
+def test_saved_native_replay_rejects_resealed_binding_coverage_and_source_changes(native_origin_runner):
+    from kb_workflows.provenance.origin_task import replay
+
+    report = native_origin_runner(activities=True)
+    with pytest.raises(ValueError, match="simulated"):
+        replay(report)
+    damages = (
+        lambda value: value["raw"]["windows"].pop(),
+        lambda value: value["native_request"]["eval_config"].update(fp32_tolerance=1),
+        lambda value: value["native_request"]["eval_config"].update(evaluator_sha256="f" * 64),
+        lambda value: value["native_runs"]["profile"]["calls"][-1].update(output_content_sha256="f" * 64),
+        lambda value: value["native_runs"]["control"]["native_result"]["metadata"].update(kernel_sha256="f" * 64),
+        lambda value: value["raw"].update(candidate_sha256="f" * 64),
+        lambda value: value["summary"].update(status="passed"),
+        lambda value: value["native_coverage"].update(candidate_calls=1),
+        lambda value: value["native_runs"]["profile"]["native_timings"].pop(),
+        lambda value: value["native_runs"]["profile"]["native_timings"][-1].update(wall_ms=999),
+        lambda value: value["native_runs"]["profile"]["native_result"]["runtime_stats"].update(samples_ms=[1, 2]),
+        lambda value: value["native_runs"]["control"]["binding"].update(scope="all_calls_including_memory"),
+    )
+    for damage in damages:
+        changed = copy.deepcopy(report)
+        damage(changed)
+        changed["receipt_sha256"] = fingerprint({k: v for k, v in changed.items() if k != "receipt_sha256"})
+        with pytest.raises(ValueError):
+            replay(changed, allow_simulated=True)
+    missing_device = copy.deepcopy(report)
+    missing_device["raw"]["simulated"] = missing_device["native_coverage"]["simulated"] = False
+    missing_device["summary"] = kernel_origin.summarize(missing_device["raw"])
+    missing_device["receipt_sha256"] = fingerprint({k: v for k, v in missing_device.items() if k != "receipt_sha256"})
+    with pytest.raises(ValueError, match="physical device UUID"):
+        replay(missing_device)
+
+
+def test_native_timeline_joins_same_clock_intervals_and_keeps_missing_work_unknown(native_origin_runner, tmp_path):
+    from kb_workflows.analysis.performance import native_timeline
+    from scripts.analyze_device_trace import main
+
+    report = native_origin_runner(activities=True)
+    result = native_timeline(report, allow_simulated=True)
+    assert result["status"] == "simulated" and not result["formal_qualification_implemented"]
+    assert {key: row["calls"] for key, row in result["by_phase"].items()} == {"correctness": 2, "warmup": 3, "timing": 2}
+    for row, observed in zip(result["calls"], report["native_runs"]["profile"]["calls"], strict=True):
+        assert row["native_call_sha256"] == fingerprint(observed)
+        assert row["profile_window_wall_ms"] == pytest.approx(0.001)
+        assert row["device_busy_ms"] == pytest.approx(0.0008) and row["O"] == pytest.approx(1.25)
+        assert row["unknown_activity_count"] == 2 and row["origin_verdicts"]["custom"] == "not_measured"
+        assert row["A"] is row["E"] is row["AE"] is None
+        for stage in ("control", "profile"):
+            if row["phase"] == "correctness":
+                assert row[f"native_{stage}_wall_ms"] is None
+            else:
+                observed_times = {item["id"]: item["wall_ms"] for item in report["native_runs"][stage]["native_timings"]}
+                assert row[f"native_{stage}_wall_ms"] == observed_times[row["id"]]
+    assert all(row["O"] == pytest.approx(1.25) for row in result["by_phase"].values())
+    empty = native_timeline(native_origin_runner(), allow_simulated=True)
+    assert empty["status"] == "not_measured" and all(row["O"] is row["device_busy_ms"] is None for row in empty["calls"])
+    assert all(row["O"] is None and not row["complete"] for row in empty["by_phase"].values())
+    for target, hidden in (("evaluate", True), ("paired_timing", False)):
+        other = native_timeline(native_origin_runner(target=target, hidden=hidden, activities=True), allow_simulated=True)
+        assert len(other["calls"]) == (8 if hidden else 13)
+    source, output = tmp_path / "origin.json", tmp_path / "offline.json"
+    source.write_text(json.dumps(report))
+    assert main(["native", str(source), "--output", str(output)]) == 2 and not output.exists()
 
 
 def test_native_origin_refuses_late_wrong_outputs_mode_changes_and_missing_windows(native_origin_runner):

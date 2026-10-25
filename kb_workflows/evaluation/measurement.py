@@ -70,7 +70,7 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
     times = []
     from contextlib import nullcontext
 
-    from ..provenance.origin_task import candidate_call, confirm, snapshot_output
+    from ..provenance.origin_task import candidate_call, confirm, record_elapsed, snapshot_output
     with torch.no_grad():
         for trial in range(num_warmup + num_trials):
             fresh = input_factory(trial) if input_factory else copy_inputs(args)
@@ -88,6 +88,7 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
                     consumed = consume_output(output)
                     synchronize(device)
                     elapsed = (CLOCK() - start) * 1000
+            record_elapsed(observed, elapsed)
             snapshot_output(observed, output)
             if verifier:
                 after_rng = torch.get_rng_state()

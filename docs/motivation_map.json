@@ -1564,9 +1564,12 @@
         "tests/hardware/test_neuron_work.py",
         "kb_workflows/hardware/neuron_processing.py",
         "scripts/analyze_device_trace.py",
-        "tests/hardware/test_neuron_processing.py"
+        "tests/hardware/test_neuron_processing.py",
+        "kb_workflows/provenance/origin_task.py",
+        "tests/provenance/test_kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet注释/DMA、来源检查后的采集字节/core收据、完整快照与固定Explorer自动处理关联、审核资源模型及同设备A/E已有软件实现。与原生时间/执行所有权的完整关联和正式归因门继续实现，未运行设备、模型或Explorer实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源诊断、launch_only和审核A/E；Neuron完整Parquet/DMA、字节/core采集、快照与Explorer关联及资源模型已有软件实现。现有保存原生报告的请求/源码/设备/输出/窗口重放，逐次绑定对照与采集的原生时间，按同一窗口计算busy/O；原生计数器逐调用关联、Neuron执行所有权与正式归因门继续实现，未运行设备、模型或工具实验"
     },
     {
       "id": "R-17",
@@ -5084,6 +5087,27 @@
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "用真实原生调用及逐次内容/布局/模式复核替换简化采样，避免只观察最初公开前向；所有窗口必须绑定，重叠未知活动不能被过滤，诊断计时不进入正式评分"
+    },
+    {
+      "id": "V49-01",
+      "title": "保存报告重放与原生时间/设备活动关联",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/analysis/performance.py",
+        "kb_workflows/evaluation/measurement.py",
+        "kb_workflows/evaluation/paired_task.py",
+        "scripts/analyze_device_trace.py",
+        "tests/provenance/test_kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "保存可重放请求，原生计时样本逐项绑定实际调用，重算窗口来源与同一时钟的busy/O；避免借用其他调用的时间、重叠累计和把缺活动当零成本，未关联的计数器不能产生A/E"
     }
   ]
 }

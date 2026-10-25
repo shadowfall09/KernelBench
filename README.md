@@ -151,7 +151,7 @@ Python 3.12 / Torch 2.12.0 的 CPU/模拟回归已执行；真实 CUDA 和各云
 python -m scripts.generate_leaderboard runs/NAME --output results.html
 ```
 
-设备记录分析统一使用 `python -m scripts.analyze_device_trace`；子命令为 `timeline`、`neuron-tables`、`neuron-process`，各自提供 `--help`。
+设备记录分析统一使用 `python -m scripts.analyze_device_trace`；子命令为 `timeline`、`native`、`neuron-tables`、`neuron-process`，各自提供 `--help`。
 
 ## 许可证与来源
 

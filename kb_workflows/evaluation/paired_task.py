@@ -34,7 +34,7 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
 
     if type(trials) is not int or trials < 10:
         raise ValueError("At least 10 paired trials are required")
-    from ..provenance.origin_task import candidate_call, confirm, snapshot_output
+    from ..provenance.origin_task import candidate_call, confirm, record_elapsed, snapshot_output
 
     models = {"R": reference, "C": candidate, "B": control}
     rows, changes = [], []
@@ -68,6 +68,7 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                         consumed = consume_output(output)
                         synchronize(device)
                         elapsed = (clock() - started) * 1000
+                record_elapsed(observed, elapsed)
                 snapshot_output(observed, output)
                 issue = compare_outputs(expected, output, tolerance)
                 if issue:

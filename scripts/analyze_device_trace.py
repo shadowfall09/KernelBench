@@ -8,7 +8,7 @@ import math
 import sys
 from pathlib import Path
 
-from kb_workflows.analysis.performance import timeline
+from kb_workflows.analysis.performance import native_timeline, timeline
 from kb_workflows.common import atomic_json, fingerprint, read_json
 from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, DEFAULT_TABLE_LIMITS, core_valid, process_capture
 from kb_workflows.hardware.neuron_tables import load
@@ -37,6 +37,32 @@ def timeline_main(argv=None):
     atomic_json(args.output, result)
     print(args.output)
     return 0
+
+
+def native_main(argv=None):
+    parser = argparse.ArgumentParser(description="Replay an existing native origin report; never start a collector or workload.")
+    parser.add_argument("report", type=Path)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        from kb_workflows.provenance.origin_task import MAX_REPORT_BYTES
+
+        if args.output.exists() or args.output.is_symlink():
+            raise ValueError("Native timeline output must be a new path")
+        if args.report.is_symlink() or not args.report.is_file() or args.report.stat().st_size > MAX_REPORT_BYTES:
+            raise ValueError("Native origin report must be a bounded regular file")
+        with args.report.open("rb") as stream:
+            raw = stream.read(MAX_REPORT_BYTES + 1)
+        if len(raw) > MAX_REPORT_BYTES:
+            raise ValueError("Native origin report exceeds the analysis byte limit")
+        result = native_timeline(json.loads(raw))
+        atomic_json(args.output, result)
+        print(args.output)
+        return 0 if result["status"] == "measured" else 2
+    except (ValueError, OSError, TypeError, KeyError, AttributeError, ImportError) as exc:
+        print(f"Error: {exc}")
+        return 2
+
 
 def neuron_tables_main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -176,9 +202,9 @@ def neuron_process_main(argv=None):
 
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
-    commands = {"timeline": timeline_main, "neuron-tables": neuron_tables_main, "neuron-process": neuron_process_main}
+    commands = {"timeline": timeline_main, "native": native_main, "neuron-tables": neuron_tables_main, "neuron-process": neuron_process_main}
     if not args or args[0] in {"-h", "--help"}:
-        parser = argparse.ArgumentParser(description=__doc__, usage="%(prog)s {timeline,neuron-tables,neuron-process} ...")
+        parser = argparse.ArgumentParser(description=__doc__, usage="%(prog)s {timeline,native,neuron-tables,neuron-process} ...")
         parser.epilog = "Use COMMAND --help for command-specific options. Legacy TRACE --backend ... remains a timeline."
         parser.print_help()
         return 0

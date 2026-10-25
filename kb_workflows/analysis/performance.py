@@ -106,6 +106,62 @@ def decomposition(wall_ms, busy_ms, sol_algorithm_ms, *, sol_execution_ms=None, 
             "execution_model_replayed": measured, "work_evidence_kind": evidence_kind}
 
 
+def native_timeline(report, *, allow_simulated=False):
+    """Join replayed native calls to wall and activity intervals from one clock.
+
+    CUPTI window duration includes the candidate invocation and completion
+    barrier. It is an instrumented diagnostic, separate from native score time.
+    """
+    from ..common import fingerprint
+    from ..provenance.origin_task import replay
+
+    summary = replay(report, allow_simulated=allow_simulated)
+    raw, coverage = report["raw"], report["native_coverage"]
+    if (raw.get("capture_complete") is not True or raw.get("source_intact") is not True
+            or raw.get("hooks_intact") is not True or raw.get("errors") != []
+            or type(raw.get("dropped_records")) is not int or raw["dropped_records"] != 0):
+        raise ValueError("Native timeline requires complete source-bound capture and drop accounting")
+    calls, totals = [], {}
+    native_times = {stage: {item["id"]: item["wall_ms"] for item in document["native_timings"]}
+                    for stage, document in report["native_runs"].items()}
+    for observed, window, activity in zip(report["native_runs"]["profile"]["calls"], raw["windows"], summary["calls"], strict=True):
+        if observed["id"] != window["id"] or observed["id"] != activity["id"]:
+            raise ValueError("Native timeline call/window/activity identities differ")
+        wall = (window["end_ns"] - window["start_ns"]) / 1e6
+        busy = activity["device_busy_ns"] / 1e6
+        if not positive(wall) or busy < 0 or busy > wall * (1 + 1e-9):
+            raise ValueError("Native activity exceeds its own wall interval")
+        calls.append({"id": observed["id"], "phase": observed["phase"], "seed": observed["seed"],
+                      "label": observed["label"], "order": observed["order"], "native_call_sha256": fingerprint(observed),
+                      "status": ("simulated" if coverage["simulated"] else "measured") if busy else "not_measured",
+                      "profile_window_wall_ms": wall, "device_busy_ms": busy if busy else None,
+                      "native_control_wall_ms": native_times["control"].get(observed["id"]),
+                      "native_profile_wall_ms": native_times["profile"].get(observed["id"]),
+                      "uncovered_wall_ms": max(0, wall - busy) if busy else None, "O": wall / busy if busy else None,
+                      "A": None, "E": None, "AE": None, "kernel_count": activity["kernel_count"],
+                      "activity_count": activity["activity_count"], "unknown_activity_count": activity["unknown_activity_count"],
+                      "origin_union_ms": {key: value / 1e6 for key, value in activity["by_origin_union_ns"].items()},
+                      "custom_exclusive_fraction_lower_bound": activity["custom_exclusive_fraction_lower_bound"],
+                      "origin_verdicts": activity["track_verdicts"]})
+        group = totals.setdefault(observed["phase"], {"calls": 0, "profile_window_wall_ms": 0., "observed_device_busy_ms": 0.})
+        group["calls"] += 1
+        group["profile_window_wall_ms"] += wall
+        group["observed_device_busy_ms"] += busy
+    for phase, group in totals.items():
+        complete = all(call["status"] != "not_measured" for call in calls if call["phase"] == phase)
+        group["device_busy_ms"] = group["observed_device_busy_ms"] if complete else None
+        group["O"] = group["profile_window_wall_ms"] / group["observed_device_busy_ms"] if complete else None
+        group["complete"] = complete
+    value = {"protocol": "kernelbench_pro_native_timeline_v1", "origin_receipt_sha256": report["receipt_sha256"],
+             "status": ("simulated" if coverage["simulated"] else "measured") if all(row["complete"] for row in totals.values()) else "not_measured",
+             "calls": calls, "by_phase": totals, "device_fingerprint": raw["binding"]["device_fingerprint"],
+             "scope": "same_CUPTI_window_invocation_and_completion; input_output_hashing_and_reference_excluded",
+             "counter_native_call_join_implemented": False, "formal_qualification_implemented": False,
+             "hardware_counters_collected": False, "timings_are_diagnostic": True, "scored_wall_times_replaced": False}
+    value["receipt_sha256"] = fingerprint(value)
+    return value
+
+
 def launch_only(reference, candidate, *, launch_ms, speedup_ci95, noise_ci95, relative_busy_tolerance=0.05):
     """A diagnostic category, requiring a noise-separated speedup and measured launch cost."""
     if (not positive(launch_ms) or not 0 <= relative_busy_tolerance < 1

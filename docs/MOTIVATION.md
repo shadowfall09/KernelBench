@@ -264,6 +264,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V44-03 Neuron同设备校准与A/E | 原始资源需求除以同物理core及软件校准率取最大值，重放全部分量再拆A/E；明确为指令注释模型且hardware_counters_collected为false | — | [performance.py](../kb_workflows/analysis/performance.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V44-05 采集前输入隔离 | 候选输入隔离复制在profile区间前完成，采集中保留候选前向与完成屏障，不把验证器复制计入执行工作 | M2 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/hardware/test_device_adapters.py) |
 | V45-05 处理收据驱动Neuron模型 | 重放工具/命令/工件、capture/report和表包络后自动配对审核模型；指定无效处理证据不得退回人工模式，仍不授予执行所有权或正式资格 | M2 | [neuron_work.py](../kb_workflows/hardware/neuron_work.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
+| V49-01 保存报告重放与原生时间/设备活动关联 | 保存可重放请求，原生计时样本逐项绑定实际调用，重算窗口来源与同一时钟的busy/O；避免借用其他调用的时间、重叠累计和把缺活动当零成本，未关联的计数器不能产生A/E | M2, M5 | [origin_task.py](../kb_workflows/provenance/origin_task.py), [performance.py](../kb_workflows/analysis/performance.py), [measurement.py](../kb_workflows/evaluation/measurement.py), [paired_task.py](../kb_workflows/evaluation/paired_task.py), [analyze_device_trace.py](../scripts/analyze_device_trace.py), [test_kernel_origin.py](../tests/provenance/test_kernel_origin.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 
 ### M4：现实的Agent回路与预算的改动
 
@@ -434,7 +435,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-13 扩展基线组合 | 代码已实现 | M3 | 291题来源清单已覆盖论文指定的SDPA、LayerNorm/var_mean、卷积benchmark/布局和cuBLASLt偏好；六基础组合及每个改写/策略的Graph对应共2750个分题声明。逐输出验证、失败保留、政策收据、冷成本/稳态选择与恢复/配对/评分门已实现；最强指声明且通过的集合，非全库最优性证明；不运行硬件实验 |
 | R-14 设备实测上限与边界证书 | 代码已实现 | M3 | 已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理 |
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
-| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet注释/DMA、来源检查后的采集字节/core收据、完整快照与固定Explorer自动处理关联、审核资源模型及同设备A/E已有软件实现。与原生时间/执行所有权的完整关联和正式归因门继续实现，未运行设备、模型或Explorer实验 |
+| R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、来源诊断、launch_only和审核A/E；Neuron完整Parquet/DMA、字节/core采集、快照与Explorer关联及资源模型已有软件实现。现有保存原生报告的请求/源码/设备/输出/窗口重放，逐次绑定对照与采集的原生时间，按同一窗口计算busy/O；原生计数器逐调用关联、Neuron执行所有权与正式归因门继续实现，未运行设备、模型或工具实验 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
 | R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列现有请求/nonce绑定、服务端到期、取消/进程组清理及未知用量拒绝，重启不重花租约；纯GPU busy时间物理硬限与其他远端后端资源契约继续实现，未运行设备或模型实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |
