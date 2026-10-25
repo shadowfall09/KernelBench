@@ -150,6 +150,7 @@ def test_harbor_generation_imports_submission_and_resumes(config, monkeypatch):
         return SimpleNamespace(wait=lambda **kw: 0, poll=lambda: 0, returncode=0)
 
     monkeypatch.setattr(harbor.subprocess, "Popen", popen)
+    monkeypatch.setattr(harbor, "terminate", lambda process: None)  # No OS process in this CLI double.
     monkeypatch.setattr(generation, "resolve_devices", lambda value, **kwargs: ["GPU-allocated"])
     assert generation.generate_run(config)
     assert (config.run_dir / kernel_name(1, 90)).read_text() == "class ModelNew: pass\n"
@@ -172,6 +173,7 @@ def test_harbor_backend_rejects_missing_or_ambiguous_artifacts(config, monkeypat
         return SimpleNamespace(wait=lambda **kw: 0, poll=lambda: 0)
 
     monkeypatch.setattr(harbor.subprocess, "Popen", popen)
+    monkeypatch.setattr(harbor, "terminate", lambda process: None)
     result = harbor.run_harbor_agent(config.run_dir, config, 90, "0")
     assert result["status"] == "failed" and "submission" in result["error"]
 

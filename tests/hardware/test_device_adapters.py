@@ -243,6 +243,7 @@ def test_local_transport_pins_neuron_cores_and_vendor_interpreter_before_torch_i
         def poll(self):
             return 0
     monkeypatch.setattr(transports.subprocess, "Popen", Process)
+    monkeypatch.setattr(transports, "terminate", lambda process: None)
     result = transports.local_evaluate(request, device="7", log_path=tmp_path / "worker.log")
     command, options = observed[0]
     assert result["compiled"] and command[0] == "/vendor/bin/python"

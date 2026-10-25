@@ -9,7 +9,7 @@
 | `agent_token_limit` | 累计完整prompt token IDs + 返回的生成token IDs；每轮prompt重新计入 | `local-transformers` |
 | `agent_output_token_limit` | 累计输出token；供应商包含的推理token按completion usage计入 | `local-transformers`、支持completion上限参数的LiteLLM模型 |
 | `agent_max_output_tokens` | 每次调用最多输出数，默认8192；用于本地模型或开启token预留的调用 | 同上 |
-| `agent_device_seconds` | 开发编译、标准测试与profiling占用独立worker的墙钟总额，包含启动与清理 | 原生local/Docker生成，local/Docker验证 |
+| `agent_device_seconds` | 开发编译、标准测试与profiling占用独立worker的墙钟总额，包含启动与清理 | 原生local/Docker生成，local/Docker或新版queue验证 |
 
 设备额度不包含最终验证，也不包含本地语言模型推理；`local_model_device`单独选择模型设备，默认`cpu`。worker占用时间不等于GPU busy时间、供应商账单或跨进程独占证明。
 
@@ -23,11 +23,21 @@ LiteLLM在请求前检查模型支持的`max_completion_tokens`/`max_tokens`参�
 
 开发worker每次执行前预留`min(任务超时+5秒清理余量, 剩余总墙钟, 剩余设备额度)`。不足5秒时不启动新任务。父进程把执行超时缩至预留减5秒，并用单调时钟测量整个transport调用，包括超时终止与清理；子进程提供的同名收据会被覆盖。profiling也要单独申请和结算。
 
-已知设备占用未超额时，预算耗尽仍可保留此前开发通过的最佳候选。缺失收据、无法完成清理或实际超额会拒绝计分资格。进程终止不能保证任意驱动或内核被立即抢占；收据明确写`physical_preemption_certified=false`，没有实现纯GPU busy时间的物理硬限。远端Modal/队列/Harbor尚无对应可信取消与计量契约，开启本版预留会在配置校验时拒绝。
+已知设备占用未超额时，预算耗尽仍可保留此前开发通过的最佳候选。缺失收据、无法完成清理或实际超额会拒绝计分资格。进程终止不能保证任意驱动或内核被立即抢占；收据明确写`physical_preemption_certified=false`，没有实现纯GPU busy时间的物理硬限。新版HTTP队列已有下述服务端租约；Modal/Harbor仍不支持对应设备预留。
 
 可选[内存工具与重复检查](TOOL_CHECKS.md)在同一次验证请求的超时和设备worker墙钟内执行；插桩、版本查询及无插桩复核没有独立额度。它们的耗时不进入性能分数，但计入实际开发资源占用。
 
 受限Docker仍按父进程完整transport墙钟结算，不把容器CPU/cgroup或设备可见性当成GPU busy硬限。[产物重评分](ISOLATION_REGRADE.md)只运行新验证阶段，旧生成成本保存在历史快照，模式单独标记为`artifact-regrade`；不会把旧费用/token重新认证成新预算证明。
+
+## HTTP队列的开发租约
+
+`evaluation = "queue"` 可搭配同一个 `agent_device_seconds`，不新增预算配置项。客户端在提交前要求 `/health` 返回 `kernelbench_pro_queue_v2` 且状态正常；旧worker不会收到带预算的任务。服务端以完整请求指纹绑定任务和唯一租约nonce，同一nonce不能换任务重花。
+
+服务端从接收租约起，以单调时钟限制排队加执行窗口；排队消耗可用窗口，但不收取设备用量。到期未启动的任务不执行；运行中的任务会通知本地验证父进程终止进程组，包括主进程退出后仍存活的子进程。服务端父进程按实际worker墙钟（含启动、校验和清理）覆盖子进程收据，客户端用匹配的请求、nonce与收据结算。它不计网络等待、GPU busy时间或账单。
+
+客户端把提交、轮询和重试放在同一等待期限内。等待超时、轮询异常或提交响应丢失后，使用原请求ID与指纹发送取消，并在5秒清理余量内查询终态；原调用仍为失败。`cancelling`不是清理成功。确认尚未启动的任务可按零用量结算；用量未知、取消无法确认或清理异常时扣除整笔预留并拒绝资格。清理异常的worker停止接单，不能把短暂父进程耗时当成后续用量已结束。
+
+取消状态和nonce绑定持久化。服务重启后，未完成的带租约任务标为失败且用量未知，不重新排队；已完成记录仍可幂等读取。未带租约的旧运行任务保留原有重排策略。服务端是配置中信任的验证器；这些内容指纹不提供独立网络身份认证或物理设备抢占证明。
 
 ## 离线本地模型
 
@@ -62,4 +72,4 @@ devices = [0]
 
 [研究工作流](STUDIES.md)的`vary`增加`total_tokens`、`output_tokens`和`device_lease_seconds`；对应曲线横轴是`declared_total_tokens`、`declared_output_tokens`和`declared_device_lease_seconds`。配置预检按后端能力拒绝不可兑现的计划；默认仍只生成计划，不启动实验。不同口径、未变化的其他预算和硬件分别比较。
 
-R-18仍标为部分实现，剩余包括纯GPU时间硬限和远端资源契约，均没有用本版墙钟收据代替。
+R-18仍标为部分实现，剩余包括纯GPU时间硬限及其他远端后端的资源契约，均没有用本版墙钟收据代替。

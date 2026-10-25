@@ -30,6 +30,7 @@ def development_evaluate(config, pid, index, remaining, task="evaluate", *, leas
     payload = task_payload(child, pid, task=task)
     if lease:
         payload["eval_config"]["device_lease"] = lease
+        payload["request_id"] = "kb-" + fingerprint(payload)
     return next(iter(evaluate_tasks(child, [(f"development-{index}-{task}", payload)])))[1]
 
 

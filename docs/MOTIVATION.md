@@ -291,6 +291,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V16-05 预注册奖励对照与持出评测 | 执行前冻结两奖励组与全部种子、优化器/数据/预算及评测会话；当前lineage/权重不符或缺作业不能缩小研究，默认不执行 | M1, M5 | [rl_effectiveness.py](../kb_workflows/agents/rl_effectiveness.py), [study_plan.py](../kb_workflows/analysis/study_plan.py), [rl_workflow.py](../scripts/rl_workflow.py) |
 | V17-07 NKI提示与coding skill | 保留ModelNew接口并提示现代NKI/native注册，skill复用设备配置与vendor解释器；客户端模型环境与可信验证环境分开 | M5 | [generation.py](../kb_workflows/agents/generation.py), [SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md), [trainium2.toml](../configs/trainium2.toml) |
 | V38-08 内层模型超时清理嵌套进程 | 模型CLI自身先超时时先清理包括独立session的后代再终止父进程，避免外层控制器已无法找到孤儿；直接与外层墙钟两种超时均做CPU子进程回归，未启动模型 | M5 | [agent_models.py](../kb_workflows/agents/agent_models.py), [generation.py](../kb_workflows/agents/generation.py), [test_agent_loop.py](../tests/agents/test_agent_loop.py) |
+| V47-01 远端队列租约、取消与未知用量拒绝 | 阻止客户端超时或重启后后台继续重花预留；以服务端到期和确认清理后的用量结算，未知用量扣除整笔并停止后续执行 | M5 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py), [transports.py](../kb_workflows/runtime/transports.py), [resource_budgets.py](../kb_workflows/agents/resource_budgets.py), [agent_loop.py](../kb_workflows/agents/agent_loop.py), [RESOURCE_BUDGETS.md](../docs/RESOURCE_BUDGETS.md), [test_workflows.py](../tests/evaluation/test_workflows.py), [test_resource_budgets.py](../tests/agents/test_resource_budgets.py) |
 
 ### M5：可复现且可部署的基础设施的改动
 
@@ -434,7 +435,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-15 Headroom分层评分与设计证书 | 代码已实现 | M3 | 已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果 |
 | R-16 完整性能归因 | 部分实现 | M3 | 已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet注释/DMA、来源检查后的采集字节/core收据、完整快照与固定Explorer自动处理关联、审核资源模型及同设备A/E已有软件实现。与原生时间/执行所有权的完整关联和正式归因门继续实现，未运行设备、模型或Explorer实验 |
 | R-17 样本聚合消融 | 代码已实现 | M3 | 已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告 |
-| R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明，模型CLI内层超时清理嵌套子进程的竞态也已修复；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验 |
+| R-18 设备时间与token硬预算 | 部分实现 | M4 | 已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列现有请求/nonce绑定、服务端到期、取消/进程组清理及未知用量拒绝，重启不重花租约；纯GPU busy时间物理硬限与其他远端后端资源契约继续实现，未运行设备或模型实验 |
 | R-19 得分预算曲线与通用agent基线 | 代码已实现 | M4 | 已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18 |
 | R-20 RL训练与奖励验证 | 代码已实现 | M4 | 已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果 |
 | R-21 Trainium/NKI与设备通用接口 | 代码已实现 | M5 | 已实现五方法设备接口、原生TorchNeuron/NKI worker、平台基线/校准、core与物理/软件身份、CPU FP64与原生最终/配对重测、每引擎轨迹诊断；40个存储接口仅CPU前端回归，FP8存储明确拒绝，SDK部署、算子覆盖和设备实验未验证 |

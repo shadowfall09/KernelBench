@@ -12,8 +12,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from ..common import ROOT, fingerprint
-from .transports import local_evaluate
+from ..agents.resource_budgets import record_device_lease, stamp_device_lease, validate_device_lease
+from ..common import ROOT, failure, fingerprint
+from .transports import QUEUE_PROTOCOL, local_evaluate
 
 
 class JobStore:
@@ -22,11 +23,21 @@ class JobStore:
         self.capacity = capacity
         path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
+        self.expiries = {}
+        self.worker_error = None
         with self.connect() as connection:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, signature TEXT, payload TEXT, status TEXT, result TEXT, created REAL)"
             )
-            connection.execute("UPDATE jobs SET status='queued' WHERE status='running'")
+            connection.execute("CREATE TABLE IF NOT EXISTS leases (nonce TEXT PRIMARY KEY, job TEXT UNIQUE)")
+            for row in connection.execute("SELECT * FROM jobs WHERE status IN ('queued','running','cancelling')").fetchall():
+                leased = json.loads(row["payload"])["eval_config"].get("device_lease") is not None
+                if leased or row["status"] == "cancelling":
+                    # A lost parent's usage/cleanup cannot be reconstructed or replayed.
+                    connection.execute("UPDATE jobs SET status='failed', result=? WHERE id=?", (
+                        json.dumps(failure("Queue restarted with unresolved work; resource usage is unknown")), row["id"]))
+                elif row["status"] == "running":
+                    connection.execute("UPDATE jobs SET status='queued' WHERE id=?", (row["id"],))
 
     def connect(self):
         connection = sqlite3.connect(self.path, timeout=30)
@@ -34,19 +45,29 @@ class JobStore:
         return connection
 
     def submit(self, payload):
+        lease = validate_device_lease(payload)
         signature = fingerprint(payload)
         request_id = payload["request_id"]
         with self.lock, self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if self.worker_error:
+                raise RuntimeError(self.worker_error)
             existing = connection.execute("SELECT signature FROM jobs WHERE id=?", (request_id,)).fetchone()
             if existing:
                 if existing["signature"] != signature:
                     raise ValueError("request_id already exists with different content")
             else:
                 active = connection.execute(
-                    "SELECT COUNT(*) FROM jobs WHERE status IN ('queued','running')"
+                    "SELECT COUNT(*) FROM jobs WHERE status IN ('queued','running','cancelling')"
                 ).fetchone()[0]
                 if active >= self.capacity:
                     raise OverflowError("Queue is full; retry later")
+                if lease:
+                    try:
+                        connection.execute("INSERT INTO leases VALUES (?,?)", (lease["nonce"], request_id))
+                    except sqlite3.IntegrityError as exc:
+                        raise ValueError("Device lease is already bound to another queue request") from exc
+                    self.expiries[request_id] = time.monotonic() + lease["execution_timeout_seconds"]
                 connection.execute(
                     "INSERT INTO jobs VALUES (?, ?, ?, 'queued', NULL, ?)",
                     (request_id, signature, json.dumps(payload), time.time()),
@@ -59,7 +80,9 @@ class JobStore:
         if row is None:
             return None
         return {
+            "protocol": QUEUE_PROTOCOL,
             "request_id": row["id"],
+            "request_sha256": row["signature"],
             "status": row["status"],
             "created_at": row["created"],
             **({"result": json.loads(row["result"])} if row["result"] else {}),
@@ -67,20 +90,62 @@ class JobStore:
 
     def claim(self):
         with self.lock, self.connect() as connection:
-            row = connection.execute(
-                "SELECT id, payload FROM jobs WHERE status='queued' ORDER BY created LIMIT 1"
-            ).fetchone()
-            if row:
+            connection.execute("BEGIN IMMEDIATE")
+            for row in connection.execute("SELECT id, payload FROM jobs WHERE status='queued' ORDER BY created").fetchall():
+                payload = json.loads(row["payload"])
+                if time.monotonic() >= self.expiries.get(row["id"], float("inf")):
+                    result = self.not_started(payload, "Queue device lease expired before execution")
+                    connection.execute("UPDATE jobs SET status='cancelled', result=? WHERE id=?", (json.dumps(result), row["id"]))
+                    self.expiries.pop(row["id"], None)
+                    continue
                 connection.execute("UPDATE jobs SET status='running' WHERE id=?", (row["id"],))
-                return row["id"], json.loads(row["payload"])
+                return row["id"], payload
         return None
 
-    def complete(self, request_id, result):
+    @staticmethod
+    def not_started(payload, reason):
+        result = failure(reason, cancelled=True, worker_started=False)
+        lease = validate_device_lease(payload)
+        return stamp_device_lease(result, lease, 0.0) if lease else result
+
+    def cancel(self, request_id, signature=None):
+        with self.lock, self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT * FROM jobs WHERE id=?", (request_id,)).fetchone()
+            if row is None:
+                return None
+            if signature is not None and signature != row["signature"]:
+                raise ValueError("Cancellation request source does not match the queued task")
+            if row["status"] == "queued":
+                result = self.not_started(json.loads(row["payload"]), "Queue task cancelled before execution")
+                connection.execute("UPDATE jobs SET status='cancelled', result=? WHERE id=?", (json.dumps(result), request_id))
+            elif row["status"] == "running":
+                connection.execute("UPDATE jobs SET status='cancelling' WHERE id=?", (request_id,))
+            self.expiries.pop(request_id, None)
+        return self.get(request_id)
+
+    def cancelled(self, request_id):
+        if time.monotonic() >= self.expiries.get(request_id, float("inf")):
+            self.cancel(request_id)
         with self.connect() as connection:
+            row = connection.execute("SELECT status FROM jobs WHERE id=?", (request_id,)).fetchone()
+        return row is None or row["status"] in {"cancelling", "cancelled", "failed"}
+
+    def complete(self, request_id, result):
+        with self.lock, self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT status FROM jobs WHERE id=?", (request_id,)).fetchone()
+            if row is None or row["status"] not in {"running", "queued", "cancelling"}:
+                return
+            status = "failed" if result.get("metadata", {}).get("resource_usage_unknown") else "completed"
+            if row["status"] == "cancelling" and not result.get("metadata", {}).get("resource_usage_unknown"):
+                result = failure("Queue task cancelled", **{**result.get("metadata", {}), "cancelled": True})
+                status = "cancelled"
             connection.execute(
-                "UPDATE jobs SET status='completed', result=? WHERE id=?",
-                (json.dumps(result, allow_nan=False), request_id),
+                "UPDATE jobs SET status=?, result=? WHERE id=?",
+                (status, json.dumps(result, allow_nan=False), request_id),
             )
+            self.expiries.pop(request_id, None)
 
     def counts(self):
         with self.connect() as connection:
@@ -103,7 +168,8 @@ def handler_for(store):
         def do_GET(self):
             path = urlparse(self.path).path
             if path == "/health":
-                self.send_json(200, {"status": "ok", "jobs": store.counts()})
+                self.send_json(200, {"status": "unavailable" if store.worker_error else "ok",
+                                     "protocol": QUEUE_PROTOCOL, "jobs": store.counts()})
             elif path.startswith("/v1/verify/"):
                 result = store.get(unquote(path[len("/v1/verify/") :]))
                 self.send_json(200 if result else 404, result or {"error": "Unknown request_id"})
@@ -111,7 +177,9 @@ def handler_for(store):
                 self.send_json(404, {"error": "Not found"})
 
         def do_POST(self):
-            if urlparse(self.path).path != "/v1/verify":
+            path = urlparse(self.path).path
+            cancelling = path.startswith("/v1/verify/") and path.endswith("/cancel")
+            if path != "/v1/verify" and not cancelling:
                 self.send_json(404, {"error": "Not found"})
                 return
             try:
@@ -119,10 +187,19 @@ def handler_for(store):
                 if not 0 < length <= 16 * 1024 * 1024:
                     raise ValueError("Body must be between 1 byte and 16 MiB")
                 payload = json.loads(self.rfile.read(length))
+                if cancelling:
+                    signature = payload.get("request_sha256") if isinstance(payload, dict) else None
+                    if not isinstance(signature, str) or not signature:
+                        raise ValueError("Cancellation requires the queued request fingerprint")
+                    result = store.cancel(unquote(path[len("/v1/verify/"):-len("/cancel")]), signature)
+                    self.send_json(200 if result else 404, result or {"error": "Unknown request_id"})
+                    return
                 validate_payload(payload)
                 self.send_json(200, store.submit(payload))
             except OverflowError as exc:
                 self.send_json(429, {"error": str(exc)})
+            except RuntimeError as exc:
+                self.send_json(503, {"error": str(exc)})
             except (ValueError, KeyError, TypeError) as exc:
                 self.send_json(400, {"error": str(exc)})
 
@@ -147,6 +224,7 @@ def validate_payload(payload):
         raise ValueError("Reference calibration accepts no candidate")
     if payload["eval_config"].get("timeout", 0) <= 0:
         raise ValueError("Evaluation timeout must be positive")
+    validate_device_lease(payload)
     from ..benchmarks.reference_revisions import validate_payload as validate_revision
 
     validate_revision(payload)
@@ -178,19 +256,28 @@ def validate_payload(payload):
 
 
 def worker_loop(store, device, stop, evaluator=local_evaluate):
-    from ..common import failure
-
+    evaluator = record_device_lease(evaluator)
     while not stop.is_set():
         job = store.claim()
         if not job:
             stop.wait(0.1)
             continue
         request_id, payload = job
+        def cancelled():
+            if stop.is_set():
+                store.cancel(request_id)
+            return store.cancelled(request_id)
         try:
-            result = evaluator(payload, device, store.path.parent / "logs" / f"{fingerprint(payload)}.log")
+            result = evaluator(payload, device, store.path.parent / "logs" / f"{fingerprint(payload)}.log", cancelled=cancelled)
         except Exception as exc:
-            result = failure(str(exc), error_name=type(exc).__name__)
+            result = failure(str(exc), error_name=type(exc).__name__, resource_usage_unknown=True)
+        if not isinstance(result, dict) or not isinstance(result.get("metadata", {}), dict):
+            result = failure("Malformed evaluator response")
+        cancelled()
         store.complete(request_id, result)
+        if result.get("metadata", {}).get("resource_usage_unknown"):
+            store.worker_error = "Queue worker stopped after uncertain process cleanup"
+            stop.set()
 
 
 def main(argv=None):

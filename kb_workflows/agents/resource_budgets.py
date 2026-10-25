@@ -101,34 +101,53 @@ def device_lease(ledger, timeout, wall_remaining):
             "scope": "exclusive_development_worker_wall_lease; not_GPU_busy_or_billing"}
 
 
+def validate_device_lease(payload):
+    lease = payload.get("eval_config", {}).get("device_lease")
+    if lease is None:
+        return None
+    timeout = payload["eval_config"].get("timeout")
+    if (not isinstance(lease, dict) or lease.get("protocol") != LEASE_PROTOCOL
+            or not isinstance(lease.get("nonce"), str) or not lease["nonce"]
+            or not amount(lease.get("reserved_seconds")) or not amount(lease.get("execution_timeout_seconds"))
+            or not amount(timeout) or not 0 < timeout <= lease["execution_timeout_seconds"]
+            or lease["execution_timeout_seconds"] + CLEANUP_SECONDS > lease["reserved_seconds"] + 1e-9):
+        raise ValueError("Invalid development resource lease")
+    return lease
+
+
+def stamp_device_lease(result, lease, elapsed):
+    """Only trusted parents call this, after work/cleanup or confirmed non-execution."""
+    receipt = {"protocol": LEASE_PROTOCOL, "nonce": lease["nonce"], "reserved_seconds": lease["reserved_seconds"],
+               "elapsed_seconds": elapsed, "method": "trusted_parent_monotonic_wall", "physical_preemption_certified": False}
+    receipt["receipt_sha256"] = fingerprint(receipt)
+    result.setdefault("metadata", {})["device_lease_receipt"] = receipt
+    if elapsed > lease["reserved_seconds"]:
+        result.update(compiled=False, correctness=False)
+        result["metadata"]["error"] = "Worker exceeded its reserved device lease, including cleanup"
+    return result
+
+
 def record_device_lease(function):
     """Parent-process timing overwrites any receipt supplied by the candidate child."""
     @wraps(function)
     def wrapped(payload, *args, **kwargs):
-        lease = payload.get("eval_config", {}).get("device_lease")
+        lease = validate_device_lease(payload)
         if lease is None:
             return function(payload, *args, **kwargs)
-        if (lease.get("protocol") != LEASE_PROTOCOL or not isinstance(lease.get("nonce"), str)
-                or not amount(lease.get("reserved_seconds")) or not amount(lease.get("execution_timeout_seconds"))
-                or not 0 < payload["eval_config"]["timeout"] <= lease["execution_timeout_seconds"]
-                or lease["execution_timeout_seconds"] + CLEANUP_SECONDS > lease["reserved_seconds"] + 1e-9):
-            raise ValueError("Invalid development resource lease")
         started = time.monotonic()
         try:
             result = function(payload, *args, **kwargs)
         except Exception as exc:
-            result = failure(str(exc), error_name=type(exc).__name__)
+            # In particular, a failed cleanup can leave usage continuing after
+            # this parent returns. A short elapsed time cannot certify it.
+            return failure(str(exc), error_name=type(exc).__name__, resource_usage_unknown=True)
         elapsed = time.monotonic() - started
         if not isinstance(result, dict) or not isinstance(result.get("metadata", {}), dict):
             result = failure("Malformed worker response")
-        receipt = {"protocol": LEASE_PROTOCOL, "nonce": lease["nonce"], "reserved_seconds": lease["reserved_seconds"],
-                   "elapsed_seconds": elapsed, "method": "trusted_parent_monotonic_wall", "physical_preemption_certified": False}
-        receipt["receipt_sha256"] = fingerprint(receipt)
-        result.setdefault("metadata", {})["device_lease_receipt"] = receipt
-        if elapsed > lease["reserved_seconds"]:
-            result.update(compiled=False, correctness=False)
-            result["metadata"]["error"] = "Worker exceeded its reserved device lease, including cleanup"
-        return result
+        if result.get("metadata", {}).get("resource_usage_unknown"):
+            result["metadata"].pop("device_lease_receipt", None)
+            return result
+        return stamp_device_lease(result, lease, elapsed)
     return wrapped
 
 

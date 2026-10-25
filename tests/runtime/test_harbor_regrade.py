@@ -38,6 +38,7 @@ def source_job(tmp_path):
 @pytest.fixture
 def config(monkeypatch):
     monkeypatch.setattr(harbor_regrade, "resolve_devices", lambda value: ["GPU-simulated"])
+    monkeypatch.setattr(harbor_regrade, "terminate", lambda process: None)
     return RunConfig(hardware="RTX_A6000", generation="local", evaluation="docker",
                      harbor_command=str(Path(sys.executable).with_name("harbor"))).validate()
 

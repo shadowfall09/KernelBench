@@ -39,7 +39,10 @@ def protocol(config):
         "output_token_limit_per_sample": config.agent_output_token_limit,
         "max_output_tokens_per_call": config.agent_max_output_tokens,
         "development_device_lease_seconds_per_sample": config.agent_device_seconds,
-        "device_budget_scope": "exclusive_development_worker_wall_including_cleanup; not_GPU_busy_or_billing",
+        "device_budget_scope": ("queue_worker_wall_including_cleanup; admission_TTL; not_network_wait_or_GPU_busy"
+                                if config.evaluation == "queue" else
+                                "exclusive_development_worker_wall_including_cleanup; not_GPU_busy_or_billing"),
+        "development_verifier": config.evaluation,
         "local_model_device": config.local_model_device if config.agent_backend == "local-transformers" else None,
         "local_model_temperature": config.agent_temperature if config.agent_backend == "local-transformers" else None,
         "development_feedback": "none" if config.generation_mode == "one-shot" else ("external" if external else "standard_only"),

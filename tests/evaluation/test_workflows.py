@@ -113,7 +113,7 @@ def test_http_queue_full_pipeline_and_resume(config, tmp_path):
     stop = threading.Event()
     calls = []
 
-    def evaluator(payload, device, log):
+    def evaluator(payload, device, log, *, cancelled=None):
         calls.append(payload)
         # This transport test simulates a standard pass followed by a hidden failure.
         hidden = payload["eval_config"]["use_hidden_tests"]
@@ -153,6 +153,18 @@ def test_http_queue_full_pipeline_and_resume(config, tmp_path):
         assert len(calls) == 6  # Only changed P1, in both phases.
         with pytest.raises(RuntimeError, match="HTTP 400"):
             http_json("POST", config.queue_url + "/v1/verify", {"invalid": True})
+        from kb_workflows.agents import resource_budgets as budgets
+        from kb_workflows.common import fingerprint
+        from kb_workflows.runtime.transports import queue_evaluate
+
+        ledger = budgets.Ledger(6, "device_lease_seconds")
+        lease = budgets.device_lease(ledger, 1, 6)
+        payload = engine.task_payload(config, 1)
+        payload["eval_config"].update(timeout=1, device_lease=lease)
+        payload["request_id"] = "kb-" + fingerprint(payload)
+        result = queue_evaluate(payload, config)
+        assert result["correctness"] and budgets.settle_device_lease(ledger, lease, result)
+        assert 0 < ledger.spent < 6
     finally:
         stop.set()
         server.shutdown()
@@ -357,3 +369,133 @@ def test_failed_overwrite_cannot_reuse_previous_kernel(config, monkeypatch):
     monkeypatch.setattr("kb_workflows.agents.generation.run_agent", lambda *args: {"status": "failed"})
     assert not generate_run(config)
     assert not destination.exists()
+
+
+def test_queue_lease_state_machine_refuses_replay_and_unknown_restart_usage(tmp_path):
+    from kb_workflows.agents import resource_budgets as budgets
+    from kb_workflows.common import fingerprint
+
+    store = JobStore(tmp_path / "lease.sqlite3")
+    ledger = budgets.Ledger(20, "device_lease_seconds")
+    lease = budgets.device_lease(ledger, 5, 20)
+    payload = {"request_id": "leased", "ref_arch_src": "source", "kernel_src": "kernel",
+               "level": 1, "problem_id": 1, "eval_config": {"timeout": 5, "device_lease": lease}}
+    store.submit(payload)
+    store.submit(payload)
+    with pytest.raises(ValueError, match="already bound"):
+        store.submit({**payload, "request_id": "another"})
+    with pytest.raises(ValueError, match="does not match"):
+        store.cancel("leased", "different-source")
+    cancelled = store.cancel("leased", fingerprint(payload))
+    assert cancelled["status"] == "cancelled" and store.claim() is None
+    assert budgets.settle_device_lease(ledger, lease, cancelled["result"]) and ledger.spent == 0
+    store.complete("leased", {"correctness": True})
+    assert store.get("leased")["result"]["correctness"] is False
+
+    lease = budgets.device_lease(ledger, 5, 20)
+    payload["request_id"], payload["eval_config"]["device_lease"] = "expired", lease
+    store.submit(payload)
+    store.expiries["expired"] = 0
+    assert store.claim() is None
+    assert budgets.settle_device_lease(ledger, lease, store.get("expired")["result"])
+    lease = budgets.device_lease(ledger, 5, 20)
+    payload["request_id"], payload["eval_config"]["device_lease"] = "interrupted", lease
+    store.submit(payload)
+    assert store.claim()[0] == "interrupted"
+    restored = JobStore(store.path)
+    assert restored.claim() is None and restored.get("interrupted")["status"] == "failed"
+    assert not budgets.settle_device_lease(ledger, lease, restored.get("interrupted")["result"])
+    assert ledger.spent == 10
+    assert restored.cancel("leased")["status"] == "cancelled"
+    lease = budgets.device_lease(ledger, 5, 10)
+    payload["request_id"], payload["eval_config"]["device_lease"] = "racing-cancel", lease
+    restored.submit(payload)
+    assert restored.claim()[0] == "racing-cancel"
+    restored.cancel("racing-cancel")
+    restored.complete("racing-cancel", budgets.stamp_device_lease({"correctness": True}, lease, 1))
+    result = restored.get("racing-cancel")["result"]
+    assert not result["correctness"] and budgets.settle_device_lease(ledger, lease, result)
+    payload["request_id"] = "failed-cleanup"
+    payload["eval_config"].update(timeout=3, device_lease=budgets.device_lease(ledger, 3, 9))
+    restored.submit(payload)
+    def broken(*args, cancelled):
+        raise TimeoutError("Cannot confirm process cleanup")
+    stopped = threading.Event()
+    worker_loop(restored, "0", stopped, evaluator=broken)
+    assert stopped.is_set() and restored.worker_error
+    assert restored.get("failed-cleanup")["status"] == "failed"
+    with pytest.raises(RuntimeError, match="uncertain"):
+        restored.submit({**payload, "request_id": "cannot-start"})
+
+
+def test_queue_cancellation_and_expiry_stop_cpu_worker_descendants(config, tmp_path, monkeypatch):
+    import time
+    from pathlib import Path
+
+    from kb_workflows.agents import resource_budgets as budgets
+    from kb_workflows.common import fingerprint
+    from kb_workflows.runtime import transports
+
+    real_popen = subprocess.Popen
+    config.start = config.end = 1
+    config.run_dir.mkdir(parents=True)
+    (config.run_dir / kernel_name(1, 1)).write_text("class ModelNew: pass")
+    for mode in ("cancel", "expire"):
+        marker = tmp_path / f"{mode}.pid"
+        child_code = ("import os,signal,time; from pathlib import Path; "
+                      "signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+                      f"Path({str(marker)!r}).write_text(str(os.getpid())); time.sleep(60)")
+        parent_code = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child_code!r}]); time.sleep(60)"
+        processes = []
+
+        def spawn(command, *args, **kwargs):
+            assert command[1:3] == ["-m", "kb_workflows.evaluation.evaluate_task"]
+            process = real_popen([sys.executable, "-c", parent_code], *args, **kwargs)
+            processes.append(process)
+            return process
+
+        monkeypatch.setattr(transports.subprocess, "Popen", spawn)
+        store = JobStore(tmp_path / f"{mode}.sqlite3")
+        stop = threading.Event()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(store))
+        worker = threading.Thread(target=worker_loop, args=(store, "0", stop))
+        service = threading.Thread(target=server.serve_forever)
+        worker.start()
+        service.start()
+        base = f"http://127.0.0.1:{server.server_port}"
+        ledger = budgets.Ledger(7, "device_lease_seconds")
+        lease = budgets.device_lease(ledger, 2, 7)
+        payload = engine.task_payload(config, 1)
+        payload["eval_config"].update(timeout=2, device_lease=lease)
+        payload["request_id"] = "kb-" + fingerprint(payload)
+        route = base + "/v1/verify/" + payload["request_id"]
+        try:
+            http_json("POST", base + "/v1/verify", payload)
+            deadline = time.monotonic() + 4
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert marker.exists(), "CPU worker did not start before lease expiry"
+            if mode == "cancel":
+                reply = http_json("POST", route + "/cancel", {"request_sha256": fingerprint(payload)})
+                assert reply["status"] in {"cancelling", "cancelled"}
+            deadline = time.monotonic() + 8
+            while store.get(payload["request_id"])["status"] != "cancelled" and time.monotonic() < deadline:
+                time.sleep(0.01)
+            reply = http_json("GET", route)
+            assert reply["status"] == "cancelled" and not reply["result"]["correctness"]
+            assert budgets.settle_device_lease(ledger, lease, reply["result"]) and 0 < ledger.spent < 7
+            pid = int(marker.read_text())
+            deadline = time.monotonic() + 2
+            while Path(f"/proc/{pid}/stat").exists() and Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z" and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert not Path(f"/proc/{pid}/stat").exists() or Path(f"/proc/{pid}/stat").read_text().split()[2] == "Z"
+            assert all(process.poll() is not None for process in processes)
+        finally:
+            stop.set()
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=5)
+            service.join(timeout=5)
+            for process in processes:
+                transports.terminate(process)
+            assert not worker.is_alive() and not service.is_alive()

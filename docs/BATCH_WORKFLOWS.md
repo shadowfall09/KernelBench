@@ -217,15 +217,14 @@ Start one worker inside a GPU allocation:
 python scripts/local_verify_worker.py --host 0.0.0.0 --port 8000 --gpu 0
 ```
 
-The HTTP interface is unchanged:
+The HTTP interface is:
 
 - `POST /v1/verify` submits an evaluation or baseline task.
 - `GET /v1/verify/{request_id}` returns its state and result.
-- `GET /health` reports worker/queue health.
+- `GET /health` reports worker/queue health and protocol capabilities.
+- `POST /v1/verify/{request_id}/cancel`, with `{"request_sha256": "..."}`, cancels the matching saved request. The submit/get response supplies its fingerprint.
 
-Jobs and results persist in `cache/verify_queue/jobs.sqlite3`. Restarted running
-jobs are requeued. Identical requests are idempotent; the client retries transient
-HTTP failures. One worker processes one task at a time, and `--capacity` bounds
+Jobs, cancellation states and lease nonce bindings persist in `cache/verify_queue/jobs.sqlite3`. Restarted unfinished leased/cancelling jobs fail with unknown usage; unleased running jobs retain the old requeue behavior. Identical requests are idempotent; the client retries transient HTTP failures. One worker processes one task at a time, and `--capacity` bounds
 pending tasks. Use a different `--state` file per worker GPU.
 
 ```bash
@@ -240,9 +239,7 @@ translates `127.0.0.1`/`localhost` to `host.docker.internal`. The worker must li
 on a reachable interface for containers to connect. The client and worker must
 use the same reference, evaluator and hidden-test sources.
 
-`--queue-wait-timeout` bounds total polling time, separate from each GPU task's
-`--timeout`. Requests that outlive the client remain in the persistent worker
-store and can be fetched/reused later.
+`--queue-wait-timeout` bounds submission/retries/polling, separate from each GPU task's `--timeout`. On timeout or lost communication the client requests cancellation, retaining the failed call and any confirmed server-parent usage. With `agent_device_seconds`, the worker also expires queued/running leases without requiring a live client; old workers are rejected before submission. See [resource budgets](RESOURCE_BUDGETS.md) for accounting and cleanup limits.
 
 The compatibility Python entrypoint still accepts common pydra options:
 

@@ -135,6 +135,7 @@ def test_profiling_is_not_free_and_retains_a_completed_candidate(config):
 def test_development_payload_carries_fractional_execution_window_and_nonce(config, monkeypatch):
     from kb_workflows import engine
 
+    config.evaluation = "queue"
     directory = generation.prepare_job(config, 90, 0)
     child = RunConfig(**read_json(directory / "job_config.json"))
     output = child.run_dir / kernel_name(1, 90)
@@ -151,6 +152,7 @@ def test_development_payload_carries_fractional_execution_window_and_nonce(confi
     assert payloads[0]["eval_config"]["timeout"] == 0.25
     assert payloads[0]["eval_config"]["device_lease"] == lease
     assert payloads[0]["eval_config"]["use_hidden_tests"] is False
+    assert payloads[0]["request_id"] == "kb-" + fingerprint(payloads[0])
 
 
 def test_parent_detects_worker_overrun(monkeypatch):
@@ -263,7 +265,7 @@ def test_checkpoint_asset_changes_invalidate_generation_resume(config):
 
 
 @pytest.mark.parametrize("options", [
-    {"agent_token_limit": 10}, {"agent_output_token_limit": 10}, {"agent_device_seconds": 10, "evaluation": "queue"},
+    {"agent_token_limit": 10}, {"agent_output_token_limit": 10}, {"agent_device_seconds": 10, "evaluation": "modal"},
     {"agent_device_seconds": 10, "generation": "harbor"}, {"agent_device_seconds": float("nan")},
     {"agent_output_token_limit": True}, {"agent_backend": "local-transformers", "model": ""},
 ])
@@ -309,3 +311,45 @@ def test_legacy_opt_out_cannot_hide_missing_resource_budget_evidence(config):
     atomic_json(config.run_dir / "run_config.json", config.to_dict())
     raw = {"90_0": {"compiled": True, "correctness": True, "metadata": {"evaluation_config": {"score_gate_required": False}}}}
     assert not apply_score_gate(raw, config.run_dir)["90_0"]["correctness"]
+
+
+def test_queue_budget_requires_capability_and_cancels_a_lost_submission(config, monkeypatch):
+    from kb_workflows.runtime import transports
+
+    config.evaluation, config.agent_device_seconds = "queue", 10
+    config.validate()
+    ledger = budgets.Ledger(10, "device_lease_seconds")
+    lease = budgets.device_lease(ledger, 3, 10)
+    payload = {"request_id": "owned", "eval_config": {"timeout": 3, "device_lease": lease}}
+    calls = []
+    supported = False
+
+    def http(method, url, value=None, timeout=30, *, deadline=None):
+        calls.append((method, url))
+        if url.endswith("/health"):
+            return {"protocol": transports.QUEUE_PROTOCOL if supported else "old-worker", "status": "ok"}
+        if url.endswith("/cancel"):
+            result = budgets.stamp_device_lease({"correctness": False}, lease, 0.25)
+            return {"request_id": "owned", "protocol": transports.QUEUE_PROTOCOL,
+                    "request_sha256": fingerprint(payload), "status": "cancelled", "result": result}
+        raise TimeoutError("Submission response lost after server admission")
+
+    monkeypatch.setattr(transports, "http_json", http)
+    result = transports.queue_evaluate(payload, config)
+    assert not result["correctness"] and len(calls) == 1  # Old server never receives work.
+    supported = True
+    result = transports.queue_evaluate(payload, config)
+    assert result["metadata"]["queue_cancellation_confirmed"] is True
+    assert calls[-1][0] == "POST" and calls[-1][1].endswith("/owned/cancel")
+    assert budgets.settle_device_lease(ledger, lease, result) and ledger.spent == 0.25
+
+    lease = budgets.device_lease(ledger, 3, 10)
+    payload["eval_config"]["device_lease"] = lease
+
+    @budgets.record_device_lease
+    def broken_cleanup(payload):
+        raise TimeoutError("Worker did not exit after SIGKILL")
+
+    result = budgets.record_device_lease(broken_cleanup)(payload)
+    assert result["metadata"]["resource_usage_unknown"] and "device_lease_receipt" not in result["metadata"]
+    assert not budgets.settle_device_lease(ledger, lease, result) and ledger.spent == 8.25

@@ -278,6 +278,7 @@ def test_claude_token_totals_include_cache_and_do_not_guess_omitted_usage(tmp_pa
     result = json.dumps({"result": "class ModelNew: pass", "usage": usage, "num_turns": 1})
     process = SimpleNamespace(communicate=lambda *a, **k: (result, None), returncode=0, poll=lambda: 0)
     monkeypatch.setattr(agent_models.subprocess, "Popen", lambda *a, **k: process)
+    monkeypatch.setattr(agent_models, "terminate", lambda process: None)
     response = agent_models.claude_response([{"role": "user", "content": "task"}], RunConfig(), tmp_path, 10)
     assert response["total_tokens"] == (20 if complete else None)
 

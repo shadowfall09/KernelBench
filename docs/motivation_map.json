@@ -1589,9 +1589,12 @@
         "kb_workflows/agents/local_model.py",
         "docs/RESOURCE_BUDGETS.md",
         "kb_workflows/agents/agent_models.py",
-        "tests/agents/test_agent_loop.py"
+        "tests/agents/test_agent_loop.py",
+        "kb_workflows/runtime/queue_worker.py",
+        "kb_workflows/runtime/transports.py",
+        "tests/evaluation/test_workflows.py"
       ],
-      "reason": "已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明，模型CLI内层超时清理嵌套子进程的竞态也已修复；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验"
+      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列现有请求/nonce绑定、服务端到期、取消/进程组清理及未知用量拒绝，重启不重花租约；纯GPU busy时间物理硬限与其他远端后端资源契约继续实现，未运行设备或模型实验"
     },
     {
       "id": "R-19",
@@ -5033,6 +5036,26 @@
         "tests/conftest.py"
       ],
       "reason": "收拢目录与分析入口，合并重复清单和模型构造，减少维护成本同时保留评分证据门"
+    },
+    {
+      "id": "V47-01",
+      "title": "远端队列租约、取消与未知用量拒绝",
+      "primary": "M4",
+      "secondary": [
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/runtime/queue_worker.py",
+        "kb_workflows/runtime/transports.py",
+        "kb_workflows/agents/resource_budgets.py",
+        "kb_workflows/agents/agent_loop.py",
+        "docs/RESOURCE_BUDGETS.md",
+        "tests/evaluation/test_workflows.py",
+        "tests/agents/test_resource_budgets.py"
+      ],
+      "reason": "阻止客户端超时或重启后后台继续重花预留；以服务端到期和确认清理后的用量结算，未知用量扣除整笔并停止后续执行"
     }
   ]
 }
