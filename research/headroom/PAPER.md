@@ -309,3 +309,5 @@ With `numerical_validation`, the actual first candidate/baseline cold output, na
 ## 9. Conclusion
 
 KernelBench Pro connects practical kernel-agent workflows to five explicit evaluation problems. The implementation provides auditable generation, validation, measurement, scoring and recovery contracts; the research plan adds task discrimination, stronger numerical and execution evidence, and hardware-aware explanations. Each existing change is mapped to its motivation, and each remaining design has a recorded gap. The current delivery advances software and regression coverage; three designs remain partially implemented. GPU, Trainium, model and training experiments are outside this implementation-only scope, and their results remain explicitly unrun.
+
+The implementation is organized by agents, evaluation, numerics, hardware, provenance, analysis, runtime and benchmarks, with data beside the responsible modules. Catalog checks reuse nominal meta models; the compact results page refreshes evidence gates and retains failed and missing slots. This maintenance does not establish new experimental results or device qualification.

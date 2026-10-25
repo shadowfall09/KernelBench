@@ -48,7 +48,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/generation.py"
+        "kb_workflows/agents/generation.py"
       ],
       "reason": "统一题集与独立样本槽位，避免各家子集不明"
     },
@@ -98,7 +98,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/modal_backend.py"
+        "kb_workflows/runtime/modal_backend.py"
       ],
       "reason": "云端执行与回收内核、日志"
     },
@@ -112,7 +112,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/queue_worker.py"
+        "kb_workflows/runtime/queue_worker.py"
       ],
       "reason": "持久化远端任务，重启后继续处理"
     },
@@ -140,7 +140,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/transports.py"
+        "kb_workflows/runtime/transports.py"
       ],
       "reason": "明确超时失败并清理任务，禁止复用旧内核"
     },
@@ -154,7 +154,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/evaluate_task.py"
+        "kb_workflows/evaluation/evaluate_task.py"
       ],
       "reason": "所有验证后端统一接受标准和隐藏门约束"
     },
@@ -280,7 +280,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/baseline_variants.py"
+        "kb_workflows/evaluation/baseline_variants.py"
       ],
       "reason": "用正确且最快的真实框架变体替代弱基线"
     },
@@ -294,7 +294,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/measurement.py"
+        "kb_workflows/evaluation/measurement.py"
       ],
       "reason": "覆盖主机调用与全部设备工作完成时间"
     },
@@ -308,7 +308,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/measurement.py"
+        "kb_workflows/evaluation/measurement.py"
       ],
       "reason": "不让缓存固定输入答案取得虚假稳态成绩"
     },
@@ -322,7 +322,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/measurement.py"
+        "kb_workflows/evaluation/measurement.py"
       ],
       "reason": "将构建、初始化和首次执行成本摊到声明调用次数"
     },
@@ -336,7 +336,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/measurement.py"
+        "kb_workflows/evaluation/measurement.py"
       ],
       "reason": "保留原始时间样本与设备环境供复核"
     },
@@ -362,7 +362,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "固定分母，防止只平均成功或最快样本"
     },
@@ -374,7 +374,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "按调用预算比较成本并用区间排除未分离的小收益"
     },
@@ -388,7 +388,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "计分前核对源码、设备、精度和测量证据"
     },
@@ -402,7 +402,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "分层分析能力并保留题目与样本不确定性"
     },
@@ -624,7 +624,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "保留运行中的题库和结果接口，避免清理破坏评测"
     },
@@ -638,7 +638,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/harbor.py"
+        "kb_workflows/runtime/harbor.py"
       ],
       "reason": "外部 agent 产物回到原生样本与评分流程"
     },
@@ -652,7 +652,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/harbor.py"
+        "kb_workflows/runtime/harbor.py"
       ],
       "reason": "同一配置导出可重放任务"
     },
@@ -666,7 +666,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/harbor_verifier.py"
+        "kb_workflows/runtime/harbor_verifier.py"
       ],
       "reason": "单独 verifier 重新判断产物，异常奖励为零"
     },
@@ -680,7 +680,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/harbor.py"
+        "kb_workflows/runtime/harbor.py"
       ],
       "reason": "GPU lane 和 Harbor 配置纳入调度与恢复"
     },
@@ -730,7 +730,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/gpu_profiles.toml"
+        "kb_workflows/hardware/gpu_profiles.toml"
       ],
       "reason": "将 GPU 型号映射集中为可维护数据"
     },
@@ -742,7 +742,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/gpu.py"
+        "kb_workflows/hardware/gpu.py"
       ],
       "reason": "接受自定义架构而非扩充固定白名单"
     },
@@ -768,7 +768,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/generation.py"
+        "kb_workflows/agents/generation.py"
       ],
       "reason": "子任务保存展开配置，消除宿主文件路径依赖"
     },
@@ -794,7 +794,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/agent_loop.py"
+        "kb_workflows/agents/agent_loop.py"
       ],
       "reason": "接入真实 DefaultAgent 而非仅有多次生成脚本"
     },
@@ -806,7 +806,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/agent_models.py"
+        "kb_workflows/agents/agent_models.py"
       ],
       "reason": "定义严格一次调用且没有执行反馈的比较协议"
     },
@@ -818,7 +818,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/agent_loop.py"
+        "kb_workflows/agents/agent_loop.py"
       ],
       "reason": "有界反馈保留最快开发正确候选，后续失败不丢结果"
     },
@@ -832,7 +832,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/profile_task.py"
+        "kb_workflows/runtime/profile_task.py"
       ],
       "reason": "诊断与最终隐藏分分离，profiler 时间不计分"
     },
@@ -846,7 +846,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/experiment.py"
+        "kb_workflows/analysis/experiment.py"
       ],
       "reason": "记录可观测成本与重试历史，未知不算免费"
     },
@@ -860,7 +860,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/experiment.py"
+        "kb_workflows/analysis/experiment.py"
       ],
       "reason": "按设定和预算分组，修改源码丢失生成归属"
     },
@@ -874,7 +874,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/agent_models.py"
+        "kb_workflows/agents/agent_models.py"
       ],
       "reason": "模型与执行后端共享协议，外部 agent 不伪装受控循环"
     },
@@ -951,7 +951,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/suites/kernelbench105.json"
+        "kb_workflows/benchmarks/manifests/kernelbench105.json"
       ],
       "reason": "接入105个scored、5个probe、140个extended的固定选集"
     },
@@ -979,7 +979,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "启发式I/F/D标注来源；probe和extended分组且不标为主榜资格"
     },
@@ -993,7 +993,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/suites.py"
+        "kb_workflows/benchmarks/suites.py"
       ],
       "reason": "记录manifest摘要并检查参考快照，阻止静默任务漂移"
     },
@@ -1007,7 +1007,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/calibration.py",
+        "kb_workflows/analysis/calibration.py",
         "scripts/calibrate_device.py"
       ],
       "reason": "提供显式设备探针与cache flush/time接口，绑定物理UUID、驱动、软件和评测器，重算原始样本速率；本轮只实现不运行校准"
@@ -1022,7 +1022,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/headroom.py",
+        "kb_workflows/analysis/headroom.py",
         "scripts/export_reachability.py"
       ],
       "reason": "核对参考源码、输入、精度和校准；D标签要求算法说明与至少两次独立标准/隐藏记录，历史暂定标签不能代替证书"
@@ -1035,7 +1035,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py",
+        "kb_workflows/analysis/paper_analysis.py",
         "kb_workflows/common.py"
       ],
       "reason": "按SOL_target归一稳态收益，缺证书置零并保留固定分母；另报摊销bounded gain，外部规格/校准修改使旧资格失效"
@@ -1048,8 +1048,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/performance.py",
-        "kb_workflows/profile_task.py"
+        "kb_workflows/analysis/performance.py",
+        "kb_workflows/runtime/profile_task.py"
       ],
       "reason": "计算重叠活动并集与kernel数，来源未知不猜测；缺工作计数器时A/E为null，启动收益须有测量解释，暂为诊断"
     },
@@ -1063,8 +1063,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/harbor.py",
-        "kb_workflows/generation.py",
+        "kb_workflows/runtime/harbor.py",
+        "kb_workflows/agents/generation.py",
         "src/validation.py"
       ],
       "reason": "可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计"
@@ -1077,8 +1077,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/production_specs.py",
-        "kb_workflows/suites/production41.json"
+        "kb_workflows/benchmarks/production_specs.py",
+        "kb_workflows/benchmarks/manifests/production41.json"
       ],
       "reason": "独立Level 5增加12设计、6数值设计、12固定格式与11反向任务，保留旧250题及旧Level 4模型"
     },
@@ -1092,8 +1092,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/production_ops.py",
-        "tests/test_production.py"
+        "kb_workflows/benchmarks/production_ops.py",
+        "tests/benchmarks/test_production.py"
       ],
       "reason": "11个VJP参考支持外层no_grad下执行；FP64 gradcheck和方向有限差分核对梯度，轨道分别选题与评分"
     },
@@ -1139,8 +1139,8 @@
       "source": "committed_implementation",
       "evidence": [
         "src/validation.py",
-        "kb_workflows/production_specs.py",
-        "tests/test_production.py"
+        "kb_workflows/benchmarks/production_specs.py",
+        "tests/benchmarks/test_production.py"
       ],
       "reason": "所有41题使用相对RMS及逐元素比较，六个数值设计预算独立；逐题验证全零反例，参考比较与独立FP64自资格明确区分"
     },
@@ -1155,8 +1155,8 @@
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/engine.py",
-        "kb_workflows/generation.py",
-        "kb_workflows/harbor.py"
+        "kb_workflows/agents/generation.py",
+        "kb_workflows/runtime/harbor.py"
       ],
       "reason": "选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹"
     },
@@ -1170,7 +1170,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/study_data.py"
+        "kb_workflows/analysis/study_data.py"
       ],
       "reason": "重新核对当前源码与计分资格后导出固定槽位，合并互不重叠层级并拒绝复制运行冒充独立会话；不调用生成或评测"
     },
@@ -1184,7 +1184,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/study_statistics.py",
+        "kb_workflows/analysis/study_statistics.py",
         "scripts/analyze_selection.py"
       ],
       "reason": "支持并列秩Spearman、Kendall tau-b、差值/排名反转、任务/会话/样本bootstrap与显式二元power假设；常量相关为null，不假称旧排名已复现"
@@ -1199,7 +1199,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/study_plan.py",
+        "kb_workflows/analysis/study_plan.py",
         "scripts/plan_study.py"
       ],
       "reason": "生成原生one-shot/反馈及Harbor coding-agent网格，保留真实候选限制；默认不执行，显式执行时经过原生配置校验与resume"
@@ -1214,7 +1214,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/budget_curves.py"
+        "kb_workflows/analysis/budget_curves.py"
       ],
       "reason": "独立预算点保留失败分母与非单调结果，区间覆盖任务/会话/样本；未知成本不免费，AUC不外推或取最好历史"
     },
@@ -1228,9 +1228,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/agent_models.py",
-        "kb_workflows/harbor_budget.py",
-        "kb_workflows/experiment.py"
+        "kb_workflows/agents/agent_models.py",
+        "kb_workflows/runtime/harbor_budget.py",
+        "kb_workflows/analysis/experiment.py"
       ],
       "reason": "补总token和样本执行时间，区分Claude与Harbor cache口径；多步缺项保持未知，外部agent收据绑定结果文件，不冒充GPU账单"
     },
@@ -1259,9 +1259,9 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/production_specs.py",
+        "kb_workflows/benchmarks/production_specs.py",
         "KernelBench/level5/1_online_attention.py",
-        "tests/test_production.py"
+        "tests/benchmarks/test_production.py"
       ],
       "reason": "已实现12设计、6数值设计、12固定格式和11反向题的参考、私有输入、数值门及原生/Harbor全流程；11个反向家族有FP64 gradcheck与有限差分，实际性能/可达性实验不运行，库baseline优化归R-13"
     },
@@ -1275,7 +1275,7 @@
       "evidence": [
         "kb_workflows/production.py",
         "src/eval.py",
-        "tests/test_production.py"
+        "tests/benchmarks/test_production.py"
       ],
       "reason": "已实现逐输入角色dtype、独立精度实例、FP8/packed格式语义和按声明显存/设备容量确定性缩放；计划与角色绑定恢复，内存为显式模型而非任意候选OOM保证"
     },
@@ -1287,8 +1287,8 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/study_statistics.py",
-        "kb_workflows/study_data.py",
+        "kb_workflows/analysis/study_statistics.py",
+        "kb_workflows/analysis/study_data.py",
         "scripts/analyze_selection.py"
       ],
       "reason": "已实现当前证据导出、全量/选集成对比较、并列秩相关、分层会话/样本bootstrap、冗余与假设power设计；缺失/复制数据拒绝，原7模型数据仍缺，按用户范围不运行重新验证实验"
@@ -1301,35 +1301,35 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/numerical.py",
-        "kb_workflows/operator_oracles.py",
-        "kb_workflows/operator_oracles.json",
-        "kb_workflows/numerical_audit.py",
-        "tests/test_operator_oracles.py",
+        "kb_workflows/numerics/numerical.py",
+        "kb_workflows/numerics/operator_oracles.py",
+        "kb_workflows/numerics/operator_oracles.json",
+        "kb_workflows/numerics/numerical_audit.py",
+        "tests/numerics/test_operator_oracles.py",
         "docs/NUMERICAL_VALIDATION.md",
-        "kb_workflows/reference_revisions.json",
-        "tests/test_reference_revisions.py",
-        "kb_workflows/composite_math.py",
-        "kb_workflows/composite_oracles.py",
-        "kb_workflows/composite_programs.json",
+        "kb_workflows/benchmarks/reference_revisions.json",
+        "tests/benchmarks/test_reference_revisions.py",
+        "kb_workflows/numerics/composite_math.py",
+        "kb_workflows/numerics/composite_oracles.py",
+        "kb_workflows/numerics/composite_programs.json",
         "docs/COMPOSITE_NUMERICS.md",
-        "kb_workflows/model_oracles.py",
-        "kb_workflows/model_math.py",
-        "kb_workflows/model_layers.py",
-        "kb_workflows/model_specs.py",
-        "kb_workflows/model_programs.json",
+        "kb_workflows/numerics/model_oracles.py",
+        "kb_workflows/numerics/model_math.py",
+        "kb_workflows/numerics/model_layers.py",
+        "kb_workflows/numerics/model_specs.py",
+        "kb_workflows/numerics/model_programs.json",
         "docs/MODEL_NUMERICS.md",
-        "tests/test_model_oracles.py",
-        "kb_workflows/reference_oracles.py",
-        "kb_workflows/input_calibration.py",
-        "tests/test_model_input_profiles.py",
-        "kb_workflows/timed_numerics.py",
-        "tests/test_timed_numerics.py",
+        "tests/numerics/test_model_oracles.py",
+        "kb_workflows/numerics/reference_oracles.py",
+        "kb_workflows/numerics/input_calibration.py",
+        "tests/numerics/test_model_input_profiles.py",
+        "kb_workflows/evaluation/timed_numerics.py",
+        "tests/evaluation/test_timed_numerics.py",
         "docs/TIMED_NUMERICS.md",
-        "kb_workflows/precision_calibration.py",
-        "kb_workflows/precision_calibration_task.py",
+        "kb_workflows/numerics/precision_calibration.py",
+        "kb_workflows/numerics/precision_calibration_task.py",
         "scripts/calibrate_precision.py",
-        "tests/test_precision_calibration.py",
+        "tests/numerics/test_precision_calibration.py",
         "docs/PRECISION_CALIBRATION.md"
       ],
       "reason": "原250题独立FP64公式/模型算法、实际正确性/冷调用/逐次计时门及评分恢复已交付；现有按题目/dtype/校准设备的参考专用阈值拟合，固定上限内五项收紧、分离种子验证不重拟合，保存原始证据并在候选前冻结。当前设备必须独立自资格，记录和预算/Agent/Harbor/RL/研究/重新评分绑定。有限软件范围已完成；用户要求不运行设备/模型/阈值实验，未产生实测阈值或泛化/硬件认证"
@@ -1342,21 +1342,21 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py",
-        "kb_workflows/numerical_audit.py",
-        "tests/test_numerical_audit.py",
-        "kb_workflows/input_calibration.py",
-        "kb_workflows/input_profiles.py",
+        "kb_workflows/evaluation/strict_validation.py",
+        "kb_workflows/numerics/numerical.py",
+        "kb_workflows/numerics/numerical_audit.py",
+        "tests/numerics/test_numerical_audit.py",
+        "kb_workflows/numerics/input_calibration.py",
+        "kb_workflows/numerics/input_profiles.py",
         "scripts/calibrate_inputs.py",
         "docs/INPUT_CALIBRATION.md",
-        "kb_workflows/model_input_profiles.py",
-        "kb_workflows/reference_oracles.py",
-        "kb_workflows/input_calibration_task.py",
-        "tests/test_model_input_profiles.py",
-        "kb_workflows/reference_population.py",
+        "kb_workflows/numerics/model_input_profiles.py",
+        "kb_workflows/numerics/reference_oracles.py",
+        "kb_workflows/numerics/input_calibration_task.py",
+        "tests/numerics/test_model_input_profiles.py",
+        "kb_workflows/benchmarks/reference_population.py",
         "scripts/freeze_reference_population.py",
-        "tests/test_reference_population.py"
+        "tests/benchmarks/test_reference_population.py"
       ],
       "reason": "原250题来源绑定名义配方与参考专用FP64选择、输入/输出变化审计、固定RNG、程序/mask收据和新基线已接入；统一入口在候选前冻结合格参考集合和全部失败/排除账本，未解决记录不能缩小题集，冻结后所有候选失败保留分母。子任务/预算/评分/恢复/重新评分绑定父集合。有限软件范围已完成，阈值校准归R-04；按要求不运行设备/模型实验"
     },
@@ -1368,21 +1368,21 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/strict_validation.py",
+        "kb_workflows/evaluation/strict_validation.py",
         "kb_workflows/production.py",
         "kb_workflows/scan_cases.py",
-        "kb_workflows/reference_revisions.json",
-        "tests/test_scan_cases.py",
-        "kb_workflows/operator_cases.py",
-        "kb_workflows/operator_input_policy.py",
+        "kb_workflows/benchmarks/reference_revisions.json",
+        "tests/benchmarks/test_scan_cases.py",
+        "kb_workflows/numerics/operator_cases.py",
+        "kb_workflows/numerics/operator_input_policy.py",
         "docs/OPERATOR_INPUTS.md",
-        "kb_workflows/model_input_cases.py",
-        "kb_workflows/model_input_families.json",
-        "tests/test_model_input_cases.py",
-        "kb_workflows/model_stress.py",
-        "kb_workflows/input_layouts.py",
+        "kb_workflows/numerics/model_input_cases.py",
+        "kb_workflows/numerics/model_input_families.json",
+        "tests/numerics/test_model_input_cases.py",
+        "kb_workflows/numerics/model_stress.py",
+        "kb_workflows/numerics/input_layouts.py",
         "src/input_groups.py",
-        "tests/test_input_layouts.py"
+        "tests/evaluation/test_input_layouts.py"
       ],
       "reason": "原250题来源绑定输入族每种子2551例：角色/形状、异号与实际权重抵消、GELU/有限极值/索引、offset与33题共享存储；转移和双向隔离副本逐项核对布局与实际系数。291题另有生产角色及模式/参数/重复检查。有限模板不保证内部传播或全部错误检出，原尺寸只做meta，按用户要求不运行实验"
     },
@@ -1394,15 +1394,15 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/state_contract.py",
-        "kb_workflows/state_audit.py",
-        "kb_workflows/strict_validation.py",
-        "tests/test_state_contract.py",
-        "tests/test_state_audit.py",
+        "kb_workflows/evaluation/state_contract.py",
+        "kb_workflows/evaluation/state_audit.py",
+        "kb_workflows/evaluation/strict_validation.py",
+        "tests/evaluation/test_state_contract.py",
+        "tests/evaluation/test_state_audit.py",
         "docs/STATE_VALIDATION.md",
-        "kb_workflows/state_paths.py",
-        "kb_workflows/state_policies.py",
-        "tests/test_ordinary_state.py"
+        "kb_workflows/evaluation/state_paths.py",
+        "kb_workflows/evaluation/state_policies.py",
+        "tests/evaluation/test_ordinary_state.py"
       ],
       "reason": "原始逐题模式/BN/参数/输入域软件契约已实现：291来源绑定政策、注册与普通Tensor状态/容器/对象、参考对应替换、逐状态所有者模式、同对象规范参数更新及R-06/R-09输入变化。L3/33持久hidden与41未使用self.h0分别审核；任意表示/非线性解码不作为通用证明，候选须保留可映射规范参数；按用户要求不跑实验"
     },
@@ -1414,16 +1414,16 @@
       "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/submission_source.py",
-        "kb_workflows/cuda_origin.py",
-        "kb_workflows/kernel_origin.py",
+        "kb_workflows/provenance/submission_source.py",
+        "kb_workflows/provenance/cuda_origin.py",
+        "kb_workflows/provenance/kernel_origin.py",
         "docs/KERNEL_ORIGIN.md",
-        "kb_workflows/origin_binaries.py",
-        "kb_workflows/origin_graphs.py",
-        "kb_workflows/triton_origin.py",
-        "kb_workflows/cpp_origin.py",
-        "tests/test_compiler_origins.py",
-        "tests/test_graph_updates.py"
+        "kb_workflows/provenance/origin_binaries.py",
+        "kb_workflows/provenance/origin_graphs.py",
+        "kb_workflows/provenance/triton_origin.py",
+        "kb_workflows/provenance/cpp_origin.py",
+        "tests/provenance/test_compiler_origins.py",
+        "tests/provenance/test_graph_updates.py"
       ],
       "reason": "已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++ object、受信wheel cubin、Graph快照及两类核参数API的v1/v2更新重绑定诊断；未关联Runtime/其他loader、动态编译器、整体/其他Graph更新、CUkernel、Neuron与正式资格门继续实现，未知不通过"
     },
@@ -1435,20 +1435,20 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/strict_validation.py",
-        "kb_workflows/numerical.py",
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/allocation_audit.py",
-        "kb_workflows/tool_runner.py",
-        "tests/test_allocation_audit.py",
+        "kb_workflows/evaluation/strict_validation.py",
+        "kb_workflows/numerics/numerical.py",
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/evaluation/allocation_audit.py",
+        "kb_workflows/evaluation/tool_runner.py",
+        "tests/evaluation/test_allocation_audit.py",
         "docs/ALLOCATION_VALIDATION.md",
-        "kb_workflows/throughput_audit.py",
-        "tests/test_throughput_audit.py",
+        "kb_workflows/evaluation/throughput_audit.py",
+        "tests/evaluation/test_throughput_audit.py",
         "docs/THROUGHPUT_VALIDATION.md",
-        "kb_workflows/cache_audit.py",
-        "kb_workflows/cache_recipes.py",
-        "kb_workflows/input_reuse.py",
-        "tests/test_cache_audit.py",
+        "kb_workflows/evaluation/cache_audit.py",
+        "kb_workflows/evaluation/cache_recipes.py",
+        "kb_workflows/evaluation/input_reuse.py",
+        "tests/evaluation/test_cache_audit.py",
         "docs/INPUT_CACHE.md"
       ],
       "reason": "原始四项已提供可选软件路径：候选分配双预填、全实际正确性实例同对象更新、公开同步/连续提交对照、候选导入/构造/调用运行设置拒绝与恢复。来源/设备/覆盖收据贯穿评分恢复；不支持路径不通过。完整GPU/线程/Graph证明不是原设计验收条件，来源与正式归因仍归R-08/R-16；按用户要求不运行实验"
@@ -1461,10 +1461,10 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/tool_runner.py",
-        "kb_workflows/tool_checks.py",
-        "kb_workflows/determinism.py",
-        "tests/test_tool_checks.py"
+        "kb_workflows/evaluation/tool_runner.py",
+        "kb_workflows/evaluation/tool_checks.py",
+        "kb_workflows/evaluation/determinism.py",
+        "tests/evaluation/test_tool_checks.py"
       ],
       "reason": "已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态"
     },
@@ -1476,8 +1476,8 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/paired_task.py",
-        "kb_workflows/paired_statistics.py"
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/analysis/paired_statistics.py"
       ],
       "reason": "已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收"
     },
@@ -1489,7 +1489,7 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/final_verification.py"
+        "kb_workflows/evaluation/final_verification.py"
       ],
       "reason": "已实现冻结源码、新标准/隐藏种子、独立最终任务、所有重复平均与分层区间、失败门和来源复核；GPU独立重测实验仍待执行"
     },
@@ -1501,10 +1501,10 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/baseline_variants.py",
-        "kb_workflows/baseline_rewrites.py",
-        "kb_workflows/baseline_policies.py",
-        "tests/test_baseline_recipes.py",
+        "kb_workflows/evaluation/baseline_variants.py",
+        "kb_workflows/evaluation/baseline_rewrites.py",
+        "kb_workflows/evaluation/baseline_policies.py",
+        "tests/evaluation/test_baseline_recipes.py",
         "docs/BASELINE_PORTFOLIO.md"
       ],
       "reason": "291题来源清单已覆盖论文指定的SDPA、LayerNorm/var_mean、卷积benchmark/布局和cuBLASLt偏好；六基础组合及每个改写/策略的Graph对应共2750个分题声明。逐输出验证、失败保留、政策收据、冷成本/稳态选择与恢复/配对/评分门已实现；最强指声明且通过的集合，非全库最优性证明；不运行硬件实验"
@@ -1517,8 +1517,8 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/calibration.py",
-        "kb_workflows/headroom.py",
+        "kb_workflows/analysis/calibration.py",
+        "kb_workflows/analysis/headroom.py",
         "scripts/calibrate_device.py"
       ],
       "reason": "已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理"
@@ -1531,9 +1531,9 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/headroom.py",
-        "kb_workflows/paper_analysis.py",
-        "tests/test_device_headroom.py"
+        "kb_workflows/analysis/headroom.py",
+        "kb_workflows/analysis/paper_analysis.py",
+        "tests/analysis/test_device_headroom.py"
       ],
       "reason": "已接入SOL_target分母、I/F/D可信规格与D独立可达性见证门，缺证据置零；稳态Headroom与K摊销bounded gain分开报告并绑定外部文件，未生成设备实验结果"
     },
@@ -1545,24 +1545,23 @@
       "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/performance.py",
-        "kb_workflows/profile_task.py",
-        "kb_workflows/neuron_device.py",
-        "kb_workflows/neuron_profile.py",
-        "kb_workflows/kernel_origin.py",
-        "kb_workflows/work_counters.py",
-        "kb_workflows/counter_task.py",
-        "kb_workflows/counter_worker.py",
+        "kb_workflows/analysis/performance.py",
+        "kb_workflows/runtime/profile_task.py",
+        "kb_workflows/hardware/neuron_device.py",
+        "kb_workflows/hardware/neuron_tables.py",
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/provenance/work_counters.py",
+        "kb_workflows/provenance/counter_task.py",
+        "kb_workflows/provenance/counter_worker.py",
         "scripts/audit_work_counters.py",
-        "tests/test_work_counters.py",
+        "tests/provenance/test_work_counters.py",
         "docs/WORK_COUNTERS.md",
-        "kb_workflows/neuron_tables.py",
         "docs/NEURON_WORK.md",
-        "kb_workflows/neuron_work.py",
-        "tests/test_neuron_work.py",
-        "kb_workflows/neuron_processing.py",
-        "scripts/process_neuron_work.py",
-        "tests/test_neuron_processing.py"
+        "kb_workflows/hardware/neuron_work.py",
+        "tests/hardware/test_neuron_work.py",
+        "kb_workflows/hardware/neuron_processing.py",
+        "scripts/analyze_device_trace.py",
+        "tests/hardware/test_neuron_processing.py"
       ],
       "reason": "已实现CUDA/Neuron busy并集、来源诊断与launch_only、Nsight采集/重放及审核A/E；Neuron完整Parquet注释/DMA、来源检查后的采集字节/core收据、完整快照与固定Explorer自动处理关联、审核资源模型及同设备A/E已有软件实现。与原生时间/执行所有权的完整关联和正式归因门继续实现，未运行设备、模型或Explorer实验"
     },
@@ -1574,7 +1573,7 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/aggregation.py"
+        "kb_workflows/evaluation/aggregation.py"
       ],
       "reason": "已在同一批声明槽位上并列计算mean/median/best-of-N，保留失败、缺失和成本；代码与持久化评分测试完成，真实模型实验另行报告"
     },
@@ -1586,11 +1585,11 @@
       "status": "in_progress",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/resource_budgets.py",
-        "kb_workflows/local_model.py",
+        "kb_workflows/agents/resource_budgets.py",
+        "kb_workflows/agents/local_model.py",
         "docs/RESOURCE_BUDGETS.md",
-        "kb_workflows/agent_models.py",
-        "tests/test_agent_loop.py"
+        "kb_workflows/agents/agent_models.py",
+        "tests/agents/test_agent_loop.py"
       ],
       "reason": "已实现本地精确总token预留、支持的API输出限额、local/Docker开发worker墙钟额度及评分/恢复证明，模型CLI内层超时清理嵌套子进程的竞态也已修复；纯GPU busy时间物理硬限、远端可信计量取消仍待实现，没有运行模型或设备实验"
     },
@@ -1602,8 +1601,8 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/study_plan.py",
-        "kb_workflows/budget_curves.py",
+        "kb_workflows/analysis/study_plan.py",
+        "kb_workflows/analysis/budget_curves.py",
         "scripts/plan_study.py"
       ],
       "reason": "已实现one-shot/反馈/Harbor通用agent多预算多会话计划、显式执行runner、当前证据曲线/区间/共同区间AUC和静态图；默认只生成计划，真实模型实验未运行，设备/token硬预算仍归R-18"
@@ -1616,13 +1615,13 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/rl_training.py",
-        "kb_workflows/rl_rewards.py",
-        "kb_workflows/rl_audit.py",
+        "kb_workflows/agents/rl_training.py",
+        "kb_workflows/agents/rl_rewards.py",
+        "kb_workflows/agents/rl_audit.py",
         "docs/RL_WORKFLOW.md",
-        "kb_workflows/scaling_certificate.py",
-        "kb_workflows/rl_lineage.py",
-        "kb_workflows/rl_effectiveness.py"
+        "kb_workflows/analysis/scaling_certificate.py",
+        "kb_workflows/agents/rl_lineage.py",
+        "kb_workflows/agents/rl_effectiveness.py"
       ],
       "reason": "已实现TRL GRPO、原生终局奖励与审计、审查绑定的多尺寸算法证书加分、模型/奖励/优化路径与父进程凭据、预注册种子对照及持出效果分析；真实训练与模型/设备实验按用户要求不运行，模拟证据不能支持正式效果"
     },
@@ -1634,10 +1633,10 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/devices.py",
-        "kb_workflows/neuron_device.py",
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/neuron_profile.py",
+        "kb_workflows/hardware/devices.py",
+        "kb_workflows/hardware/neuron_device.py",
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/hardware/neuron_tables.py",
         "docs/NEURON.md"
       ],
       "reason": "已实现五方法设备接口、原生TorchNeuron/NKI worker、平台基线/校准、core与物理/软件身份、CPU FP64与原生最终/配对重测、每引擎轨迹诊断；40个存储接口仅CPU前端回归，FP8存储明确拒绝，SDK部署、算子覆盖和设备实验未验证"
@@ -1650,7 +1649,7 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/evidence.py"
+        "kb_workflows/evaluation/evidence.py"
       ],
       "reason": "已实现逐项状态收据、缺项null、等级判定与评分门；L1/L2缺少的设备工具证据不会降格冒充通过，GPU验收仍独立记录"
     },
@@ -1662,12 +1661,12 @@
       "status": "implemented",
       "source": "paper_design",
       "evidence": [
-        "kb_workflows/isolation.py",
-        "kb_workflows/restricted_transport.py",
-        "kb_workflows/regrade.py",
-        "kb_workflows/harbor_regrade.py",
-        "tests/test_isolation.py",
-        "tests/test_harbor_regrade.py"
+        "kb_workflows/runtime/isolation.py",
+        "kb_workflows/runtime/restricted_transport.py",
+        "kb_workflows/runtime/regrade.py",
+        "kb_workflows/runtime/harbor_regrade.py",
+        "tests/runtime/test_isolation.py",
+        "tests/runtime/test_harbor_regrade.py"
       ],
       "reason": "已实现CUDA/Docker受限策略与实际配置/进程观察、Harbor禁止联网/只读验证器/agent allowlist，以及完整槽位冻结的native和Harbor产物重评分；原始测量与历史来源分开绑定，默认不执行，不认证OS逃逸或GPU独占；真实部署、隔离和重评分实验按用户范围未运行"
     },
@@ -1679,7 +1678,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerical.py"
+        "kb_workflows/numerics/numerical.py"
       ],
       "reason": "在17道已审阅L1的附加实例上，参考与候选均须通过RMS及全元素FP64门"
     },
@@ -1691,7 +1690,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerical.py"
+        "kb_workflows/numerics/numerical.py"
       ],
       "reason": "记录输出量级、非有限值、常数与容差覆盖；至少一组合法实例有信息量"
     },
@@ -1705,7 +1704,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/strict_validation.py"
+        "kb_workflows/evaluation/strict_validation.py"
       ],
       "reason": "限定17题的耦合维度、符号、近常数、动态范围、边界、GELU辨别输入及最终非连续stride"
     },
@@ -1717,7 +1716,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/strict_validation.py"
+        "kb_workflows/evaluation/strict_validation.py"
       ],
       "reason": "审计train/eval、同名buffer、参数原地更新与同对象输入修改后的响应"
     },
@@ -1731,7 +1730,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/strict_validation.py"
+        "kb_workflows/evaluation/strict_validation.py"
       ],
       "reason": "记录并恢复候选导入和执行修改的后端、默认dtype、线程和环境变量；收据不含环境变量值"
     },
@@ -1746,7 +1745,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/evidence.py"
+        "kb_workflows/evaluation/evidence.py"
       ],
       "reason": "实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级"
     },
@@ -1760,7 +1759,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "显式严格模式下，未适配题、失败检查和缺失收据拒绝资格；后端设置与等级参与任务及比较指纹"
     },
@@ -1774,7 +1773,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/aggregation.py"
+        "kb_workflows/evaluation/aggregation.py"
       ],
       "reason": "对同一批声明槽位计算mean、median、best-of-N，保留失败零分和成本记录，正式分数不变"
     },
@@ -1788,7 +1787,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/paired_task.py"
+        "kb_workflows/evaluation/paired_task.py"
       ],
       "reason": "同进程平衡参考/候选/参考控制顺序，逐次验证输出，按重复进程与配对样本重采样估计倍率区间"
     },
@@ -1802,7 +1801,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/final_verification.py"
+        "kb_workflows/evaluation/final_verification.py"
       ],
       "reason": "冻结源码按新种子在独立任务重测标准和隐藏正确性，保留全部重复，正式分数使用重测而非最快重复"
     },
@@ -1814,7 +1813,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/baseline_variants.py"
+        "kb_workflows/evaluation/baseline_variants.py"
       ],
       "reason": "增加compile default/max-autotune各自Graph组合；3道归一化题增加源码指纹约束的框架等价改写"
     },
@@ -1843,7 +1842,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/final_verification.py"
+        "kb_workflows/evaluation/final_verification.py"
       ],
       "reason": "恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母"
     },
@@ -1857,8 +1856,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/agent_models.py",
-        "kb_workflows/resource_budgets.py"
+        "kb_workflows/agents/agent_models.py",
+        "kb_workflows/agents/resource_budgets.py"
       ],
       "reason": "调用前预留本地精确总token或API输出额度，已知用量返还，缺失或超额停止并拒绝计分；不支持的后端显式拒绝"
     },
@@ -1872,7 +1871,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/local_model.py"
+        "kb_workflows/agents/local_model.py"
       ],
       "reason": "直接使用实际chat template输入ID与单条生成序列；只加载本地safetensors且禁止远端代码，权重和tokenizer内容绑定恢复与评分"
     },
@@ -1886,8 +1885,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/resource_budgets.py",
-        "kb_workflows/transports.py"
+        "kb_workflows/agents/resource_budgets.py",
+        "kb_workflows/runtime/transports.py"
       ],
       "reason": "local/Docker父进程记录包含启动/清理的开发worker墙钟，评测和profile均先预留；超额/未知不合格，不冒充物理GPU抢占或账单"
     },
@@ -1902,8 +1901,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/generation.py",
-        "kb_workflows/paper_analysis.py",
+        "kb_workflows/agents/generation.py",
+        "kb_workflows/analysis/paper_analysis.py",
         "kb_workflows/common.py"
       ],
       "reason": "限额槽位只允许一次可审计尝试，匹配完成记录可resume；重算账本、绑定历史与汇总，修改预算证据使新旧计分门均失效"
@@ -1918,8 +1917,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/study_plan.py",
-        "kb_workflows/budget_curves.py"
+        "kb_workflows/analysis/study_plan.py",
+        "kb_workflows/analysis/budget_curves.py"
       ],
       "reason": "研究计划和曲线增加总token、输出token和开发worker占用三种额度；按真实后端能力预检，保持其他预算分组，默认不执行"
     },
@@ -1934,7 +1933,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_plan.py"
+        "kb_workflows/agents/rl_plan.py"
       ],
       "reason": "显式任务、参考与隐藏源码哈希、审查family、初始模型及实现指纹固定计划；公开参考沿用input-blind策略，默认不执行"
     },
@@ -1948,7 +1947,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_training.py"
+        "kb_workflows/agents/rl_training.py"
       ],
       "reason": "固定TRL 1.8.0及DAPO损失变体，接入one-shot/反馈工具、原生最佳候选选择和离线模型；持出题不进入训练callback"
     },
@@ -1962,8 +1961,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/evaluate_task.py",
-        "kb_workflows/rl_rewards.py"
+        "kb_workflows/evaluation/evaluate_task.py",
+        "kb_workflows/agents/rl_rewards.py"
       ],
       "reason": "qualify_small在原尺寸分配前运行审查契约；源码与小实例失败先停止昂贵阶段，基线过期则在模型加载前停止"
     },
@@ -1978,7 +1977,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_rewards.py"
+        "kb_workflows/agents/rl_rewards.py"
       ],
       "reason": "同题共享repeat种子并交替启动独立标准/隐藏/配对计时任务，核对设备UUID；严格资格分与弱raw-speedup消融分开，失败槽位为零"
     },
@@ -1992,7 +1991,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_training.py"
+        "kb_workflows/agents/rl_training.py"
       ],
       "reason": "生成前持久化预留group，中断仍扣额度；checkpoint绑定文件、step及奖励前缀；父进程监督总墙钟含清理，缺账本拒绝重置"
     },
@@ -2007,8 +2006,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_evaluation.py",
-        "kb_workflows/rl_audit.py"
+        "kb_workflows/agents/rl_evaluation.py",
+        "kb_workflows/agents/rl_audit.py"
       ],
       "reason": "预声明源码案例与重复计划，重算ICC/奖励排序/攻击接受率和公共最终差；缺数据与基础设施故障不能冒充抵御攻击，统计依赖假设显式保留"
     },
@@ -2023,8 +2022,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_evaluation.py",
-        "kb_workflows/study_plan.py",
+        "kb_workflows/agents/rl_evaluation.py",
+        "kb_workflows/analysis/study_plan.py",
         "scripts/rl_workflow.py"
       ],
       "reason": "持出checkpoint资产冻结并复用原生one-shot/反馈任务及独立会话；提供默认非执行CLI，模型改变在运行前拒绝"
@@ -2056,7 +2055,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/scaling_certificate.py",
+        "kb_workflows/analysis/scaling_certificate.py",
         "docs/SCALING_CERTIFICATES.md"
       ],
       "reason": "至少5尺寸且跨度16倍，固定源码/设备/变体和形状规律，重做原生资格与配对测量，斜率须匹配当前D/SOL审查且显著低于参考"
@@ -2072,8 +2071,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_rewards.py",
-        "kb_workflows/rl_plan.py"
+        "kb_workflows/agents/rl_rewards.py",
+        "kb_workflows/agents/rl_plan.py"
       ],
       "reason": "默认关闭；高资格候选才可请求证书，加分后封顶1，失败或恒定倍率优化无算法加分，证书墙钟记入训练预算"
     },
@@ -2087,8 +2086,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_lineage.py",
-        "kb_workflows/rl_training.py"
+        "kb_workflows/agents/rl_lineage.py",
+        "kb_workflows/agents/rl_training.py"
       ],
       "reason": "绑定最终权重、计划、全部奖励/证书文件和当前优化路径；恢复保留丢弃更新的成本，nonce与锁拒绝旧完成文件和并发监督"
     },
@@ -2103,8 +2102,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_effectiveness.py",
-        "kb_workflows/study_plan.py",
+        "kb_workflows/agents/rl_effectiveness.py",
+        "kb_workflows/analysis/study_plan.py",
         "scripts/rl_workflow.py"
       ],
       "reason": "执行前冻结两奖励组与全部种子、优化器/数据/预算及评测会话；当前lineage/权重不符或缺作业不能缩小研究，默认不执行"
@@ -2119,8 +2118,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/rl_effectiveness.py",
-        "tests/test_rl_workflow.py"
+        "kb_workflows/agents/rl_effectiveness.py",
+        "tests/agents/test_rl_workflow.py"
       ],
       "reason": "重算持出资格分，报告配对训练种子效应、分层区间与双侧检验；失败检查未知槽位给上下界，模拟数据不能支持正式效果"
     },
@@ -2134,8 +2133,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/devices.py",
-        "kb_workflows/calibration.py"
+        "kb_workflows/hardware/devices.py",
+        "kb_workflows/analysis/calibration.py"
       ],
       "reason": "定义caps/calibrate/flush/time/attribute，CUDA与Neuron两实现，导入及配置预览不加载SDK"
     },
@@ -2151,8 +2150,8 @@
       "source": "current_integration",
       "evidence": [
         "kb_workflows/config.py",
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/transports.py"
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/runtime/transports.py"
       ],
       "reason": "device节、独立vendor解释器、物理core分配及LNC=1，接入标准/隐藏/最终与开发任务，拒绝CUDA镜像和旧XLA混用"
     },
@@ -2167,8 +2166,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/baseline_variants.py"
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/evaluation/baseline_variants.py"
       ],
       "reason": "eager/compile及4题源码绑定的框架库改写，最快正确基线、平衡配对与冻结重测复用；平台单独分组"
     },
@@ -2182,9 +2181,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/strict_validation.py",
-        "kb_workflows/measurement.py",
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/evaluation/strict_validation.py",
+        "kb_workflows/evaluation/measurement.py",
         "src/reliability.py"
       ],
       "reason": "独立oracle留在CPU，逐次验证保持输入角色、模型调用状态及Neuron RNG；审计冻结NKI文件和环境，禁止FP8存储降级与模拟设备计分"
@@ -2199,8 +2198,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/neuron_device.py",
-        "kb_workflows/calibration.py"
+        "kb_workflows/hardware/neuron_device.py",
+        "kb_workflows/analysis/calibration.py"
       ],
       "reason": "绑定序列号/core/驱动/SDK并保留原始copy、分dtype GEMM和启动代理，明确同步墙钟口径、无FP64速率和未知缓存驱逐"
     },
@@ -2214,8 +2213,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/neuron_profile.py",
-        "kb_workflows/neuron_device.py",
+        "kb_workflows/hardware/neuron_tables.py",
+        "kb_workflows/hardware/neuron_device.py",
         "scripts/analyze_device_trace.py"
       ],
       "reason": "收集框架trace/NEFF/NTFF与哈希；显式单位/窗口的tensor/vector/scalar/DMA并集，不把指令数冒充kernel数或capture跨度冒充host墙钟"
@@ -2230,7 +2229,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/generation.py",
+        "kb_workflows/agents/generation.py",
         ".claude/skills/kernelbench-pro/SKILL.md",
         "configs/trainium2.toml"
       ],
@@ -2246,8 +2245,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/tool_runner.py",
-        "kb_workflows/evaluate_task.py"
+        "kb_workflows/evaluation/tool_runner.py",
+        "kb_workflows/evaluation/evaluate_task.py"
       ],
       "reason": "分别运行memcheck/racecheck/synccheck/initcheck，要求完成摘要与正调用覆盖，缺工具/日志或超时保持未知，工具范围含参考及框架"
     },
@@ -2259,7 +2258,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/determinism.py",
+        "kb_workflows/evaluation/determinism.py",
         "src/reliability.py"
       ],
       "reason": "逐实例复制模型和输入并重放RNG，不推进原模型；每次保留原生精度门，记录输出位摘要，缺实例或快照不给通过"
@@ -2274,9 +2273,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/determinism.py",
-        "kb_workflows/generation.py",
-        "kb_workflows/harbor.py"
+        "kb_workflows/evaluation/determinism.py",
+        "kb_workflows/agents/generation.py",
+        "kb_workflows/runtime/harbor.py"
       ],
       "reason": "默认逐位一致，有限波动须有参考源码摘要、审核理由及非零界限；不放宽离散值、非有限值或原生精度"
     },
@@ -2290,9 +2289,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/tool_checks.py",
+        "kb_workflows/evaluation/tool_checks.py",
         "kb_workflows/engine.py",
-        "kb_workflows/final_verification.py"
+        "kb_workflows/evaluation/final_verification.py"
       ],
       "reason": "绑定工具版本/二进制、逐进程日志、阶段nonce/源码/物理设备；重算派生结果，已记录失败可恢复，篡改收据失效"
     },
@@ -2307,9 +2306,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/tool_runner.py",
-        "kb_workflows/tool_checks.py",
-        "kb_workflows/evidence.py"
+        "kb_workflows/evaluation/tool_runner.py",
+        "kb_workflows/evaluation/tool_checks.py",
+        "kb_workflows/evaluation/evidence.py"
       ],
       "reason": "保留首次无插桩原生/配对样本与冷启动，诊断共用原请求预算；四工具全通过才给内存工具证据，L2另需重复一致性"
     },
@@ -2324,8 +2323,8 @@
       "source": "current_integration",
       "evidence": [
         "kb_workflows/config.py",
-        "kb_workflows/experiment.py",
-        "kb_workflows/rl_plan.py",
+        "kb_workflows/analysis/experiment.py",
+        "kb_workflows/agents/rl_plan.py",
         "configs/a6000-safety.toml"
       ],
       "reason": "配置可选工具/重复预算和题目策略；所有transport复用CLI，策略内容进入生成、最终冻结、比较、RL和旧评分指纹，Neuron拒绝CUDA工具"
@@ -2340,8 +2339,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/isolation.py",
-        "kb_workflows/restricted_transport.py",
+        "kb_workflows/runtime/isolation.py",
+        "kb_workflows/runtime/restricted_transport.py",
         "configs/a6000-restricted.toml"
       ],
       "reason": "显式CUDA/Docker受限策略，每请求把标签解析为不可变image ID；清空worker环境，使用非root、只读根和私有编译缓存，不把不支持的transport降格当作满足策略"
@@ -2356,8 +2355,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/isolation.py",
-        "kb_workflows/isolated_worker.py"
+        "kb_workflows/runtime/isolation.py",
+        "kb_workflows/runtime/isolated_worker.py"
       ],
       "reason": "核对前后Docker配置与Linux capability/no-new-privileges/seccomp、namespace和cgroup；单设备/主机资源有明确上限，缺观察不通过，不认证GPU独占或驱动逃逸安全"
     },
@@ -2372,8 +2371,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/restricted_transport.py",
-        "kb_workflows/isolation.py"
+        "kb_workflows/runtime/restricted_transport.py",
+        "kb_workflows/runtime/isolation.py"
       ],
       "reason": "只读请求和独立结果目录，退出后只读有大小界限的普通JSON；拒绝symlink/FIFO/非有限值，确认删除自己创建的容器并处理create客户端超时"
     },
@@ -2388,10 +2387,10 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/paper_analysis.py",
-        "kb_workflows/final_verification.py",
-        "kb_workflows/paired_task.py",
-        "kb_workflows/tool_checks.py"
+        "kb_workflows/analysis/paper_analysis.py",
+        "kb_workflows/evaluation/final_verification.py",
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/evaluation/tool_checks.py"
       ],
       "reason": "重算配置/结果摘要和原生观察，基线变体与标准/隐藏/最终/配对数据不能混用image；模拟凭据拒绝正式资格，保留诊断与原始计时分离"
     },
@@ -2406,9 +2405,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/harbor.py",
-        "kb_workflows/harbor_verifier.py",
-        "tests/test_isolation.py"
+        "kb_workflows/runtime/harbor.py",
+        "kb_workflows/runtime/harbor_verifier.py",
+        "tests/runtime/test_isolation.py"
       ],
       "reason": "独立verifier禁止联网，受限Compose隔离可写路径并复用bundled tests；agent执行使用显式host allowlist，实际SDK schema已校验，容器部署未运行"
     },
@@ -2422,7 +2421,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/regrade.py",
+        "kb_workflows/runtime/regrade.py",
         "scripts/regrade_artifacts.py"
       ],
       "reason": "固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动"
@@ -2438,8 +2437,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/regrade.py",
-        "kb_workflows/experiment.py",
+        "kb_workflows/runtime/regrade.py",
+        "kb_workflows/analysis/experiment.py",
         "kb_workflows/common.py"
       ],
       "reason": "单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格"
@@ -2454,9 +2453,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/harbor_regrade.py",
+        "kb_workflows/runtime/harbor_regrade.py",
         "scripts/regrade_artifacts.py",
-        "tests/test_harbor_regrade.py"
+        "tests/runtime/test_harbor_regrade.py"
       ],
       "reason": "固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览"
     },
@@ -2470,9 +2469,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/submission_source.py",
+        "kb_workflows/provenance/submission_source.py",
         "src/eval.py",
-        "tests/test_kernel_origin.py"
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "用实际内容哈希文件和保留代码对象加载候选，支持Triton源码检查与future导入；相同文件名或重新编译的相等对象不继承身份"
     },
@@ -2486,8 +2485,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/cuda_origin.py",
-        "tests/test_kernel_origin.py"
+        "kb_workflows/provenance/cuda_origin.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "可选CUPTI/Triton适配器关联实际cubin、模块/函数代次和成功launch；复制完整二进制摘要，卸载及句柄复用不继承来源"
     },
@@ -2501,8 +2500,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/kernel_origin.py",
-        "tests/test_kernel_origin.py"
+        "kb_workflows/provenance/kernel_origin.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "逐调用重算保守自写时间占比，重叠活动只计一次，未知/Graph/内存活动不获自写信用；丢记录、错绑和模式变化不通过"
     },
@@ -2516,9 +2515,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/origin_task.py",
+        "kb_workflows/provenance/origin_task.py",
         "scripts/audit_kernel_origin.py",
-        "tests/test_kernel_origin.py"
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "独立公开输入worker保留请求/源码/设备/模式和逐次输出验证，CLI默认零设备预览；结果与日志不覆盖原实验"
     },
@@ -2534,7 +2533,7 @@
       "evidence": [
         "docs/KERNEL_ORIGIN.md",
         "research/headroom/PAPER.md",
-        "kb_workflows/kernel_origin.py"
+        "kb_workflows/provenance/kernel_origin.py"
       ],
       "reason": "R-08转为部分实现；库/Graph/Neuron和正式轨道门槛未完成，95%仅可配置诊断，不授予L1，不替换原生计时或声称算法/安全证明"
     },
@@ -2548,8 +2547,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/origin_binaries.py",
-        "tests/test_origin_binaries.py"
+        "kb_workflows/provenance/origin_binaries.py",
+        "tests/provenance/test_origin_binaries.py"
       ],
       "reason": "候选导入前固定RECORD与逐文件哈希，只提取实际加载且前后身份一致的DSO；CUDA ELF字节匹配实际模块，缺工具/篡改/冲突/模拟不能建立库来源"
     },
@@ -2563,8 +2562,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/origin_graphs.py",
-        "tests/test_kernel_origin.py"
+        "kb_workflows/provenance/origin_graphs.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "关联实际创建/克隆/instantiate的节点与函数代次，每次replay保存快照；源模板销毁不抹除既有执行，未知更新或可执行对象销毁不沿用旧来源"
     },
@@ -2578,9 +2577,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/kernel_origin.py",
-        "kb_workflows/cuda_origin.py",
-        "tests/test_kernel_origin.py"
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/provenance/cuda_origin.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放"
     },
@@ -2594,9 +2593,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/cuda_origin.py",
-        "kb_workflows/origin_binaries.py",
-        "tests/test_kernel_origin.py"
+        "kb_workflows/provenance/cuda_origin.py",
+        "kb_workflows/provenance/origin_binaries.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "补齐DRIVER/RUNTIME activity生成correlation，运行时父关联唯一时才使用；二进制工具/日志按原字节绑定，兼容非UTF-8记录"
     },
@@ -2610,8 +2609,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/origin_task.py",
-        "tests/test_kernel_origin.py"
+        "kb_workflows/provenance/origin_task.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "导入前冻结配置容差，核对执行前后training/grad并记录恢复进程设置；协议v2要求后置观察，模式或环境改变保持未知"
     },
@@ -2623,9 +2622,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/queue_worker.py",
+        "kb_workflows/runtime/queue_worker.py",
         "kb_workflows/common.py",
-        "tests/test_kernel_origin.py"
+        "tests/provenance/test_kernel_origin.py"
       ],
       "reason": "队列接收origin_audit并强制候选源码，验证器摘要包含新增入口；CPU请求校验覆盖预览生成的实际payload，不运行设备"
     },
@@ -2639,8 +2638,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/submission_source.py",
-        "tests/test_compiler_origins.py"
+        "kb_workflows/provenance/submission_source.py",
+        "tests/provenance/test_compiler_origins.py"
       ],
       "reason": "在执行候选前固定函数文本和保留代码对象，不依赖运行时inspect/linecache；记录完整字符串字面量供CUDA编译输入核对"
     },
@@ -2654,8 +2653,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/triton_origin.py",
-        "tests/test_compiler_origins.py"
+        "kb_workflows/provenance/triton_origin.py",
+        "tests/provenance/test_compiler_origins.py"
       ],
       "reason": "观察真实AST解析和CodeGenerator调用，逐callee核对候选/语言源码与字节码和callable闭包；外层wrapper或builtin标签不代表完整来源"
     },
@@ -2669,9 +2668,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/triton_origin.py",
-        "kb_workflows/cuda_origin.py",
-        "tests/test_compiler_origins.py"
+        "kb_workflows/provenance/triton_origin.py",
+        "kb_workflows/provenance/cuda_origin.py",
+        "tests/provenance/test_compiler_origins.py"
       ],
       "reason": "在CUDA后端输出与真实构造器边界固定cubin、source、metadata和原始依赖收据；替换产物或事后洗白依赖无效，缓存/IR override缺证据不通过"
     },
@@ -2685,8 +2684,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/cpp_origin.py",
-        "tests/test_compiler_origins.py"
+        "kb_workflows/provenance/cpp_origin.py",
+        "tests/provenance/test_compiler_origins.py"
       ],
       "reason": "核对Torch适配器RECORD、实际loader调用点、CUDA字面量、Ninja/source/object和工具/环境；未知header、编译wrapper或未完成构建不赋予来源"
     },
@@ -2700,9 +2699,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/cpp_origin.py",
-        "kb_workflows/kernel_origin.py",
-        "kb_workflows/origin_task.py"
+        "kb_workflows/provenance/cpp_origin.py",
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/provenance/origin_task.py"
       ],
       "reason": "只提取已核对CUDA object的cubin，再匹配实际模块和函数/launch；不是整个.so都算自写，未关联Runtime注册及模拟构建不能建立实测来源"
     },
@@ -2716,9 +2715,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/kernel_origin.py",
-        "kb_workflows/triton_origin.py",
-        "tests/test_compiler_origins.py",
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/provenance/triton_origin.py",
+        "tests/provenance/test_compiler_origins.py",
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1"
@@ -2733,8 +2732,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/state_contract.py",
-        "tests/test_state_contract.py"
+        "kb_workflows/evaluation/state_contract.py",
+        "tests/evaluation/test_state_contract.py"
       ],
       "reason": "支持重命名、融合切片、转置与不复制存储的reshape，核对值/元数据/共享关系；映射不能豁免状态比较"
     },
@@ -2746,8 +2745,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/state_contract.py",
-        "tests/test_state_contract.py"
+        "kb_workflows/evaluation/state_contract.py",
+        "tests/evaluation/test_state_contract.py"
       ],
       "reason": "同一模型连续train/train/eval/train/eval，检查累计buffer、输出及training/grad后置状态，不只检查首次调用"
     },
@@ -2759,8 +2758,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/state_contract.py",
-        "tests/test_state_contract.py"
+        "kb_workflows/evaluation/state_contract.py",
+        "tests/evaluation/test_state_contract.py"
       ],
       "reason": "分别在train/eval预热后两轮修改同一参数存储；非零偏移覆盖全零参数，共享参数只修改一次，记录参考敏感性"
     },
@@ -2775,10 +2774,10 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/state_audit.py",
-        "kb_workflows/evaluate_task.py",
-        "kb_workflows/tool_checks.py",
-        "tests/test_state_audit.py"
+        "kb_workflows/evaluation/state_audit.py",
+        "kb_workflows/evaluation/evaluate_task.py",
+        "kb_workflows/evaluation/tool_checks.py",
+        "tests/evaluation/test_state_audit.py"
       ],
       "reason": "可选state_validation经过统一后端与Harbor，独立复核覆盖实际标准/隐藏输入，共享原请求预算，诊断不替换性能样本"
     },
@@ -2792,10 +2791,10 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/state_contract.py",
-        "kb_workflows/state_audit.py",
+        "kb_workflows/evaluation/state_contract.py",
+        "kb_workflows/evaluation/state_audit.py",
         "kb_workflows/common.py",
-        "tests/test_state_audit.py"
+        "tests/evaluation/test_state_audit.py"
       ],
       "reason": "拒绝共享模型/状态存储和改变快照值，逐例重算绑定摘要与模式/参数步骤；改容差/漏实例/模拟执行不能获得设备资格"
     },
@@ -2809,10 +2808,10 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/operator_specs.py",
-        "kb_workflows/operator_oracles.py",
-        "kb_workflows/operator_oracles.json",
-        "tests/test_operator_oracles.py"
+        "kb_workflows/numerics/operator_specs.py",
+        "kb_workflows/numerics/operator_oracles.py",
+        "kb_workflows/numerics/operator_oracles.json",
+        "tests/numerics/test_operator_oracles.py"
       ],
       "reason": "为原L1全部100题提供冻结源码/域/初始误差预算的CPU公式，不调用参考forward；原题不被改写，L2/L3缺适配不冒充覆盖"
     },
@@ -2824,8 +2823,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/operator_oracles.py",
-        "tests/test_operator_oracles.py"
+        "kb_workflows/numerics/operator_oracles.py",
+        "tests/numerics/test_operator_oracles.py"
       ],
       "reason": "显式逐组空间收缩与转置散射，保留stride/dilation/padding/output padding；窗口池化保留ceil边界、分母与并列索引，不调用原融合算子"
     },
@@ -2837,8 +2836,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/operator_oracles.py",
-        "tests/test_operator_oracles.py"
+        "kb_workflows/numerics/operator_oracles.py",
+        "tests/numerics/test_operator_oracles.py"
       ],
       "reason": "归一化/attention/loss采用显式FP64公式并保留状态、标签、epsilon和精确激活语义；固定BF16抵消反例不能因候选等于参考而通过"
     },
@@ -2853,10 +2852,10 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerical_audit.py",
+        "kb_workflows/numerics/numerical_audit.py",
         "kb_workflows/config.py",
-        "kb_workflows/evaluate_task.py",
-        "tests/test_numerical_audit.py"
+        "kb_workflows/evaluation/evaluate_task.py",
+        "tests/numerics/test_numerical_audit.py"
       ],
       "reason": "可选numerical_validation覆盖实际原生标准/隐藏输入，分配前核对主机内存估计包络；不缩小原尺寸，独立复核不替换性能样本"
     },
@@ -2868,8 +2867,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerical.py",
-        "tests/test_operator_oracles.py"
+        "kb_workflows/numerics/numerical.py",
+        "tests/numerics/test_operator_oracles.py"
       ],
       "reason": "参考资格独立计算，oracle shape/结构/离散dtype不符时不能因没有数值叶子而通过；92题exclusive scan参考缺陷明确保留失败"
     },
@@ -2884,10 +2883,10 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerical_audit.py",
-        "kb_workflows/tool_checks.py",
+        "kb_workflows/numerics/numerical_audit.py",
+        "kb_workflows/evaluation/tool_checks.py",
         "kb_workflows/cli.py",
-        "tests/test_numerical_audit.py"
+        "tests/numerics/test_numerical_audit.py"
       ],
       "reason": "核对逐原生实例、冻结规格/误差/内存政策、RMS限值、元素计数和信号叶子；源码漂移/缺项/模拟不能获得设备资格，配置贯穿Harbor及评分恢复"
     },
@@ -2902,8 +2901,8 @@
       "source": "current_integration",
       "evidence": [
         "KernelBench/level1/92_cumsum_exclusive.py",
-        "kb_workflows/operator_oracles.py",
-        "tests/test_reference_revisions.py"
+        "kb_workflows/numerics/operator_oracles.py",
+        "tests/benchmarks/test_reference_revisions.py"
       ],
       "reason": "沿声明轴补零/累加/裁剪，保留负轴、singleton与空轴shape；独立移位公式和旧错误反例同时核对，不改变名义计时尺寸"
     },
@@ -2923,7 +2922,7 @@
         "hidden_tests/level1/91_hidden.py",
         "hidden_tests/level1/92_hidden.py",
         "hidden_tests/level1/93_hidden.py",
-        "tests/test_scan_cases.py"
+        "tests/benchmarks/test_scan_cases.py"
       ],
       "reason": "五题追加奇数/非连续/rank-3/单元素/空轴，保留原3或4分布；乘积保持信号、mask保持bool，生成器不丢新增入口"
     },
@@ -2937,9 +2936,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/reference_revisions.py",
-        "kb_workflows/reference_revisions.json",
-        "tests/test_reference_revisions.py"
+        "kb_workflows/benchmarks/reference_revisions.py",
+        "kb_workflows/benchmarks/reference_revisions.json",
+        "tests/benchmarks/test_reference_revisions.py"
       ],
       "reason": "记录参考/隐藏前后哈希、连续版本链和共享生成器；worker/队列执行前核对，新结果记录修订，评分恢复拒绝无当前修订的正结果"
     },
@@ -2954,9 +2953,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/suites.py",
-        "kb_workflows/suites/kernelbench105.json",
-        "tests/test_reference_revisions.py"
+        "kb_workflows/benchmarks/suites.py",
+        "kb_workflows/benchmarks/manifests/kernelbench105.json",
+        "tests/benchmarks/test_reference_revisions.py"
       ],
       "reason": "KernelBench-105清单v2保留250题身份/105主选/5探针/140扩展及seed，显式基底加修订；原研究CSV不重写为新结果"
     },
@@ -2968,9 +2967,9 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerical.py",
-        "kb_workflows/numerical_audit.py",
-        "tests/test_numerical_audit.py"
+        "kb_workflows/numerics/numerical.py",
+        "kb_workflows/numerics/numerical_audit.py",
+        "tests/numerics/test_numerical_audit.py"
       ],
       "reason": "合法空Tensor按结构/dtype检查，RMS及误差保留null，不编造测得零误差；空输出不能单独提供参考信号"
     },
@@ -2985,11 +2984,11 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/tool_checks.py",
-        "kb_workflows/experiment.py",
-        "kb_workflows/final_verification.py",
-        "kb_workflows/study_data.py",
-        "tests/test_reference_revisions.py"
+        "kb_workflows/evaluation/tool_checks.py",
+        "kb_workflows/analysis/experiment.py",
+        "kb_workflows/evaluation/final_verification.py",
+        "kb_workflows/analysis/study_data.py",
+        "tests/benchmarks/test_reference_revisions.py"
       ],
       "reason": "统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告"
     },
@@ -3003,8 +3002,8 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "tests/test_reference_revisions.py",
-        "tests/test_scan_cases.py",
+        "tests/benchmarks/test_reference_revisions.py",
+        "tests/benchmarks/test_scan_cases.py",
         "scripts/generate_hidden_inputs.py",
         "docs/REFERENCE_REVISIONS.md"
       ],
@@ -3018,8 +3017,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_calibration_task.py",
-        "kb_workflows/input_calibration.py"
+        "kb_workflows/numerics/input_calibration_task.py",
+        "kb_workflows/numerics/input_calibration.py"
       ],
       "reason": "按固定顺序与三个种子检查参考FP64资格、信号和探针变化，保留失败尝试，不加载候选或采集速度"
     },
@@ -3031,8 +3030,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_profiles.py",
-        "tests/test_input_calibration.py"
+        "kb_workflows/numerics/input_profiles.py",
+        "tests/numerics/test_input_calibration.py"
       ],
       "reason": "100题适配保留shape/stride/离散角色；乘积随机有界前缀、概率与三角结构受约束，隐藏工厂不套用名义配方"
     },
@@ -3044,9 +3043,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_calibration.py",
-        "kb_workflows/evaluate_task.py",
-        "kb_workflows/paired_task.py",
+        "kb_workflows/numerics/input_calibration.py",
+        "kb_workflows/evaluation/evaluate_task.py",
+        "kb_workflows/evaluation/paired_task.py",
         "src/eval.py"
       ],
       "reason": "绝对误差项收紧为零且不放宽原预算，参考和候选均须通过独立FP64；首基线、warmup及每个计时输出在计时外核对"
@@ -3060,8 +3059,8 @@
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/engine.py",
-        "kb_workflows/paper_analysis.py",
-        "kb_workflows/input_calibration.py"
+        "kb_workflows/analysis/paper_analysis.py",
+        "kb_workflows/numerics/input_calibration.py"
       ],
       "reason": "输入记录进入基线指纹，缺当前配方、执行设备、工厂调用或逐输出检查数不能恢复/评分，旧分布基线须重测"
     },
@@ -3073,9 +3072,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_calibration.py",
-        "kb_workflows/neuron_worker.py",
-        "tests/test_input_calibration.py"
+        "kb_workflows/numerics/input_calibration.py",
+        "kb_workflows/hardware/neuron_worker.py",
+        "tests/numerics/test_input_calibration.py"
       ],
       "reason": "分别记录校准设备和执行设备；复用配方须在本设备再次数值资格，不借用性能或可达性证据"
     },
@@ -3087,11 +3086,11 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/generation.py",
-        "kb_workflows/harbor.py",
-        "kb_workflows/final_verification.py",
-        "kb_workflows/rl_plan.py",
-        "kb_workflows/study_data.py"
+        "kb_workflows/agents/generation.py",
+        "kb_workflows/runtime/harbor.py",
+        "kb_workflows/evaluation/final_verification.py",
+        "kb_workflows/agents/rl_plan.py",
+        "kb_workflows/analysis/study_data.py"
       ],
       "reason": "文件内容进入最终冻结、研究/RL及重新评分；单题子任务和Harbor私有文件保持一致，公开提示词说明分布及政策"
     },
@@ -3104,7 +3103,7 @@
       "source": "committed_implementation",
       "evidence": [
         "scripts/calibrate_inputs.py",
-        "tests/test_input_calibration.py",
+        "tests/numerics/test_input_calibration.py",
         "docs/INPUT_CALIBRATION.md"
       ],
       "reason": "默认预览无SDK/输入/目录副作用，执行显式开启；内存超限在变换/公式前拒绝，CPU反例覆盖证据删改及所有计时输出"
@@ -3117,8 +3116,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_cases.py",
-        "tests/test_operator_inputs.py"
+        "kb_workflows/numerics/operator_cases.py",
+        "tests/numerics/test_operator_inputs.py"
       ],
       "reason": "100题使用参考实际参数构造合法形状/布局，LN固定normalized_shape及卷积通道/分组不替换，计时输入不变"
     },
@@ -3130,8 +3129,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_cases.py",
-        "kb_workflows/operator_input_policy.py"
+        "kb_workflows/numerics/operator_cases.py",
+        "kb_workflows/numerics/operator_input_policy.py"
       ],
       "reason": "矩阵耦合/结构、卷积池化空间、扫描mask/乘积、概率标签及attention独立处理，每种子632例且保留旧隐藏分布"
     },
@@ -3143,9 +3142,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/numerical.py",
-        "kb_workflows/numerical_audit.py",
-        "kb_workflows/operator_oracles.json"
+        "kb_workflows/numerics/numerical.py",
+        "kb_workflows/numerics/numerical_audit.py",
+        "kb_workflows/numerics/operator_oracles.json"
       ],
       "reason": "五种激活追加NaN/Inf及全NaN，传播严格匹配；全非有限叶子的RMS/误差为null，不能贡献参考信号"
     },
@@ -3159,7 +3158,7 @@
       "evidence": [
         "src/eval.py",
         "src/validation.py",
-        "tests/test_operator_inputs.py"
+        "tests/numerics/test_operator_inputs.py"
       ],
       "reason": "修正dtype/device转换可能压紧切片的问题，将真实正stride与离散dtype送入候选及隔离副本"
     },
@@ -3171,10 +3170,10 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_input_policy.py",
+        "kb_workflows/numerics/operator_input_policy.py",
         "src/reliability.py",
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/tool_checks.py"
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/evaluation/tool_checks.py"
       ],
       "reason": "CUDA及Neuron共同追加案例，逐例记录有效输入/种子/双向调用；评分恢复拒绝漏例、改布局、重复标签或缺记录"
     },
@@ -3189,7 +3188,7 @@
         "kb_workflows/config.py",
         "kb_workflows/engine.py",
         "kb_workflows/cli.py",
-        "kb_workflows/harbor.py"
+        "kb_workflows/runtime/harbor.py"
       ],
       "reason": "默认256MiB输入估计在分配前检查，超限不缩尺寸；计划和额度贯穿队列、生成、Harbor、最终冻结及研究比较"
     },
@@ -3201,9 +3200,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_oracles.json",
-        "kb_workflows/paper_analysis.py",
-        "tests/test_operator_inputs.py"
+        "kb_workflows/numerics/operator_oracles.json",
+        "kb_workflows/analysis/paper_analysis.py",
+        "tests/numerics/test_operator_inputs.py"
       ],
       "reason": "BN/IN固定CPU FP32反例超过既定FP64预算，保留已知问题与失败；来源变化的旧结果在分析时明确失效"
     },
@@ -3215,8 +3214,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_operator_inputs.py",
-        "tests/_operator_evidence.py",
+        "tests/numerics/test_operator_inputs.py",
+        "tests/support/_operator_evidence.py",
         "docs/OPERATOR_INPUTS.md"
       ],
       "reason": "真实100题初始化meta检查及CPU算式、私有seed、NaN信号、Neuron模拟、评分/RL/恢复收据回归，不运行设备实验"
@@ -3229,9 +3228,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/composite_oracles.py",
-        "kb_workflows/composite_programs.json",
-        "kb_workflows/composite_specs.py"
+        "kb_workflows/numerics/composite_oracles.py",
+        "kb_workflows/numerics/composite_programs.json",
+        "kb_workflows/numerics/composite_specs.py"
       ],
       "reason": "100题冻结参考SHA、图节点、构造属性、状态形状与随机节点；构造变化或未知算术不回退到参考forward"
     },
@@ -3243,9 +3242,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/composite_math.py",
-        "kb_workflows/operator_oracles.py",
-        "tests/test_composite_oracles.py"
+        "kb_workflows/numerics/composite_math.py",
+        "kb_workflows/numerics/operator_oracles.py",
+        "tests/numerics/test_composite_oracles.py"
       ],
       "reason": "Linear/卷积/池化/归一化/激活显式CPU公式，保留GELU近似、inplace别名及原dtype常量舍入，不调用融合数值forward"
     },
@@ -3257,8 +3256,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/composite_oracles.py",
-        "kb_workflows/numerical_audit.py"
+        "kb_workflows/numerics/composite_oracles.py",
+        "kb_workflows/numerics/numerical_audit.py"
       ],
       "reason": "Dropout保持实际模式，以原dtype/shape/stride/device和seed重放掩码；FP64算式独立计算数值，外部RNG恢复"
     },
@@ -3270,9 +3269,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/composite_specs.py",
-        "kb_workflows/numerical_audit.py",
-        "tests/test_composite_oracles.py"
+        "kb_workflows/numerics/composite_specs.py",
+        "kb_workflows/numerics/numerical_audit.py",
+        "tests/numerics/test_composite_oracles.py"
       ],
       "reason": "逐例复核冻结程序、节点、采样模式/概率/布局/计数/摘要，缺失随机证据或图身份不匹配不能取得数值资格"
     },
@@ -3284,8 +3283,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/composite_oracles.py",
-        "kb_workflows/numerical_audit.py"
+        "kb_workflows/numerics/composite_oracles.py",
+        "kb_workflows/numerics/numerical_audit.py"
       ],
       "reason": "不先复制真实GPU权重，先汇总meta输入/状态/节点元素估算主机包络，超限不执行FP64或采样也不缩题"
     },
@@ -3298,7 +3297,7 @@
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/config.py",
-        "kb_workflows/operator_specs.py",
+        "kb_workflows/numerics/operator_specs.py",
         "kb_workflows/common.py",
         "pyproject.toml"
       ],
@@ -3312,8 +3311,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_oracles.json",
-        "tests/test_composite_oracles.py"
+        "kb_workflows/numerics/operator_oracles.json",
+        "tests/numerics/test_composite_oracles.py"
       ],
       "reason": "83题min后clamp在固定参数下恒零，数值相等不能恢复reference_signal；源文件与总体不变，不放宽误差"
     },
@@ -3325,8 +3324,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/_composite_cases.py",
-        "tests/test_composite_oracles.py",
+        "tests/support/_composite_cases.py",
+        "tests/numerics/test_composite_oracles.py",
         "docs/COMPOSITE_NUMERICS.md"
       ],
       "reason": "100题小配置CPU数值与原构造/名义shape的meta检查，禁用融合forward、两类低精度、随机收据及准入反例"
@@ -3339,7 +3338,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_input_families.json"
+        "kb_workflows/numerics/model_input_families.json"
       ],
       "reason": "全100题600例每种子，保留学习特征、LayerNorm末轴及外部转置卷积残差几何"
     },
@@ -3351,7 +3350,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_input_cases.py"
+        "kb_workflows/numerics/model_input_cases.py"
       ],
       "reason": "50题297例，区分序列与状态batch轴，三题保留固定初始化并明示原因"
     },
@@ -3363,7 +3362,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/reference_revisions.json"
+        "kb_workflows/benchmarks/reference_revisions.json"
       ],
       "reason": "KL温度归一化及hinge只变预测；保留槽位/公式并冻结修订历史，生成器不退回旧域"
     },
@@ -3377,7 +3376,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_input_policy.py"
+        "kb_workflows/numerics/operator_input_policy.py"
       ],
       "reason": "250题原生与Neuron按seed、双向调用、内存、布局复核，缺完整执行证据不能恢复正结果"
     },
@@ -3405,7 +3404,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_model_input_cases.py"
+        "tests/numerics/test_model_input_cases.py"
       ],
       "reason": "150原工厂/初始化meta与CPU小输入、数值控制、Neuron模拟覆盖；超限分配、篡改与旧域回归"
     },
@@ -3417,7 +3416,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/allocation_audit.py"
+        "kb_workflows/evaluation/allocation_audit.py"
       ],
       "reason": "两组不同填充值检查浮点/复数/整数/bool，首模式与参考碰巧一致仍须通过第二模式"
     },
@@ -3441,7 +3440,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/allocation_audit.py"
+        "kb_workflows/evaluation/allocation_audit.py"
       ],
       "reason": "只填连续扩容新逻辑尾部；不支持存储保留未知，metadata-only存储量为null"
     },
@@ -3455,7 +3454,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/tool_runner.py"
+        "kb_workflows/evaluation/tool_runner.py"
       ],
       "reason": "两模式各用父进程配置的fresh CUDA正确性worker，直接后续复核，不替换原生性能时间"
     },
@@ -3469,7 +3468,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/tool_checks.py"
+        "kb_workflows/evaluation/tool_checks.py"
       ],
       "reason": "复核设备/来源/模式/环境/导入构造/实际case-seed-order，开关进入冻结、研究、RL与Harbor"
     },
@@ -3483,7 +3482,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_allocation_audit.py"
+        "tests/evaluation/test_allocation_audit.py"
       ],
       "reason": "CPU多dtype分配、局部未写与缓存、首模式碰撞和模拟进程篡改/超时；原始allocator与Graph等未知不宣称覆盖"
     },
@@ -3497,7 +3496,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/tool_runner.py"
+        "kb_workflows/evaluation/tool_runner.py"
       ],
       "reason": "两种新公开worker对照逐次同步和连续N次后同步，参考/候选交替且原计时保持"
     },
@@ -3509,7 +3508,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/throughput_audit.py"
+        "kb_workflows/evaluation/throughput_audit.py"
       ],
       "reason": "相同快照消费成本保留每次复用缓冲区输出，逐例结构/形状/精度/设备与数值核对"
     },
@@ -3535,7 +3534,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/throughput_audit.py"
+        "kb_workflows/evaluation/throughput_audit.py"
       ],
       "reason": "参考meta输出推导后原尺寸存储准入，未知/超额不换实例、不缩题或降N"
     },
@@ -3549,7 +3548,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "逐轮10%标记可来自正常并行，不抹除原生答案；未消除差异不获性能分，分母不减"
     },
@@ -3563,7 +3562,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/tool_checks.py"
+        "kb_workflows/evaluation/tool_checks.py"
       ],
       "reason": "来源/设备/模式/调用/seed/字节/时间重放，统一冻结/研究/RL/队列/Harbor且无隐藏诊断"
     },
@@ -3577,7 +3576,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_throughput_audit.py"
+        "tests/evaluation/test_throughput_audit.py"
       ],
       "reason": "CPU排队/合法摊销、状态随机、复用与结构化输出、缺项篡改/超时和Neuron前端证明代码路径"
     },
@@ -3589,7 +3588,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/cache_audit.py"
+        "kb_workflows/evaluation/cache_audit.py"
       ],
       "reason": "独立worker覆盖原生公开/隐藏实例，三次复用Tensor身份并逐次验证输出，原计时保持"
     },
@@ -3601,7 +3600,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/cache_recipes.py"
+        "kb_workflows/evaluation/cache_recipes.py"
       ],
       "reason": "L1/L2/L3和生产41题保持几何/耦合与离散角色；公开继续可信工厂，隐藏不借公开配方"
     },
@@ -3615,7 +3614,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_reuse.py"
+        "kb_workflows/evaluation/input_reuse.py"
       ],
       "reason": "隔离重复对象/正stride/offset/广播别名、分离计算图并原地复制；几何恢复记录且未知表示不通过"
     },
@@ -3627,7 +3626,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/cache_audit.py"
+        "kb_workflows/evaluation/cache_audit.py"
       ],
       "reason": "参考候选相同调用数和随机重放，不重置状态；立即快照复用输出，常量参考不误判作弊"
     },
@@ -3639,7 +3638,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/tool_checks.py"
+        "kb_workflows/evaluation/tool_checks.py"
       ],
       "reason": "导入/构造/原生/更新调用记录并恢复设置；修复状态收据覆盖父文档而破坏后续诊断"
     },
@@ -3667,7 +3666,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_cache_audit.py"
+        "tests/evaluation/test_cache_audit.py"
       ],
       "reason": "小输入验证L1/L2/生产族、缓存反例及私有流程；R09按最初四项验收，不增加万能GPU证明条件"
     },
@@ -3679,7 +3678,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/state_paths.py"
+        "kb_workflows/evaluation/state_paths.py"
       ],
       "reason": "按真实字典键/类型、列表位置和普通对象属性绑定，跳过注册参数的框架别名，不执行property"
     },
@@ -3691,7 +3690,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/state_policies.py"
+        "kb_workflows/evaluation/state_policies.py"
       ],
       "reason": "源绑定L3/33持久hidden替换和放置，以及L3/41未使用初始化h0；候选可省略无用属性而不省输入"
     },
@@ -3705,7 +3704,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/state_contract.py"
+        "kb_workflows/evaluation/state_contract.py"
       ],
       "reason": "普通属性/容器/对象的值、元数据、路径及对象/重叠存储别名保真；deepcopy不能修复断开的共享或重连失效缓存"
     },
@@ -3717,7 +3716,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/state_contract.py"
+        "kb_workflows/evaluation/state_contract.py"
       ],
       "reason": "按实际参考连续比较替换后的普通状态，支持映射注册buffer；注册参数仍要求同对象存储及非零更新"
     },
@@ -3729,7 +3728,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/state_audit.py"
+        "kb_workflows/evaluation/state_audit.py"
       ],
       "reason": "每次调用记录并比较全部映射状态所有者的train/eval和no_grad，漏模式/改角色/缺持久状态拒绝资格"
     },
@@ -3757,7 +3756,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_ordinary_state.py"
+        "tests/evaluation/test_ordinary_state.py"
       ],
       "reason": "291题仅构造meta模型、不调用输入工厂；小循环状态/对象缓存、别名、快照和收据反例验证有限软件范围"
     },
@@ -3771,7 +3770,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/baseline_rewrites.json"
+        "kb_workflows/evaluation/baseline_rewrites.json"
       ],
       "reason": "291题冻结参考SHA、11个数学改写和491个适用后端策略；没有额外改写的题目保留基础组合"
     },
@@ -3785,7 +3784,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/baseline_rewrites.py"
+        "kb_workflows/evaluation/baseline_rewrites.py"
       ],
       "reason": "SDPA/GQA、LayerNorm/var_mean、残差RMS及行缩放/范数形式保持名义域、mask、eps、affine和输出格式"
     },
@@ -3799,7 +3798,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/baseline_policies.py"
+        "kb_workflows/evaluation/baseline_policies.py"
       ],
       "reason": "channels-last/3d、cuDNN benchmark、cuBLASLt偏好按调用设置恢复，转换与设置成本计时；不冒充GPU来源"
     },
@@ -3811,7 +3810,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/baseline_variants.py"
+        "kb_workflows/evaluation/baseline_variants.py"
       ],
       "reason": "六基础组合加每项库/后端Graph版本，完整声明2750个分题变体；不支持捕获和错误输出保留失败"
     },
@@ -3853,7 +3852,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_baseline_recipes.py"
+        "tests/evaluation/test_baseline_recipes.py"
       ],
       "reason": "三个dtype的合法值配方、291题清单、2D/3D布局、设置异常恢复、原生错误拒绝与收据删改；不运行设备实验"
     },
@@ -3867,7 +3866,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_input_families.json"
+        "kb_workflows/numerics/model_input_families.json"
       ],
       "reason": "150题冻结七类角色与特征轴，追加异号对、激活分支、孤立极值和坐标不对称输入"
     },
@@ -3881,7 +3880,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_stress.py"
+        "kb_workflows/numerics/model_stress.py"
       ],
       "reason": "100个直接线性/标准卷积/循环入口按权重比值构造有界输入，保留参数与偏置并记录实际系数摘要"
     },
@@ -3895,7 +3894,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_cases.py"
+        "kb_workflows/numerics/operator_cases.py"
       ],
       "reason": "15个激活题覆盖±32/±32752，26/88加±2.699，池化/极值归约检查实际窗口内的单个边界极值"
     },
@@ -3909,7 +3908,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_layouts.py"
+        "kb_workflows/numerics/input_layouts.py"
       ],
       "reason": "250题追加非零offset，33个合法多输入题追加重叠存储，初始化守卫并在分配前核对更大包络"
     },
@@ -3925,7 +3924,7 @@
       "evidence": [
         "src/input_groups.py",
         "src/reliability.py",
-        "kb_workflows/neuron_worker.py"
+        "kb_workflows/hardware/neuron_worker.py"
       ],
       "reason": "原生/Neuron转换、双向比较、状态/重复/数值检查保留stride、offset、别名和重复对象；输出快照保持独立"
     },
@@ -3939,8 +3938,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/operator_input_policy.py",
-        "tests/test_model_input_cases.py"
+        "kb_workflows/numerics/operator_input_policy.py",
+        "tests/numerics/test_model_input_cases.py"
       ],
       "reason": "重算有效输入及双向四次隔离副本布局，缺API/压紧/拆存储/错dtype不能取得别名资格；实际权重收据拒绝meta替代"
     },
@@ -3954,7 +3953,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_input_layouts.py"
+        "tests/evaluation/test_input_layouts.py"
       ],
       "reason": "全250题转移及隔离的meta布局、小输入权重抵消/参数不变、GELU近似与BF16反例、边界极值及收据删改"
     },
@@ -3968,7 +3967,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_programs.json"
+        "kb_workflows/numerics/model_programs.json"
       ],
       "reason": "50题绑定来源、完整module树、标量属性、状态几何与算式；保留精度/模式/物理参数布局变化，拒绝缩小正式构造"
     },
@@ -3982,7 +3981,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_layers.py"
+        "kb_workflows/numerics/model_layers.py"
       ],
       "reason": "显式投影、分头、mask、softmax、残差、前馈及norm，保持源码batch-first方向；原内置随机概率为零"
     },
@@ -3996,7 +3995,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_math.py"
+        "kb_workflows/numerics/model_math.py"
       ],
       "reason": "RNN逐步递推、LSTM/GRU门公式、多层双向和h/c返回，保持33的状态copy舍入；不调用融合RNN"
     },
@@ -4010,7 +4009,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_math.py"
+        "kb_workflows/numerics/model_math.py"
       ],
       "reason": "窗口/shift、两类patch合并、余弦/因果/ReLU注意力、ghost残差及块内外状态递推分别实现，保持未使用层语义"
     },
@@ -4024,7 +4023,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_oracles.py"
+        "kb_workflows/numerics/model_oracles.py"
       ],
       "reason": "meta仅给形状/布局；全尺寸输入/状态与attention workspace先准入，原生值无关mask保留dtype/stride/RNG；闭包指向隔离meta模块"
     },
@@ -4038,8 +4037,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_specs.py",
-        "kb_workflows/numerical_audit.py",
+        "kb_workflows/numerics/model_specs.py",
+        "kb_workflows/numerics/numerical_audit.py",
         "kb_workflows/config.py",
         "pyproject.toml"
       ],
@@ -4055,8 +4054,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_model_oracles.py",
-        "tests/_model_cases.py",
+        "tests/numerics/test_model_oracles.py",
+        "tests/support/_model_cases.py",
         "docs/MODEL_NUMERICS.md"
       ],
       "reason": "36个小配置的两模式算式、融合forward禁用、50题双meta计划、随机/可选状态/收据反例；35省略状态的FP32默认不被暗改"
@@ -4071,7 +4070,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/model_input_profiles.py"
+        "kb_workflows/numerics/model_input_profiles.py"
       ],
       "reason": "七类模型角色共731个配方声明，保留实际特征/显式初始状态、尺寸、参数和隐藏分布"
     },
@@ -4085,7 +4084,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_profiles.py"
+        "kb_workflows/numerics/input_profiles.py"
       ],
       "reason": "共享backing仅采样一次并保持视图/精度；七个L1极值题增加正态配方，修复FP16 uniform max恒值"
     },
@@ -4099,7 +4098,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_calibration.py"
+        "kb_workflows/numerics/input_calibration.py"
       ],
       "reason": "三个输入种子共享前向seed 42，同时要求输入探针变化和输出至少两次不同；恒零/非零常量不合格"
     },
@@ -4113,7 +4112,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_calibration_task.py"
+        "kb_workflows/numerics/input_calibration_task.py"
       ],
       "reason": "L1公式/L2复合/L3模型算式统一准入，保留程序与mask收据；候选、时间样本和误差放宽不参与选择"
     },
@@ -4127,8 +4126,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/reference_oracles.py",
-        "kb_workflows/input_calibration.py"
+        "kb_workflows/numerics/reference_oracles.py",
+        "kb_workflows/numerics/input_calibration.py"
       ],
       "reason": "计时参考调用前计算独立真值并恢复RNG，绑定参考/输入计划；模型路径拒绝缺票据的事后计算"
     },
@@ -4142,13 +4141,13 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paired_task.py",
+        "kb_workflows/evaluation/paired_task.py",
         "src/eval.py",
         "src/reliability.py",
-        "kb_workflows/measurement.py",
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/evaluate_task.py",
-        "kb_workflows/baseline_variants.py"
+        "kb_workflows/evaluation/measurement.py",
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/evaluation/evaluate_task.py",
+        "kb_workflows/evaluation/baseline_variants.py"
       ],
       "reason": "基线/候选/配对/Neuron逐对票据，回调重放trial RNG，转移/快照/Graph输入保持别名；诊断不替换原始时间"
     },
@@ -4162,7 +4161,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_model_input_profiles.py",
+        "tests/numerics/test_model_input_profiles.py",
         "docs/INPUT_CALIBRATION.md"
       ],
       "reason": "150原构造的所有配方仅做meta；小CPU输入验证三精度别名、常量/全零、固定mask、连续状态/RNG和模拟Neuron三阶段"
@@ -4177,7 +4176,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/reference_population.py"
+        "kb_workflows/benchmarks/reference_population.py"
       ],
       "reason": "按预定原题范围核对完整参考校准，固定第一个合格配方、每个失败配方的原因和case摘要；候选和时间不参与选择"
     },
@@ -4191,8 +4190,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/reference_population.py",
-        "tests/test_reference_population.py"
+        "kb_workflows/benchmarks/reference_population.py",
+        "tests/benchmarks/test_reference_population.py"
       ],
       "reason": "缺项、未测完菜单、资源/worker错误、模拟或来源漂移拒绝冻结；没有合格题目不能产生空集得分"
     },
@@ -4206,8 +4205,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/reference_population.py",
-        "kb_workflows/generation.py",
+        "kb_workflows/benchmarks/reference_population.py",
+        "kb_workflows/agents/generation.py",
         "kb_workflows/engine.py"
       ],
       "reason": "在生成、导出和评测前保存集合及样本数，已有候选/结果不能补选集合；冻结后失败和缺失样本保留零分"
@@ -4224,9 +4223,9 @@
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/cli.py",
-        "kb_workflows/paper_analysis.py",
+        "kb_workflows/analysis/paper_analysis.py",
         "kb_workflows/common.py",
-        "kb_workflows/final_verification.py"
+        "kb_workflows/evaluation/final_verification.py"
       ],
       "reason": "生成、基线、最终/配对验证、评分和研究分析统一选择器；全校准文件及清单绑定执行/评分/恢复指纹"
     },
@@ -4241,10 +4240,10 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/input_calibration.py",
-        "kb_workflows/harbor.py",
-        "kb_workflows/rl_plan.py",
-        "kb_workflows/regrade.py"
+        "kb_workflows/numerics/input_calibration.py",
+        "kb_workflows/runtime/harbor.py",
+        "kb_workflows/agents/rl_plan.py",
+        "kb_workflows/runtime/regrade.py"
       ],
       "reason": "私有子任务保留父清单与当前题校准，运行收据校验父摘要；Harbor、RL、预算、研究和重新评分保留完整排除账本与实际子范围"
     },
@@ -4275,7 +4274,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_reference_population.py"
+        "tests/benchmarks/test_reference_population.py"
       ],
       "reason": "小CPU与不计分的序列化夹具覆盖缺项/篡改/未解决、固定分母、零分保留、私有委托、运行收据和轻量命令；不建立实测资格"
     },
@@ -4289,9 +4288,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/agent_models.py",
-        "kb_workflows/generation.py",
-        "tests/test_agent_loop.py"
+        "kb_workflows/agents/agent_models.py",
+        "kb_workflows/agents/generation.py",
+        "tests/agents/test_agent_loop.py"
       ],
       "reason": "模型CLI自身先超时时先清理包括独立session的后代再终止父进程，避免外层控制器已无法找到孤儿；直接与外层墙钟两种超时均做CPU子进程回归，未启动模型"
     },
@@ -4305,9 +4304,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/timed_numerics.py",
-        "kb_workflows/evaluate_task.py",
-        "kb_workflows/input_calibration.py",
+        "kb_workflows/evaluation/timed_numerics.py",
+        "kb_workflows/evaluation/evaluate_task.py",
+        "kb_workflows/numerics/input_calibration.py",
         "src/eval.py"
       ],
       "reason": "启用数值验证后，原250题的原生计时自动采用独立实际输入真值，不再要求输入配方；实际冷调用/双向正确性输出、预热与每次正式输出均核对参考和候选"
@@ -4322,7 +4321,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/timed_numerics.py"
+        "kb_workflows/evaluation/timed_numerics.py"
       ],
       "reason": "记录每次输出的类别、序号、RMS/全元素门、参考信号、内存与模型/随机mask收据；独立核对覆盖数、固定政策和源身份，不虚构前向seed"
     },
@@ -4336,8 +4335,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/paired_task.py",
-        "kb_workflows/neuron_worker.py"
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/hardware/neuron_worker.py"
       ],
       "reason": "每轮先计算一次参考调用前真值，再逐一验证三方输出；验证不额外推进普通Tensor/注册状态或随机流，保持原同步墙钟样本"
     },
@@ -4351,9 +4350,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_worker.py",
-        "kb_workflows/evaluate_task.py",
-        "kb_workflows/paired_task.py"
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/evaluation/evaluate_task.py",
+        "kb_workflows/evaluation/paired_task.py"
       ],
       "reason": "未配置输入配方也启用Neuron双向/首次/预热/正式/配对强门；数值模式的FP32非组合基线关闭TF32，不改原尺寸和误差政策"
     },
@@ -4368,9 +4367,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/tool_checks.py",
+        "kb_workflows/evaluation/tool_checks.py",
         "kb_workflows/engine.py",
-        "kb_workflows/paper_analysis.py"
+        "kb_workflows/analysis/paper_analysis.py"
       ],
       "reason": "基线记录/缓存、候选恢复、配对、最终重测和普通评分核对完整逐次收据；缺检查、改预算或篡改误差计数不能取得正分"
     },
@@ -4384,7 +4383,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/measurement.py"
+        "kb_workflows/evaluation/measurement.py"
       ],
       "reason": "数值或其他验证回调抛错时，finally仍恢复候选实际调用后的CPU/CUDA/Neuron随机状态，不把参考诊断的消耗带出计时器"
     },
@@ -4398,7 +4397,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_timed_numerics.py",
+        "tests/evaluation/test_timed_numerics.py",
         "docs/TIMED_NUMERICS.md"
       ],
       "reason": "小CPU原构造验证L1/L2/L3票据、旧容差漏错、首/预热/正式覆盖、收据重封篡改和连续随机状态；模拟Neuron验证三阶段，不建立设备测量资格"
@@ -4413,7 +4412,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/numerical.py"
+        "kb_workflows/numerics/numerical.py"
       ],
       "reason": "从实际存储值与未舍入FP64真值计算逐叶RMS和逐元素最大预算使用比例；原上限失格不能通过拟合加宽"
     },
@@ -4427,7 +4426,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/precision_calibration_task.py"
+        "kb_workflows/numerics/precision_calibration_task.py"
       ],
       "reason": "原L1/L2/L3按题目/dtype使用三个拟合种子和三个不重叠验证种子，固定构造/前向RNG、隔离状态，不加载候选、不采性能时间"
     },
@@ -4441,7 +4440,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/precision_calibration.py"
+        "kb_workflows/numerics/precision_calibration.py"
       ],
       "reason": "固定margin4/floor1e-6且factor最多1，五项预算一同收紧；独立种子验证失败保留原政策，离散输出精确且不虚构浮点拟合"
     },
@@ -4471,9 +4470,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/precision_calibration.py",
-        "kb_workflows/numerical_audit.py",
-        "kb_workflows/timed_numerics.py"
+        "kb_workflows/numerics/precision_calibration.py",
+        "kb_workflows/numerics/numerical_audit.py",
+        "kb_workflows/evaluation/timed_numerics.py"
       ],
       "reason": "校准设备保持来源身份，同硬件/软件类别可复用契约且逐次当前设备FP64自资格；异类拒绝，运行记录不能冒充新设备已校准"
     },
@@ -4488,8 +4487,8 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/precision_calibration.py",
-        "kb_workflows/reference_population.py"
+        "kb_workflows/numerics/precision_calibration.py",
+        "kb_workflows/benchmarks/reference_population.py"
       ],
       "reason": "冻结校准文件、类别、范围与样本数，候选出现后不能补选/替换阈值；预算、最终冻结和研究计划识别文件变化"
     },
@@ -4504,11 +4503,11 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/generation.py",
-        "kb_workflows/harbor.py",
-        "kb_workflows/rl_plan.py",
-        "kb_workflows/regrade.py",
-        "kb_workflows/tool_checks.py"
+        "kb_workflows/agents/generation.py",
+        "kb_workflows/runtime/harbor.py",
+        "kb_workflows/agents/rl_plan.py",
+        "kb_workflows/runtime/regrade.py",
+        "kb_workflows/evaluation/tool_checks.py"
       ],
       "reason": "子任务携带本题/dtype记录，公开提示只给有效政策；Harbor/RL/评分恢复、研究导出及重新评分绑定内容和实际执行收据"
     },
@@ -4523,7 +4522,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_precision_calibration.py",
+        "tests/numerics/test_precision_calibration.py",
         "docs/PRECISION_CALIBRATION.md"
       ],
       "reason": "小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览"
@@ -4536,7 +4535,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/origin_graphs.py",
+        "kb_workflows/provenance/origin_graphs.py",
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "观察cuGraphKernelNodeSetParams的v1/v2参数前缀及匹配CUPTI事件，更新模板代次，保留已实例化可执行Graph"
@@ -4551,7 +4550,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/origin_graphs.py",
+        "kb_workflows/provenance/origin_graphs.py",
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "可执行Graph核参数更新只修改目标实例的后续提交；原模板、其他实例和旧调用快照保留，克隆节点沿原节点身份更新"
@@ -4566,7 +4565,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/kernel_origin.py",
+        "kb_workflows/provenance/kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "v4来源收据重放API、函数与context、节点/实例事件、前后代次和调用边界，拒绝回滚节点或借用其他实例的更新"
@@ -4579,7 +4578,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/origin_graphs.py",
+        "kb_workflows/provenance/origin_graphs.py",
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "成功却缺事件、错绑事件或失败伴更新事件使后续关联未知；原始代次及失效边界保留，有界重放超额拒绝而不省略证据"
@@ -4594,7 +4593,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_graph_updates.py",
+        "tests/provenance/test_graph_updates.py",
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA"
@@ -4607,7 +4606,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/work_counters.py",
+        "kb_workflows/provenance/work_counters.py",
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "逐launch解析Nsight原始CSV的PID/context/stream/device、精确uint64计数与单位，缺指标、重复、错绑、截断和缩放值不转为零"
@@ -4622,7 +4621,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/work_counters.py",
+        "kb_workflows/provenance/work_counters.py",
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "仅完整审核规则可建执行模型，绑定来源/参考、输入几何、精度政策、dtype与设备类别；部分资源计数保留诊断范围"
@@ -4635,7 +4634,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/performance.py",
+        "kb_workflows/analysis/performance.py",
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "从原始计数与同物理设备校准率重算资源最大值SOL并自动填A/E；拒绝measured字符串、手填SOL或篡改分量，缺证据只给AE/O"
@@ -4650,7 +4649,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/counter_worker.py",
+        "kb_workflows/provenance/counter_worker.py",
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改"
@@ -4666,7 +4665,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/counter_task.py",
+        "kb_workflows/provenance/counter_task.py",
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "固定ncu参数和工具身份，重查源码/配置/输入/政策/实际设备及报告PID，超时或失格保留有界原始失败前缀，不产生部分通过"
@@ -4697,7 +4696,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_work_counters.py",
+        "tests/provenance/test_work_counters.py",
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验"
@@ -4712,7 +4711,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_tables.py",
+        "kb_workflows/hardware/neuron_tables.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "完整读取12.0.1必需表和可选质量表，分片连续且不混用；全部文件先准入再解码，保留SHA、字段投影与读取后复查，不用UI采样或Summary替代"
@@ -4725,7 +4724,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_tables.py",
+        "kb_workflows/hardware/neuron_tables.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "精确整数保留raw/adjusted FLOPs、HBM缺失行和引擎busy并集；DMA包独立计账，不与HBM注释或聚合表重复相加"
@@ -4740,7 +4739,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_tables.py",
+        "kb_workflows/hardware/neuron_tables.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "唯一包含区间联结execution，NKI同时匹配execution/site/NEFF；含糊保留未知，标签不授予源码或硬件计数资格"
@@ -4753,9 +4752,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_device.py",
+        "kb_workflows/hardware/neuron_device.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "接当前SDK的NeuronProfiler.export_trace回调，在编译前设置私有NEFF缓存并恢复环境，流式保留NEFF/NTFF与框架trace摘要"
     },
@@ -4767,9 +4766,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_worker.py",
+        "kb_workflows/hardware/neuron_worker.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "相同seed与连续状态下先冻结参考输出及可选oracle票据，关闭profiler后验证采集的候选输出，拒绝模式或环境变化"
     },
@@ -4781,9 +4780,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/strict_validation.py",
+        "kb_workflows/evaluation/strict_validation.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "Neuron统一no_grad；环境守卫检测并恢复候选泄漏的梯度模式，包括异常退出，合法局部梯度上下文仍保留"
     },
@@ -4798,9 +4797,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_neuron_tables.py",
+        "tests/hardware/test_neuron_tables.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "实际Parquet读写覆盖分片、大整数、缺失、重叠、准入与重封篡改；CPU状态随机模型和SDK模拟验证输出门，不运行设备实验"
     },
@@ -4814,9 +4813,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_work.py",
+        "kb_workflows/hardware/neuron_work.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "编译文件复核后封装源码/参考、配置、输入与注册状态探针、此前用例、政策、设备/软件、模式和工件；模拟收据不能建真实设备模型"
     },
@@ -4830,7 +4829,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_work.py",
+        "kb_workflows/hardware/neuron_work.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "可信维护者配对审核report/capture并逐行精确匹配engine/opcode/dtype，缺raw FLOPs/HBM拒绝建模；DMA不叠加，来源仍未知"
@@ -4843,7 +4842,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/performance.py",
+        "kb_workflows/analysis/performance.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "原始资源需求除以同物理core及软件校准率取最大值，重放全部分量再拆A/E；明确为指令注释模型且hardware_counters_collected为false"
@@ -4858,7 +4857,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_tables.py",
+        "kb_workflows/hardware/neuron_tables.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "优先验证Instruction.execution_index存在且时间包含；缺字段才用唯一包含区间，不能借其他execution修复矛盾"
@@ -4873,9 +4872,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_worker.py",
+        "kb_workflows/hardware/neuron_worker.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "候选输入隔离复制在profile区间前完成，采集中保留候选前向与完成屏障，不把验证器复制计入执行工作"
     },
@@ -4889,7 +4888,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "scripts/analyze_neuron_work.py",
+        "scripts/analyze_device_trace.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "已有Parquet可选联合capture/review/calibration构建模型，全程不启动工具或设备；模型失格仍保存完整原始报告与原因"
@@ -4905,9 +4904,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_neuron_work.py",
+        "tests/hardware/test_neuron_work.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "CPU与实际Parquet回归覆盖审核缺项、精确关联、非空质量表、设备/校准/源码/汇总重封篡改、模拟收据和失败持久化，不运行设备实验"
     },
@@ -4919,9 +4918,9 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_device.py",
+        "kb_workflows/hardware/neuron_device.py",
         "docs/NEURON_WORK.md",
-        "tests/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py"
       ],
       "reason": "原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射"
     },
@@ -4935,7 +4934,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_processing.py",
+        "kb_workflows/hardware/neuron_processing.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "完整树先准入再核对捕获SHA/大小，拒绝缺项/额外/特殊文件/软链接；在独立新目录逐块校验复制为只读文件，原始目录与工作目录不得重叠"
@@ -4950,7 +4949,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_processing.py",
+        "kb_workflows/hardware/neuron_processing.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "版本查询前固定可执行文件路径与SHA，查询后及处理/解码后复核；仅固定view/完整Parquet命令，无capture、inspect或过滤附加参数"
@@ -4965,7 +4964,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_processing.py",
+        "kb_workflows/hardware/neuron_processing.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "处理和表解码后复查原始文件、快照、工具及全部输出；超时/更改/超限不产生收据，保留完整工作目录及有界日志前缀"
@@ -4980,7 +4979,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/neuron_work.py",
+        "kb_workflows/hardware/neuron_work.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "重放工具/命令/工件、capture/report和表包络后自动配对审核模型；指定无效处理证据不得退回人工模式，仍不授予执行所有权或正式资格"
@@ -4993,7 +4992,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "scripts/process_neuron_work.py",
+        "scripts/analyze_device_trace.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "默认不查工具、不创建路径；显式execute只处理已有采集，超时及工件/表行数/解码估计可配，拒绝覆写，工具调用与设备工作标记分开记录"
@@ -5009,10 +5008,31 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "tests/test_neuron_processing.py",
+        "tests/hardware/test_neuron_processing.py",
         "docs/NEURON_WORK.md"
       ],
       "reason": "真实文件/Parquet及注入runner覆盖字节/core、完整快照、工具/输入/输出/目录替换、晚到修改、超时/资源门、收据重封和模型/CLI拒绝降级；不运行Explorer或设备"
+    },
+    {
+      "id": "V46-01",
+      "title": "按职责归类并合并重复实现",
+      "primary": "M5",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "kb_workflows/common.py",
+        "kb_workflows/hardware/neuron_tables.py",
+        "scripts/analyze_device_trace.py",
+        "scripts/generate_leaderboard.py",
+        "tests/benchmarks/test_catalogs.py",
+        "tests/conftest.py"
+      ],
+      "reason": "收拢目录与分析入口，合并重复清单和模型构造，减少维护成本同时保留评分证据门"
     }
   ]
 }

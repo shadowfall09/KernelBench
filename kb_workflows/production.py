@@ -8,8 +8,8 @@ from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
 
+from .benchmarks.production_specs import comparison_contract, task
 from .common import fingerprint, read_json
-from .production_specs import comparison_contract, task
 
 PROTOCOL = "production_families_v1"
 SETTINGS = ContextVar("production_instance_settings", default={})
@@ -219,7 +219,7 @@ def make_inputs(pid, *, case=None, precision=None, profile=None, memory_bytes=No
 
 
 def execute(pid, *args):
-    from . import production_ops
+    from .benchmarks import production_ops
 
     spec = task(pid)
     function = getattr(production_ops, spec["operation"])
@@ -262,7 +262,7 @@ def task_input_policy(function):
         if "dimensions_override" in options:
             settings["dimensions_override"] = options["dimensions_override"]
         plan = instance_plan(payload["problem_id"], **settings)
-        from .numerical import PrecisionContract, precision_gate
+        from .numerics.numerical import PrecisionContract, precision_gate
 
         contract = PrecisionContract(**plan["output_comparison_contract"])
         def comparator(expected, actual, path):

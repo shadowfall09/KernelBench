@@ -5,9 +5,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from kb_workflows.analysis.headroom import witness_from_run
 from kb_workflows.common import atomic_json, read_json
 from kb_workflows.config import RunConfig
-from kb_workflows.headroom import witness_from_run
 
 
 def main(argv=None):

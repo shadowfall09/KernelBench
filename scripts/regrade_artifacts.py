@@ -4,9 +4,9 @@ import argparse
 import json
 from pathlib import Path
 
-from kb_workflows import harbor_regrade, regrade
 from kb_workflows.common import read_json
 from kb_workflows.config import parse_config
+from kb_workflows.runtime import harbor_regrade, regrade
 
 
 def main(argv=None):

@@ -5,15 +5,15 @@ import math
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from .benchmarks.reference_population import select_run_problems
+from .benchmarks.suites import selection_receipt
 from .common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, kernel_name, read_json, select_problems
-from .reference_population import select_run_problems
-from .suites import selection_receipt
-from .tool_checks import diagnostic_options, reusable
-from .transports import docker_evaluate, local_evaluate, queue_evaluate, resolve_devices
+from .evaluation.tool_checks import diagnostic_options, reusable
+from .runtime.transports import docker_evaluate, local_evaluate, queue_evaluate, resolve_devices
 
 
 def settings(config, hidden=False):
-    from .isolation import options
+    from .runtime.isolation import options
 
     # Changes to the actual evaluator invalidate resumed evaluations.
     return {
@@ -48,45 +48,45 @@ def settings(config, hidden=False):
 def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
     path = select_problems(config.level, problem_ids=[pid])[pid]
     options = settings(config, hidden)
-    from .reference_revisions import binding
+    from .benchmarks.reference_revisions import binding
 
     if revision := binding(config.level, pid, path.read_text()):
         options["reference_revision"] = revision
-    from .operator_input_policy import plan
+    from .numerics.operator_input_policy import plan
 
     if config.level in {1, 2, 3}:
         options["operator_inputs"] = plan(config.level, pid, path.read_text(), config.input_family_memory_mb)
-    from .reference_population import binding
+    from .benchmarks.reference_population import binding
 
     if population := binding(config, pid):
         options["reference_population"] = population
     if config.input_calibration:
-        from .input_calibration import record_for
+        from .numerics.input_calibration import record_for
 
         options["input_profile"] = record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())
     if config.precision_calibration:
-        from .precision_calibration import record_for
+        from .numerics.precision_calibration import record_for
 
         options["precision_profile"] = record_for(config.precision_calibration, config.level, pid, config.precision, path.read_text(), options.get("input_profile"))
     if config.numerical_validation:
-        from .operator_specs import spec_for
+        from .numerics.operator_specs import spec_for
 
         options["oracle_spec_sha256"] = fingerprint(spec_for(config.level, pid, path.read_text()))
     if config.cache_validation:
-        from .cache_recipes import plan as cache_plan
+        from .evaluation.cache_recipes import plan as cache_plan
 
         options["input_cache_plan"] = cache_plan(config.level, pid, path.read_text())
     if config.state_validation:
-        from .state_policies import plan as state_plan
+        from .evaluation.state_policies import plan as state_plan
 
         options["state_policy"] = state_plan(config.level, pid, path.read_text())
     if config.determinism_checks:
-        from .determinism import policy_for
+        from .evaluation.determinism import policy_for
 
         options["determinism_policy"] = policy_for(config.determinism_policy_file, config.level, pid, path.read_text())
     if config.level == 5:
+        from .benchmarks.production_specs import task as production_task
         from .production import PROTOCOL
-        from .production_specs import task as production_task
 
         spec = production_task(pid)
         options["precision"] = spec["fixed_activation_dtype"] or config.precision
@@ -148,7 +148,7 @@ def evaluate_tasks(config, payloads):
             elif config.evaluation == "queue":
                 result = queue_evaluate(payload, config)
             else:
-                from .modal_backend import modal_evaluate
+                from .runtime.modal_backend import modal_evaluate
 
                 result = modal_evaluate(payload, config)
         except Exception as exc:
@@ -164,7 +164,7 @@ def evaluate_tasks(config, payloads):
 
 
 def evaluate_run(config):
-    from .reference_population import freeze_run
+    from .benchmarks.reference_population import freeze_run
 
     freeze_run(config)
     selected = select_run_problems(config)
@@ -195,7 +195,7 @@ def evaluate_run(config):
             print(f"[{label}] {key}: compiled={result['compiled']}, correct={result['correctness']}", flush=True)
         atomic_json(target, results)
     if config.final_repeats:
-        from .final_verification import run
+        from .evaluation.final_verification import run
 
         run(config)
     if config.paired_timing:
@@ -205,7 +205,7 @@ def evaluate_run(config):
 
 
 def write_pass_at_k(config):
-    from .final_verification import correctness_passed
+    from .evaluation.final_verification import correctness_passed
 
     standard = read_json(config.run_dir / "eval_results.json", {})
     hidden = read_json(config.run_dir / "eval_results_hidden.json", {}) if config.hidden_tests else standard
@@ -272,12 +272,12 @@ def write_validation_summary(config, standard=None, hidden=None):
 
 
 def record_baseline(config):
-    from .reference_population import freeze_run
+    from .benchmarks.reference_population import freeze_run
 
     freeze_run(config)
-    from .input_calibration import issue as calibrated_input_issue
-    from .isolation import issue as isolation_issue
-    from .timed_numerics import issue as timed_issue
+    from .evaluation.timed_numerics import issue as timed_issue
+    from .numerics.input_calibration import issue as calibrated_input_issue
+    from .runtime.isolation import issue as isolation_issue
 
     if not config.hardware:
         raise ValueError("Specify --hardware when recording a baseline (use the actual verifier GPU name)")
@@ -316,7 +316,7 @@ def analyze_run(config):
         raise ValueError("Specify --hardware to choose the matching baseline")
     from scripts.benchmark_eval_analysis import analyze_multi_sample_eval
 
-    from .paper_analysis import analyze_paper
+    from .analysis.paper_analysis import analyze_paper
 
     write_validation_summary(config)
     report = analyze_paper(config)
@@ -333,17 +333,17 @@ def analyze_run(config):
 
 
 def record_baseline_suite(config):
-    from .reference_population import freeze_run
+    from .benchmarks.reference_population import freeze_run
 
     freeze_run(config)
-    from .baseline_rewrites import baseline_issue as recipe_baseline_issue
-    from .baseline_rewrites import issue as recipe_issue
-    from .baseline_variants import select_baseline, variants_for
-    from .input_calibration import baseline_issue as calibrated_baseline_issue
-    from .input_calibration import issue as calibrated_input_issue
-    from .isolation import baseline_issue
-    from .timed_numerics import baseline_issue as timed_baseline_issue
-    from .timed_numerics import issue as timed_issue
+    from .evaluation.baseline_rewrites import baseline_issue as recipe_baseline_issue
+    from .evaluation.baseline_rewrites import issue as recipe_issue
+    from .evaluation.baseline_variants import select_baseline, variants_for
+    from .evaluation.timed_numerics import baseline_issue as timed_baseline_issue
+    from .evaluation.timed_numerics import issue as timed_issue
+    from .numerics.input_calibration import baseline_issue as calibrated_baseline_issue
+    from .numerics.input_calibration import issue as calibrated_input_issue
+    from .runtime.isolation import baseline_issue
 
     target = ROOT / "results" / "timing" / config.hardware / f"{config.baseline}.json"
     results = read_json(target, {})
@@ -388,9 +388,9 @@ def record_baseline_suite(config):
 
 
 def paired_variant(config, pid):
-    from .baseline_rewrites import baseline_issue as recipe_baseline_issue
-    from .measurement import amortized
-    from .timed_numerics import baseline_issue as timed_baseline_issue
+    from .evaluation.baseline_rewrites import baseline_issue as recipe_baseline_issue
+    from .evaluation.measurement import amortized
+    from .evaluation.timed_numerics import baseline_issue as timed_baseline_issue
 
     reference = select_problems(config.level, problem_ids=[pid])[pid]
     data = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
@@ -411,7 +411,7 @@ def paired_variant(config, pid):
 def paired_payload(config, pid, sid, *, repeat=None, variant=None):
     variant = paired_variant(config, pid) if variant is None else variant
     if repeat is not None:
-        from .final_verification import payload_for
+        from .evaluation.final_verification import payload_for
 
         return payload_for(config, pid, sid, repeat, task="paired_timing", variant=variant)
     payload = task_payload(config, pid, sid, task="paired_timing")

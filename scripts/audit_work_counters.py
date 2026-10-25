@@ -7,11 +7,11 @@ import copy
 import json
 from pathlib import Path
 
+from kb_workflows.benchmarks.reference_population import select_run_problems
 from kb_workflows.common import atomic_json, fingerprint, read_json
 from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
-from kb_workflows.reference_population import select_run_problems
-from kb_workflows.work_counters import MODEL, execution_model, recipe
+from kb_workflows.provenance.work_counters import MODEL, execution_model, recipe
 
 
 def prepare(config, pid, sid, policy, *, target="candidate", seed=42):

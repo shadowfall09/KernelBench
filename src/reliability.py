@@ -62,16 +62,16 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     Snapshot each output before the other implementation can reuse its storage.
     Pairing two reference calls also supports stateful modules such as BatchNorm.
     """
-    from kb_workflows.determinism import observe
-    from kb_workflows.numerical_audit import observe as observe_numerical
-    from kb_workflows.state_audit import observe as observe_state
-    from kb_workflows.throughput_audit import observe as observe_throughput
+    from kb_workflows.evaluation.determinism import observe
+    from kb_workflows.evaluation.state_audit import observe as observe_state
+    from kb_workflows.evaluation.throughput_audit import observe as observe_throughput
+    from kb_workflows.numerics.numerical_audit import observe as observe_numerical
 
     observe_throughput(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_state(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_numerical(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
-    from kb_workflows.measurement import input_signature
+    from kb_workflows.evaluation.measurement import input_signature
 
     receipt = {"label": label, "seed": seed, "passed": False, "orders": [], "input_signature": input_signature(inputs),
                "input_layout": layout(inputs), "copied_layouts": []}
@@ -91,9 +91,9 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
                 started = clock() if record_first_call and name == "candidate" else None
                 from contextlib import nullcontext
 
-                from kb_workflows.allocation_audit import candidate_scope
-                from kb_workflows.cache_audit import candidate_guard as cache_guard
-                from kb_workflows.throughput_audit import candidate_guard
+                from kb_workflows.evaluation.allocation_audit import candidate_scope
+                from kb_workflows.evaluation.cache_audit import candidate_guard as cache_guard
+                from kb_workflows.evaluation.throughput_audit import candidate_guard
 
                 context = candidate_scope("forward", label=label, seed=seed, order=order) if name == "candidate" else nullcontext()
                 throughput_context = candidate_guard() if name == "candidate" else nullcontext()
@@ -118,7 +118,7 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
         if verify_pair:
             verify_pair(inputs, outputs)
     receipt["passed"] = True
-    from kb_workflows.cache_audit import observe as observe_cache
+    from kb_workflows.evaluation.cache_audit import observe as observe_cache
 
     observe_cache(reference, candidate, inputs, reference_output=outputs["reference"], seed=seed,
                   tolerance=tolerance, device=device, set_seed=set_seed, label=label)

@@ -7,11 +7,11 @@ import copy
 import json
 from pathlib import Path
 
+from kb_workflows.benchmarks.reference_population import select_run_problems
 from kb_workflows.common import atomic_json, fingerprint
 from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
-from kb_workflows.precision_calibration import BUNDLE, CHECK_SEEDS, FIT, FIT_SEEDS
-from kb_workflows.reference_population import select_run_problems
+from kb_workflows.numerics.precision_calibration import BUNDLE, CHECK_SEEDS, FIT, FIT_SEEDS
 
 
 def prepare(config):

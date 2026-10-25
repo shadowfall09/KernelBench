@@ -15,7 +15,7 @@ neuron-explorer view --session-dir ./profile_output --output-format parquet --ou
 在装有`analysis`可选依赖的Python 3.12环境中，对一个已处理的profile目录运行：
 
 ```bash
-python -m scripts.analyze_neuron_work ./profile_parquet --output ./new-neuron-work.json
+python -m scripts.analyze_device_trace neuron-tables ./profile_parquet --output ./new-neuron-work.json
 ```
 
 命令只处理本地文件并写新报告，已有输出会拒绝。必需表是`Metadata`、`ExecutionInfo`、`Instruction`、`DmaPacket`；可选读取`NkiKernelCallSites`、`Warning`和`Error`。每表支持一个完整文件或从0连续编号的分片，不能混用、缺片、重复或用软链接。所有分片先完成准入，再分批读全部行，只投影审核过的字段；不读取`Summary`或DMA聚合表来补工作量。
@@ -55,7 +55,7 @@ dtype标签按报告原值填写，不猜拼写或用输出存储dtype推导全�
 对已有文件增加三个选项即可离线构建：
 
 ```bash
-python -m scripts.analyze_neuron_work ./profile_parquet --output ./new-neuron-model.json \
+python -m scripts.analyze_device_trace neuron-tables ./profile_parquet --output ./new-neuron-model.json \
   --capture ./profile-result.json --review ./reviewed-neuron-work.json \
   --calibration ./same-device-calibration.json
 ```
@@ -69,7 +69,7 @@ python -m scripts.analyze_neuron_work ./profile_parquet --output ./new-neuron-mo
 已有真实原生profile结果和工件时，先预览：
 
 ```bash
-python -m scripts.process_neuron_work --capture ./profile-result.json \
+python -m scripts.analyze_device_trace neuron-process --capture ./profile-result.json \
   --artifacts /path/to/native-profile --output ./new-processing.json
 ```
 
@@ -93,4 +93,4 @@ python -m scripts.process_neuron_work --capture ./profile-result.json \
 
 这里自动关联的是受信控制进程所观察的文件处理。它没有隔离供应商工具的所有外部依赖，也不是对候选或设备驱动的密码学认证；更不证明与未插桩原生计时路径、全部状态或隐藏用例等价。R-16继续保持部分实现：与原生时间/执行来源的完整关联及正式评分门尚未完成。
 
-CUDA现有模型见[工作计数器](WORK_COUNTERS.md)。实现及回归分别位于[表读取器](../kb_workflows/neuron_tables.py)、[审核模型](../kb_workflows/neuron_work.py)、[读取命令](../scripts/analyze_neuron_work.py)、[自动处理器](../kb_workflows/neuron_processing.py)、[处理命令](../scripts/process_neuron_work.py)、[表测试](../tests/test_neuron_tables.py)、[模型测试](../tests/test_neuron_work.py)和[处理链测试](../tests/test_neuron_processing.py)。
+CUDA现有模型见[工作计数器](WORK_COUNTERS.md)。实现及回归分别位于[表读取器](../kb_workflows/hardware/neuron_tables.py)、[审核模型](../kb_workflows/hardware/neuron_work.py)、[读取命令](../scripts/analyze_device_trace.py)、[自动处理器](../kb_workflows/hardware/neuron_processing.py)、[处理命令](../scripts/analyze_device_trace.py)、[表测试](../tests/hardware/test_neuron_tables.py)、[模型测试](../tests/hardware/test_neuron_work.py)和[处理链测试](../tests/hardware/test_neuron_processing.py)。

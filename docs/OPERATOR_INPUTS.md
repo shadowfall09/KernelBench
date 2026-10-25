@@ -24,7 +24,7 @@
 
 ## L2/L3的耦合尺寸
 
-[冻结清单](../kb_workflows/model_input_families.json)记录150题原输入工厂的名义shape、参考SHA、逐族shape与约束说明；只使用参考元数据和人工审查的尺寸角色，不按数值输出、候选或性能筛选输入。运行时不替换构造函数，也不执行原名义工厂来分配巨型隐藏输入。CLI和收据复核读取清单，无需导入Torch。
+[冻结清单](../kb_workflows/numerics/model_input_families.json)记录150题原输入工厂的名义shape、参考SHA、逐族shape与约束说明；只使用参考元数据和人工审查的尺寸角色，不按数值输出、候选或性能筛选输入。运行时不替换构造函数，也不执行原名义工厂来分配巨型隐藏输入。CLI和收据复核读取清单，无需导入Torch。
 
 | 家族 | 形状与角色 |
 | --- | --- |
@@ -91,4 +91,4 @@ L2/L3独立重建预期逐输入shape、输入数量与原生精度。即使同�
 
 追加案例由独立的`kernelbench_pro_operator_cases_v1`协议标识；98/100旧分布语义变化另有revision 2记录，先前扫描修订保持原样。校准名义值配方不套用这些案例，隐藏失败也不反馈给同轮候选优化。
 
-实现与CPU/模拟证据见[L1输入构造](../kb_workflows/operator_cases.py)、[L2/L3输入构造](../kb_workflows/model_input_cases.py)、[存储组](../src/input_groups.py)、[压力构造](../kb_workflows/model_stress.py)、[覆盖复核](../kb_workflows/operator_input_policy.py)、[L1回归](../tests/test_operator_inputs.py)、[模型家族回归](../tests/test_model_input_cases.py)及[别名/数值反例](../tests/test_input_layouts.py)。250题真实初始化只做meta元数据检查；数值和原生入口以CPU小配置/小输入及显式Neuron模拟器验证。这不等同于原尺寸、GPU、Trainium或预训练模型实验。
+实现与CPU/模拟证据见[L1输入构造](../kb_workflows/numerics/operator_cases.py)、[L2/L3输入构造](../kb_workflows/numerics/model_input_cases.py)、[存储组](../src/input_groups.py)、[压力构造](../kb_workflows/numerics/model_stress.py)、[覆盖复核](../kb_workflows/numerics/operator_input_policy.py)、[L1回归](../tests/numerics/test_operator_inputs.py)、[模型家族回归](../tests/numerics/test_model_input_cases.py)及[别名/数值反例](../tests/evaluation/test_input_layouts.py)。250题真实初始化只做meta元数据检查；数值和原生入口以CPU小配置/小输入及显式Neuron模拟器验证。这不等同于原尺寸、GPU、Trainium或预训练模型实验。

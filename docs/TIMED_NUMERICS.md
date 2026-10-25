@@ -26,4 +26,4 @@
 
 不运行性能的隐藏/诊断/小实例阶段没有虚构计时检查数；实际正确性仍由原独立诊断控制与严格契约验证。profiling不是性能计分来源。未启用`numerical_validation`的旧路径保留原比较政策。
 
-实现见[逐次控制](../kb_workflows/timed_numerics.py)、[共享票据](../kb_workflows/input_calibration.py)、[配对计时](../kb_workflows/paired_task.py)和[CPU回归](../tests/test_timed_numerics.py)。这不是执行来源认证或防候选篡改的通用安全证明。参考专用阈值拟合代码已实现，见[阈值校准](PRECISION_CALIBRATION.md)；不能将初始预算或这些软件回归写成设备阈值已校准。
+实现见[逐次控制](../kb_workflows/evaluation/timed_numerics.py)、[共享票据](../kb_workflows/numerics/input_calibration.py)、[配对计时](../kb_workflows/evaluation/paired_task.py)和[CPU回归](../tests/evaluation/test_timed_numerics.py)。这不是执行来源认证或防候选篡改的通用安全证明。参考专用阈值拟合代码已实现，见[阈值校准](PRECISION_CALIBRATION.md)；不能将初始预算或这些软件回归写成设备阈值已校准。

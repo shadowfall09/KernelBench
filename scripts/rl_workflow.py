@@ -4,12 +4,12 @@ import argparse
 import json
 from pathlib import Path
 
+from kb_workflows.agents.rl_audit import analyze
+from kb_workflows.agents.rl_evaluation import execute_regrade, heldout_plan, make_regrade_plan
+from kb_workflows.agents.rl_plan import make_plan, read_plan, write_plan
+from kb_workflows.agents.rl_rewards import prepare_baselines
+from kb_workflows.agents.rl_training import execute_plan
 from kb_workflows.common import atomic_json, read_json
-from kb_workflows.rl_audit import analyze
-from kb_workflows.rl_evaluation import execute_regrade, heldout_plan, make_regrade_plan
-from kb_workflows.rl_plan import make_plan, read_plan, write_plan
-from kb_workflows.rl_rewards import prepare_baselines
-from kb_workflows.rl_training import execute_plan
 
 
 def main(argv=None):
@@ -76,14 +76,14 @@ def main(argv=None):
     elif args.action == "regrade":
         result = execute_regrade(read_plan(args.training_plan), read_json(args.plan), execute=args.execute, resume=args.resume)
     elif args.action == "heldout-plan":
-        from kb_workflows.study_plan import write_plan as write_study
+        from kb_workflows.analysis.study_plan import write_plan as write_study
 
         plan = heldout_plan(read_plan(args.training_plan), read_json(args.checkpoints), directory=args.output_dir,
                             sessions=args.sessions, samples=args.samples)
         write_study(plan, args.output_dir)
         result = {"plan": str(args.output_dir / "plan.json"), "job_count": len(plan["jobs"]), "experiments_started": False}
     elif args.action.startswith("experiment-"):
-        from kb_workflows import rl_effectiveness
+        from kb_workflows.agents import rl_effectiveness
 
         if args.action == "experiment-plan":
             result = rl_effectiveness.make_experiment(read_json(args.spec), directory=args.output_dir,
@@ -96,7 +96,7 @@ def main(argv=None):
         elif args.action == "experiment-evaluation-plan":
             result = rl_effectiveness.evaluation_plan(read_json(args.experiment), directory=args.output_dir, audit_only=args.audit_only)
             if result.get("status") != "not_ready":
-                from kb_workflows.study_plan import write_plan as write_study
+                from kb_workflows.analysis.study_plan import write_plan as write_study
 
                 write_study(result, args.output_dir)
                 result = {"plan": str(args.output_dir / "plan.json"), "experiments_started": False}

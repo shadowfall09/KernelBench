@@ -59,8 +59,8 @@
 Python 3.10 / Torch 2.9.0 下，172 项 CPU/模拟测试通过，其中新增 58 项。新增用例覆盖缓存答案、共享缓冲覆盖、第二次调用错误、状态与 RNG 配对、后端设置恢复、无效参考/空隐藏集、三种子重生成、三类压力分布、输入域限制、全部 29 道适配题的小形状参考执行、源码命名空间隔离、阶段统计与恢复指纹。
 
 ```bash
-python -m pytest -q tests/test_reliability.py tests/test_correctness_validation.py \
-  tests/test_baseline_timing.py tests/test_scoring_recovery.py tests/test_workflows.py \
+python -m pytest -q tests/evaluation/test_reliability.py tests/evaluation/test_correctness_validation.py \
+  tests/evaluation/test_baseline_timing.py tests/evaluation/test_scoring_recovery.py tests/evaluation/test_workflows.py \
   src/unit_tests/test_dataset.py src/unit_tests/test_score.py
 ```
 

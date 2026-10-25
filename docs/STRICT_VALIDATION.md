@@ -16,7 +16,7 @@ python scripts/run_batch.py --config configs/a6000-feedback.toml \
 
 TOML中使用`[run] strict_validation = true`、`evidence_level = "L0"`。`current`是既有等级，L0/L1/L2要求在下表列出。不同配置分别比较，配置、契约文件和评测模块均进入恢复指纹。旧结果需要重评；不能只给旧JSON加等级字段。
 
-当前适配17道L1：1–3、19–27、47–49、51–52。参考源码SHA-256、输入族、状态语义和各dtype阈值保存在随包分发的[契约清单](../kb_workflows/verification_contracts.json)。未适配题、参考漂移、无法构造oracle或缺失必要收据，在严格模式下不给通过资格。CLI会在创建运行目录或调用模型前拒绝含未适配题的严格任务；`--dry-run`显示覆盖范围。直接提交到worker的未适配任务也不会获得严格资格。
+当前适配17道L1：1–3、19–27、47–49、51–52。参考源码SHA-256、输入族、状态语义和各dtype阈值保存在随包分发的[契约清单](../kb_workflows/numerics/verification_contracts.json)。未适配题、参考漂移、无法构造oracle或缺失必要收据，在严格模式下不给通过资格。CLI会在创建运行目录或调用模型前拒绝含未适配题的严格任务；`--dry-run`显示覆盖范围。直接提交到worker的未适配任务也不会获得严格资格。
 
 ## FP64与输入范围
 

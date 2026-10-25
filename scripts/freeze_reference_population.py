@@ -6,9 +6,9 @@ import argparse
 import json
 from pathlib import Path
 
+from kb_workflows.benchmarks.reference_population import build
 from kb_workflows.common import atomic_json
 from kb_workflows.config import parse_config
-from kb_workflows.reference_population import build
 
 
 def main(argv=None):

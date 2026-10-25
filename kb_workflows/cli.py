@@ -7,17 +7,17 @@ import time
 from contextlib import nullcontext
 from pathlib import Path
 
+from .benchmarks.reference_population import select_run_problems
+from .benchmarks.suites import selection_receipt
 from .common import ROOT, atomic_json, evaluator_digest, fingerprint, read_json
 from .config import parse_config
-from .reference_population import select_run_problems
-from .suites import selection_receipt
 
 
 def main(argv=None):
     try:
         config = parse_config(argv)
         if config.regrade_manifest:
-            from .regrade import matches_config, validate
+            from .runtime.regrade import matches_config, validate
 
             plan = read_json(Path(config.regrade_manifest))
             validate(plan)
@@ -29,32 +29,32 @@ def main(argv=None):
         calibrated_precision = None
         baseline_variants = None
         if config.baseline_suite and config.baseline_portfolio == "extended":
-            from .baseline_variants import variants_for
+            from .evaluation.baseline_variants import variants_for
 
             choices = {pid: list(variants_for(config, pid)) for pid in selected}
             baseline_variants = {"portfolio": "extended", "declared_variants": sum(map(len, choices.values())), "tasks": choices}
         if config.state_validation:
-            from .state_policies import plan as state_plan
+            from .evaluation.state_policies import plan as state_plan
 
             for pid, path in selected.items():
                 state_plan(config.level, pid, path.read_text())
         if config.cache_validation:
-            from .cache_recipes import plan as cache_plan
+            from .evaluation.cache_recipes import plan as cache_plan
 
             for pid, path in selected.items():
                 cache_plan(config.level, pid, path.read_text())
         if config.input_calibration:
-            from .input_calibration import record_for
+            from .numerics.input_calibration import record_for
 
             calibrated_inputs = {pid: record_for(config.input_calibration, config.level, pid, config.precision, path.read_text())["selected_recipe"]
                                  for pid, path in selected.items()}
         if config.precision_calibration:
-            from .precision_calibration import for_config
+            from .numerics.precision_calibration import for_config
 
             calibrated_precision = {pid: for_config(config, pid, path.read_text())["policy"] for pid, path in selected.items()}
         operator_input_coverage = None
         if config.level in {1, 2, 3}:
-            from .operator_input_policy import plan
+            from .numerics.operator_input_policy import plan
 
             plans = {pid: plan(config.level, pid, path.read_text(), config.input_family_memory_mb) for pid, path in selected.items()}
             operator_input_coverage = {"protocol": next(iter(plans.values()))["protocol"],
@@ -62,12 +62,12 @@ def main(argv=None):
                 "scope": "additional_hidden_correctness_only; original_initialization_preserved"}
         strict_coverage = None
         if config.strict_validation:
-            from .contract_specs import coverage
+            from .numerics.contract_specs import coverage
 
             strict_coverage = coverage(config.level, selected)
         numerical_coverage = None
         if config.numerical_validation:
-            from .operator_specs import spec_for
+            from .numerics.operator_specs import spec_for
 
             specs = {pid: spec_for(config.level, pid, path.read_text()) for pid, path in selected.items()}
             numerical_coverage = {"supported": list(specs), "scope": "independent_FP64_on_actual_native_inputs",
@@ -98,7 +98,7 @@ def main(argv=None):
                 )
             )
             return 0
-        from .reference_population import freeze_run
+        from .benchmarks.reference_population import freeze_run
 
         freeze_run(config)
         if (strict_coverage and strict_coverage["unsupported"]
@@ -107,7 +107,7 @@ def main(argv=None):
         if config.stage != "analyze":
             config.require_gpu_target()
         if config.stage == "export-harbor":
-            from .harbor import export_tasks
+            from .runtime.harbor import export_tasks
 
             print(f"Harbor tasks: {export_tasks(config)}", flush=True)
             return 0
@@ -122,8 +122,8 @@ def main(argv=None):
                 raise ValueError("Claude Code CLI is missing; install it or select --agent-backend litellm")
         if config.stage in {"all", "analyze", "baseline"} and not config.hardware:
             raise ValueError("Specify --hardware for the actual verifier GPU to select/record its baseline")
+        from .agents.generation import build_docker_image, generate_run
         from .engine import analyze_run, evaluate_run, record_baseline, task_payload
-        from .generation import build_docker_image, generate_run
 
         needs_image = (config.generation == "docker" and config.stage in {"all", "generate"}) or (
             config.evaluation == "docker" and config.stage in {"all", "evaluate", "baseline"}
@@ -134,7 +134,7 @@ def main(argv=None):
             config.generation == "modal" and config.stage in {"all", "generate"}
         )
         if cloud:
-            from .modal_backend import modal_session
+            from .runtime.modal_backend import modal_session
         context = modal_session(config) if cloud and config.stage != "analyze" else nullcontext()
         config.run_dir.mkdir(parents=True, exist_ok=True)
         if not config.regrade_manifest:

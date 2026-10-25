@@ -18,7 +18,7 @@ python scripts/run_batch.py --config configs/a6000-feedback.toml \
   --numerical-validation --oracle-memory-mb 4096 --dry-run
 ```
 
-`--dry-run`不加载Torch，不分配题目输入、不运行设备；输出`numerical_coverage`及已记录的参考问题。源码SHA与[适配器清单](../kb_workflows/operator_oracles.json)不一致时，预检和worker都拒绝套用旧公式。详见[L2复合数值参考](COMPOSITE_NUMERICS.md)与[L3模型数值参考](MODEL_NUMERICS.md)。生产任务仍使用自身声明的数值门；本选项不接受它们，也不允许通用`.double()`冒充独立适配器。
+`--dry-run`不加载Torch，不分配题目输入、不运行设备；输出`numerical_coverage`及已记录的参考问题。源码SHA与[适配器清单](../kb_workflows/numerics/operator_oracles.json)不一致时，预检和worker都拒绝套用旧公式。详见[L2复合数值参考](COMPOSITE_NUMERICS.md)与[L3模型数值参考](MODEL_NUMERICS.md)。生产任务仍使用自身声明的数值门；本选项不接受它们，也不允许通用`.double()`冒充独立适配器。
 
 ## 实际检查什么
 
@@ -34,7 +34,7 @@ python scripts/run_batch.py --config configs/a6000-feedback.toml \
 - 归一化按声明轴显式计算中心化/方差或范数，保留仿射状态及train/eval中的running state；attention显式计算缩放、稳定softmax和加权和。
 - 激活、scan及loss保留精确GELU与tanh近似的区别、exclusive/reverse/masked语义、cross-entropy标签、KL零target项及triplet epsilon/margin等参数。
 
-实现仍依赖安装的CPU Tensor算术和FP64精度，不能解释为底层库无误或数学精确算术的证明。完整公式见[实现](../kb_workflows/operator_oracles.py)。
+实现仍依赖安装的CPU Tensor算术和FP64精度，不能解释为底层库无误或数学精确算术的证明。完整公式见[实现](../kb_workflows/numerics/operator_oracles.py)。
 
 ## 误差、参考自资格与信号
 

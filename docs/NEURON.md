@@ -60,7 +60,7 @@ python scripts/run_batch.py --config configs/trainium2.toml --dry-run
 
 ## 五个适配方法与诊断
 
-`kb_workflows.devices.DeviceAdapter`定义`caps/calibrate/flush/time/attribute`，工厂只注册CUDA与Neuron，实现导入时不加载SDK。可使用以下显式探针入口；本轮未运行：
+`kb_workflows.hardware.devices.DeviceAdapter`定义`caps/calibrate/flush/time/attribute`，工厂只注册CUDA与Neuron，实现导入时不加载SDK。可使用以下显式探针入口；本轮未运行：
 
 ```bash
 /path/to/neuron-venv/bin/python -m scripts.calibrate_device --backend neuron --device neuron:0 --output neuron_calibration.json

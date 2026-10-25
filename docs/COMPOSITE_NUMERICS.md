@@ -22,7 +22,7 @@ python -m scripts.run_batch --level 2 --start 1 --end 100 \
 
 ## 来源、构造和图绑定
 
-每题的参考SHA、图摘要、节点数和随机节点记录在[算子清单](../kb_workflows/operator_oracles.json)中。完整的图、使用的模块构造属性、状态形状和常量身份记录在[冻结程序](../kb_workflows/composite_programs.json)。图身份绑定实际的通道、分组、卷积/池化参数、归一化形状、epsilon、激活近似和Dropout概率等构造配置；合法参数数值更新不需要改变形状。
+每题的参考SHA、图摘要、节点数和随机节点记录在[算子清单](../kb_workflows/numerics/operator_oracles.json)中。完整的图、使用的模块构造属性、状态形状和常量身份记录在[冻结程序](../kb_workflows/numerics/composite_programs.json)。图身份绑定实际的通道、分组、卷积/池化参数、归一化形状、epsilon、激活近似和Dropout概率等构造配置；合法参数数值更新不需要改变形状。
 
 worker先将参考的已存在参数和buffer映射为meta元数据，再复制Python模块结构，不先深拷贝一份真实GPU权重。FX符号追踪会执行参考Python控制逻辑，shape propagation会执行meta层forward；它们用于构图和推导形状，不计算真实参考数值输出。程序摘要必须与冻结清单一致。构造变化、未知函数/方法/模块或无法追踪的控制流明确失败，不回退到`reference.double().forward`。
 

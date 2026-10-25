@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from kb_workflows.common import atomic_json
-from kb_workflows.devices import adapter
+from kb_workflows.hardware.devices import adapter
 
 
 def main(argv=None):

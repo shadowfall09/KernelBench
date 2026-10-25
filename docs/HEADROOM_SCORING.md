@@ -6,7 +6,7 @@
 
 ## 校准接口与收据
 
-`kb_workflows.devices.DeviceAdapter`定义`caps()`、`flush()`、`time()`、`calibrate()`和`attribute()`，提供CUDA与[原生Neuron适配器](NEURON.md)。校准只执行可信探针，不导入候选，不会由评测自动启动。CUDA使用events采集探针时间；Neuron标明同步墙钟口径，缺少真实FP64能力时不生成FP64速率。两者均未在本轮运行实机校准。
+`kb_workflows.hardware.devices.DeviceAdapter`定义`caps()`、`flush()`、`time()`、`calibrate()`和`attribute()`，提供CUDA与[原生Neuron适配器](NEURON.md)。校准只执行可信探针，不导入候选，不会由评测自动启动。CUDA使用events采集探针时间；Neuron标明同步墙钟口径，缺少真实FP64能力时不生成FP64速率。两者均未在本轮运行实机校准。
 
 ```bash
 python -m scripts.calibrate_device --device cuda:0 --output calibration.json

@@ -65,7 +65,7 @@ agent_profile = true
 `phase_budget.json` 分开记录本次命令的基线、生成、最终验证与分析墙钟时间，包含请求等待和编译，不包含前置镜像构建与环境启动；它不是 GPU 实际执行时间或云账单。`paper_analysis.json` 附带协议及资源回执。
 
 ```bash
-python -m kb_workflows.experiment runs/a6000_one_shot runs/a6000_feedback
+python -m kb_workflows.analysis.experiment runs/a6000_one_shot runs/a6000_feedback
 ```
 
 比较器按模式、框架、模型适配器、声明预算、采样数、题集、硬件、精度和验证参数分组；不同模型可列在同组，实际模型名显示在各自记录中。不同组不合并排名。该报告展示已有评分，不能替代正式验证或当前测量证据检查。旧 HTML 榜单是历史展示工具，不作为新实验模式混合比较的入口。
@@ -76,7 +76,7 @@ Harbor 仍可用于外部 agent，但标为 `external`，不声称其内部执�
 
 项目 skill 位于 [SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md)，Claude Code 可用 `/kernelbench-pro`；`.agents/skills/kernelbench-pro` 指向同一份 skill，避免维护两套说明。
 
-在当前 coding-agent 会话中，`python -m kb_workflows.agent_task prepare ...` 准备一个任务，`verify.py` 提供标准开发反馈，`finalize` 冻结最佳源码，再由原生 CLI 执行最终验证。这个模式不递归调用 Claude CLI，也不清除嵌套会话保护。由于当前会话模型/tool 调用不可完全观测，它标记为 `interactive`，不冒充受测 one-shot 或自动 mini-swe-agent 轨迹。交互状态文件不是安全边界；最终正确性仍来自可信评测。
+在当前 coding-agent 会话中，`python -m kb_workflows.agents.agent_task prepare ...` 准备一个任务，`verify.py` 提供标准开发反馈，`finalize` 冻结最佳源码，再由原生 CLI 执行最终验证。这个模式不递归调用 Claude CLI，也不清除嵌套会话保护。由于当前会话模型/tool 调用不可完全观测，它标记为 `interactive`，不冒充受测 one-shot 或自动 mini-swe-agent 轨迹。交互状态文件不是安全边界；最终正确性仍来自可信评测。
 
 ## 参考与选择依据
 

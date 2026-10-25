@@ -21,7 +21,7 @@ rl = ["trl==1.8.0", "transformers>=5.2,<6", "accelerate>=1.4,<2", "safetensors>=
 
 [project.scripts]
 kb-batch = "kb_workflows.cli:main"
-kb-verify-worker = "kb_workflows.queue_worker:main"
+kb-verify-worker = "kb_workflows.runtime.queue_worker:main"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
@@ -31,7 +31,7 @@ where = ["."]
 include = ["src*", "kb_workflows*", "scripts*"]
 
 [tool.setuptools.package-data]
-kb_workflows = ["gpu_profiles.toml", "suites/*.json", "verification_contracts.json", "operator_oracles.json", "composite_programs.json", "model_programs.json", "model_input_families.json", "reference_revisions.json", "baseline_rewrites.json"]
+kb_workflows = ["hardware/gpu_profiles.toml", "benchmarks/manifests/*.json", "numerics/verification_contracts.json", "numerics/operator_oracles.json", "numerics/composite_programs.json", "numerics/model_programs.json", "numerics/model_input_families.json", "benchmarks/reference_revisions.json", "evaluation/baseline_rewrites.json"]
 
 [tool.ruff]
 target-version = "py312"
@@ -42,3 +42,4 @@ select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--import-mode=importlib"

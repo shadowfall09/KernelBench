@@ -3,10 +3,10 @@
 import argparse
 from pathlib import Path
 
+from kb_workflows.analysis.study_data import METRICS, collect_manifest, discrimination_groups, study_digest
+from kb_workflows.analysis.study_statistics import paired_binary_design, selection_analysis
+from kb_workflows.benchmarks.suites import load_manifest
 from kb_workflows.common import atomic_json, read_json
-from kb_workflows.study_data import METRICS, collect_manifest, discrimination_groups, study_digest
-from kb_workflows.study_statistics import paired_binary_design, selection_analysis
-from kb_workflows.suites import load_manifest
 
 
 def main(argv=None):

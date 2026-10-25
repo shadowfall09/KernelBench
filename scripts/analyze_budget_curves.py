@@ -3,9 +3,9 @@
 import argparse
 from pathlib import Path
 
-from kb_workflows.budget_curves import AXES, VARY, budget_curves, plot_curves
+from kb_workflows.analysis.budget_curves import AXES, VARY, budget_curves, plot_curves
+from kb_workflows.analysis.study_data import METRICS, collect_manifest
 from kb_workflows.common import atomic_json
-from kb_workflows.study_data import METRICS, collect_manifest
 
 
 def main(argv=None):

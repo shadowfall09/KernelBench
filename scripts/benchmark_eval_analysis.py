@@ -4,13 +4,17 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import json, os, math
-from pathlib import Path
+import json
+import math
+import os
 from collections import defaultdict
-from tabulate import tabulate
+from pathlib import Path
+
 import numpy as np
 import pydra
 from pydra import REQUIRED, Config
+from tabulate import tabulate
+
 from src.dataset import construct_kernelbench_dataset
 
 """
@@ -117,7 +121,13 @@ def compute_sample_metrics(sample_entries, all_problem_ids, baseline_lookup, p_v
     Given one sample's entries across all problems, compute scalar metrics.
     Returns a dict of metric_name -> value.
     """
-    from src.score import geometric_mean_speed_ratio_correct_only, geometric_mean_speedup_all_problems, fastp, geometric_mean_memory_ratio, memory_efficient_p
+    from src.score import (
+        fastp,
+        geometric_mean_memory_ratio,
+        geometric_mean_speed_ratio_correct_only,
+        geometric_mean_speedup_all_problems,
+        memory_efficient_p,
+    )
 
     n = len(all_problem_ids)
     is_correct = np.array([sample_entries[pid]["correctness"] for pid in all_problem_ids])
@@ -150,7 +160,7 @@ def compute_best_of_n_metrics(by_sample, all_problem_ids, baseline_lookup, sampl
     (baseline/actual) that is also correct. Problems with no correct sample count as failures.
     Returns a dict of metric_name -> value.
     """
-    from src.score import geometric_mean_speed_ratio_correct_only, geometric_mean_speedup_all_problems, fastp
+    from src.score import fastp, geometric_mean_speed_ratio_correct_only, geometric_mean_speedup_all_problems
 
     n = len(all_problem_ids)
     best_correct  = np.zeros(n, dtype=bool)
@@ -291,7 +301,7 @@ def analyze_multi_sample_eval(run_name, hardware, baseline, level, use_hidden_ev
     print(f"  Compilation rate:  {comp_mean*100:.1f}% ± {comp_std*100:.1f}%")
     print(f"  Correctness rate:  {corr_mean*100:.1f}% ± {corr_std*100:.1f}%")
 
-    print(f"\nSpeedup metrics:")
+    print("\nSpeedup metrics:")
     print(f"  Geometric mean speedup (correct only): {gmsr_mean:.4f} ± {gmsr_std:.4f}")
 
     detail_rows = []
@@ -325,7 +335,7 @@ def analyze_multi_sample_eval(run_name, hardware, baseline, level, use_hidden_ev
     if baseline_memory_lookup:
         gmr_mean, gmr_std = mean_std("gmr")
         mep_mean, mep_std = mean_std("memory_efficient_p")
-        print(f"\nMemory metrics:")
+        print("\nMemory metrics:")
         print(f"  Geometric mean memory ratio (kernel/baseline): {gmr_mean:.4f} ± {gmr_std:.4f}  [lower = better]")
         print(f"  Memory efficient (ratio < 1.0): {mep_mean*100:.1f}% ± {mep_std*100:.1f}%")
 
@@ -337,7 +347,7 @@ def analyze_multi_sample_eval(run_name, hardware, baseline, level, use_hidden_ev
         print(f"\nFast_p Results (mean ± std  vs  best@{n_samples} oracle):")
         print(tabulate(bon_rows, headers=["Speedup Threshold (p)", "Fast_p (mean ± std)", f"Fast_p (best@{n_samples})"], tablefmt="grid"))
 
-        print(f"\nPer-sample breakdown:")
+        print("\nPer-sample breakdown:")
         header = ["Sample"] + ["compiled%"] + ["correct%"] + [f"fast_p_{p}" for p in p_values]
         sample_rows = []
         for i, (sid, m) in enumerate(zip(sample_ids, per_sample_metrics)):

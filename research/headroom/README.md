@@ -8,7 +8,7 @@
 | [Motivation](../../docs/MOTIVATION.md) | 中文主线、67 项历史改动、本轮改动与待完成项 |
 | [功能清单](../../docs/FEATURE_INVENTORY.md) | 保留逐版提交与验证历史 |
 | [来源清单](evidence/source_manifest.json) | 压缩包与采用文件的 SHA-256、转换产物摘要、未导入类别 |
-| [任务选集](../../kb_workflows/suites/kernelbench105.json) | 随包分发的运行清单，含参考源码快照、角色和暂定层 |
+| [任务选集](../../kb_workflows/benchmarks/manifests/kernelbench105.json) | 随包分发的运行清单，含参考源码快照、角色和暂定层 |
 
 没有导入 archive 下的旧论文与旧大纲、内部对话记录、重复清单、未上 GPU 的攻击程序、依赖缺失的 `strict_check.py` 和本机路径脚本。证据表经过排序、字段标准化和一致性核对，论文与 motivation 按当前实现重写；不在仓库根目录堆放压缩包副本。
 

@@ -50,4 +50,4 @@ timeout = 1800
 
 评分与恢复重新计算覆盖、存储估计、时间均值和10%标记，核对普通正确性复核，拒绝缺模式、改seed、少输出、改时间总和和模拟设备冒充实测。政策进入最终冻结、研究/RL合同、运行分组、队列预检及Harbor私有配置；旧正结果不能跨政策复用。
 
-实现与证据见[对照收集和重放](../kb_workflows/throughput_audit.py)、[进程监督](../kb_workflows/tool_runner.py)、[评分政策](../kb_workflows/paper_analysis.py)及[CPU/模拟回归](../tests/test_throughput_audit.py)。完整GPU来源、任意线程/allocator、所有异步提交与硬件完整性仍未完成，R-09保持部分实现。
+实现与证据见[对照收集和重放](../kb_workflows/evaluation/throughput_audit.py)、[进程监督](../kb_workflows/evaluation/tool_runner.py)、[评分政策](../kb_workflows/analysis/paper_analysis.py)及[CPU/模拟回归](../tests/evaluation/test_throughput_audit.py)。完整GPU来源、任意线程/allocator、所有异步提交与硬件完整性仍未完成，R-09保持部分实现。

@@ -10,8 +10,8 @@ from pathlib import Path
 from kb_workflows.common import atomic_json, fingerprint, select_problems
 from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
-from kb_workflows.input_calibration import BUNDLE, SEEDS
-from kb_workflows.input_profiles import recipes
+from kb_workflows.numerics.input_calibration import BUNDLE, SEEDS
+from kb_workflows.numerics.input_profiles import recipes
 
 
 def prepare(config):

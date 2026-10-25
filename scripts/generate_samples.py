@@ -4,20 +4,22 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import pydra
-from pydra import REQUIRED, Config
-import os, sys
-import torch
-import json
+import os
 from dataclasses import dataclass
 
-
+import pydra
+import torch
 from datasets import load_dataset
+from pydra import REQUIRED, Config
 
 from src.dataset import construct_kernelbench_dataset
-from src.eval import eval_kernel_against_ref
 from src.prompt_constructor import prompt_generate_custom_cuda_from_prompt_template
-from src.utils import extract_first_code, set_gpu_arch, read_file, create_inference_server_from_presets, maybe_multithread
+from src.utils import (
+    create_inference_server_from_presets,
+    extract_first_code,
+    maybe_multithread,
+    read_file,
+)
 
 """
 Batch Generate Samples for Particular Level

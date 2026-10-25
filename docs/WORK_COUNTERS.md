@@ -65,8 +65,8 @@ worker 保留原构造和实际公开工厂尺寸，预热单独的初始实例�
 在已有完整规则和当前设备校准文件时，可在显式采集命令中增加 `--calibration FILE`。模型校验失败仍保存已完成的计数器报告，退出码为2。也可对现有完整记录离线调用：
 
 ```python
-from kb_workflows.work_counters import execution_model
-from kb_workflows.performance import decomposition
+from kb_workflows.provenance.work_counters import execution_model
+from kb_workflows.analysis.performance import decomposition
 
 model = execution_model(counter_record, device_calibration)
 factors = decomposition(wall_ms, busy_ms, sol_algorithm_ms, counters=model)
@@ -76,4 +76,4 @@ factors = decomposition(wall_ms, busy_ms, sol_algorithm_ms, counters=model)
 
 这是数值分析接口，调用者给出的 wall/busy/SOL_alg 尚未被一条完整正式归因门连接到原生结果和执行来源。另有[Neuron Parquet分析与审核模型](NEURON_WORK.md)，可重放逐指令工作注释、独立DMA包及execution/NKI调用点，并用审核后的完整资源映射和同设备校准拆A/E。report/capture可以由维护者人工配对，也可以重放固定Explorer工具、完整工件快照及全部输出的自动处理收据；后者默认预览，只处理已有文件。两者都不提升硬件计数器或正式来源资格。与原生时间/执行来源的完整关联和正式计分门仍由 R-16/R-08 继续实现。设备实验按用户要求不运行，不能用软件回归冒充这些证据。
 
-实现见[原始记录与工作模型](../kb_workflows/work_counters.py)、[父采集器](../kb_workflows/counter_task.py)、[单次前向](../kb_workflows/counter_worker.py)、[命令](../scripts/audit_work_counters.py)、[分解](../kb_workflows/performance.py)和[回归](../tests/test_work_counters.py)。
+实现见[原始记录与工作模型](../kb_workflows/provenance/work_counters.py)、[父采集器](../kb_workflows/provenance/counter_task.py)、[单次前向](../kb_workflows/provenance/counter_worker.py)、[命令](../scripts/audit_work_counters.py)、[分解](../kb_workflows/analysis/performance.py)和[回归](../tests/provenance/test_work_counters.py)。

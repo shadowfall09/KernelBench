@@ -82,7 +82,7 @@ python scripts/run_batch.py --config configs/a6000.toml \
 
 TOML `[gpu]` selects the target preset, architecture and local devices; `[run]`
 sets the workflow. Explicit CLI options override the file. Presets live in
-`kb_workflows/gpu_profiles.toml`; custom GPUs can be configured inline. Unknown
+`kb_workflows/hardware/gpu_profiles.toml`; custom GPUs can be configured inline. Unknown
 hardware no longer falls back to Hopper, and there is no implicit H100 target.
 See [GPU configuration](GPU_CONFIG.md) for the schema and precedence rules.
 

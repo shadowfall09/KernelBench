@@ -17,7 +17,7 @@ python scripts/run_batch.py --level 3 --numerical-validation --dry-run
 
 ## 解释器与模型算式
 
-[模型清单](../kb_workflows/model_programs.json)冻结50个来源构造计划，包含完整module树、公开标量属性、状态形状/种类、算式类型与dropout调用顺序；[任务规格](../kb_workflows/operator_oracles.json)另绑定参考SHA和初始误差政策。浮点存储dtype、train/eval模式与物理参数布局可以按已有协议变化；这些变化不改数学拓扑，也不能取消实际输入上的数值门。维度、层数、激活形式、概率等构造变化不能复用原计划。
+[模型清单](../kb_workflows/numerics/model_programs.json)冻结50个来源构造计划，包含完整module树、公开标量属性、状态形状/种类、算式类型与dropout调用顺序；[任务规格](../kb_workflows/numerics/operator_oracles.json)另绑定参考SHA和初始误差政策。浮点存储dtype、train/eval模式与物理参数布局可以按已有协议变化；这些变化不改数学拓扑，也不能取消实际输入上的数值门。维度、层数、激活形式、概率等构造变化不能复用原计划。
 
 | 题目 | 独立算术路径 |
 | --- | --- |
@@ -54,6 +54,6 @@ L3/35省略h0/c0时，源码的`torch.zeros`没有指定dtype，固定使用当�
 
 全部50个原始构造和名义形状仅在meta上检查。数值单元测试使用36个明确的小构造配置，覆盖全部专用模型算式及代表性CNN/MLP；禁止参考/融合数值forward的负例、两种模式、原生随机mask、可选状态和收据删改另行验证。原生入口用小输入、原始LeNet构造验证；小配置收据不能冒充冻结原题构造。
 
-没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验。原生算式、模型构造和收据的代码验证不提供上述实验结论。实现见[模型解释器](../kb_workflows/model_oracles.py)、[独立模型算式](../kb_workflows/model_math.py)、[attention/encoder算式](../kb_workflows/model_layers.py)、[证据复核](../kb_workflows/model_specs.py)和[回归](../tests/test_model_oracles.py)。
+没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验。原生算式、模型构造和收据的代码验证不提供上述实验结论。实现见[模型解释器](../kb_workflows/numerics/model_oracles.py)、[独立模型算式](../kb_workflows/numerics/model_math.py)、[attention/encoder算式](../kb_workflows/numerics/model_layers.py)、[证据复核](../kb_workflows/numerics/model_specs.py)和[回归](../tests/numerics/test_model_oracles.py)。
 
 数值验证现在不依赖名义输入配方即可检查首次、预热与全部计时输出；逐次误差/信号/程序证据进入评分和恢复，见[计时数值验证](TIMED_NUMERICS.md)。配对每轮共用一次调用前真值，不额外推进状态或RNG。

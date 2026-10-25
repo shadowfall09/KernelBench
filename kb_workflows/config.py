@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .common import ROOT, safe_name
-from .gpu import cuda_architectures, gpu_options, gpu_profiles, read_toml
+from .hardware.gpu import cuda_architectures, gpu_options, gpu_profiles, read_toml
 
 
 def boolean(value):
@@ -188,7 +188,7 @@ class RunConfig:
             value = getattr(self, name)
             if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and nonnegative")
-        from .resource_budgets import active
+        from .agents.resource_budgets import active
 
         if active(self) and self.generation not in {"local", "docker"}:
             raise ValueError("Resource reservations require native local/docker generation; remote/Harbor enforcement is unavailable")
@@ -211,7 +211,7 @@ class RunConfig:
             self.generation_mode = "external"
         if self.generation_mode == "external" and self.generation != "harbor" and self.stage in {"all", "generate"}:
             raise ValueError("external generation mode is reserved for Harbor")
-        from .suites import ROLES, SUITES
+        from .benchmarks.suites import ROLES, SUITES
 
         if self.suite not in SUITES or self.suite_role not in ROLES:
             raise ValueError("Invalid suite or suite role")
@@ -221,7 +221,7 @@ class RunConfig:
             raise ValueError("Unknown evidence level")
         if self.evidence_level != "current":
             self.strict_validation = True
-        from .tool_checks import select_tools
+        from .evaluation.tool_checks import select_tools
 
         tools = select_tools(self.sanitizer_tools)
         self.sanitizer_tools = ",".join(tools) if tools else "none"
@@ -235,14 +235,14 @@ class RunConfig:
             raise ValueError("State validation requires an explicit boolean")
         if type(self.allocation_validation) is not bool or self.allocation_validation and self.device_backend != "cuda":
             raise ValueError("Allocation validation requires an explicit boolean and the CUDA backend")
-        from .throughput_audit import validate_inline as validate_throughput
+        from .evaluation.throughput_audit import validate_inline as validate_throughput
 
         validate_throughput({"eval_config": self.to_dict()})
-        from .cache_audit import validate_inline as validate_cache
+        from .evaluation.cache_audit import validate_inline as validate_cache
 
         validate_cache({"eval_config": self.to_dict()})
         if self.input_calibration:
-            from .input_calibration import read_bundle
+            from .numerics.input_calibration import read_bundle
 
             if not isinstance(self.input_calibration, str) or self.level not in {1, 2, 3}:
                 raise ValueError("Input calibration requires a file and original level 1, 2 or 3")
@@ -250,7 +250,7 @@ class RunConfig:
             read_bundle(self.input_calibration)
             self.numerical_validation = True
         if self.precision_calibration:
-            from .precision_calibration import read_bundle
+            from .numerics.precision_calibration import read_bundle
 
             if not isinstance(self.precision_calibration, str) or self.level not in {1, 2, 3}:
                 raise ValueError("Precision calibration requires a file and original level 1, 2 or 3")
@@ -264,7 +264,7 @@ class RunConfig:
                 raise ValueError("Reference population requires a file and input calibration")
             self.reference_population = str(Path(self.reference_population).expanduser().resolve())
         if self.reference_population or self.input_calibration:
-            from .reference_population import manifest_for
+            from .benchmarks.reference_population import manifest_for
 
             manifest_for(self)
         if type(self.numerical_validation) is not bool or (self.numerical_validation and self.level not in {1, 2, 3}):
@@ -274,11 +274,11 @@ class RunConfig:
         if type(self.oracle_memory_mb) is not int or not 1 <= self.oracle_memory_mb <= 1048576:
             raise ValueError("Oracle host-memory envelope must be 1..1048576 MiB")
         if self.determinism_policy_file:
-            from .determinism import read_policies
+            from .evaluation.determinism import read_policies
 
             self.determinism_policy_file = str(Path(self.determinism_policy_file).expanduser().resolve())
             read_policies(self.determinism_policy_file)
-        from .isolation import allowed_hosts, options, policy
+        from .runtime.isolation import allowed_hosts, options, policy
 
         policy(options(self))
         hosts = allowed_hosts(self.harbor_agent_hosts)
@@ -335,7 +335,7 @@ class RunConfig:
         target = self.hardware or self.gpu
         preset = profiles.get(target, {})
         if self.device_backend == "neuron":
-            from .devices import NEURON_TARGETS
+            from .hardware.devices import NEURON_TARGETS
 
             if target not in NEURON_TARGETS or self.gpu_arch not in {"", NEURON_TARGETS.get(target)}:
                 raise ValueError("Neuron requires Trainium2/trn2 or Trainium3/trn3")
@@ -402,7 +402,7 @@ def parser():
         description="KernelBench Pro: generate, evaluate, and analyze with one configuration"
     )
     p.add_argument("--config", type=Path, help="TOML file with [run] and [gpu] sections; CLI flags override it")
-    p.add_argument("--gpu-profile", help="GPU preset from kb_workflows/gpu_profiles.toml")
+    p.add_argument("--gpu-profile", help="GPU preset from kb_workflows/hardware/gpu_profiles.toml")
     for name in (
         "level",
         "start",
@@ -560,7 +560,7 @@ def file_options(path, argument_parser):
     if document.get("gpu") and document.get("device"):
         raise ValueError("Use either [gpu] or [device] for one device target")
     if "device" in document:
-        from .devices import device_options
+        from .hardware.devices import device_options
 
         options.update(device_options(document["device"], directory=path.parent))
     else:

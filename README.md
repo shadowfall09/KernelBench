@@ -35,6 +35,23 @@ LICENSE file in the root directory of this source tree.
 当前提供 NVIDIA CUDA 和[原生Neuron/NKI设备工作流](docs/NEURON.md)；后者为软件接入及CPU/模拟验证，实机部署与性能未验证。可选Headroom评分要求真实设备校准和可信规格，缺证据不计分。
 显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/STRICT_VALIDATION.md)。
 
+## 代码布局
+
+`kb_workflows/` 根部只保留配置、统一入口与题目兼容入口；实现按职责归类：
+
+| 目录 | 职责 |
+| --- | --- |
+| `agents/` | 生成回路、模型接入、预算与训练流程 |
+| `evaluation/` | 正确性、状态、基线、计时与结果资格 |
+| `numerics/` | 独立算式、精度政策、输入族与校准 |
+| `hardware/` | CUDA/Neuron 适配和设备数据读取 |
+| `provenance/` | 执行来源、二进制归属与工作计数 |
+| `analysis/` | 评分、统计、Headroom 与研究分析 |
+| `runtime/` | 隔离、传输、队列及 Harbor |
+| `benchmarks/` | 题集、生产题规格与参考版本 |
+
+数据清单随对应模块存放，测试沿用相同分类。开发规则见 [贡献指南](CONTRIBUTING.md)。
+
 ## 安装
 
 使用 Python 3.12。项目固定依赖 Torch 2.12.0。
@@ -126,6 +143,15 @@ python -m scripts.check_motivations
 | [贡献指南](CONTRIBUTING.md) | 本仓库的开发与评审方式 |
 
 Python 3.12 / Torch 2.12.0 的 CPU/模拟回归已执行；真实 CUDA 和各云后端仍需对应环境的实机验证。
+
+
+结果页从已有运行重新核对评分证据后生成，不执行内核：
+
+```bash
+python -m scripts.generate_leaderboard runs/NAME --output results.html
+```
+
+设备记录分析统一使用 `python -m scripts.analyze_device_trace`；子命令为 `timeline`、`neuron-tables`、`neuron-process`，各自提供 `--help`。
 
 ## 许可证与来源
 

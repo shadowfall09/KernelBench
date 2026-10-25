@@ -4,8 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
+from kb_workflows.analysis.study_plan import execute_plan, make_plan, write_plan
 from kb_workflows.common import read_json
-from kb_workflows.study_plan import execute_plan, make_plan, write_plan
 
 
 def main(argv=None):

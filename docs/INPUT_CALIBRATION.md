@@ -89,8 +89,8 @@ reference_population = "/path/to/new-reference-population.json"
 
 Agent/Harbor私有子任务只携带本题校准，但保留完整父清单及委托题号；公开指令不带其他题校准数据。RL的内部单题配置使用`reference_population_scope = "task"`，验证完整父清单并将实际单题范围单独写入收据。普通批量配置保持默认`"run"`；任务委托不能修改已冻结运行的范围或样本数。运行校准收据也必须含匹配的父集合摘要，基线/评分/最终恢复、研究契约和重新评分绑定该摘要及外部文件内容。
 
-这是一份可信控制端的完整性与执行顺序契约，不是签名认证或对历史实验先后顺序的外部证明。参考入选只说明该校准文件的固定种子/配方达到政策；本次设备及未变换的隐藏输入仍须独立通过数值验证。实现见[资格集合](../kb_workflows/reference_population.py)、[冻结命令](../scripts/freeze_reference_population.py)和[软件回归](../tests/test_reference_population.py)。
+这是一份可信控制端的完整性与执行顺序契约，不是签名认证或对历史实验先后顺序的外部证明。参考入选只说明该校准文件的固定种子/配方达到政策；本次设备及未变换的隐藏输入仍须独立通过数值验证。实现见[资格集合](../kb_workflows/benchmarks/reference_population.py)、[冻结命令](../scripts/freeze_reference_population.py)和[软件回归](../tests/benchmarks/test_reference_population.py)。
 
-CPU/模拟测试不代表任何设备或模型实验结果；本任务按用户要求不运行这些实验。实现见[模型配方](../kb_workflows/model_input_profiles.py)、[校准器](../kb_workflows/input_calibration_task.py)、[共享oracle准备](../kb_workflows/reference_oracles.py)和[回归](../tests/test_model_input_profiles.py)。
+CPU/模拟测试不代表任何设备或模型实验结果；本任务按用户要求不运行这些实验。实现见[模型配方](../kb_workflows/numerics/model_input_profiles.py)、[校准器](../kb_workflows/numerics/input_calibration_task.py)、[共享oracle准备](../kb_workflows/numerics/reference_oracles.py)和[回归](../tests/numerics/test_model_input_profiles.py)。
 
 数值验证现在不依赖名义输入配方即可检查首次、预热与全部计时输出；逐次误差/信号/程序证据进入评分和恢复，见[计时数值验证](TIMED_NUMERICS.md)。配对每轮共用一次调用前真值，不额外推进状态或RNG。

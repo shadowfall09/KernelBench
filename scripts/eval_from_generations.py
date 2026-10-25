@@ -4,25 +4,29 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from dataclasses import dataclass
+import json
+import multiprocessing as mp
+import os
 import shutil
 import time
+from dataclasses import dataclass
+
 import pydra
-from pydra import REQUIRED, Config
-
-import json
-from tqdm import tqdm
-from src import eval, utils, compile
 import torch
-import os
-import multiprocessing as mp
-
-
 from datasets import load_dataset
+from pydra import REQUIRED, Config
+from tqdm import tqdm
 
+from src import compile
 from src.dataset import construct_kernelbench_dataset
-from src.eval import build_compile_cache, eval_kernel_against_ref, KernelExecResult, check_metadata_serializable_all_types, get_torch_dtype_from_string, get_hidden_test_path
-from src.utils import set_gpu_arch, read_file
+from src.eval import (
+    KernelExecResult,
+    check_metadata_serializable_all_types,
+    eval_kernel_against_ref,
+    get_hidden_test_path,
+    get_torch_dtype_from_string,
+)
+from src.utils import read_file, set_gpu_arch
 
 """
 Batch Evaluation from Existing Generations
@@ -224,7 +228,7 @@ def cuda_single_eval_wrapper(curr_work: WorkArgs, configs: dict, dataset, run_di
             pool.terminate()
             pool.join()
             raise
-        except mp.TimeoutError as e:
+        except mp.TimeoutError:
             print(f"[WARNING] Evaluation TIMED OUT for Problem ID: {curr_work.problem_id}, Sample ID: {curr_work.sample_id}")
 
         print(f"[Eval Result] Problem ID: {curr_work.problem_id}, Sample ID: {curr_work.sample_id}: {result}")

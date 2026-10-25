@@ -29,7 +29,7 @@ python scripts/run_batch.py --config configs/a6000.toml --resume
 
 ## 型号与自定义目标
 
-内置型号集中维护在 [gpu_profiles.toml](../kb_workflows/gpu_profiles.toml)，随 Python 包一起分发。当前提供 A10G、A100、A100-80GB、RTX_A6000、L4、L40S、H100、H200 和 T4；这是配置预设列表，不表示所有型号都已在当前 CUDA 镜像上完成实机验证。
+内置型号集中维护在 [gpu_profiles.toml](../kb_workflows/hardware/gpu_profiles.toml)，随 Python 包一起分发。当前提供 A10G、A100、A100-80GB、RTX_A6000、L4、L40S、H100、H200 和 T4；这是配置预设列表，不表示所有型号都已在当前 CUDA 镜像上完成实机验证。
 
 每个预设用 `architecture` 描述编译目标，支持云端的预设另有 `modal_type`。预设名用作基线目录标签。增加常用型号可以直接修改 TOML；临时目标直接在运行配置中填写，无需修改 Python 代码：
 

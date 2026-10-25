@@ -45,7 +45,7 @@ def select_problems(level: int, start: int = 1, end: int | None = None, problem_
     if not selected or missing:
         raise ValueError(f"Invalid level {level} problem selection; missing IDs: {missing}")
     if suite != "full":
-        from .suites import SUITES, suite_rows
+        from .benchmarks.suites import SUITES, suite_rows
 
         if suite not in SUITES:
             raise ValueError(f"Unknown suite: {suite}")
@@ -81,65 +81,16 @@ def fingerprint(payload: dict):
 
 
 def evaluator_digest():
+    """Hash trusted source/data by stable relative path, without a growing allowlist."""
     digest = hashlib.sha256()
-    for name in (
-        "src/eval.py", "src/utils.py", "src/validation.py", "src/reliability.py", "requirements.txt", "requirements-neuron-worker.txt",
-        "src/input_groups.py",
-        "kb_workflows/evaluate_task.py", "kb_workflows/measurement.py", "kb_workflows/baseline_variants.py",
-        "kb_workflows/common.py", "kb_workflows/config.py", "kb_workflows/engine.py",
-        "kb_workflows/transports.py", "kb_workflows/queue_worker.py", "kb_workflows/paper_analysis.py",
-        "kb_workflows/harbor.py", "kb_workflows/harbor_verifier.py",
-        "kb_workflows/harbor_budget.py",
-        "kb_workflows/resource_budgets.py", "kb_workflows/local_model.py",
-        "kb_workflows/devices.py", "kb_workflows/neuron_device.py", "kb_workflows/neuron_worker.py", "kb_workflows/neuron_profile.py",
-        "kb_workflows/neuron_tables.py", "kb_workflows/neuron_work.py", "scripts/analyze_neuron_work.py",
-        "kb_workflows/neuron_processing.py", "scripts/process_neuron_work.py",
-        "kb_workflows/gpu.py", "kb_workflows/gpu_profiles.toml",
-        "kb_workflows/suites.py", "kb_workflows/suites/kernelbench105.json",
-        "kb_workflows/evidence.py", "kb_workflows/numerical.py", "kb_workflows/strict_validation.py",
-        "kb_workflows/state_contract.py",
-        "kb_workflows/state_paths.py", "kb_workflows/state_policies.py",
-        "kb_workflows/state_audit.py",
-        "kb_workflows/allocation_audit.py",
-        "kb_workflows/throughput_audit.py",
-        "kb_workflows/cache_audit.py", "kb_workflows/cache_recipes.py", "kb_workflows/input_reuse.py",
-        "kb_workflows/numerical_audit.py", "kb_workflows/operator_oracles.py",
-        "kb_workflows/composite_math.py", "kb_workflows/composite_oracles.py", "kb_workflows/composite_specs.py",
-        "kb_workflows/composite_programs.json",
-        "kb_workflows/model_layers.py", "kb_workflows/model_math.py", "kb_workflows/model_oracles.py", "kb_workflows/model_specs.py", "kb_workflows/model_programs.json",
-        "kb_workflows/operator_specs.py", "kb_workflows/operator_oracles.json",
-        "kb_workflows/reference_revisions.py", "kb_workflows/reference_revisions.json",
-        "kb_workflows/scan_cases.py", "kb_workflows/operator_cases.py", "kb_workflows/operator_input_policy.py",
-        "kb_workflows/model_input_cases.py", "kb_workflows/model_input_families.json",
-        "kb_workflows/model_stress.py", "kb_workflows/input_layouts.py",
-        "kb_workflows/input_profiles.py", "kb_workflows/input_calibration.py", "kb_workflows/input_calibration_task.py",
-        "kb_workflows/model_input_profiles.py", "kb_workflows/reference_oracles.py",
-        "kb_workflows/timed_numerics.py",
-        "kb_workflows/precision_calibration.py", "kb_workflows/precision_calibration_task.py", "scripts/calibrate_precision.py",
-        "kb_workflows/reference_population.py", "scripts/freeze_reference_population.py",
-        "scripts/calibrate_inputs.py",
-        "kb_workflows/determinism.py", "kb_workflows/tool_checks.py", "kb_workflows/tool_runner.py",
-        "kb_workflows/submission_source.py", "kb_workflows/kernel_origin.py", "kb_workflows/cuda_origin.py",
-        "kb_workflows/origin_binaries.py", "kb_workflows/origin_graphs.py",
-        "kb_workflows/triton_origin.py", "kb_workflows/cpp_origin.py",
-        "kb_workflows/origin_task.py", "scripts/audit_kernel_origin.py",
-        "kb_workflows/work_counters.py", "kb_workflows/counter_worker.py", "kb_workflows/counter_task.py", "scripts/audit_work_counters.py",
-        "kb_workflows/isolation.py", "kb_workflows/isolated_worker.py", "kb_workflows/restricted_transport.py",
-        "kb_workflows/regrade.py", "kb_workflows/harbor_regrade.py", "scripts/regrade_artifacts.py",
-        "kb_workflows/verification_contracts.json",
-        "kb_workflows/aggregation.py",
-        "kb_workflows/contract_specs.py",
-        "kb_workflows/paired_statistics.py", "kb_workflows/paired_task.py", "kb_workflows/final_verification.py",
-        "kb_workflows/calibration.py", "kb_workflows/headroom.py", "kb_workflows/performance.py",
-        "kb_workflows/production.py", "kb_workflows/production_ops.py", "kb_workflows/production_specs.py",
-        "kb_workflows/suites/production41.json",
-        "kb_workflows/baseline_rewrites.py", "kb_workflows/baseline_rewrites.json",
-        "kb_workflows/baseline_policies.py",
-        "kb_workflows/agent_loop.py", "kb_workflows/agent_models.py", "kb_workflows/experiment.py",
-        "kb_workflows/profile_task.py", "kb_workflows/agent_task.py", "kb_workflows/generation.py",
-    ):
-        digest.update(name.encode())
-        digest.update((ROOT / name).read_bytes())
+    paths = [ROOT / "requirements.txt", ROOT / "requirements-neuron-worker.txt"]
+    for folder in ("src", "kb_workflows", "scripts"):
+        paths.extend(path for path in (ROOT / folder).rglob("*")
+                     if path.is_file() and path.suffix in {".py", ".json", ".toml"}
+                     and not {"__pycache__", "unit_tests"} & set(path.parts))
+    for path in sorted(paths, key=lambda item: item.relative_to(ROOT).as_posix()):
+        digest.update(path.relative_to(ROOT).as_posix().encode())
+        digest.update(path.read_bytes())
     return digest.hexdigest()
 
 

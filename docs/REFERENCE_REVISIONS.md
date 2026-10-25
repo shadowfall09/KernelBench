@@ -1,6 +1,6 @@
 # 参考修正与输入契约版本
 
-参考和隐藏输入的修正通过[修订表](../kb_workflows/reference_revisions.json)记录前后SHA-256、任务版本、原因、代码证据与依赖。原始档案保留；修正后的结果不能沿用旧参考的通过记录。当前有L1/89–93、98、100七条revision 2记录。
+参考和隐藏输入的修正通过[修订表](../kb_workflows/benchmarks/reference_revisions.json)记录前后SHA-256、任务版本、原因、代码证据与依赖。原始档案保留；修正后的结果不能沿用旧参考的通过记录。当前有L1/89–93、98、100七条revision 2记录。
 
 ## 概率和浮点标签的旧隐藏变换
 
@@ -44,7 +44,7 @@ cumprod实例使用接近单位量级的有限输入，并在首位置加入负�
 
 统一payload为这些任务携带`eval_config.reference_revision`，含当前修订ID、版本、参考/隐藏源码SHA、修订表SHA和共享隐藏生成器SHA。worker和HTTP队列在执行前核对；数字类型伪装、旧源码、缺失或改动的修订、隐藏文件或共享依赖不一致都会被拒绝。
 
-本地、Docker、Modal、队列和Harbor共用原生dispatch；基线、标准/隐藏、配对、最终重测及诊断结果记录当前修订。评分和恢复重新核对该记录。匹配的负结果仍可保留以避免反复花费，缺失修订的正结果不能作为新版本通过。实现见[修订绑定](../kb_workflows/reference_revisions.py)。这不是任意代码安全或硬件来源认证。
+本地、Docker、Modal、队列和Harbor共用原生dispatch；基线、标准/隐藏、配对、最终重测及诊断结果记录当前修订。评分和恢复重新核对该记录。匹配的负结果仍可保留以避免反复花费，缺失修订的正结果不能作为新版本通过。实现见[修订绑定](../kb_workflows/benchmarks/reference_revisions.py)。这不是任意代码安全或硬件来源认证。
 
 KernelBench-105运行清单升级为version 2，保留250个任务、105 scored、5 probe、140 extended、原seed、层标签和选题角色。`selection_reference_snapshot`保存原始选题快照，当前快照明确表示“基底加已声明修订”；完整题集报告也带修订表版本信息。研究档案CSV与来源表保持原字节，不把旧分析结果重标为修正后的实验。
 

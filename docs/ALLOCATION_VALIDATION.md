@@ -39,7 +39,7 @@ timeout = 1800
 
 父进程和评分/恢复重新核对模式、源码/请求/设备、导入与构造覆盖、每个实际调用及后续未预填复核。不接受删模式、改seed、丢调用、错误设备、模式被移除、不可处理分配或超时。候选在预填条件下的原生比较失败会阻止资格；没有完整证据标为`not_measured`。模拟过程不能用作设备资格。
 
-开关属于统一诊断政策，进入最终冻结、研究/RL合同、运行分组和Harbor私有配置。更改开关或评测器不能复用旧正结果。实现见[分配观察](../kb_workflows/allocation_audit.py)、[进程监督](../kb_workflows/tool_runner.py)、[收据复核](../kb_workflows/tool_checks.py)和[CPU/模拟测试](../tests/test_allocation_audit.py)。
+开关属于统一诊断政策，进入最终冻结、研究/RL合同、运行分组和Harbor私有配置。更改开关或评测器不能复用旧正结果。实现见[分配观察](../kb_workflows/evaluation/allocation_audit.py)、[进程监督](../kb_workflows/evaluation/tool_runner.py)、[收据复核](../kb_workflows/evaluation/tool_checks.py)和[CPU/模拟测试](../tests/evaluation/test_allocation_audit.py)。
 
 ## 观察边界
 

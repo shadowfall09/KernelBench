@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from kb_workflows.agents.generation import run_agent
 from kb_workflows.common import atomic_json
 from kb_workflows.config import RunConfig
-from kb_workflows.generation import run_agent
 
 
 def main():

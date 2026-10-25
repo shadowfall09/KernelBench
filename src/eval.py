@@ -8,19 +8,19 @@
 Helpers for Evaluations
 """
 
-import torch
-import torch.nn as nn
-import os, subprocess
-from pydantic import BaseModel
-import numpy as np
-import random
 import json
-from contextlib import contextmanager, redirect_stdout, redirect_stderr
+import os
+import subprocess
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from contextvars import ContextVar
 from io import StringIO
-import sys
 
-from kb_workflows.measurement import CLOCK, input_signature, synchronized_times, timing_stats
+import numpy as np
+import torch
+import torch.nn as nn
+from pydantic import BaseModel
+
+from kb_workflows.evaluation.measurement import CLOCK, input_signature, synchronized_times, timing_stats
 
 _PRESERVE_INPUT_DTYPES = ContextVar("preserve_declared_input_dtypes", default=False)
 
@@ -198,7 +198,7 @@ def load_original_model_and_inputs(
     get_init_inputs_fn = context.get("get_init_inputs")
     get_inputs_fn = context.get("get_inputs")
     Model = context.get("Model")
-    from kb_workflows.input_profiles import wrap_factory
+    from kb_workflows.numerics.input_profiles import wrap_factory
 
     get_inputs_fn = wrap_factory(model_original_src, get_inputs_fn)
     return (Model, get_init_inputs_fn, get_inputs_fn)
@@ -216,13 +216,13 @@ def load_custom_model(
         os.environ["TORCH_EXTENSIONS_DIR"] = str(build_directory)
 
     try:
-        from kb_workflows.allocation_audit import candidate_scope
-        from kb_workflows.cache_audit import candidate_guard as cache_guard
-        from kb_workflows.throughput_audit import candidate_guard
+        from kb_workflows.evaluation.allocation_audit import candidate_scope
+        from kb_workflows.evaluation.cache_audit import candidate_guard as cache_guard
+        from kb_workflows.evaluation.throughput_audit import candidate_guard
 
         with candidate_scope("import"), candidate_guard(), cache_guard():
             if build_directory:
-                from kb_workflows.submission_source import execute
+                from kb_workflows.provenance.submission_source import execute
 
                 execute(model_custom_src, context, build_directory)
             else:
@@ -448,7 +448,7 @@ def run_correctness_on_fixed_inputs(
     This is used for hidden test configs where inputs are fixed and deterministic.
     """
     inputs = _process_input_group(raw_inputs, device, precision)
-    from kb_workflows.timed_numerics import pair_hooks
+    from kb_workflows.evaluation.timed_numerics import pair_hooks
 
     with torch.no_grad():
         reference = move_model(original_model_instance, device, precision)
@@ -518,8 +518,8 @@ def run_hidden_correctness_check(
         # Release this seed's tensors before generating the next seed's suite.
         del hidden_configs, raw_inputs, inputs
 
-        from kb_workflows.operator_input_policy import completed as operator_case_completed
-        from kb_workflows.operator_input_policy import extra_cases
+        from kb_workflows.numerics.operator_input_policy import completed as operator_case_completed
+        from kb_workflows.numerics.operator_input_policy import extra_cases
 
         for row in extra_cases(original_model_instance, seed):
             effective = _process_input_group(row["inputs"], device, precision)
@@ -695,9 +695,9 @@ def eval_kernel_against_ref(
     try:
         with torch.no_grad():
             set_seed(seed_num)  # set seed for reproducible weights
-            from kb_workflows.allocation_audit import candidate_scope
-            from kb_workflows.cache_audit import candidate_guard as cache_guard
-            from kb_workflows.throughput_audit import candidate_guard
+            from kb_workflows.evaluation.allocation_audit import candidate_scope
+            from kb_workflows.evaluation.cache_audit import candidate_guard as cache_guard
+            from kb_workflows.evaluation.throughput_audit import candidate_guard
 
             with candidate_scope("constructor"), candidate_guard(), cache_guard():
                 custom_model = ModelNew(*init_inputs)
@@ -769,7 +769,7 @@ def eval_kernel_against_ref(
                 kernel_exec_result = KernelExecResult(
                     compiled=True, correctness=True, metadata=metadata
                 )
-        except RuntimeError as e:
+        except RuntimeError:
             # Fatal config error (e.g. hidden file not found) — crash loudly
             raise
         except Exception as e:
@@ -798,14 +798,14 @@ def eval_kernel_against_ref(
                 timing_receipt = metadata["timing_receipt"] = {}
 
                 def input_factory(trial):
-                    from kb_workflows.measurement import fresh_seed
+                    from kb_workflows.evaluation.measurement import fresh_seed
                     seed = fresh_seed()
                     timing_receipt.setdefault("input_seeds", []).append(seed)
                     set_seed(seed)
                     return _process_input_group(get_inputs(), device, precision)
 
                 def verifier(fresh, actual):
-                    from kb_workflows.input_calibration import prepare_output, verify_output
+                    from kb_workflows.numerics.input_calibration import prepare_output, verify_output
 
                     from .input_groups import copy_inputs
 
@@ -906,10 +906,10 @@ def run_and_check_correctness(
         metadata["correctness_issue"] = "Correctness requires at least one trial"
         return KernelExecResult(compiled=True, correctness=False, metadata=metadata)
     pass_count = 0
-    from kb_workflows.throughput_audit import bind_factory
+    from kb_workflows.evaluation.throughput_audit import bind_factory
 
     bind_factory(lambda: _process_input_group(get_inputs_fn(), device, precision))
-    from kb_workflows.cache_audit import bind_factory as bind_cache_factory
+    from kb_workflows.evaluation.cache_audit import bind_factory as bind_cache_factory
 
     bind_cache_factory(lambda: _process_input_group(get_inputs_fn(), device, precision))
     generator = torch.Generator().manual_seed(seed)
@@ -920,7 +920,7 @@ def run_and_check_correctness(
         for trial, trial_seed in enumerate(seeds):
             set_seed(trial_seed)
             inputs = _process_input_group(get_inputs_fn(), device, precision)
-            from kb_workflows.timed_numerics import pair_hooks
+            from kb_workflows.evaluation.timed_numerics import pair_hooks
 
             issue = check_paired_calls(
                 model, model_new, inputs, seed=trial_seed,

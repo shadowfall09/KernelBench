@@ -8,12 +8,12 @@ import inspect
 import json
 from pathlib import Path
 
+from kb_workflows.benchmarks.production_specs import task
 from kb_workflows.common import ROOT
-from kb_workflows.production_specs import task
 
 
 def artifacts():
-    from kb_workflows import production_ops
+    from kb_workflows.benchmarks import production_ops
 
     outputs, rows = {}, []
     dependencies = {"budget_attention": ["attention"], "token_fp8_attention": ["attention"],
@@ -51,7 +51,7 @@ def artifacts():
     manifest = {"name": "production41", "version": 1, "selection_seed": None, "problems": rows,
                 "layer_certificates": False, "reachability_results_collected": False,
                 "reference_source": "KernelBench Pro mathematical references; no imported candidate implementations"}
-    outputs[Path("kb_workflows/suites/production41.json")] = json.dumps(manifest, indent=2) + "\n"
+    outputs[Path("kb_workflows/benchmarks/manifests/production41.json")] = json.dumps(manifest, indent=2) + "\n"
     return outputs
 
 

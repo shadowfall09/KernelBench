@@ -9,37 +9,27 @@
 ########################
 
 import multiprocessing
+
 from dotenv import load_dotenv
+
 load_dotenv()  # Load variables from .env early so query_server can see them
-import subprocess
-import re
-import random
-import tempfile
-from pathlib import Path
-import re
-import math
+import concurrent
 import os
-import json
-from tqdm import tqdm
+import re
+
+# from datasets import load_dataset
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import cache
+
+import anthropic
+from google import genai
+from openai import OpenAI
 
 # API clients
 from together import Together
-from openai import OpenAI
-from google import genai
-import anthropic
-
-# from datasets import load_dataset
-import numpy as np
-from contextlib import contextmanager
-from collections import defaultdict
-import time
-import shutil
-import concurrent
-from functools import cache
+from tqdm import tqdm
 from transformers import AutoTokenizer
-import hashlib
-
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Define API key access
 TOGETHER_KEY = os.environ.get("TOGETHER_API_KEY")
@@ -83,7 +73,7 @@ def set_gpu_arch(arch_list: list[str]):
     """
     Set env variable for torch cuda arch list to build kernels for specified architectures
     """
-    from kb_workflows.gpu import cuda_architectures
+    from kb_workflows.hardware.gpu import cuda_architectures
 
     os.environ["TORCH_CUDA_ARCH_LIST"] = cuda_architectures(",".join(arch_list)).replace(",", ";")
 
@@ -225,6 +215,7 @@ def query_server(
 
     elif server_type == "google":
         import time
+
         from google.genai import types
         max_retries, backoff = 8, 15  # start at 15s, doubles each retry
         for attempt in range(max_retries):
@@ -760,8 +751,10 @@ def maybe_multiprocess_cuda(
     return output_data
 
 # src/random_inputs.py
-import os, torch, itertools
-from torch.distributions import Normal, Uniform, Laplace, Exponential, LogNormal
+import os
+
+import torch
+from torch.distributions import Exponential, Laplace, LogNormal, Normal, Uniform
 
 # Pick which distributions are allowed in “random” mode.
 _DEFAULT_RANDOM_POOL = (

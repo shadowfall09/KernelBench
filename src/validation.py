@@ -85,7 +85,7 @@ def synchronize(device):
     if device is not None and torch.device(device).type == "cuda":
         torch.cuda.synchronize(device=device)
     elif device is not None and str(device).split(":")[0] == "neuron":
-        from kb_workflows.devices import torch_adapter
+        from kb_workflows.hardware.devices import torch_adapter
 
         torch_adapter(device).synchronize()
 

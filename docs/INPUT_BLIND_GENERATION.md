@@ -21,7 +21,7 @@ LICENSE file in the root directory of this source tree.
 | 3 | 35 | LSTM |
 | 3 | 47 | NetVLAD |
 
-批量入口通过 `kb_workflows/generation.py` 的 `prompt_source()` 按配置动态提取源码，放入本次工作目录的 `model.py`；原生生成入口使用 prompt constructor。无需维护预先导出的 prompt 文件。
+批量入口通过 `kb_workflows/agents/generation.py` 的 `prompt_source()` 按配置动态提取源码，放入本次工作目录的 `model.py`；原生生成入口使用 prompt constructor。无需维护预先导出的 prompt 文件。
 
 ## 添加题目
 
@@ -35,7 +35,7 @@ LICENSE file in the root directory of this source tree.
 ```bash
 python - <<'PYTHON'
 from kb_workflows.common import select_problems
-from kb_workflows.generation import prompt_source
+from kb_workflows.agents.generation import prompt_source
 
 path = select_problems(1, problem_ids=[90])[90]
 print(prompt_source(path.read_text(), 1, 90))
