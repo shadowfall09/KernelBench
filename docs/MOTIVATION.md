@@ -203,6 +203,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V45-01 采集字节与可见core清单 | 原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射 | — | [neuron_device.py](../kb_workflows/hardware/neuron_device.py), [NEURON_WORK.md](../docs/NEURON_WORK.md), [test_device_adapters.py](../tests/hardware/test_device_adapters.py) |
 | V45-03 固定Explorer处理工具与命令 | 版本查询前固定可执行文件路径与SHA，查询后及处理/解码后复核；仅固定view/完整Parquet命令，无capture、inspect或过滤附加参数 | M5 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V45-04 输入输出复查与失败工件保留 | 处理和表解码后复查原始文件、快照、工具及全部输出；超时/更改/超限不产生收据，保留完整工作目录及有界日志前缀 | M5 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
+| V48-01 原生调用覆盖与独立来源对照 | 用真实原生调用及逐次内容/布局/模式复核替换简化采样，避免只观察最初公开前向；所有窗口必须绑定，重叠未知活动不能被过滤，诊断计时不进入正式评分 | M3, M5 | [origin_task.py](../kb_workflows/provenance/origin_task.py), [cuda_origin.py](../kb_workflows/provenance/cuda_origin.py), [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py), [measurement.py](../kb_workflows/evaluation/measurement.py), [paired_task.py](../kb_workflows/evaluation/paired_task.py), [determinism.py](../kb_workflows/evaluation/determinism.py), [eval.py](../src/eval.py), [reliability.py](../src/reliability.py), [audit_kernel_origin.py](../scripts/audit_kernel_origin.py), [test_kernel_origin.py](../tests/provenance/test_kernel_origin.py), [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) |
 
 ### M3：可解释且可比较的性能指标的改动
 
@@ -425,7 +426,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | R-05 参考退化审计与输入校准 | 代码已实现 | M2 | 原250题来源绑定名义配方与参考专用FP64选择、输入/输出变化审计、固定RNG、程序/mask收据和新基线已接入；统一入口在候选前冻结合格参考集合和全部失败/排除账本，未解决记录不能缩小题集，冻结后所有候选失败保留分母。子任务/预算/评分/恢复/重新评分绑定父集合。有限软件范围已完成，阈值校准归R-04；按要求不运行设备/模型实验 |
 | R-06 针对算子的输入族与隐藏形状 | 代码已实现 | M2 | 原250题来源绑定输入族每种子2551例：角色/形状、异号与实际权重抵消、GELU/有限极值/索引、offset与33题共享存储；转移和双向隔离副本逐项核对布局与实际系数。291题另有生产角色及模式/参数/重复检查。有限模板不保证内部传播或全部错误检出，原尺寸只做meta，按用户要求不运行实验 |
 | R-07 模式、状态、参数更新与输入敏感性 | 代码已实现 | M2 | 原始逐题模式/BN/参数/输入域软件契约已实现：291来源绑定政策、注册与普通Tensor状态/容器/对象、参考对应替换、逐状态所有者模式、同对象规范参数更新及R-06/R-09输入变化。L3/33持久hidden与41未使用self.h0分别审核；任意表示/非线性解码不作为通用证明，候选须保留可映射规范参数；按用户要求不跑实验 |
-| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++ object、受信wheel cubin、Graph快照及两类核参数API的v1/v2更新重绑定诊断；未关联Runtime/其他loader、动态编译器、整体/其他Graph更新、CUkernel、Neuron与正式资格门继续实现，未知不通过 |
+| R-08 自写内核执行归因与库轨道 | 部分实现 | M2 | 已有CUDA/Triton/C++产物、wheel库和Graph代次诊断；现替换3-seed简化循环，复用原生主流程做独立对照/采集，逐次绑定双顺序正确性、预热/计时、隐藏和配对调用及完整字节/布局/模式/seed，并优化窗口联结。内存探针/其他诊断、Runtime/其他编译器、Neuron来源和正式轨道门仍继续实现，未知不通过 |
 | R-09 执行完整性与缓存审计 | 代码已实现 | M2 | 原始四项已提供可选软件路径：候选分配双预填、全实际正确性实例同对象更新、公开同步/连续提交对照、候选导入/构造/调用运行设置拒绝与恢复。来源/设备/覆盖收据贯穿评分恢复；不支持路径不通过。完整GPU/线程/Graph证明不是原设计验收条件，来源与正式归因仍归R-08/R-16；按用户要求不运行实验 |
 | R-10 内存与竞态工具 | 代码已实现 | M2 | 已实现可选四工具独立正确性worker、原始日志/二进制/设备/请求绑定、无插桩复核与题目级快照重复策略；审核原子操作仅允许有界波动，不放宽精度门；评分与恢复重算证据，未运行工具或GPU实验，重复一致不证明无竞态 |
 | R-11 交替计时与噪声底 | 代码已实现 | M3 | 已实现平衡交替墙钟、参考控制噪声、重复进程/配对bootstrap及评分门；CPU路径和持久化反例验证完成，真实设备漂移/时钟试点仍待验收 |

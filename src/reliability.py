@@ -72,6 +72,7 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     observe_state(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     observe_numerical(reference, candidate, inputs, seed=seed, device=device, set_seed=set_seed, tolerance=tolerance, label=label)
     from kb_workflows.evaluation.measurement import input_signature
+    from kb_workflows.provenance.origin_task import candidate_call, confirm, snapshot_output
 
     receipt = {"label": label, "seed": seed, "passed": False, "orders": [], "input_signature": input_signature(inputs),
                "input_layout": layout(inputs), "copied_layouts": []}
@@ -79,6 +80,7 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
     metadata["reliability_protocol"] = PROTOCOL
     for order in ("candidate_first", "reference_first"):
         outputs = {}
+        candidate_observation = None
         if prepare_pair:
             prepare_pair()
         names = ("candidate", "reference") if order == "candidate_first" else ("reference", "candidate")
@@ -88,7 +90,6 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
                 receipt["copied_layouts"].append({"order": order, "model": name, "layout": layout(fresh)})
                 set_seed(seed)
                 synchronize(device)
-                started = clock() if record_first_call and name == "candidate" else None
                 from contextlib import nullcontext
 
                 from kb_workflows.evaluation.allocation_audit import candidate_scope
@@ -98,14 +99,21 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
                 context = candidate_scope("forward", label=label, seed=seed, order=order) if name == "candidate" else nullcontext()
                 throughput_context = candidate_guard() if name == "candidate" else nullcontext()
                 cache_context = cache_guard() if name == "candidate" else nullcontext()
-                with preserve_backend_settings(), context, throughput_context, cache_context:
-                    output = (candidate if name == "candidate" else reference)(*fresh)
-                    synchronize(device)
-                if started is not None:
-                    metadata["first_forward_ms"] = (clock() - started) * 1000
-                    metadata["cold_start_ms"] = metadata.get("candidate_setup_ms", 0) + metadata["first_forward_ms"]
-                    record_first_call = False
+                scope = candidate_call(candidate, fresh, device=device, phase="correctness", seed=seed,
+                                       label=label, order=order) if name == "candidate" else nullcontext((reference, None))
+                with scope as (execute, observed):
+                    started = clock() if record_first_call and name == "candidate" else None
+                    with preserve_backend_settings(), context, throughput_context, cache_context:
+                        output = execute(*fresh)
+                        synchronize(device)
+                    if started is not None:
+                        metadata["first_forward_ms"] = (clock() - started) * 1000
+                        metadata["cold_start_ms"] = metadata.get("candidate_setup_ms", 0) + metadata["first_forward_ms"]
+                        record_first_call = False
                 outputs[name] = clone_tensors(output)
+                if name == "candidate":
+                    candidate_observation = observed
+                    snapshot_output(observed, outputs[name])
                 synchronize(device)
             except Exception as exc:
                 receipt.update(failure_kind=f"{name}_error", issue=f"{type(exc).__name__}: {exc}")
@@ -117,6 +125,7 @@ def check_paired_calls(reference, candidate, inputs, *, seed, tolerance, device,
             return f"{label}/{order}: {issue}"
         if verify_pair:
             verify_pair(inputs, outputs)
+        confirm(candidate_observation)
     receipt["passed"] = True
     from kb_workflows.evaluation.cache_audit import observe as observe_cache
 

@@ -15,7 +15,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from kb_workflows.common import ROOT, fingerprint
+from kb_workflows.common import ROOT, evaluator_digest, fingerprint
 from kb_workflows.provenance import cuda_origin, kernel_origin
 from kb_workflows.provenance.submission_source import SourceRegistry, execute, record_sources, sha256
 
@@ -504,7 +504,7 @@ def test_origin_cli_simulated_dispatch_keeps_source_run_and_scores_untouched(tmp
     assert cli.main(["--config", str(path), "--problem", "2", "--output", str(output), "--execute"]) == 0
     actual_cfg, rows = observed[0]
     assert actual_cfg.run_dir != config.run_dir and rows[0][1]["task"] == "origin_audit"
-    assert rows[0][1]["eval_config"]["measure_performance"] is False
+    assert rows[0][1]["eval_config"]["measure_performance"] is True
     assert rows[0][1]["eval_config"]["use_hidden_tests"] is False
     assert {str(p): p.read_bytes() for p in config.run_dir.iterdir()} == before
     assert json.loads(output.read_text())["simulated"] is True
@@ -515,13 +515,13 @@ def test_origin_prepare_rejects_outside_population_neuron_and_bad_policy(tmp_pat
 
     config, _ = make_config(tmp_path)
     with pytest.raises(ValueError, match="population"):
-        prepare(config, 1, 0, seeds=[42], minimum_custom_fraction=0.95)
-    for seeds, threshold in [([42, 42], 0.95), ([], 0.95), ([True], 0.95), ([42], float("nan"))]:
+        prepare(config, 1, 0, minimum_custom_fraction=0.95)
+    for threshold in (0, 1.1, True, float("nan")):
         with pytest.raises(ValueError):
-            prepare(config, 2, 0, seeds=seeds, minimum_custom_fraction=threshold)
+            prepare(config, 2, 0, minimum_custom_fraction=threshold)
     config.device_backend = "neuron"
     with pytest.raises(ValueError, match="Neuron"):
-        prepare(config, 2, 0, seeds=[42], minimum_custom_fraction=0.95)
+        prepare(config, 2, 0, minimum_custom_fraction=0.95)
 
 
 def test_origin_dispatch_does_not_fall_into_neuron_evaluator(monkeypatch):
@@ -538,7 +538,7 @@ def test_origin_dispatch_does_not_fall_into_neuron_evaluator(monkeypatch):
     assert evaluate_task.dispatch(payload) == {"origin_diagnostic": True}
 
 
-def test_origin_worker_rejects_hidden_and_neuron_before_sdk_import():
+def test_origin_worker_rejects_incomplete_requests_before_sdk_import():
     from kb_workflows.provenance.origin_task import audit
 
     for settings in ({"use_hidden_tests": True}, {"device_backend": "neuron"}):
@@ -546,71 +546,6 @@ def test_origin_worker_rejects_hidden_and_neuron_before_sdk_import():
             audit({"eval_config": settings})
 
 
-@pytest.mark.parametrize("wrong", [False, True])
-@pytest.mark.parametrize("mutation", [None, "mode", "grad", "env", "near_tolerance"])
-def test_origin_worker_checks_every_public_output_and_mode_on_cpu(tmp_path, monkeypatch, wrong, mutation):
-    from contextlib import contextmanager
-
-    import torch
-
-    from kb_workflows.evaluation import evaluate_task, measurement
-    from kb_workflows.provenance import origin_binaries, origin_task
-    from src import eval as native
-
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return x + 1
-
-    class FakeCapture(cuda_origin.Capture):
-        def __init__(self, source):
-            sdk, _ = fake_sdk()
-            ticks = iter(range(1, 1000))
-            sdk.get_timestamp = lambda: next(ticks)
-            super().__init__(source, bindings=sdk)
-
-        @contextmanager
-        def recording(self):
-            with record_sources(self.registry):
-                yield self
-            self.raw.update(capture_complete=True, source_intact=self.registry.intact(), hooks_intact=True)
-
-    action = {None: "", "near_tolerance": "", "mode": "        self.eval()\n",
-              "grad": "        torch.set_grad_enabled(True)\n",
-              "env": "        import os\n        os.environ['KB_FP32_TOL'] = '1.0'\n"}[mutation]
-    offset = 2 if wrong else (1.0005 if mutation == "near_tolerance" else 1)
-    source = ("import torch\nclass ModelNew(torch.nn.Module):\n"
-              f"    def forward(self, x):\n{action}        return x + {offset}\n")
-    monkeypatch.setattr(cuda_origin, "Capture", FakeCapture)
-    monkeypatch.setenv("KB_FP32_TOL", "1e-3")
-    monkeypatch.setenv("TORCH_EXTENSIONS_DIR", str(tmp_path))
-    monkeypatch.setenv("TORCH_USE_CUDA_DSA", "1")
-    monkeypatch.setattr(origin_binaries, "Catalog", lambda: NS(collect=lambda **kwargs: {"simulated": True}))
-    monkeypatch.setattr(origin_task, "ROOT", tmp_path)
-    monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: "reference")
-    monkeypatch.setattr(evaluate_task, "configure_tf32", lambda *args: None)
-    monkeypatch.setattr(native, "load_original_model_and_inputs", lambda *args: (Model, lambda: [], lambda: [torch.arange(4.)]))
-    monkeypatch.setattr(native, "move_model", lambda model, *args: model)
-    monkeypatch.setattr(native, "_process_input_tensor", lambda value, *args: value)
-    monkeypatch.setattr(native, "set_seed", lambda seed: torch.random.default_generator.manual_seed(seed))
-    monkeypatch.setattr(measurement, "synchronize", lambda device: None)
-    monkeypatch.setattr(measurement, "device_fingerprint", lambda device: {"available": False, "simulated": True})
-    result = origin_task.audit({"level": 1, "problem_id": 2, "kernel_src": source,
-        "eval_config": {"precision": "fp32", "fp32_tolerance": 1e-4, "origin_seeds": [42, 43, 44]}})
-    windows = result["raw"]["windows"]
-    assert len(windows) == 3 and [row["seed"] for row in windows] == [42, 43, 44]
-    assert all(row["no_grad"] is (mutation != "grad") for row in windows)
-    if mutation == "mode":
-        assert [row["training"] for row in windows] == [True, False, False]
-        assert all(row["training_after"] is False for row in windows)
-    else:
-        assert all(row["training"] is True and row["training_after"] is True for row in windows)
-    assert all(row["input_signature"][0]["shape"] == [4] for row in windows)
-    failed_accuracy = wrong or mutation == "near_tolerance"
-    assert all(row["output_verified"] is (not failed_accuracy) for row in windows)
-    assert len(result["raw"]["errors"]) == (3 if failed_accuracy else 0) + (1 if mutation in {"env", "grad"} else 0)
-    assert ("env.KB_FP32_TOL" in result["raw"]["environment_changes"]) is (mutation == "env")
-    assert result["summary"]["status"] == "not_measured" and result["scored_wall_times_replaced"] is False
-    assert "evidence_receipt" not in result
 
 
 def graph_capture():
@@ -906,8 +841,171 @@ def test_queue_accepts_source_bound_origin_requests_and_requires_a_candidate(tmp
     from scripts.audit_kernel_origin import prepare
 
     config, _ = make_config(tmp_path)
-    payload = prepare(config, 2, 0, seeds=[42], minimum_custom_fraction=0.95)
+    payload = prepare(config, 2, 0, minimum_custom_fraction=0.95)
     validate_payload(payload)
     payload.pop("kernel_src")
     with pytest.raises(ValueError):
         validate_payload(payload)
+
+
+@pytest.fixture
+def native_origin_runner(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    import torch
+
+    from kb_workflows.evaluation import evaluate_task, measurement, paired_task
+    from kb_workflows.provenance import origin_binaries, origin_task
+    from src import eval as native
+    from src.input_groups import copy_inputs
+    from src.validation import compare_outputs
+
+    class FakeCapture(cuda_origin.Capture):
+        def __init__(self, source, **options):
+            sdk, _ = fake_sdk()
+            ticks = iter(range(1, 100_000))
+            sdk.get_timestamp = lambda: next(ticks)
+            super().__init__(source, bindings=sdk, **options)
+
+        @contextmanager
+        def recording(self):
+            with record_sources(self.registry):
+                yield self
+            self.raw.update(capture_complete=True, source_intact=self.registry.intact(), hooks_intact=True)
+
+    class Reference(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+        def forward(self, x):
+            self.calls += 1
+            return x + self.calls + 1
+
+    hidden = tmp_path / "private_hidden.py"
+    hidden.write_text("import torch\ndef get_hidden_inputs():\n    return [[torch.rand(4)]]\n")
+    action = {"damage": None}
+    monkeypatch.setenv("TORCH_EXTENSIONS_DIR", str(tmp_path))
+    monkeypatch.setenv("TORCH_USE_CUDA_DSA", "1")
+    monkeypatch.setenv("KB_FP32_TOL", "0.0001")
+    monkeypatch.setattr(cuda_origin, "Capture", FakeCapture)
+    monkeypatch.setattr(origin_binaries, "Catalog", lambda: NS(collect=lambda **kwargs: {"simulated": True}))
+    monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: "CPU parser fixture, not measured source evidence")
+    monkeypatch.setattr(native, "set_seed", lambda seed: torch.random.default_generator.manual_seed(seed))
+
+    def invoke(payload):
+        build = Path(payload["build_root"]) / fingerprint(payload)
+        os.environ.update(TORCH_EXTENSIONS_DIR=str(build), TORCH_USE_CUDA_DSA="1", KB_FP32_TOL="0.0001")
+        Candidate = native.load_custom_model(payload["kernel_src"], {}, str(build))
+        metadata = {"device_fingerprint": {"available": False, "name": "SIMULATED"}}
+        with torch.no_grad():
+            candidate, reference = Candidate(), Reference()
+            if payload["task"] == "paired_timing":
+                metadata["paired_timing"] = paired_task.collect_pairs(
+                    Reference(), candidate, Reference(), lambda _: [torch.rand(4)], Reference(),
+                    device="cpu", trials=10, seed=42, set_seed=native.set_seed)
+                return {"compiled": True, "correctness": True, "metadata": metadata}
+            outcome = native.run_and_check_correctness(reference, candidate, lambda: [torch.rand(4)], metadata,
+                                                       num_correct_trials=1, device="cpu", precision=torch.float32)
+            if payload["eval_config"]["use_hidden_tests"] and outcome.correctness:
+                outcome.correctness = native.run_hidden_correctness_check(reference, candidate, str(hidden), metadata,
+                                                                          device="cpu", precision=torch.float32)
+            if payload["eval_config"]["measure_performance"] and outcome.correctness:
+                receipt = metadata["timing_receipt"] = {}
+                def inputs(trial):
+                    seed = measurement.fresh_seed()
+                    receipt.setdefault("input_seeds", []).append(seed)
+                    native.set_seed(seed)
+                    return [torch.rand(4)]
+                def verify(args, actual):
+                    issue = compare_outputs(reference(*copy_inputs(args)), actual, 1e-4)
+                    if issue:
+                        raise ValueError(issue)
+                measurement.synchronized_times(candidate, [torch.zeros(4)], "cpu", num_trials=2, input_factory=inputs,
+                                               verifier=verify, receipt=receipt, origin_candidate=True)
+            return {"compiled": True, "correctness": outcome.correctness, "metadata": metadata}
+
+    def runner(command, timeout, log, *, environment):
+        payload = json.loads(Path(command[3]).read_text())
+        document = origin_task._run_native(payload, lambda: invoke(payload))
+        if payload["_origin_stage"] == "profile":
+            if action["damage"] == "raw_window":
+                document["raw"]["windows"].pop()
+            elif action["damage"] == "output":
+                document["calls"][-1]["output_content_sha256"] = "f" * 64
+            elif action["damage"] == "request":
+                document["binding"]["native_request_sha256"] = "f" * 64
+        Path(command[4]).write_text(json.dumps(document))
+        Path(log).write_text("Explicit CPU process simulation; no device collector loaded")
+        return {"exit_code": 0, "timed_out": False, "request_wall_seconds": 0.01}
+
+    def audit(*, target="evaluate", hidden=False, mutation="", damage=None):
+        action["damage"] = damage
+        source = ("import torch\nclass ModelNew(torch.nn.Module):\n"
+                  "    def __init__(self):\n        super().__init__()\n        self.calls = 0\n"
+                  f"    def forward(self, x):\n        self.calls += 1\n{mutation}"
+                  "        return x + self.calls + 1\n")
+        payload = {"task": "origin_audit", "level": 1, "problem_id": 2, "kernel_src": source, "ref_arch_src": "reference",
+                   "_origin_target": target, "_origin_timing_seeds": [100, 101, 102, 103, 104] if target == "evaluate" and not hidden else [],
+                   "eval_config": {"precision": "fp32", "fp32_tolerance": 1e-4, "num_perf_trials": 2,
+                                   "num_correct_trials": 1, "timeout": 60, "use_hidden_tests": hidden,
+                                   "measure_performance": not hidden, "paired_trials": 10,
+                                   "evaluator_sha256": evaluator_digest()}}
+        return origin_task.audit(payload, run=runner)
+    return audit
+
+
+def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(native_origin_runner):
+    for target, hidden, expected in (("evaluate", False, 7), ("evaluate", True, 8), ("paired_timing", False, 13)):
+        result = native_origin_runner(target=target, hidden=hidden)
+        assert result["native_coverage"]["status"] == "passed", result.get("native_coverage")
+        assert result["native_coverage"]["candidate_calls"] == len(result["raw"]["windows"]) == expected
+        assert result["native_coverage"]["simulated"] and not result["formal_qualification_implemented"]
+        assert not result["scored_wall_times_replaced"] and result["summary"]["status"] == "not_measured"
+        assert all(row["output_verified"] and row["native_call_sha256"] for row in result["raw"]["windows"])
+
+
+def test_native_origin_refuses_late_wrong_outputs_mode_changes_and_missing_windows(native_origin_runner):
+    mutations = ("        if self.calls > 4: return x + 99\n", "        self.eval()\n",
+                 "        torch.set_grad_enabled(True)\n", "        import os\n        os.environ['KB_FP32_TOL'] = '1'\n",
+                 "        return x + self.calls + 1.0005\n")
+    for mutation in mutations:
+        result = native_origin_runner(mutation=mutation)
+        assert result["native_coverage"]["status"] == "not_measured"
+        assert result["summary"]["status"] == "not_measured"
+    for damage in ("raw_window", "output", "request"):
+        result = native_origin_runner(damage=damage)
+        assert result.get("native_coverage", {}).get("status", result["status"]) == "not_measured"
+
+
+def test_streaming_content_signature_preserves_dense_strided_bits_and_typed_structure():
+    import hashlib
+
+    import torch
+
+    from kb_workflows.evaluation.determinism import signature
+
+    values = [torch.arange(800_000, dtype=torch.float32), torch.arange(800_000, dtype=torch.float32).bfloat16(),
+              torch.arange(1_600_000).reshape(1000, 1600)[:, ::3], torch.empty(0, 3), torch.tensor(3)]
+    for value in values:
+        expected = hashlib.sha256(value.contiguous().reshape(-1).view(torch.uint8).numpy().tobytes()).hexdigest()
+        assert signature(value)["bytes_sha256"] == expected
+    first = {1: torch.tensor([3]), "1": (torch.tensor([5]),)}
+    assert signature(first, typed=True) == signature(dict(reversed(list(first.items()))), typed=True)
+    assert signature(first, typed=True) != signature({"1": [torch.tensor([5])]}, typed=True)
+
+
+def test_native_activity_filter_preserves_unknown_overlaps_and_all_drop_accounting_queues():
+    sdk, _ = fake_sdk()
+    capture = cuda_origin.Capture(SOURCE, bindings=sdk, candidate_windows_only=True)
+    capture.raw.update(raw_capture(), candidate_windows_only=True, scope_filtered_activities=0)
+    capture.raw["activities"] = []
+    def event(start, end, correlation, stream=7):
+        return NS(kind=10, start=start, end=end, device_id=0, stream_id=stream, context_id=9,
+                  correlation_id=correlation, graph_id=0, graph_node_id=0, name="fixture")
+    capture.buffer_completed([event(10, 20, 999, stream=17), event(120, 220, 10),
+                              event(170, 270, 99), event(310, 350, 999)])
+    assert capture.raw["scope_filtered_activities"] == 2
+    assert (9, 17) in capture.activity_queues  # Filtered streams still need drop queries.
+    result = kernel_origin.summarize(capture.raw)
+    assert result["status"] == "not_measured"
+    assert result["calls"][0]["custom_exclusive_fraction_lower_bound"] == pytest.approx(1 / 3)

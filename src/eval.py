@@ -820,6 +820,7 @@ def eval_kernel_against_ref(
                 elapsed_times = synchronized_times(
                     model_new, inputs, device, num_trials=num_perf_trials,
                     input_factory=input_factory, verifier=verifier, receipt=timing_receipt,
+                    origin_candidate=True,
                 )
                 metadata["cold_start_ms"] = metadata.get("cold_start_ms", 0) + timing_receipt.get("warmup_total_ms", 0)
                 metadata.update(input_signature=input_signature(inputs), timing_method="synchronized_wall",
@@ -884,6 +885,11 @@ def time_execution_with_cuda_event(
     return synchronized_times(kernel_fn, args, device, num_warmup, num_trials)
 
 
+def correctness_seeds(seed, count):
+    generator = torch.Generator().manual_seed(seed)
+    return torch.randint(0, 2**32 - 1, (count,), generator=generator).tolist()
+
+
 def run_and_check_correctness(
     original_model_instance: nn.Module,
     new_model_instance: nn.Module,
@@ -912,8 +918,7 @@ def run_and_check_correctness(
     from kb_workflows.evaluation.cache_audit import bind_factory as bind_cache_factory
 
     bind_cache_factory(lambda: _process_input_group(get_inputs_fn(), device, precision))
-    generator = torch.Generator().manual_seed(seed)
-    seeds = torch.randint(0, 2**32 - 1, (num_correct_trials,), generator=generator).tolist()
+    seeds = correctness_seeds(seed, num_correct_trials)
     with torch.no_grad():
         model = move_model(original_model_instance, device, precision)
         model_new = move_model(new_model_instance, device, precision)

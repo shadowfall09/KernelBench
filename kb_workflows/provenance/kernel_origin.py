@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import re
+from bisect import bisect_left
 
 from ..analysis.performance import interval_union
 from ..common import fingerprint
@@ -173,12 +174,26 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
                   and type(raw.get("dropped_records")) is int and raw.get("errors") == []
                   and _sha(raw.get("candidate_sha256")) and raw.get("simulated") is False)
     library_owners = binary_owners(raw.get("binary_inventory"))
+    # Native hidden portfolios can have thousands of windows. Join once, while
+    # retaining every cross-window overlap, instead of scanning all events for
+    # every call. Refuse excessive overlap expansion rather than truncate it.
+    starts = [window["start_ns"] for window in ordered]
+    per_window = {window["id"]: [] for window in ordered}
+    associations = 0
+    for activity in activities:
+        index = bisect_left(starts, activity["end_ns"]) - 1
+        while index >= 0 and ordered[index]["end_ns"] > activity["start_ns"]:
+            window = ordered[index]
+            if window["device"] == activity["device"]:
+                per_window[window["id"]].append(activity)
+                associations += 1
+                if associations > MAX_RECORDS:
+                    raise ValueError("Activity/window overlap limit exceeded")
+            index -= 1
     calls = []
     for window in ordered:
         rows = []
-        for activity in activities:
-            if activity["device"] != window["device"]:
-                continue
+        for activity in per_window[window["id"]]:
             start = max(window["start_ns"], activity["start_ns"])
             end = min(window["end_ns"], activity["end_ns"])
             if end <= start:

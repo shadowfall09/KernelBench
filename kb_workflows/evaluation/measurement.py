@@ -21,7 +21,10 @@ _SEED = secrets.randbits
 
 def fresh_seed():
     # Generated on demand, so a candidate cannot precompute a public seed schedule.
-    return _SEED(63)
+    from ..provenance.origin_task import next_seed
+
+    observed = next_seed()
+    return _SEED(63) if observed is None else observed
 
 
 def synchronize(device):
@@ -57,13 +60,17 @@ def tensor_bytes(value):
     return 0
 
 
-def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=None, input_factory=None, verifier=None):
+def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=None, input_factory=None, verifier=None,
+                       origin_candidate=False):
     """Include host dispatch and completion of work on every stream in this process.
 
     Input allocation/copy is outside the interval and synchronized before timing.
     Fresh input objects prevent a same-object cache from winning steady-state time.
     """
     times = []
+    from contextlib import nullcontext
+
+    from ..provenance.origin_task import candidate_call, confirm, snapshot_output
     with torch.no_grad():
         for trial in range(num_warmup + num_trials):
             fresh = input_factory(trial) if input_factory else copy_inputs(args)
@@ -73,11 +80,15 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
             neuron_rng = torch.neuron.get_rng_state(device) if verifier and str(device).split(":")[0] == "neuron" else None
             with preserve_backend_settings():
                 synchronize(device)
-                start = CLOCK()
-                output = fn(*fresh)
-                consumed = consume_output(output)
-                synchronize(device)
-                elapsed = (CLOCK() - start) * 1000
+                scope = candidate_call(fn, fresh, device=device, phase="warmup" if trial < num_warmup else "timing",
+                                       label=str(trial)) if origin_candidate else nullcontext((fn, None))
+                with scope as (execute, observed):
+                    start = CLOCK()
+                    output = execute(*fresh)
+                    consumed = consume_output(output)
+                    synchronize(device)
+                    elapsed = (CLOCK() - start) * 1000
+            snapshot_output(observed, output)
             if verifier:
                 after_rng = torch.get_rng_state()
                 after_cuda_rng = torch.cuda.get_rng_state(device) if cuda_rng is not None else None
@@ -95,6 +106,7 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
                         torch.cuda.set_rng_state(after_cuda_rng, device)
                     if after_neuron_rng is not None:
                         torch.neuron.set_rng_state(after_neuron_rng, device)
+                confirm(observed)
             if trial == 0 and receipt is not None:
                 receipt["first_timed_call_ms"] = elapsed
                 receipt["output_bytes"] = tensor_bytes(output)

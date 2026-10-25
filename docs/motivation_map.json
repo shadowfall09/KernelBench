@@ -1423,9 +1423,12 @@
         "kb_workflows/provenance/triton_origin.py",
         "kb_workflows/provenance/cpp_origin.py",
         "tests/provenance/test_compiler_origins.py",
-        "tests/provenance/test_graph_updates.py"
+        "tests/provenance/test_graph_updates.py",
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/evaluation/measurement.py",
+        "kb_workflows/evaluation/paired_task.py"
       ],
-      "reason": "已实现CUDA/Triton实际AST/审核primitive依赖与产物冻结、CUDA C++ object、受信wheel cubin、Graph快照及两类核参数API的v1/v2更新重绑定诊断；未关联Runtime/其他loader、动态编译器、整体/其他Graph更新、CUkernel、Neuron与正式资格门继续实现，未知不通过"
+      "reason": "已有CUDA/Triton/C++产物、wheel库和Graph代次诊断；现替换3-seed简化循环，复用原生主流程做独立对照/采集，逐次绑定双顺序正确性、预热/计时、隐藏和配对调用及完整字节/布局/模式/seed，并优化窗口联结。内存探针/其他诊断、Runtime/其他编译器、Neuron来源和正式轨道门仍继续实现，未知不通过"
     },
     {
       "id": "R-09",
@@ -5056,6 +5059,31 @@
         "tests/agents/test_resource_budgets.py"
       ],
       "reason": "阻止客户端超时或重启后后台继续重花预留；以服务端到期和确认清理后的用量结算，未知用量扣除整笔并停止后续执行"
+    },
+    {
+      "id": "V48-01",
+      "title": "原生调用覆盖与独立来源对照",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/provenance/cuda_origin.py",
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/evaluation/measurement.py",
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/evaluation/determinism.py",
+        "src/eval.py",
+        "src/reliability.py",
+        "scripts/audit_kernel_origin.py",
+        "tests/provenance/test_kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md"
+      ],
+      "reason": "用真实原生调用及逐次内容/布局/模式复核替换简化采样，避免只观察最初公开前向；所有窗口必须绑定，重叠未知活动不能被过滤，诊断计时不进入正式评分"
     }
   ]
 }

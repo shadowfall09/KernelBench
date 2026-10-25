@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import random
+from contextlib import nullcontext
 
 from src.input_groups import copy_inputs
 from src.validation import clone_tensors, compare_outputs, preserve_backend_settings
@@ -14,26 +15,31 @@ from .measurement import CLOCK, consume_output, synchronize
 from .strict_validation import environment_guard
 
 
+def call_plan(*, trials, warmup, seed):
+    rng = random.Random(seed)
+    choices = ["RCB", "CRB", "BCR", "BRC", "CBR", "RBC"]
+    orders = []
+    for trial in range(warmup + trials):
+        if trial == warmup:
+            orders = []
+        if not orders:
+            orders = list(choices)
+            rng.shuffle(orders)
+        yield trial, rng.randrange(1 << 31), orders.pop()
+
+
 def collect_pairs(reference, candidate, control, input_factory, oracle, *, device, trials, seed,
                   reset=None, set_seed=None, tolerance=1e-3, warmup=3, clock=CLOCK, verifier=None, prepare_verifier=None):
     import torch
 
     if type(trials) is not int or trials < 10:
         raise ValueError("At least 10 paired trials are required")
-    rng = random.Random(seed)
-    choices = ["RCB", "CRB", "BCR", "BRC", "CBR", "RBC"]
+    from ..provenance.origin_task import candidate_call, confirm, snapshot_output
+
     models = {"R": reference, "C": candidate, "B": control}
     rows, changes = [], []
-    orders = []
     with torch.no_grad():
-        for trial in range(warmup + trials):
-            if trial == warmup:
-                orders = []  # Warmup must not consume the measured balance block.
-            if not orders:
-                orders = list(choices)
-                rng.shuffle(orders)
-            order = orders.pop()
-            case_seed = rng.randrange(1 << 31)
+        for trial, case_seed, order in call_plan(trials=trials, warmup=warmup, seed=seed):
             if set_seed:
                 set_seed(case_seed)
             args = input_factory(trial)
@@ -54,11 +60,15 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                 context = environment_guard(changes) if name == "C" else preserve_backend_settings()
                 with context:
                     synchronize(device)
-                    started = clock()
-                    output = models[name](*fresh)
-                    consumed = consume_output(output)
-                    synchronize(device)
-                    elapsed = (clock() - started) * 1000
+                    scope = candidate_call(candidate, fresh, device=device, phase="paired_warmup" if trial < warmup else "paired",
+                                           seed=case_seed, label=str(trial), order=order) if name == "C" else nullcontext((models[name], None))
+                    with scope as (execute, observed):
+                        started = clock()
+                        output = execute(*fresh)
+                        consumed = consume_output(output)
+                        synchronize(device)
+                        elapsed = (clock() - started) * 1000
+                snapshot_output(observed, output)
                 issue = compare_outputs(expected, output, tolerance)
                 if issue:
                     raise ValueError(f"Paired trial {trial}/{name}: {issue}")
@@ -72,6 +82,7 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                             verifier(args, output)
                         else:
                             verifier(args, output, expected=expected, prepared=prepared)
+                confirm(observed)
                 samples[name] = elapsed
                 del output, consumed, fresh
             if trial >= warmup:
@@ -122,7 +133,9 @@ def evaluate_paired(payload):
     for name in ("R", "B", "oracle"):
         set_seed(seed)
         models[name] = move_model(Model(*clone_tensors(initial)), device, dtype)
-    build = ROOT / "cache/workflow" / fingerprint(payload)
+    from pathlib import Path
+
+    build = Path(payload.get("build_root", ROOT / "cache/workflow")) / fingerprint(payload)
     build.mkdir(parents=True, exist_ok=True)
     os.environ["TORCH_EXTENSIONS_DIR"] = str(build)
     os.environ["TORCH_USE_CUDA_DSA"] = "1"

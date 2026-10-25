@@ -14,6 +14,7 @@ import os
 import platform
 import tempfile
 import threading
+from bisect import bisect_left
 from contextlib import contextmanager
 
 from .kernel_origin import MAX_RECORDS, PROTOCOL
@@ -59,14 +60,15 @@ def abi_supported():
 
 
 class Capture:
-    def __init__(self, candidate_source, *, bindings=None):
+    def __init__(self, candidate_source, *, bindings=None, candidate_windows_only=False):
         self.registry = SourceRegistry()
         self.cupti = bindings
         self.raw = {"protocol": PROTOCOL, "candidate_sha256": sha256(candidate_source.encode()),
                     "modules": [], "functions": [], "proofs": [], "launches": [], "activities": [], "windows": [],
                     "graph_nodes": [], "graph_launches": [], "graph_updates": [], "memory_calls": [],
                     "capture_complete": False, "source_intact": False, "hooks_intact": False,
-                    "dropped_records": 0, "errors": [], "simulated": bindings is not None}
+                    "dropped_records": 0, "errors": [], "simulated": bindings is not None,
+                    "candidate_windows_only": candidate_windows_only, "scope_filtered_activities": 0}
         self.lock = threading.RLock()
         self.loads, self.module_map, self.function_map = {}, {}, {}
         self.pending_launches, self.active_calls = {}, {}
@@ -75,6 +77,7 @@ class Capture:
         self.graphs = Graphs(self)
         self.contexts = {}
         self.enabled = []
+        self.activity_queues = set()
         self.subscriber = None
         self._original_handle_init = None
         self._wrapped_handle_init = None
@@ -104,6 +107,8 @@ class Capture:
     def buffer_completed(self, records):
         try:
             with self.lock:
+                windows = self.raw["windows"]
+                starts = [window["start_ns"] for window in windows]
                 for row in records:
                     kind = int(row.kind)
                     kinds = self.cupti.ActivityKind
@@ -115,11 +120,26 @@ class Capture:
                         label = "memset"
                     else:
                         continue
-                    self.append("activities", {"kind": label, "start_ns": int(row.start), "end_ns": int(row.end),
+                    copied = {"kind": label, "start_ns": int(row.start), "end_ns": int(row.end),
                         "device": int(row.device_id), "stream": int(row.stream_id), "context_id": int(row.context_id),
                         "correlation": int(row.correlation_id), "graph_id": int(getattr(row, "graph_id", 0)),
                         "graph_node_id": int(getattr(row, "graph_node_id", 0)),
-                        "name": str(getattr(row, "name", ""))[:2048]})
+                        "name": str(getattr(row, "name", ""))[:2048]}
+                    if (copied["end_ns"] <= copied["start_ns"] or any(value < 0 for key, value in copied.items()
+                                                                 if key not in {"kind", "name"})):
+                        self.error("Invalid device activity interval or identity")
+                        continue
+                    queue = copied["context_id"], copied["stream"]
+                    if queue not in self.activity_queues and len(self.activity_queues) >= MAX_RECORDS:
+                        self.error("Activity drop-accounting queue limit exceeded")
+                    else:
+                        self.activity_queues.add(queue)
+                    if self.raw["candidate_windows_only"]:
+                        index = bisect_left(starts, copied["end_ns"]) - 1
+                        if index < 0 or windows[index]["end_ns"] is not None and windows[index]["end_ns"] <= copied["start_ns"]:
+                            self.raw["scope_filtered_activities"] += 1
+                            continue
+                    self.append("activities", copied)
         except Exception as exc:
             self.error("Activity callback: " + type(exc).__name__)
 
@@ -211,6 +231,8 @@ class Capture:
             if loading:
                 self.loads.setdefault(tid, []).append({"key": key, "resources": []})
             elif launching:
+                if self.raw["candidate_windows_only"] and self.active_calls.get(tid) is None:
+                    return  # Keep module/function events; outside launches earn no call ownership.
                 struct = LaunchKernelEx if name.startswith("cuLaunchKernelEx") else LaunchKernel
                 handle = struct.from_address(params).function
                 function = self.function_map.get((context, handle))
@@ -355,19 +377,21 @@ class Capture:
     @contextmanager
     def call(self, *, seed, signature, device=0, training=True):
         tid = threading.get_ident()
-        if tid in self.active_calls:
-            raise RuntimeError("Nested origin call scopes are unsupported")
-        row = self.append("windows", {"seed": seed, "input_signature": signature, "device": device,
-            "training": training, "no_grad": True, "start_ns": int(self.cupti.get_timestamp()),
-            "end_ns": None, "output_verified": False})
-        if row is None:
-            raise RuntimeError("Origin call limit exceeded")
-        self.active_calls[tid] = row["id"]
+        with self.lock:
+            if tid in self.active_calls:
+                raise RuntimeError("Nested origin call scopes are unsupported")
+            row = self.append("windows", {"seed": seed, "input_signature": signature, "device": device,
+                "training": training, "no_grad": True, "start_ns": int(self.cupti.get_timestamp()),
+                "end_ns": None, "output_verified": False})
+            if row is None:
+                raise RuntimeError("Origin call limit exceeded")
+            self.active_calls[tid] = row["id"]
         try:
             yield row
         finally:
-            row["end_ns"] = int(self.cupti.get_timestamp())
-            self.active_calls.pop(tid, None)
+            with self.lock:
+                row["end_ns"] = int(self.cupti.get_timestamp())
+                self.active_calls.pop(tid, None)
 
     def stop(self):
         # Flush before disable; query every observed context/stream queue as well
@@ -375,12 +399,13 @@ class Capture:
         try:
             self.cupti.activity_flush_all(1)
             queues = {(0, 0), *((context, 0) for context in self.contexts.values())}
-            for row in self.raw["activities"]:
-                context = self.contexts.get(row["context_id"])
+            observed = self.activity_queues | {(row["context_id"], row["stream"]) for row in self.raw["activities"]}
+            for context_id, stream in observed:
+                context = self.contexts.get(context_id)
                 if context is None:
                     self.error("Activity has no observed context handle for drop accounting")
                 else:
-                    queues.add((context, row["stream"]))
+                    queues.add((context, stream))
             for context, stream in sorted(queues):
                 dropped = C.c_size_t()
                 self.cupti.activity_get_num_dropped_records(context, stream, C.addressof(dropped))

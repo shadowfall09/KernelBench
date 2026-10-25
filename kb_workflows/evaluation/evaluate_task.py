@@ -16,6 +16,7 @@ from ..numerics.input_calibration import task_policy as nominal_input_policy
 from ..numerics.operator_input_policy import task_policy as operator_input_policy
 from ..numerics.precision_calibration import task_policy as calibrated_precision_policy
 from ..production import task_input_policy
+from ..provenance.origin_task import native_policy
 from .timed_numerics import task_policy as timed_numerical_policy
 
 
@@ -296,6 +297,7 @@ def qualify_small(payload):
     return result
 
 
+@native_policy
 @record_result
 @timed_numerical_policy
 @calibrated_precision_policy
@@ -423,8 +425,8 @@ def main():
         from .allocation_audit import STAGES
         from .throughput_audit import STAGES as THROUGHPUT_STAGES
 
-        if payload.get("task") == "counter_audit":
-            result = dispatch(payload)  # NCU runs separately from sanitizer/repeat workers.
+        if payload.get("task") in {"counter_audit", "origin_audit"}:
+            result = dispatch(payload)  # Separate diagnostic supervisors own their child runs.
         elif native_worker and settings.get("diagnostic_stage") == "input_cache":
             result = cache_control(payload)
         elif native_worker and settings.get("diagnostic_stage") in STAGES.values():

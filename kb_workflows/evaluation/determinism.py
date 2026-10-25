@@ -71,19 +71,36 @@ def validate_inline(policy, source):
         raise ValueError("Unknown repeat policy mode")
 
 
-def signature(value):
+def signature(value, *, typed=False):
     import torch
 
     if type(value) is torch.Tensor:
         if value.layout != torch.strided:
             raise ValueError("Repeat audit requires dense materialized tensors")
-        tensor = value.detach().cpu().contiguous()
-        raw = tensor.reshape(-1).view(torch.uint8).numpy().tobytes()
-        return {"shape": list(tensor.shape), "dtype": str(tensor.dtype), "bytes_sha256": hashlib.sha256(raw).hexdigest()}
+        digest = hashlib.sha256()
+
+        def blocks(tensor):
+            # Bound host copies even for large, strided nominal inputs. Slice in
+            # logical row-major order so this retains the old canonical digest.
+            if tensor.numel() * tensor.element_size() <= 1024**2:
+                yield tensor.detach().contiguous().cpu().reshape(-1).view(torch.uint8).numpy().tobytes()
+                return
+            axis = next(index for index, size in enumerate(tensor.shape) if size > 1)
+            row_bytes = tensor.numel() // tensor.shape[axis] * tensor.element_size()
+            step = max(1, 1024**2 // row_bytes)
+            for start in range(0, tensor.shape[axis], step):
+                yield from blocks(tensor.narrow(axis, start, min(step, tensor.shape[axis] - start)))
+
+        for raw in blocks(value):
+            digest.update(raw)
+        return {"shape": list(value.shape), "dtype": str(value.dtype), "bytes_sha256": digest.hexdigest()}
     if isinstance(value, dict):
+        if typed:
+            return {"type": "dict", "items": [[signature(key, typed=True), signature(item, typed=True)]
+                                              for key, item in sorted(value.items(), key=lambda pair: (type(pair[0]).__name__, repr(pair[0])))]}
         return {key: signature(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
-        return {"type": type(value).__name__, "items": [signature(item) for item in value]}
+        return {"type": type(value).__name__, "items": [signature(item, typed=typed) for item in value]}
     if type(value) is float:
         return {"type": "float", "bits": struct.pack(">d", value).hex()}
     if type(value) is complex:

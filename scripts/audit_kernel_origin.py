@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import secrets
 from pathlib import Path
 
 from kb_workflows.benchmarks.reference_population import select_run_problems
@@ -13,7 +14,7 @@ from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
 
 
-def prepare(config, problem, sample, *, seeds, minimum_custom_fraction):
+def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate", hidden=False, variant=None):
     if config.device_backend != "cuda":
         raise ValueError("CUDA origin diagnostics cannot substitute for Neuron binary attribution")
     if config.regrade_manifest:
@@ -21,17 +22,26 @@ def prepare(config, problem, sample, *, seeds, minimum_custom_fraction):
     selected = select_run_problems(config)
     if problem not in selected or not 0 <= sample < config.num_samples:
         raise ValueError("Requested candidate is outside the configured task/sample population")
-    if (not seeds or len(seeds) > 100 or len(set(seeds)) != len(seeds)
-            or any(type(seed) is not int or not 0 <= seed < 2**32 for seed in seeds)):
-        raise ValueError("Seeds must be 1..100 distinct uint32 values")
+    if task not in {"evaluate", "paired_timing"} or hidden and task != "evaluate":
+        raise ValueError("Origin capture requires evaluation or public paired timing")
+    if hidden and not config.hidden_tests:
+        raise ValueError("Hidden origin capture requires configured final hidden verification")
+    if task == "paired_timing" and variant is None:
+        raise ValueError("Paired origin capture requires an explicit baseline variant")
     import math
 
     if (type(minimum_custom_fraction) not in (int, float) or not math.isfinite(minimum_custom_fraction)
             or not 0 < minimum_custom_fraction <= 1):
         raise ValueError("Minimum custom fraction must be in (0, 1]")
-    payload = task_payload(config, problem, sample, task="origin_audit")
-    payload["eval_config"].update(measure_performance=False, origin_seeds=seeds,
-                                  origin_minimum_custom_fraction=minimum_custom_fraction)
+    payload = task_payload(config, problem, sample, task=task, hidden=hidden)
+    if task == "paired_timing":
+        from kb_workflows.evaluation.baseline_rewrites import plan_for
+
+        plan_for(config.level, problem, payload["ref_arch_src"], variant)
+        payload["eval_config"]["paired_baseline_variant"] = variant
+    count = config.num_perf_trials + 3 if task == "evaluate" and not hidden else 0
+    payload.update(task="origin_audit", _origin_target=task, _origin_timing_seeds=[secrets.randbits(63) for _ in range(count)])
+    payload["eval_config"]["origin_minimum_custom_fraction"] = minimum_custom_fraction
     payload["request_id"] = "kb-" + fingerprint(payload)
     return payload
 
@@ -41,19 +51,22 @@ def main(argv=None):
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--problem", required=True, type=int)
     parser.add_argument("--sample", type=int, default=0)
-    parser.add_argument("--seeds", default="42,43,44")
+    parser.add_argument("--task", choices=("evaluate", "paired_timing"), default="evaluate")
+    parser.add_argument("--hidden", action="store_true", help="Trusted final hidden task, never development feedback")
+    parser.add_argument("--baseline-variant", help="Required for paired_timing; use the selected source-bound baseline variant")
     parser.add_argument("--minimum-custom-fraction", type=float, default=0.95)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     try:
         config = parse_config(["--config", str(args.config), "--stage", "evaluate", "--generation", "local"])
-        payload = prepare(config, args.problem, args.sample, seeds=[int(part) for part in args.seeds.split(",")],
-                          minimum_custom_fraction=args.minimum_custom_fraction)
+        payload = prepare(config, args.problem, args.sample, minimum_custom_fraction=args.minimum_custom_fraction,
+                          task=args.task, hidden=args.hidden, variant=args.baseline_variant)
         if args.output.exists() or args.output.is_symlink():
             raise ValueError("Origin output must be a new path; saved evidence is not overwritten")
         preview = {"task": "origin_audit", "request_sha256": fingerprint(payload), "backend": config.evaluation,
-                   "output": str(args.output.resolve()), "input_seeds": payload["eval_config"]["origin_seeds"],
+                   "output": str(args.output.resolve()), "native_task": payload["_origin_target"],
+                   "hidden": payload["eval_config"]["use_hidden_tests"], "timing_seed_count": len(payload["_origin_timing_seeds"]),
                    "experiments_started": False, "scored_wall_times_replaced": False,
                    "formal_qualification_implemented": False}
         if not args.execute:
