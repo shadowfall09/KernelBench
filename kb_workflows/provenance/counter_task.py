@@ -1,106 +1,229 @@
-"""Parent-owned Nsight Compute invocation; never used as scored latency."""
+"""Native-sequence Nsight collection and replay; diagnostic times never score."""
 
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
+import os
+import re
+import secrets
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from ..common import atomic_json, fingerprint, read_json
-from .work_counters import MAX_BYTES, binding_valid, recipe, record
+from . import origin_task
+from .work_counters import MAX_BYTES, execution_values, parse_csv, recipe, work_totals
 
-CONFIGURATION = "config_file_off; kernel_replay; profiler_API_single_call; base_units; all_children"
+CONFIGURATION = "config_file_off; kernel_replay; profiler_API_native_calls; nvtx_rename; base_units; all_children; cache_none; clocks_none; kernel_names_off"
+PROTOCOL = "kernelbench_pro_native_work_counters_v1"
+MODEL = "kernelbench_pro_native_execution_models_v1"
+
+
+class Profiler:
+    """Capture trusted functions before import; one profiler/NVTX window per call."""
+    def __init__(self, payload, *, functions=None):
+        self.nonce = payload["_native_counter"]["nonce"]
+        if not isinstance(self.nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", self.nonce):
+            raise ValueError("Native counters require a fresh parent-owned capture nonce")
+        self.simulated, self.pid = functions is not None, os.getpid()
+        if functions is None:
+            import torch
+
+            functions = (torch.cuda.profiler.start, torch.cuda.profiler.stop, torch.cuda.nvtx.range_push, torch.cuda.nvtx.range_pop)
+        self.start, self.stop, self.push, self.pop = functions
+        self.windows = []
+
+    @contextmanager
+    def call(self, *, seed, signature, training):
+        window = {"id": len(self.windows) + 1, "seed": seed, "input_signature": signature, "training": training,
+                  "started": False, "stopped": False, "range_balanced": False}
+        window["marker"] = f"kb_native_{self.nonce}_{window['id']}"
+        self.windows.append(window)
+        depth = self.push(window["marker"])
+        if type(depth) is not int or depth < 0:
+            raise ValueError("NVTX push did not create a valid range")
+        try:
+            self.start()
+            window["started"] = True
+            try:
+                yield window
+            finally:
+                self.stop()
+                window["stopped"] = True
+        finally:
+            window["range_balanced"] = self.pop() == depth
 
 
 def command(binary, source, target, report, metrics):
     return [binary, "--config-file", "off", "--profile-from-start", "off", "--replay-mode", "kernel",
-            "--target-processes", "all", "--csv", "--page", "raw", "--print-metric-name", "name",
-            "--print-units", "base", "--print-metric-instances", "none", "--print-summary", "none",
-            "--metrics", ",".join(sorted(metrics)), "--log-file", str(report),
-            sys.executable, "-m", "kb_workflows.provenance.counter_worker", str(source), str(target)]
+            "--cache-control", "none", "--clock-control", "none", "--rename-kernels", "off",
+            "--target-processes", "all", "--nvtx", "--print-nvtx-rename", "kernel",
+            "--csv", "--page", "raw", "--print-metric-name", "name", "--print-units", "base",
+            "--print-metric-instances", "none", "--print-summary", "none", "--metrics", ",".join(sorted(metrics)),
+            "--log-file", str(report), sys.executable, "-m", "kb_workflows.evaluation.evaluate_task",
+            str(source), str(target), "--native-worker"]
 
 
-def validate_call(payload, child, device):
-    from ..analysis.calibration import identity
+def _receipt(value):
+    return fingerprint({k: v for k, v in value.items() if k not in {"receipt_sha256", "metadata", "execution_models"}})
 
-    settings, binding = payload["eval_config"], binding_valid(child.get("binding"))
-    source = payload["ref_arch_src"] if settings["counter_target"] == "reference" else payload["kernel_src"]
+
+def native_contract(payload):
+    """Review binds native settings/role/variant; actual inputs bind separately."""
+    return fingerprint({k: v for k, v in origin_task.native_request(payload).items() if k != "_origin_timing_seeds"})
+
+
+def _observations(value, *, allow_simulated=False):
+    origin = value["origin"]
+    summary = origin_task.replay(origin, allow_simulated=allow_simulated)
+    payload, child = origin["native_request"], value["native_run"]
+    rows = origin_task.validate_native(child, payload, stage="counter", simulated=value["simulated"])
+    if rows != origin["native_runs"]["profile"]["calls"] or child["binding"] != origin["native_runs"]["profile"]["binding"]:
+        raise ValueError("Counter process changed the complete native input/output/mode sequence or device")
+    windows = child["counter_windows"]
+    if (type(child.get("pid")) is not int or child["pid"] <= 0 or len(windows) != len(rows)
+            or not isinstance(value.get("nonce"), str) or not re.fullmatch(r"[0-9a-f]{32}", value["nonce"])):
+        raise ValueError("Missing counter process, nonce or call windows")
+    markers = {}
+    for window, row in zip(windows, rows, strict=True):
+        if (window.get("id") != row["id"] or window.get("marker") != f"kb_native_{value['nonce']}_{row['id']}"
+                or window.get("native_call_sha256") != fingerprint(row) or window.get("seed") != row["seed"]
+                or fingerprint({"signature": window.get("input_signature")}) != row["input_signature_sha256"]
+                or any(window.get(key) is not True for key in ("started", "stopped", "range_balanced", "output_verified", "no_grad"))
+                or any(window.get(key) != row[key] for key in ("training", "training_after"))):
+            raise ValueError("Native counter window is incomplete or rebound")
+        markers[window["marker"]] = []
+    parsed = parse_csv(value["raw_csv"].encode(), value["recipe"], pid=child["pid"])
+    for action in parsed["actions"]:
+        marker = action["identity"]["Kernel Name"]
+        if marker not in markers:
+            raise ValueError("Counter action has no unique trusted native NVTX call; nested/unscoped work is unsupported")
+        markers[marker].append(action)
+    observations = []
+    for row, window, activity in zip(rows, windows, summary["calls"], strict=True):
+        actions = markers[window["marker"]]
+        if activity["id"] != row["id"] or not actions or len(actions) != activity["kernel_count"]:
+            raise ValueError("Native counter launches omit or change source-capture call coverage")
+        observations.append({"id": row["id"], "native_call_sha256": fingerprint(row),
+                             "action_ids": [action["identity"]["ID"] for action in actions],
+                             "work": work_totals(actions, value["recipe"]),
+                             "non_kernel_activity_count": activity["activity_count"] - activity["kernel_count"]})
+    return observations
+
+
+def validate(value, *, allow_simulated=False):
+    try:
+        if (value.get("protocol") != PROTOCOL or value.get("status") != "ok" or value.get("receipt_sha256") != _receipt(value)
+                or type(value.get("simulated")) is not bool or value["simulated"] and not allow_simulated
+                or value.get("scored_wall_times_replaced") is not False or value.get("formal_qualification_implemented") is not False
+                or not value["simulated"] and (value["native_run"].get("counter_simulated") is not False
+                                               or value["origin"]["native_coverage"].get("simulated") is not False)):
+            raise ValueError("Native counter report is missing, changed or simulated")
+        tool = value["tool"]
+        if (tool.get("name") != "ncu" or not re.fullmatch(r"[0-9a-f]{64}", tool.get("sha256", ""))
+                or not isinstance(tool.get("version"), str) or not tool["version"].strip()
+                or tool.get("version_sha256") != hashlib.sha256(tool["version"].encode()).hexdigest()
+                or tool.get("configuration") != CONFIGURATION or tool.get("binary_unchanged") is not True
+                or tool.get("exit_code") != 0 or tool.get("timed_out") is not False):
+            raise ValueError("Native counters lack a completed unchanged Nsight executable identity")
+        if _observations(value, allow_simulated=allow_simulated) != value["calls"]:
+            raise ValueError("Native counter totals differ from raw actions and actual calls")
+        return value
+    except (KeyError, TypeError, AttributeError, OverflowError) as exc:
+        raise ValueError("Incomplete or invalid native counter report") from exc
+
+
+def execution_models(value, calibration, *, allow_simulated=False):
+    validate(value, allow_simulated=allow_simulated)
+    payload = value["origin"]["native_request"]
+    if value["recipe"]["review"].get("native_contract_sha256") != native_contract(payload):
+        raise ValueError("Complete native work review must bind the native configuration, role and baseline variant")
+    settings = payload["eval_config"]
     policy = {"native_tolerance": settings["fp32_tolerance"] if settings["precision"] == "fp32" else 1e-2}
     if settings.get("numerical_validation"):
         from ..numerics.numerical_audit import _spec
 
         _, policy = _spec(payload)
-    expected = {"source_sha256": hashlib.sha256(source.encode()).hexdigest(),
-                "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
-                "evaluation_contract_sha256": fingerprint({"settings": settings}), "precision": settings["precision"],
-                "target": settings["counter_target"], "seed": settings["counter_seed"],
-                "policy_sha256": fingerprint(policy), "device_identity_sha256": identity(device)}
-    if any(binding.get(k) != v for k, v in expected.items()) or not isinstance(child.get("input_signature"), list) or binding["input_signature_sha256"] != fingerprint({"signature": child["input_signature"]}):
-        raise ValueError("Counter child changed source, inputs, policy, seed or execution device")
+    models = []
+    source = payload["ref_arch_src"] if payload.get("_origin_role") == "reference" else payload["kernel_src"]
+    for observed, row in zip(value["calls"], value["native_run"]["calls"], strict=True):
+        if observed["non_kernel_activity_count"]:
+            raise ValueError("Kernel counters cannot establish complete work for native memcpy/memset activities")
+        binding = {"source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+                   "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
+                   "device": value["native_run"]["binding"]["device_fingerprint"], "precision": settings["precision"],
+                   "input_signature_sha256": row["input_signature_sha256"], "policy_sha256": fingerprint(policy)}
+        latency, components = execution_values(binding, value["recipe"], observed["work"], calibration,
+                                               digest=settings["evaluator_sha256"])
+        models.append({"id": row["id"], "native_call_sha256": fingerprint(row), "sol_execution_ms": latency, "components_ms": components})
+    result = {"protocol": MODEL, "counter_receipt_sha256": value["receipt_sha256"], "calibration": calibration, "calls": models,
+              "simulated": value["simulated"], "hardware_counters_collected": not value["simulated"],
+              "interpretation": "reviewed_per_native_call_demands_over_attained_rates; not_a_physical_lower_bound"}
+    result["receipt_sha256"] = fingerprint(result)
+    return result
 
 
-def _collect(payload, *, directory, run=None, binary=None, device_caps=None):
+def audit(payload, *, run=None, binary=None):
     from ..evaluation.tool_runner import binary_identity, environment, process
 
-    settings = payload["eval_config"]
-    if settings.get("use_hidden_tests") or settings.get("device_backend", "cuda") != "cuda":
-        raise ValueError("Nsight counters require a separate public CUDA diagnostic")
-    metrics = recipe(settings["counter_recipe"])
-    simulated = run is not None or binary is not None or device_caps is not None
-    run = run or process
-    deadline = time.monotonic() + settings["timeout"]
-    tool = binary_identity(binary or "ncu", run=run, directory=directory, timeout=max(0, deadline - time.monotonic()))
-    if tool.get("status") != "measured":
-        raise ValueError("Nsight Compute executable/version unavailable or discovery budget expired")
-    if device_caps is None:
-        from ..evaluation.measurement import device_fingerprint
-
-        device_caps = device_fingerprint("cuda:0")
-    source, target, report = directory / "request.json", directory / "worker.json", directory / "counters.csv"
-    atomic_json(source, payload)
-    argv = command(tool["path"], source, target, report, metrics)
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise ValueError("Counter request has no remaining execution budget")
-    result = run(argv, remaining, directory / "application.log", environment=environment())
-    if (result.get("exit_code") != 0 or result.get("timed_out") is not False
-            or not report.is_file() or report.is_symlink() or report.stat().st_size > MAX_BYTES
-            or not target.is_file() or target.is_symlink() or target.stat().st_size > MAX_BYTES):
-        raise ValueError("Nsight counter process timed out, failed or left missing/oversized reports")
-    if hashlib.sha256(Path(tool["path"]).read_bytes()).hexdigest() != tool["sha256"]:
-        raise ValueError("Nsight executable changed during capture")
-    child = read_json(target)
-    if child.get("status") != "ok":
-        raise ValueError("Counter-call qualification failed: " + str(child.get("error")))
-    validate_call(payload, child, device_caps)
-    tool.update(name="ncu", configuration=CONFIGURATION, binary_unchanged=True, exit_code=0, timed_out=False)
-    counters = record(report.read_bytes(), settings["counter_recipe"], child["binding"], tool,
-                      simulated=simulated or child.get("simulated") is not False)
-    # The command/report/call survive the temporary directory for review.
-    return {"status": "ok", "purpose": "work_counters_diagnostics_only", "counters": counters,
-            "call": child, "command": argv, "scored_wall_times_replaced": False,
-            "origin_or_complete_native_coverage_proven": False}
-
-
-def audit(payload, *, run=None, binary=None, device_caps=None):
-    with tempfile.TemporaryDirectory(prefix="kb-counter-parent-") as temporary:
+    origin = None
+    with tempfile.TemporaryDirectory(prefix="kb-native-counter-") as temporary:
         directory = Path(temporary)
         try:
-            return _collect(payload, directory=directory, run=run, binary=binary, device_caps=device_caps)
-        except (ValueError, OSError, RuntimeError, KeyError, TypeError, UnicodeError) as exc:
+            settings = payload["eval_config"]
+            if settings.get("use_hidden_tests") or settings.get("device_backend", "cuda") != "cuda":
+                raise ValueError("Native Nsight counters require public CUDA evaluation or paired timing")
+            metrics = recipe(payload["_native_counter"]["recipe"])
+            runner = run or process
+            deadline = time.monotonic() + settings["timeout"]
+            tool = binary_identity(binary or "ncu", run=runner, directory=directory, timeout=max(0, deadline - time.monotonic()))
+            if tool.get("status") != "measured":
+                raise ValueError("Nsight executable/version unavailable within the original budget")
+            base = copy.deepcopy(payload)
+            base.pop("_native_counter", None)
+            base["task"] = "origin_audit"
+            origin = origin_task.audit(base, run=run, budget_seconds=max(0, (deadline - time.monotonic() - 5) / 2))
+            origin_task.replay(origin, allow_simulated=run is not None)
+            nonce = secrets.token_hex(16)
+            child = origin_task.native_request(base)
+            child.update(_origin_stage="counter", _native_counter={"nonce": nonce}, build_root=str(directory / "build"))
+            child["request_id"] = "kb-" + fingerprint(child)
+            source, target, csv = directory / "request.json", directory / "worker.json", directory / "counters.csv"
+            atomic_json(source, child)
+            argv = command(tool["path"], source, target, csv, metrics)
+            remaining = deadline - time.monotonic() - 5
+            if remaining <= 0:
+                raise ValueError("Native counter collection exhausted its original timeout")
+            result = runner(argv, remaining, directory / "application.log", environment=environment())
+            if (result.get("exit_code") != 0 or result.get("timed_out") is not False
+                    or any(not p.is_file() or p.is_symlink() or p.stat().st_size > MAX_BYTES for p in (csv, target))):
+                raise ValueError("Native Nsight process failed or left missing/excessive reports")
+            if hashlib.sha256(Path(tool["path"]).read_bytes()).hexdigest() != tool["sha256"]:
+                raise ValueError("Nsight executable changed during native collection")
+            document = read_json(target)
+            tool.update(name="ncu", configuration=CONFIGURATION, binary_unchanged=True, exit_code=0, timed_out=False)
+            value = {"protocol": PROTOCOL, "status": "ok", "purpose": "native_work_counters_diagnostics_only",
+                     "origin": origin, "native_run": document, "recipe": payload["_native_counter"]["recipe"], "nonce": nonce,
+                     "raw_csv": csv.read_text(encoding="utf-8-sig"), "tool": tool, "command": argv,
+                     "simulated": run is not None or binary is not None or document.get("counter_simulated") is not False,
+                     "scored_wall_times_replaced": False, "formal_qualification_implemented": False}
+            value["calls"] = _observations(value, allow_simulated=value["simulated"])
+            value["receipt_sha256"] = _receipt(value)
+            return validate(value, allow_simulated=value["simulated"])
+        except (ValueError, OSError, RuntimeError, KeyError, TypeError, AttributeError, UnicodeError, ImportError) as exc:
             artifacts = {}
             for name in ("counters.csv", "application.log", "sanitizer-version.txt", "worker.json"):
                 path = directory / name
-                if not path.is_file() or path.is_symlink():
-                    continue
-                size = path.stat().st_size
-                with path.open("rb") as stream:
-                    raw = stream.read(min(size, 64 * 1024))
-                artifacts[name] = {"bytes": size, "prefix_base64": base64.b64encode(raw).decode(),
-                                   "prefix_sha256": hashlib.sha256(raw).hexdigest(), "complete": len(raw) == size}
-            return {"status": "not_measured", "purpose": "work_counters_diagnostics_only", "reason": str(exc),
-                    "failure_artifacts": artifacts, "scored_wall_times_replaced": False,
-                    "origin_or_complete_native_coverage_proven": False}
+                if path.is_file() and not path.is_symlink():
+                    size = path.stat().st_size
+                    with path.open("rb") as stream:
+                        raw = stream.read(64 * 1024)
+                    artifacts[name] = {"bytes": size, "prefix_base64": base64.b64encode(raw).decode(),
+                                       "prefix_sha256": hashlib.sha256(raw).hexdigest(), "complete": size == len(raw)}
+            return {"status": "not_measured", "purpose": "native_work_counters_diagnostics_only", "reason": str(exc),
+                    "origin": origin, "failure_artifacts": artifacts, "scored_wall_times_replaced": False,
+                    "formal_qualification_implemented": False}

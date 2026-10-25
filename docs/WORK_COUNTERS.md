@@ -1,35 +1,38 @@
-# 工作计数器与审核后的 A/E 分解
+# 原生调用计数器与审核后的 A/E 分解
 
-本路径提供 Nsight Compute 采集入口、原始 CSV 重放和审核工作模型的软件实现。默认只预览；本次没有运行 ncu、GPU、Trainium、模型、容器或校准实验。计数器工件属于独立诊断，不建立完整来源/原生用例覆盖，也不修改正式计分时间。
+计数器采集复用原生评测序列，不再另造一个初始实例测一次前向。默认仅预览；没有运行 ncu、CUPTI、GPU、Neuron、模型、容器或校准实验。所有插桩时间属于诊断，不写回正式分数。
 
-## 入口与范围
-
-对已有候选先预览：
+## 入口
 
 ```bash
 python -m scripts.audit_work_counters --config /path/to/device.toml \
-  --recipe /path/to/counter-recipe.json --problem 2 --sample 0 \
-  --output /path/to/new-counter-report.json
+  --recipe /path/to/recipe.json --problem 2 --sample 0 \
+  --output /path/to/new-counters.json
 ```
 
-预览不导入设备/模型 SDK、不查询工具、不创建输出目录。只有明确要运行采集时才增加 `--execute`；本次仅用模拟executor测试执行分支，没有实际采集。可用 `--target reference` 对参考运行同一采集路径，默认目标为候选。输入 seed 默认 42、可配置；参数初始化和前向 seed 固定为 42。采集复用 local、Docker、Modal 或 HTTP 队列，worker 中需已有 ncu。Neuron 明确拒绝这条 CUDA 路径。
+预览不导入设备SDK、不查工具、不创建输出。仅在实验已授权时增加 `--execute`。执行使用同一总超时：先冻结工具路径、字节与版本，再运行原生对照和CUPTI来源采集，最后在新进程中采集完整序列的计数器；每个阶段均受父进程剩余预算约束。复用local、Docker、Modal、HTTP队列，CUDA工具缺失或Neuron请求不能降级成通过。
 
-worker 保留原构造和实际公开工厂尺寸，预热单独的初始实例，然后测另一个初始实例的一次前向。它在导入候选前固定输入、参考输出、容差和设备身份；可选名义配方仍经现有入口应用。启用 `numerical_validation` 时另作实际输入的独立 FP64 检查，超内存估计包络不缩小尺寸。Profiler start/stop 只包围目标前向和完成屏障；异常也执行 stop。模式或已观察的环境修改拒绝输出资格，可信编译目录在审计前设置并在退出后恢复。
+默认目标为候选的原生 `evaluate`，覆盖双顺序正确性、所有预热和正式计时调用。配对路径使用 `--task paired_timing --baseline-variant eager`，变体须填写实际选中的来源绑定基线；加 `--target reference` 测该真实配对基线，不再用另造的公开参考实例代替。原生初始化、连续状态、输入角色/精度、数值门和实际调用顺序保持原样。旧的单次 `--seed` 路径和 `counter_worker.py` 已移除；原生评测seed来自配置，计时输入计划在候选前冻结。
 
-这不是原生连续状态、全部标准/隐藏用例或参考信号资格的证明。输入与参考注册参数/buffer记录每Tensor最多256点探针，不是完整内容或普通未注册状态哈希。所有工件明确标记该范围；不能将它们直接升级为正式来源或高级证据等级。
+## 逐次采集与重放
 
-## 指标规则
+采集进程在候选导入前捕获profiler start/stop和NVTX push/pop函数。每次被观察的调用使用父进程新nonce和唯一ID标记，独立启停profiler；前向异常也关闭采集并弹出范围，栈深须平衡。NVTX仅关联调用，不作为源码归属证据。
 
-规则只声明要读取的聚合计数器及单位换算。例如下面只报告 DRAM 流量和一个 FP32 指令类别，**不具备完整工作量覆盖资格**：
+ncu禁用用户配置和额外kernel重命名，显式关闭cache flush与时钟控制，采用kernel replay、base units、完整子进程范围和原始逐launch CSV，开启NVTX并将最近push/pop范围打印为标签。不按NVTX过滤或只取前若干kernel。解析须覆盖每项请求指标、实际PID和device；标签必须唯一对应可信窗口，且每个调用的launch数与独立来源采集中的kernel数相等。嵌套NVTX覆盖标签、无范围/后台工作、缺launch或重复身份无法匹配时明确失败，不凭名称猜测或把未知记录丢掉。[NVIDIA CLI说明](https://docs.nvidia.com/nsight-compute/NsightComputeCli/)记录了这些选项；push/pop深度按当前Torch绑定核对。kernel replay仍会改变并发和缓存历史，不保证与未插桩的工作量相同；这些SOL和分解保留为审核后的诊断模型。真实部署的vendor输出仍未实验验证。
+
+原生对照、来源采集和ncu三阶段必须具有相同的完整调用序列：完整逻辑输入/输出字节、布局、模式、seed、顺序、当前源码、精度和设备绑定逐项核对，所有输出仍过原来的数值检查。原生计时样本和窗口由[来源重放](KERNEL_ORIGIN.md)再次检查。设备内存/其他诊断探针仍不在此序列内；跨进程可观察一致不证明未插桩路径或任意参数状态等价。
+
+报告只保留一份原始CSV、源码采集和计数器进程记录，按调用重算计数，不复制整份CSV到每个调用。协议为 `kernelbench_pro_native_work_counters_v1`；`counter_task.validate()`重放全部关联及工作量，不信任保存的passed标记或重封的汇总。旧 `kernelbench_pro_work_counters_v1` 的原始CSV读取和离线模型API仍可用于历史诊断，但不能建立本版原生调用关联。
+
+## 指标与可信审核
+
+规则是显式聚合计数器、单位和正换算系数，不执行Python或正则指标表达式。例如下面只记录DRAM流量，不能声称完整工作量：
 
 ```json
 {
   "protocol": "kernelbench_pro_counter_recipe_v1",
   "coverage": "reported_resources_only",
-  "review": {
-    "reviewer": "counter mapping maintainer",
-    "rationale": "Partial resource report; excludes other arithmetic and engines"
-  },
+  "review": {"reviewer": "maintainer", "rationale": "Partial memory report"},
   "resources": {
     "memory_bytes": {
       "rate_unit": "bytes/s",
@@ -37,43 +40,29 @@ worker 保留原构造和实际公开工厂尺寸，预热单独的初始实例�
         {"metric": "dram__bytes_read.sum", "unit": "byte", "coefficient": 1},
         {"metric": "dram__bytes_write.sum", "unit": "byte", "coefficient": 1}
       ]
-    },
-    "fp32_flops": {
-      "rate_unit": "operations/s",
-      "terms": [
-        {"metric": "smsp__sass_thread_inst_executed_op_ffma_pred_on.sum", "unit": "inst", "coefficient": 2}
-      ]
     }
   }
 }
 ```
 
-不能用示例的 FMA 项代表所有浮点运算，也不能从 Tensor engine busy 时间猜 FLOPs。不同架构、dtype、指令形状和实现需要相应的审核映射；不支持的指标保持失败，不换算成零。规则允许明确的 byte/inst/op/sector 单位和正换算系数，不执行 Python，也不接受 regex 指标表达式。每个 launch 均须具备全部请求指标、相同单位及精确非负 uint64 聚合值；缺项、N/A、缩放单位、分数计数、重复值、实例列表或其他进程/设备数据不能建立完整报告。
+每launch必须有全部请求指标、相同单位及精确非负uint64计数；缺项、N/A、缩放、分数、实例列表、重复值或其他进程/设备数据均不能成为完整报告。浮点/Tensor指令类别与系数需逐架构、dtype和指令审核；不能用一个FMA项或引擎busy比例代表所有运算。
 
-## 采集与重放
+只有 `reviewed_complete_workload` 才能建执行模型。审核保留来源列表、硬件/软件类别和 `workload_contracts` 的来源/参考/输入签名/精度政策/precision；另须用 `review.native_contract_sha256` 绑定原生配置、观察角色和基线变体。预览会打印该摘要；它排除每次的新计时seed与采集参数，实际输入值和完整调用序列由各自收据绑定，不能借用其他基线/模式的审核。审核属于可信控制端输入，不是候选声明或签名认证。
 
-父进程冻结 ncu 路径、文件哈希与版本，禁用用户配置文件，显式选择 kernel replay、base units、完整子进程范围和单次 profiler API 窗口。原始报告保留 launch/PID/context/stream/device 身份，kernel 名称只作为标签。kernel replay 可能序列化或重放设备工作，因此其时间不能替代未插桩时间，也不证明两条路径等价。[Nsight Compute CLI](https://docs.nvidia.com/nsight-compute/NsightComputeCli/)说明了这些选项。
+`--calibration FILE` 在采集后重算每个调用的资源需求/当前设备实测速率；设备、单位或审核不符时保留完整采集，模型标为未测。CUDA memcpy/memset活动没有对应的完整kernel计数，本版拒绝将其自动补零后建立完整执行模型。不能将校准达到的速率称为物理上限。模型协议为 `kernelbench_pro_native_execution_models_v1`，每调用保留自身的SOL与组件，校准仅存一次。
 
-父进程再次核对请求源码、参考、设置、输入签名、精度政策、seed 与实际设备身份；报告 PID 必须对应该次 worker，结束后工具字节也要一致。记录保存原 CSV、换算规则、逐 launch 原值与汇总、来源与设备、输出检查和独立程序收据。整数计数先精确解析，避免经 float 丢失大整数。记录进入当前评测器摘要；CPU/注入 runner 或适配器保留 simulated 标记，不能成为设备测量。
+## 离线原生 A/E/O
 
-超时、工具/报告变更、输出失格、缺指标或解析失败保存 `not_measured` 及有界失败工件：每个日志/报告保留前64 KiB的base64、长度、摘要和是否完整，不把截断内容当完整证据。成功报告也有64 MiB及原始行数上限。该路径沿用现有任务超时和进程清理，不提供 GPU busy 时间的物理硬预算。
+对既有计数器报告，不启动任何工具或设备：
 
-## 执行工作模型与 A/E
-
-只有 `coverage = "reviewed_complete_workload"` 才能构建执行工作模型。审核还须固定 `source_sha256` 列表、硬件/软件类别 `numeric_class_sha256`，以及 `workload_contracts` 中的候选/参考来源 SHA、输入签名 SHA、精度政策 SHA 和 precision；缺项、其他题/形状/精度/政策不能借用完整资格。该审核是可信控制端输入，不是候选自行声明或密码学认证。
-
-在已有完整规则和当前设备校准文件时，可在显式采集命令中增加 `--calibration FILE`。模型校验失败仍保存已完成的计数器报告，退出码为2。也可对现有完整记录离线调用：
-
-```python
-from kb_workflows.provenance.work_counters import execution_model
-from kb_workflows.analysis.performance import decomposition
-
-model = execution_model(counter_record, device_calibration)
-factors = decomposition(wall_ms, busy_ms, sol_algorithm_ms, counters=model)
+```bash
+python -m scripts.analyze_device_trace native /path/to/counters.json \
+  --calibration /path/to/calibration.json --certificate /path/to/bound.json \
+  --output /path/to/new-decomposition.json
 ```
 
-执行 SOL 从原始计数器换算的各资源需求除以相同物理设备的实测率，取最大值；零需求不虚构工作，缺率或单位不同拒绝。分解自动使用该 SOL，重新核对完整记录、审核范围、校准原样本和资源分量。仅有 `status="measured"`/来源字符串或手填 `sol_execution_ms` 不能启用 A/E；缺证据时继续只给 AE/O。与模型不一致的结果保留标记，不判作弊。所用实测率不是已证明的物理极限。
+算法证书复用[Headroom](HEADROOM_SCORING.md)的审核规则：当前参考SHA、精度、实际输入签名与同设备校准须匹配；多种几何可给证书列表，每次恰好匹配一项，缺失或重复不选择性跳过。执行SOL来自当前调用的原始计数，算法SOL来自该调用的审核证书，busy来自原生来源窗口的活动并集；O仅用同一CUPTI时钟的窗口长度/busy，原生对照时间与ncu重放时间分别保存，不混用。
 
-这是数值分析接口，调用者给出的 wall/busy/SOL_alg 尚未被一条完整正式归因门连接到原生结果和执行来源。另有[Neuron Parquet分析与审核模型](NEURON_WORK.md)，可重放逐指令工作注释、独立DMA包及execution/NKI调用点，并用审核后的完整资源映射和同设备校准拆A/E。report/capture可以由维护者人工配对，也可以重放固定Explorer工具、完整工件快照及全部输出的自动处理收据；后者默认预览，只处理已有文件。两者都不提升硬件计数器或正式来源资格。与原生时间/执行来源的完整关联和正式计分门仍由 R-16/R-08 继续实现。设备实验按用户要求不运行，不能用软件回归冒充这些证据。
+每次及每个阶段按 `A=SOL_exec/SOL_alg`、`E=busy/SOL_exec`、`AE=busy/SOL_alg`、`O=window/busy` 报告，阶段使用各自总量之比。没有请求完整模型时A/E保持null；缺活动仍为未知。模型顺序与测量不一致会保留 `model_consistent=false`，不冒充错误答案。模拟输入永远保留simulated且不能成为hardware-counter证据；当前仅有CPU状态模型、模拟采集边界、vendor格式、重封篡改及软件集成回归。
 
-实现见[原始记录与工作模型](../kb_workflows/provenance/work_counters.py)、[父采集器](../kb_workflows/provenance/counter_task.py)、[单次前向](../kb_workflows/provenance/counter_worker.py)、[命令](../scripts/audit_work_counters.py)、[分解](../kb_workflows/analysis/performance.py)和[回归](../tests/provenance/test_work_counters.py)。
+缺工具、工具替换、超时、输出/模式/窗口/launch错配均保存not_measured和有界失败工件。CSV及worker单文件上限64MiB，原始行数上限200000；失败日志保留各自前64KiB、长度、摘要及完整性，截断不是完整证据。来源完整性、未覆盖探针/后端、正式L1/L2门和设备资源硬限继续按原23项跟踪，绝不从诊断状态直接授予资格。

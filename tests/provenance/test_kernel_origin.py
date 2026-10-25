@@ -883,7 +883,7 @@ def native_origin_runner(tmp_path, monkeypatch):
 
     hidden = tmp_path / "private_hidden.py"
     hidden.write_text("import torch\ndef get_hidden_inputs():\n    return [[torch.rand(4)]]\n")
-    action = {"damage": None, "activities": False}
+    action = {"damage": None, "activities": False, "caps": None}
     monkeypatch.setenv("TORCH_EXTENSIONS_DIR", str(tmp_path))
     monkeypatch.setenv("TORCH_USE_CUDA_DSA", "1")
     monkeypatch.setenv("KB_FP32_TOL", "0.0001")
@@ -896,7 +896,7 @@ def native_origin_runner(tmp_path, monkeypatch):
         build = Path(payload["build_root"]) / fingerprint(payload)
         os.environ.update(TORCH_EXTENSIONS_DIR=str(build), TORCH_USE_CUDA_DSA="1", KB_FP32_TOL="0.0001")
         Candidate = native.load_custom_model(payload["kernel_src"], {}, str(build))
-        metadata = {"device_fingerprint": {"available": False, "name": "SIMULATED"},
+        metadata = {"device_fingerprint": action["caps"] or {"available": False, "name": "SIMULATED"},
                     "reference_sha256": fingerprint({"source": payload["ref_arch_src"]}),
                     "kernel_sha256": fingerprint({"source": payload["kernel_src"]}), "precision": "fp32"}
         with torch.no_grad():
@@ -949,8 +949,8 @@ def native_origin_runner(tmp_path, monkeypatch):
         Path(log).write_text("Explicit CPU process simulation; no device collector loaded")
         return {"exit_code": 0, "timed_out": False, "request_wall_seconds": 0.01}
 
-    def audit(*, target="evaluate", hidden=False, mutation="", damage=None, activities=False):
-        action.update(damage=damage, activities=activities)
+    def audit(*, target="evaluate", hidden=False, mutation="", damage=None, activities=False, role="candidate", caps=None):
+        action.update(damage=damage, activities=activities, caps=caps)
         source = ("import torch\nclass ModelNew(torch.nn.Module):\n"
                   "    def __init__(self):\n        super().__init__()\n        self.calls = 0\n"
                   f"    def forward(self, x):\n        self.calls += 1\n{mutation}"
@@ -961,7 +961,10 @@ def native_origin_runner(tmp_path, monkeypatch):
                                    "num_correct_trials": 1, "timeout": 60, "use_hidden_tests": hidden,
                                    "measure_performance": not hidden, "paired_trials": 10,
                                    "evaluator_sha256": evaluator_digest()}}
+        if role == "reference":
+            payload["_origin_role"] = role
         return origin_task.audit(payload, run=runner)
+    audit.runner, audit.invoke = runner, invoke
     return audit
 
 

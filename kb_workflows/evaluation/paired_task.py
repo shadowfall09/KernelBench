@@ -60,8 +60,9 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                 context = environment_guard(changes) if name == "C" else preserve_backend_settings()
                 with context:
                     synchronize(device)
-                    scope = candidate_call(candidate, fresh, device=device, phase="paired_warmup" if trial < warmup else "paired",
-                                           seed=case_seed, label=str(trial), order=order) if name == "C" else nullcontext((models[name], None))
+                    scope = candidate_call(models[name], fresh, device=device, phase="paired_warmup" if trial < warmup else "paired",
+                                           seed=case_seed, label=str(trial), order=order,
+                                           role="candidate" if name == "C" else "reference") if name != "B" else nullcontext((models[name], None))
                     with scope as (execute, observed):
                         started = clock()
                         output = execute(*fresh)

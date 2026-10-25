@@ -85,7 +85,7 @@ python -m scripts.analyze_device_trace native /path/to/origin-result.json \
 
 `O`只使用同一CUPTI时钟下的候选窗口长度除以设备busy并集。窗口包括前向与完成屏障，排除输入/输出摘要及参考调用；它与包含输出消费和其他主机开销的原生计时区间分别命名、分别保存，不混用跨进程的分子分母。按阶段汇总为总窗口长度/总busy，而非逐调用比值的平均；阶段间隙不属于窗口总和。某次缺活动时该次busy、O及完整阶段总量保持null，同时保留已观察量，不能将缺失当零成本。重叠的未知工作仍进入分母；来源未建立时来源轨道继续未知。
 
-此关联尚未把独立ncu前向计数器绑定至相同连续状态下的原生调用，因此A、E、AE保持null，不借用其他seed、状态或形状的模型。所有结果仍是诊断，不修改正式时间、评分或L1；内存探针、其他诊断与Neuron来源继续跟踪。最终隐藏报告限可信分析使用，不作为开发反馈。
+原生ncu采集现复用相同完整调用序列，以唯一NVTX窗口、实际输出及来源kernel数量逐次关联；提供完整审核、同设备校准与逐几何算法证书后，离线分析可重算A/E/AE，详见[工作计数器](WORK_COUNTERS.md)。未请求或证据缺项时保持null，不借用其他seed、状态、基线或形状的模型。所有结果仍是诊断，不修改正式时间、评分或L1；内存探针、其他诊断与Neuron来源继续跟踪。最终隐藏报告限可信分析使用，不作为开发反馈。
 
 ## 使用入口
 
@@ -98,7 +98,7 @@ python -m scripts.audit_kernel_origin --config configs/a6000-feedback.toml \
   --problem 2 --sample 0 --output /tmp/origin-diagnostics/result.json
 ```
 
-只有在实验已授权且环境可用时才追加`--execute`。`--minimum-custom-fraction 0.95`可调整诊断阈值；旧`--seeds`简化循环已移除。默认复核公开原生评测；`--hidden`只用于可信最终隐藏请求；`--task paired_timing --baseline-variant eager`复核显式声明的配对基线变体，应填写实际选中的来源绑定变体。结果路径必须新建，诊断worker日志与结果放在独立目录；失败结果保留已完成阶段及有限日志前缀，不写回原运行的分数、配置或轨迹。
+只有在实验已授权且环境可用时才追加`--execute`。`--minimum-custom-fraction 0.95`可调整诊断阈值；旧`--seeds`简化循环已移除。默认复核公开原生评测；`--hidden`只用于可信最终隐藏请求；`--task paired_timing --baseline-variant eager`复核显式声明的配对基线变体；`--role reference`观察该真实基线调用，应填写实际选中的来源绑定变体。结果路径必须新建，诊断worker日志与结果放在独立目录；失败结果保留已完成阶段及有限日志前缀，不写回原运行的分数、配置或轨迹。
 
 当前实现工作没有执行设备诊断、cuobjdump、CUPTI、容器或模型实验。CPU/模拟回归覆盖真实Triton源码检查、已安装包RECORD静态读取、C ABI布局、句柄复用、Graph克隆/销毁/更新失效、原生内存活动、库产物错绑、非UTF-8日志、并发并集、模式与容差修改、缺工具/丢记录和默认零设备预览。
 

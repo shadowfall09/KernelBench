@@ -7,21 +7,18 @@ import copy
 import json
 from pathlib import Path
 
-from kb_workflows.benchmarks.reference_population import select_run_problems
 from kb_workflows.common import atomic_json, fingerprint, read_json
 from kb_workflows.config import parse_config
-from kb_workflows.engine import evaluate_tasks, task_payload
-from kb_workflows.provenance.work_counters import MODEL, execution_model, recipe
+from kb_workflows.engine import evaluate_tasks
+from kb_workflows.provenance.counter_task import MODEL, execution_models, native_contract
+from kb_workflows.provenance.work_counters import recipe
+from scripts.audit_kernel_origin import prepare as prepare_origin
 
 
-def prepare(config, pid, sid, policy, *, target="candidate", seed=42):
+def prepare(config, pid, sid, policy, *, target="candidate", task="evaluate", variant=None):
     metrics = recipe(policy)
-    if (config.device_backend != "cuda" or config.regrade_manifest or target not in {"candidate", "reference"}
-            or pid not in select_run_problems(config) or not 0 <= sid < config.num_samples
-            or type(seed) is not int or not 0 <= seed < 2**32):
-        raise ValueError("Counter diagnostic needs one selected public CUDA task/sample and uint32 seed")
-    payload = task_payload(config, pid, sid, task="counter_audit")
-    payload["eval_config"].update(counter_recipe=policy, counter_target=target, counter_seed=seed, measure_performance=False)
+    payload = prepare_origin(config, pid, sid, minimum_custom_fraction=0.95, task=task, variant=variant, role=target)
+    payload.update(task="counter_audit", _native_counter={"recipe": policy})
     payload["request_id"] = "kb-" + fingerprint(payload)
     return payload, sorted(metrics)
 
@@ -33,17 +30,20 @@ def main(argv=None):
     parser.add_argument("--problem", required=True, type=int)
     parser.add_argument("--sample", default=0, type=int)
     parser.add_argument("--target", choices=("candidate", "reference"), default="candidate")
-    parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument("--task", choices=("evaluate", "paired_timing"), default="evaluate")
+    parser.add_argument("--baseline-variant", help="Required for paired timing; the actual source-bound baseline")
     parser.add_argument("--calibration", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     try:
         config = parse_config(["--config", str(args.config), "--stage", "evaluate", "--generation", "local"])
-        payload, metrics = prepare(config, args.problem, args.sample, read_json(args.recipe), target=args.target, seed=args.seed)
+        payload, metrics = prepare(config, args.problem, args.sample, read_json(args.recipe), target=args.target,
+                                   task=args.task, variant=args.baseline_variant)
         if args.output.exists() or args.output.is_symlink():
             raise ValueError("Counter output must be a new path")
-        preview = {"task": "counter_audit", "metrics": metrics, "target": args.target, "seed": args.seed,
+        preview = {"task": "counter_audit", "metrics": metrics, "target": args.target, "native_task": args.task,
+                   "native_contract_sha256": native_contract(payload),
                    "request_sha256": fingerprint(payload), "backend": config.evaluation,
                    "calibration_sha256": fingerprint(read_json(args.calibration)) if args.calibration else None,
                    "output": str(args.output.resolve()), "experiments_started": False, "scored_wall_times_replaced": False}
@@ -56,11 +56,11 @@ def main(argv=None):
         _, result = next(evaluate_tasks(runtime, [("counters", payload)]))
         if args.calibration and result.get("status") == "ok":
             try:
-                result["execution_model"] = execution_model(result["counters"], read_json(args.calibration))
+                result["execution_models"] = execution_models(result, read_json(args.calibration))
             except (ValueError, OSError, TypeError, KeyError) as exc:
-                result["execution_model"] = {"status": "not_measured", "reason": str(exc)}
+                result["execution_models"] = {"status": "not_measured", "reason": str(exc)}
         atomic_json(args.output, result)
-        modeled = result.get("execution_model", {}).get("protocol") == MODEL
+        modeled = result.get("execution_models", {}).get("protocol") == MODEL
         model_status = "not_requested" if not args.calibration else ("measured" if modeled else "not_measured")
         print(json.dumps({**preview, "experiments_started": True, "result_status": result.get("status", "error"),
                           "execution_model_status": model_status}, indent=2))

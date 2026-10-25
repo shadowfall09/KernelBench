@@ -237,7 +237,7 @@ def validate_payload(payload):
     if payload.get("task") == "counter_audit":
         from ..provenance.work_counters import recipe
 
-        recipe(payload["eval_config"].get("counter_recipe"))
+        recipe(payload.get("_native_counter", {}).get("recipe"))
     from ..numerics.operator_input_policy import validate_inline as validate_operator_inputs
 
     validate_operator_inputs(payload)

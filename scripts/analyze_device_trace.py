@@ -43,6 +43,8 @@ def native_main(argv=None):
     parser = argparse.ArgumentParser(description="Replay an existing native origin report; never start a collector or workload.")
     parser.add_argument("report", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--calibration", type=Path, help="Existing calibration; requires native counters and certificate")
+    parser.add_argument("--certificate", type=Path, help="Reviewed algorithm certificate or list covering every native geometry")
     args = parser.parse_args(argv)
     try:
         from kb_workflows.provenance.origin_task import MAX_REPORT_BYTES
@@ -55,7 +57,13 @@ def native_main(argv=None):
             raw = stream.read(MAX_REPORT_BYTES + 1)
         if len(raw) > MAX_REPORT_BYTES:
             raise ValueError("Native origin report exceeds the analysis byte limit")
-        result = native_timeline(json.loads(raw))
+        from kb_workflows.provenance.counter_task import PROTOCOL as COUNTERS
+
+        report = json.loads(raw)
+        counters = report if report.get("protocol") == COUNTERS else None
+        result = native_timeline(counters["origin"] if counters is not None else report, counter_report=counters,
+                                 calibration=read_json(args.calibration) if args.calibration else None,
+                                 bound=read_json(args.certificate) if args.certificate else None)
         atomic_json(args.output, result)
         print(args.output)
         return 0 if result["status"] == "measured" else 2

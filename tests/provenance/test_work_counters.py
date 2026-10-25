@@ -8,24 +8,22 @@ import hashlib
 import io
 import json
 import math
-import os
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace as NS
 
 import pytest
-import torch
 
 from kb_workflows import engine
 from kb_workflows.analysis import calibration, performance
 from kb_workflows.common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name
 from kb_workflows.config import RunConfig
 from kb_workflows.numerics.precision_calibration import numeric_class
-from kb_workflows.provenance import counter_task, counter_worker
+from kb_workflows.provenance import counter_task, origin_task
 from kb_workflows.provenance import work_counters as wc
 from scripts.audit_work_counters import prepare
-from tests.numerics.test_input_calibration import CAPS, CPUAdapter
+from tests.numerics.test_input_calibration import CAPS
+from tests.provenance.test_kernel_origin import native_origin_runner as native_origin_runner
 
 READ, WRITE = "dram__bytes_read.sum", "dram__bytes_write.sum"
 FMA = "smsp__sass_thread_inst_executed_op_ffma_pred_on.sum"
@@ -103,7 +101,7 @@ def tool():
         "binary_unchanged": True,
         "exit_code": 0,
         "timed_out": False,
-        "configuration": counter_task.CONFIGURATION,
+        "configuration": "config_file_off; kernel_replay; profiler_API_single_call; base_units; all_children",
     }
 
 
@@ -261,242 +259,190 @@ def test_partial_or_wrongly_bound_work_cannot_separate_algorithm_and_efficiency(
     )
 
 
-def cpu_call(
-    tmp_path,
-    *,
-    wrong=False,
-    numerical=False,
-    tolerance=1e-4,
-    target="candidate",
-    precision="fp32",
-    source=None,
-    events=None,
-):
-    config = RunConfig(
-        level=1,
-        start=2,
-        end=2,
-        generation="local",
-        runs_dir=str(tmp_path),
-        fp32_tolerance=tolerance,
-        precision=precision,
-        numerical_validation=numerical,
-        oracle_memory_mb=64,
-    ).validate()
-    config.run_dir.mkdir(parents=True)
-    (config.run_dir / kernel_name(1, 2, 0)).write_text(
-        source or (SOURCE.replace("a @ b", "a @ b + 1e-5") if wrong else SOURCE)
-    )
-    request, _ = prepare(config, 2, 0, policy(), target=target)
-    from src.eval import load_original_model_and_inputs
 
-    def loader(source, namespace):
-        Model, init, _ = load_original_model_and_inputs(source, namespace)
-        return (
-            Model,
-            init,
-            lambda: [torch.randint(-4, 5, (3, 7)).float() * 0.25, torch.randint(-4, 5, (7, 5)).float() * 0.25],
-        )
-
-    events = [] if events is None else events
-    result = counter_worker.run_call(
-        request,
-        adapter=CPUAdapter(),
-        loader=loader,
-        profiler=NS(start=lambda: events.append("start"), stop=lambda: events.append("stop")),
-    )
-    return config, request, result, events
-
-
-@pytest.mark.parametrize("numerical", [False, True])
-def test_one_public_cpu_call_observes_profiler_boundaries_and_freezes_policy_before_submission(tmp_path, numerical):
-    _, request, result, events = cpu_call(tmp_path, numerical=numerical)
-    assert events == ["start", "stop"] and result["simulated"] and result["binding"]["output_verified"]
-    assert bool(result["numerical_gate"]) == numerical
-    assert result["binding"]["input_signature_sha256"] == fingerprint({"signature": result["input_signature"]})
-    counter_task.validate_call(request, result, CAPS)
-    altered = copy.deepcopy(result)
-    altered["binding"]["source_sha256"] = "f" * 64
-    with pytest.raises(ValueError):
-        counter_task.validate_call(request, altered, CAPS)
-
-
-def test_strict_configured_fp32_tolerance_is_used_in_the_instrumented_call(tmp_path):
-    with pytest.raises(ValueError, match="frozen native"):
-        cpu_call(tmp_path, wrong=True, tolerance=1e-8)
-
-
-def test_parent_ncu_command_uses_only_fixed_arguments_and_simulated_results_stay_simulated(tmp_path):
-    _, request, child, _ = cpu_call(tmp_path)
+@pytest.fixture
+def native_counter_runner(tmp_path, native_origin_runner):
+    report = native_origin_runner(activities=True, caps=CAPS)
     binary = tmp_path / "unscored-ncu-stub"
-    binary.write_text("unscored placeholder, never executed")
+    binary.write_text("Unexecuted software-format fixture")
     binary.chmod(0o700)
-    observed = []
+    events, damage = [], {"kind": None}
 
-    def runner(argv, timeout, log, **kwargs):
-        observed.append(argv)
+    def runner(argv, timeout, log, **options):
         if argv[-1] == "--version":
-            Path(log).write_text("unscored NCU version fixture")
-        else:
-            assert "--config-file" in argv and argv[argv.index("--config-file") + 1] == "off"
-            report = Path(argv[argv.index("--log-file") + 1])
-            report.write_bytes(csv_report(child["binding"]["pid"]))
-            atomic_json(Path(argv[-1]), child)
-        return {"exit_code": 0, "timed_out": False}
+            if damage["kind"] == "sdk":
+                raise ImportError("simulated missing optional profiler SDK")
+            Path(log).write_text("Unscored Nsight native protocol format fixture")
+            return {"exit_code": 0, "timed_out": False}
+        if "--log-file" not in argv:
+            return native_origin_runner.runner(argv, timeout, log, **options)
+        assert "--nvtx" in argv and argv[argv.index("--print-nvtx-rename") + 1] == "kernel"
+        for flag, expected in (("--config-file", "off"), ("--profile-from-start", "off"),
+                               ("--cache-control", "none"), ("--clock-control", "none"), ("--rename-kernels", "off")):
+            assert argv[argv.index(flag) + 1] == expected
+        index = argv.index("-m")
+        payload = json.loads(Path(argv[index + 2]).read_text())
+        active = {"depth": -1}
+        def push(marker):
+            active["depth"] += 1
+            events.append(("push", marker))
+            return active["depth"]
+        def pop():
+            depth = active["depth"]
+            active["depth"] -= 1
+            events.append(("pop", None))
+            return depth
+        profiler = counter_task.Profiler(payload, functions=(lambda: events.append(("start", None)),
+            lambda: events.append(("stop", None)), push, pop))
+        document = origin_task._run_native(payload, lambda: native_origin_runner.invoke(payload), observer=profiler)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(wc.FIELDS)
+        action = 0
+        for window in document["counter_windows"]:
+            for _ in range(2):
+                for metric, unit, count in ((READ, "byte", 32), (WRITE, "byte", 64), (FMA, "inst", 10)):
+                    writer.writerow([action, document["pid"], 1, 2, 0, window["marker"], metric, unit, count])
+                action += 1
+        raw = output.getvalue()
+        if damage["kind"] == "unscoped":
+            raw = raw.replace(document["counter_windows"][0]["marker"], "unscoped_kernel")
+        elif damage["kind"] == "output":
+            document["calls"][-1]["output_content_sha256"] = "f" * 64
+        elif damage["kind"] == "window":
+            document["counter_windows"].pop()
+        elif damage["kind"] == "binary":
+            binary.write_text("changed simulated binary")
+        Path(argv[argv.index("--log-file") + 1]).write_text(raw)
+        Path(log).write_text("CPU native invocation simulation, no profiler or GPU loaded")
+        atomic_json(Path(argv[index + 3]), document)
+        return {"exit_code": 0, "timed_out": damage["kind"] == "timeout"}
 
-    result = counter_task.audit(request, run=runner, binary=str(binary), device_caps=CAPS)
-    assert result["status"] == "ok", result
-    assert len(observed) == 2 and result["counters"]["simulated"]
-    wc.validate(result["counters"], allow_simulated=True)
+    def collect(*, target="evaluate", role="candidate", failure=None, mutation=""):
+        nonlocal report
+        report = native_origin_runner(target=target, role=role, mutation=mutation, activities=True, caps=CAPS)
+        payload = copy.deepcopy(report["native_request"])
+        payload.update(task="counter_audit", _native_counter={"recipe": policy(complete=False)})
+        damage["kind"] = failure
+        events.clear()
+        return counter_task.audit(payload, run=runner, binary=str(binary)), list(events)
+    return collect
 
 
-def test_counter_cli_preview_and_queue_calibration_dispatch_do_not_load_device_sdks(tmp_path):
-    config, request, _, _ = cpu_call(tmp_path)
+def test_native_counters_cover_complete_stateful_sequence_and_both_paired_roles(native_counter_runner):
+    for target, role, count in (("evaluate", "candidate", 7), ("paired_timing", "candidate", 13),
+                                ("paired_timing", "reference", 13)):
+        result, events = native_counter_runner(target=target, role=role)
+        assert result["status"] == "ok", result.get("reason")
+        assert result["simulated"] and len(result["calls"]) == count
+        assert [event[0] for event in events] == ["push", "start", "stop", "pop"] * count
+        assert all(call["work"] == {"memory_bytes": 192, "fp32_flops": 40} for call in result["calls"])
+        assert result["native_run"]["calls"] == result["origin"]["native_runs"]["control"]["calls"]
+        assert not result["scored_wall_times_replaced"] and not result["formal_qualification_implemented"]
+        counter_task.validate(result, allow_simulated=True)
+        with pytest.raises(ValueError, match="simulated"):
+            counter_task.validate(result)
+
+
+def test_native_counters_reject_unmatched_ranges_state_outputs_and_incomplete_captures(native_counter_runner):
+    for failure in ("unscoped", "output", "window", "binary", "timeout"):
+        result, _ = native_counter_runner(failure=failure)
+        assert result["status"] == "not_measured", failure
+        assert "calls" not in result and result["failure_artifacts"]
+    result, _ = native_counter_runner()
+    for damage in (lambda value: value["calls"][0]["work"].update(memory_bytes=1),
+                   lambda value: value["native_run"]["calls"][-1].update(input_content_sha256="e" * 64),
+                   lambda value: value["native_run"]["counter_windows"][0].update(range_balanced=False)):
+        changed = copy.deepcopy(result)
+        damage(changed)
+        changed["receipt_sha256"] = counter_task._receipt(changed)
+        with pytest.raises(ValueError):
+            counter_task.validate(changed, allow_simulated=True)
+    events = []
+    observer = counter_task.Profiler({"_native_counter": {"nonce": "a" * 32}}, functions=(
+        lambda: events.append("start"), lambda: events.append("stop"), lambda marker: 0,
+        lambda: events.append("pop") or 0))
+    with pytest.raises(RuntimeError, match="forward failed"):
+        with observer.call(seed=42, signature=[], training=True):
+            raise RuntimeError("forward failed")
+    assert events == ["start", "stop", "pop"]
+    assert observer.windows[0]["stopped"] and observer.windows[0]["range_balanced"]
+    broken = counter_task.Profiler({"_native_counter": {"nonce": "a" * 32}}, functions=(
+        lambda: events.append("unexpected start"), lambda: None, lambda marker: -1, lambda: -1))
+    with pytest.raises(ValueError, match="valid range"):
+        with broken.call(seed=42, signature=[], training=True):
+            pytest.fail("Invalid NVTX range must not enter the candidate")
+    unavailable, _ = native_counter_runner(failure="sdk")
+    assert unavailable["status"] == "not_measured" and "calls" not in unavailable
+
+
+def test_native_counter_models_replay_per_call_work_review_and_device_rates(native_counter_runner):
+    result, _ = native_counter_runner()
+    rows, payload = result["native_run"]["calls"], result["origin"]["native_request"]
+    source = hashlib.sha256(payload["kernel_src"].encode()).hexdigest()
+    result["recipe"] = policy(source=source)
+    result["recipe"]["review"]["native_contract_sha256"] = counter_task.native_contract(payload)
+    result["recipe"]["review"]["workload_contracts"] = [
+        {"source_sha256": source, "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
+         "input_signature_sha256": row["input_signature_sha256"], "precision": "fp32",
+         "policy_sha256": fingerprint({"native_tolerance": 1e-4})} for row in rows]
+    result["receipt_sha256"] = counter_task._receipt(result)
+    modeled = counter_task.execution_models(result, device_calibration(), allow_simulated=True)
+    assert len(modeled["calls"]) == len(rows) and modeled["simulated"]
+    assert not modeled["hardware_counters_collected"]
+    assert all(row["sol_execution_ms"] == pytest.approx(0.192) for row in modeled["calls"])
+    calibrated = device_calibration()
+    bound = {"protocol": "reviewed_headroom_certificate_v1", "layer": "I", "precision": "fp32",
+             "review": {"reviewer": "unscored format fixture", "rationale": "CPU serialization only"},
+             "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
+             "input_signature": result["origin"]["raw"]["windows"][0]["input_signature"],
+             "calibration_sha256": calibrated["receipt_sha256"],
+             "reference_work": {"memory_bytes": 192}, "algorithm_work": {"memory_bytes": 96}}
+    timeline = performance.native_timeline(result["origin"], counter_report=result, calibration=calibrated,
+                                           bound=bound, allow_simulated=True)
+    assert timeline["execution_model_replayed"] and not timeline["hardware_counters_collected"]
+    for call in timeline["calls"]:
+        assert call["A"] == pytest.approx(2)
+        assert call["sol_algorithm_ms"] * call["A"] * call["E"] * call["O"] == pytest.approx(call["profile_window_wall_ms"])
+        assert not call["model_consistent"]  # Intentionally impossible CPU-format timings are not physical evidence.
+    mismatched = {**bound, "reference_sha256": "f" * 64}
+    with pytest.raises(ValueError, match="mismatch"):
+        performance.native_timeline(result["origin"], counter_report=result, calibration=calibrated,
+                                    bound=mismatched, allow_simulated=True)
+    rebound = copy.deepcopy(result)
+    rebound["recipe"]["review"]["native_contract_sha256"] = "f" * 64
+    rebound["receipt_sha256"] = counter_task._receipt(rebound)
+    with pytest.raises(ValueError, match="native configuration"):
+        counter_task.execution_models(rebound, calibrated, allow_simulated=True)
+    partial = copy.deepcopy(result)
+    partial["recipe"]["coverage"] = "reported_resources_only"
+    partial["receipt_sha256"] = counter_task._receipt(partial)
+    with pytest.raises(ValueError, match="complete reviewed"):
+        counter_task.execution_models(partial, device_calibration(), allow_simulated=True)
+
+
+def test_counter_cli_preview_and_queue_validation_are_sdk_light(tmp_path):
+    config = RunConfig(level=1, start=2, end=2, generation="local", runs_dir=str(tmp_path)).validate()
+    config.run_dir.mkdir(parents=True)
+    (config.run_dir / kernel_name(1, 2)).write_text(SOURCE)
+    request, _ = prepare(config, 2, 0, policy())
     from kb_workflows.runtime.queue_worker import validate_payload
 
     validate_payload(request)
+    with pytest.raises(ValueError, match="explicit paired"):
+        prepare(config, 2, 0, policy(), target="reference")
     calibration_request = engine.task_payload(config, 2, task="calibrate_precision")
     validate_payload(calibration_request)
     calibration_request["kernel_src"] = SOURCE
     with pytest.raises(ValueError, match="no candidate"):
         validate_payload(calibration_request)
-    policy_path = tmp_path / "counter-recipe.json"
+    policy_path, config_path, output = tmp_path / "recipe.json", tmp_path / "config.toml", tmp_path / "result.json"
     atomic_json(policy_path, policy())
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(
-        f'[run]\nlevel=1\nstart=2\nend=2\nruns_dir={json.dumps(str(tmp_path))}\nrun_name="{config.run_name}"\n'
-    )
-    output = tmp_path / "never-created.json"
-    code = (
-        "import sys; from scripts.audit_work_counters import main; "
-        f"assert main({['--config', str(config_path), '--recipe', str(policy_path), '--problem', '2', '--output', str(output)]!r}) == 0; "
-        "assert not any(n in sys.modules for n in ('torch','triton','cupti','harbor','transformers'))"
-    )
-    completed = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, check=True)
-    assert json.loads(completed.stdout)["experiments_started"] is False and not output.exists()
-
-
-@pytest.mark.parametrize("target", ["candidate", "reference"])
-@pytest.mark.parametrize("precision", ["fp16", "bf16"])
-def test_stored_precision_and_reference_target_keep_unrounded_truth_and_do_not_invent_counter_measurements(
-    tmp_path, target, precision
-):
-    _, request, result, events = cpu_call(tmp_path, target=target, precision=precision, numerical=True)
-    assert result["binding"]["precision"] == precision and result["binding"]["target"] == target
-    assert result["numerical_gate"]["reference_qualified"] and events == ["start", "stop"]
-    counter_task.validate_call(request, result, CAPS)
-
-
-def test_profiler_stops_even_when_the_instrumented_forward_raises(tmp_path):
-    events = []
-    source = (
-        "import torch\nclass ModelNew(torch.nn.Module):\n"
-        "    calls=0\n    def forward(self,a,b):\n        ModelNew.calls += 1\n"
-        "        if ModelNew.calls == 2: raise RuntimeError('unit counter call failed')\n        return a @ b\n"
-    )
-    with pytest.raises(RuntimeError, match="unit counter call failed"):
-        cpu_call(tmp_path, source=source, events=events)
-    assert events == ["start", "stop"]
-
-
-@pytest.mark.parametrize("mode", ["self.eval()", "torch.set_grad_enabled(True)"])
-def test_constructor_cannot_weaken_the_frozen_training_and_grad_mode(tmp_path, mode):
-    source = SOURCE.replace(
-        "    def forward", f"    def __init__(self):\n        super().__init__()\n        {mode}\n    def forward"
-    )
-    events = []
-    with pytest.raises(ValueError, match="training/gradient"):
-        cpu_call(tmp_path, source=source, events=events)
-    assert events == []
-
-
-@pytest.mark.parametrize("mutation", ["mode", "environment"])
-def test_trusted_build_setup_is_restored_but_submission_setting_changes_are_rejected(tmp_path, mutation):
-    before = os.environ.get("TORCH_EXTENSIONS_DIR")
-    line = (
-        "self.eval()" if mutation == "mode" else "__import__('os').environ['TORCH_EXTENSIONS_DIR']='submission-change'"
-    )
-    source = SOURCE.replace("        return", f"        {line}\n        return")
-    with pytest.raises(ValueError, match="bindings"):
-        cpu_call(tmp_path, source=source)
-    assert os.environ.get("TORCH_EXTENSIONS_DIR") == before
-
-
-@pytest.mark.parametrize("failure", ["timeout", "metric_missing", "source", "device", "binary_changed"])
-def test_parent_preserves_bounded_failure_artifacts_and_never_returns_partial_counts(tmp_path, failure):
-    _, request, child, _ = cpu_call(tmp_path)
-    binary = tmp_path / "unscored-ncu"
-    binary.write_text("unused fixture tool")
-    binary.chmod(0o700)
-
-    def runner(argv, timeout, log, **kwargs):
-        if argv[-1] == "--version":
-            Path(log).write_text("unscored tool version")
-        else:
-            Path(log).write_text("unscored failure log")
-            raw = csv_report(child["binding"]["pid"])
-            if failure == "metric_missing":
-                raw = b"\n".join(raw.splitlines()[:-1])
-            Path(argv[argv.index("--log-file") + 1]).write_bytes(raw)
-            changed = copy.deepcopy(child)
-            if failure == "source":
-                changed["binding"]["source_sha256"] = "f" * 64
-            if failure == "device":
-                changed["binding"]["device"]["uuid"] = "wrong-worker"
-                changed["binding"]["device_identity_sha256"] = calibration.identity(changed["binding"]["device"])
-            if failure == "binary_changed":
-                binary.write_text("changed during simulated capture")
-            atomic_json(Path(argv[-1]), changed)
-            if failure == "timeout":
-                return {"exit_code": 124, "timed_out": True}
-        return {"exit_code": 0, "timed_out": False}
-
-    result = counter_task.audit(request, run=runner, binary=str(binary), device_caps=CAPS)
-    assert result["status"] == "not_measured" and "counters" not in result
-    assert set(result["failure_artifacts"]) >= {"counters.csv", "application.log"}
-    assert all(item["complete"] for item in result["failure_artifacts"].values())
-
-
-def test_extreme_vendor_exponent_is_a_failed_count_instead_of_a_parser_exception():
-    with pytest.raises(ValueError, match="envelope"):
-        wc.count("1e999999999999999999999999999")
-
-
-def test_failed_offline_model_keeps_the_completed_counter_report(tmp_path, monkeypatch, format_record):
-    from scripts import audit_work_counters as cli
-
-    config, _, _, _ = cpu_call(tmp_path)
-    config_path = tmp_path / "source.toml"
-    config_path.write_text(
-        f'[run]\nlevel=1\nstart=2\nend=2\nruns_dir={json.dumps(str(tmp_path))}\nrun_name="{config.run_name}"\n'
-    )
-    recipe_path, calibration_path, output = (
-        tmp_path / "recipe.json",
-        tmp_path / "invalid-calibration.json",
-        tmp_path / "counter-result.json",
-    )
-    atomic_json(recipe_path, policy())
-    atomic_json(calibration_path, {})
-    monkeypatch.setattr(
-        cli, "evaluate_tasks", lambda *args: iter([("counters", {"status": "ok", "counters": format_record})])
-    )
-    assert (
-        cli.main(
-            [
-                "--config",
-                str(config_path),
-                "--recipe",
-                str(recipe_path),
-                "--problem",
-                "2",
-                "--calibration",
-                str(calibration_path),
-                "--output",
-                str(output),
-                "--execute",
-            ]
-        )
-        == 2
-    )
-    saved = json.loads(output.read_text())
-    assert saved["counters"] == format_record and saved["execution_model"]["status"] == "not_measured"
+    config_path.write_text(f'[run]\nruns_dir={json.dumps(str(tmp_path))}\nrun_name="test_run"\nstart=2\nend=2\ngeneration="local"\n')
+    (tmp_path / "test_run").mkdir()
+    (tmp_path / "test_run" / kernel_name(1, 2)).write_text(SOURCE)
+    code = "from scripts.audit_work_counters import main; import sys; status=main(sys.argv[1:]); assert not {'torch','triton','cupti','harbor'} & set(sys.modules); raise SystemExit(status)"
+    completed = subprocess.run([sys.executable, "-c", code, "--config", str(config_path), "--recipe", str(policy_path),
+                                "--problem", "2", "--output", str(output)], cwd=ROOT, text=True, capture_output=True)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert not output.exists()

@@ -83,6 +83,13 @@ def count(value):
     return int(result)
 
 
+def work_totals(actions, policy):
+    """Shared aggregate-count arithmetic for standalone and native reports."""
+    return {resource: sum(sum(action["metrics"][term["metric"]]["count"] * term["coefficient"]
+                             for term in rule["terms"]) for action in actions)
+            for resource, rule in policy["resources"].items()}
+
+
 def parse_csv(raw, policy, *, pid, device=0):
     units = recipe(policy)
     if not isinstance(raw, bytes) or not 0 < len(raw) <= MAX_BYTES or type(pid) is not int or pid <= 0:
@@ -123,9 +130,7 @@ def parse_csv(raw, policy, *, pid, device=0):
         action["metrics"][name] = {"unit": units[name], "count": count(item["Metric Value"])}
     if not actions or any(set(action["metrics"]) != set(units) for action in actions.values()):
         raise ValueError("Counter report omitted a required metric or has no measured launches")
-    work = {resource: sum(sum(action["metrics"][term["metric"]]["count"] * term["coefficient"]
-                             for term in rule["terms"]) for action in actions.values())
-            for resource, rule in policy["resources"].items()}
+    work = work_totals(actions.values(), policy)
     if any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in work.values()):
         raise ValueError("Counter work overflows its finite quantity envelope")
     return {"actions": list(actions.values()), "work": work, "messages": messages,
@@ -179,24 +184,27 @@ def validate(value, *, allow_simulated=False):
     return value
 
 
-def execution_model(counters, calibration):
+def execution_values(binding, policy, work, calibration, *, digest=None):
     from ..analysis.calibration import validate as validate_calibration
     from ..analysis.headroom import sol
     from ..numerics.precision_calibration import numeric_class
 
-    validate(counters)
-    binding, policy = counters["binding"], counters["recipe"]
-    validate_calibration(calibration, binding["device"])
+    validate_calibration(calibration, binding["device"], digest=digest)
     if (policy["coverage"] != "reviewed_complete_workload"
             or binding["source_sha256"] not in policy["review"]["source_sha256"]
             or {key: binding[key] for key in WORKLOAD_FIELDS} not in policy["review"]["workload_contracts"]
             or numeric_class(binding["device"]) != policy["review"]["numeric_class_sha256"]):
         raise ValueError("Separate A/E needs complete reviewed workload/resource coverage on this device class")
-    work = {k: v for k, v in counters["observed"]["work"].items() if v > 0}
+    work = {k: v for k, v in work.items() if v > 0}
     for name in work:
         if calibration.get("probes", {}).get(name, {}).get("unit") != policy["resources"][name]["rate_unit"]:
             raise ValueError("Counter work and calibration rates use different resource units")
-    latency, components = sol(work, calibration)
+    return sol(work, calibration)
+
+
+def execution_model(counters, calibration):
+    validate(counters)
+    latency, components = execution_values(counters["binding"], counters["recipe"], counters["observed"]["work"], calibration)
     result = {"protocol": MODEL, "counters": counters, "calibration": calibration,
               "sol_execution_ms": latency, "components_ms": components,
               "interpretation": "reviewed_resource_demand_over_attained_rates; not_a_physical_lower_bound"}

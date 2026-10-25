@@ -2,7 +2,7 @@
 
 本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
 
-当前能力为第一至第四十九版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+当前能力为第一至第五十版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
 
 当前版本继续沿用统一入口：
 
@@ -1207,7 +1207,7 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 | V42-01 | 原始工作计数器逐核重放 | 逐launch解析Nsight原始CSV的PID/context/stream/device、精确uint64计数与单位，缺指标、重复、错绑、截断和缩放值不转为零 | `kb_workflows/provenance/work_counters.py` | [M3](MOTIVATION.md#m3) |
 | V42-02 | 审核资源映射与完整实例契约 | 仅完整审核规则可建执行模型，绑定来源/参考、输入几何、精度政策、dtype与设备类别；部分资源计数保留诊断范围 | `kb_workflows/provenance/work_counters.py` | [M3](MOTIVATION.md#m3) |
 | V42-03 | 计数器驱动的A/E分解 | 从原始计数与同物理设备校准率重算资源最大值SOL并自动填A/E；拒绝measured字符串、手填SOL或篡改分量，缺证据只给AE/O | `kb_workflows/analysis/performance.py` | [M3](MOTIVATION.md#m3) |
-| V42-04 | 独立Nsight参考与候选采集 | 初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改 | `kb_workflows/provenance/counter_worker.py` | [M3](MOTIVATION.md#m3) |
+| V42-04 | 独立Nsight参考与候选采集 | 初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改 | `kb_workflows/provenance/counter_task.py`（单次worker已由第50版整合） | [M3](MOTIVATION.md#m3) |
 | V42-05 | 计数器父校验与失败工件保存 | 固定ncu参数和工具身份，重查源码/配置/输入/政策/实际设备及报告PID，超时或失格保留有界原始失败前缀，不产生部分通过 | `kb_workflows/provenance/counter_task.py` | [M2](MOTIVATION.md#m2) |
 | V42-06 | 计数器路由与精度校准队列修复 | 默认SDK轻量预览、显式execute及独立输出，local/Docker/Modal/队列路由；修复队列遗漏calibrate_precision并禁止参考校准带候选 | `scripts/audit_work_counters.py` | [M5](MOTIVATION.md#m5) |
 | V42-07 | 计数器反例与软件集成回归 | CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验 | `tests/provenance/test_work_counters.py` | [M5](MOTIVATION.md#m5) |
@@ -1360,3 +1360,14 @@ R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实�
 | V49-01 | 保存报告重放与原生时间/设备活动关联 | 保存请求与逐次原生时间，收集和离线分析共用来源/设备/覆盖/窗口复核；将对照和采集的原生时间分别关联至同一调用，以同一CUPTI窗口计算busy并集及O，按阶段保留全部调用，缺活动保持null。见[来源文档](KERNEL_ORIGIN.md)、[分析入口](../scripts/analyze_device_trace.py)、[实现](../kb_workflows/analysis/performance.py)。 | [M3](MOTIVATION.md#m3) |
 
 旧的简化诊断报告不能建立本版调用关联；重算失败、模拟采集或缺项不产生正式资格，A/E仍待原生计数器逐调用关联。23项保持20项代码已实现、3项部分实现；没有执行设备、模型、容器或训练实验，原stash未恢复。
+
+
+## 第50版：原生计数器与逐调用 A/E 关联
+
+基础提交为 `5e9149fc407327a2249311792f9ad4c561287dce`。删除独立前向worker，采集和分析继续放在现有模块；共享原生软件夹具，替换重复单次路径与测试。
+
+| 编号 | 功能 | 变化与实现入口 | Motivation |
+| --- | --- | --- | --- |
+| V50-01 | 原生序列计数器与逐调用A/E关联 | 在同一总预算内对照/来源/计数三进程复用完整原生输入、连续调用、输出门和计时；唯一NVTX窗口与来源launch数逐次核对，支持真实配对参考角色；完整审核、同设备校准与算法证书驱动离线A/E/O，失败保留原始工件。见[计数文档](WORK_COUNTERS.md)、[采集](../kb_workflows/provenance/counter_task.py)、[分析](../kb_workflows/analysis/performance.py)。 | [M3](MOTIVATION.md#m3) |
+
+旧的单次seed采集路径已移除，历史CSV仅供原范围离线诊断。未知、非kernel工作未覆盖、错配或模拟记录不能建立完整模型/正式资格。原23项仍为20项代码已实现、3项部分实现；没有执行设备、工具、模型、容器或训练实验，原stash保持原样。

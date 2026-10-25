@@ -14,7 +14,7 @@ from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
 
 
-def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate", hidden=False, variant=None):
+def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate", hidden=False, variant=None, role="candidate"):
     if config.device_backend != "cuda":
         raise ValueError("CUDA origin diagnostics cannot substitute for Neuron binary attribution")
     if config.regrade_manifest:
@@ -28,6 +28,8 @@ def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate"
         raise ValueError("Hidden origin capture requires configured final hidden verification")
     if task == "paired_timing" and variant is None:
         raise ValueError("Paired origin capture requires an explicit baseline variant")
+    if role not in {"candidate", "reference"} or role == "reference" and task != "paired_timing":
+        raise ValueError("Reference capture requires the explicit paired baseline")
     import math
 
     if (type(minimum_custom_fraction) not in (int, float) or not math.isfinite(minimum_custom_fraction)
@@ -41,6 +43,8 @@ def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate"
         payload["eval_config"]["paired_baseline_variant"] = variant
     count = config.num_perf_trials + 3 if task == "evaluate" and not hidden else 0
     payload.update(task="origin_audit", _origin_target=task, _origin_timing_seeds=[secrets.randbits(63) for _ in range(count)])
+    if role == "reference":
+        payload["_origin_role"] = role
     payload["eval_config"]["origin_minimum_custom_fraction"] = minimum_custom_fraction
     payload["request_id"] = "kb-" + fingerprint(payload)
     return payload
@@ -54,6 +58,7 @@ def main(argv=None):
     parser.add_argument("--task", choices=("evaluate", "paired_timing"), default="evaluate")
     parser.add_argument("--hidden", action="store_true", help="Trusted final hidden task, never development feedback")
     parser.add_argument("--baseline-variant", help="Required for paired_timing; use the selected source-bound baseline variant")
+    parser.add_argument("--role", choices=("candidate", "reference"), default="candidate")
     parser.add_argument("--minimum-custom-fraction", type=float, default=0.95)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--execute", action="store_true")
@@ -61,7 +66,7 @@ def main(argv=None):
     try:
         config = parse_config(["--config", str(args.config), "--stage", "evaluate", "--generation", "local"])
         payload = prepare(config, args.problem, args.sample, minimum_custom_fraction=args.minimum_custom_fraction,
-                          task=args.task, hidden=args.hidden, variant=args.baseline_variant)
+                          task=args.task, hidden=args.hidden, variant=args.baseline_variant, role=args.role)
         if args.output.exists() or args.output.is_symlink():
             raise ValueError("Origin output must be a new path; saved evidence is not overwritten")
         preview = {"task": "origin_audit", "request_sha256": fingerprint(payload), "backend": config.evaluation,

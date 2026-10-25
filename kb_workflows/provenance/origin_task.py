@@ -27,6 +27,9 @@ MAX_REPORT_BYTES = 64 * 1024**2
 def _validate(payload):
     settings = payload["eval_config"]
     target = payload.get("_origin_target", payload.get("task", "evaluate"))
+    role = payload.get("_origin_role", "candidate")
+    if role not in {"candidate", "reference"} or role == "reference" and target != "paired_timing":
+        raise ValueError("Reference origin/counters require the explicit native paired baseline")
     if settings.get("device_backend", "cuda") != "cuda":
         raise ValueError("Native origin capture supports CUDA; Neuron association is pending")
     if target not in {"evaluate", "paired_timing"} or settings.get("use_hidden_tests") and target != "evaluate":
@@ -54,9 +57,19 @@ def _validate(payload):
     return target, seeds, threshold
 
 
+def native_request(payload):
+    """Normalize instrumentation and transport without changing native settings."""
+    result = copy.deepcopy(payload)
+    result["task"] = result.get("_origin_target", result.get("task", "evaluate"))
+    for key in ("_origin_target", "_origin_stage", "_native_counter", "request_id", "build_root"):
+        result.pop(key, None)
+    return result
+
+
 class _Calls:
-    def __init__(self, capture, seeds):
+    def __init__(self, capture, seeds, role="candidate"):
         self.capture, self.seeds = capture, seeds
+        self.role = role
         self.rows, self.windows, self.changes = [], {}, []
         self.timings = []
         self.cursor, self.last_seed = 0, None
@@ -84,7 +97,7 @@ class _Calls:
         aliases = layout(args)
         if aliases is None:
             raise ValueError("Native origin cannot describe input storage, offsets and aliases")
-        row = {"id": len(self.rows) + 1, "phase": phase, "seed": seed, "label": label, "order": order,
+        row = {"id": len(self.rows) + 1, "role": self.role, "phase": phase, "seed": seed, "label": label, "order": order,
                "input_content_sha256": fingerprint({"value": signature(args, typed=True)}),
                "input_signature_sha256": fingerprint({"signature": geometry}),
                "input_layout_sha256": fingerprint(aliases),
@@ -118,10 +131,10 @@ def next_seed():
 
 
 @contextmanager
-def candidate_call(model, args, **scope):
+def candidate_call(model, args, *, role="candidate", **scope):
     """Inactive calls retain the exact original callable, with no timed wrapper."""
     state = _ACTIVE.get()
-    yield state.call(model, args, **scope) if state is not None else (model, None)
+    yield state.call(model, args, **scope) if state is not None and state.role == role else (model, None)
 
 
 def snapshot_output(row, output):
@@ -154,13 +167,18 @@ def native_policy(function):
         stage = payload.get("_origin_stage")
         if stage is None:
             return function(payload, *args, **kwargs)
-        if stage not in {"control", "profile"}:
+        if stage not in {"control", "profile", "counter"}:
             raise ValueError("Unknown native origin worker stage")
-        return _run_native(payload, lambda: function(payload, *args, **kwargs))
+        observer = None
+        if stage == "counter":
+            from .counter_task import Profiler
+
+            observer = Profiler(payload)
+        return _run_native(payload, lambda: function(payload, *args, **kwargs), observer=observer)
     return wrapped
 
 
-def _run_native(payload, invoke):
+def _run_native(payload, invoke, *, observer=None):
     _, seeds, _ = _validate(payload)
     from src import eval as native
 
@@ -168,9 +186,11 @@ def _run_native(payload, invoke):
     from .cuda_origin import Capture
     from .origin_binaries import Catalog
 
-    capture = Capture(payload["kernel_src"], candidate_windows_only=True) if payload["_origin_stage"] == "profile" else None
+    role = payload.get("_origin_role", "candidate")
+    source = payload["ref_arch_src"] if role == "reference" else payload["kernel_src"]
+    capture = Capture(source, candidate_windows_only=True) if payload["_origin_stage"] == "profile" else None
     catalog = Catalog() if capture else None
-    state = _Calls(capture, seeds)
+    state = _Calls(observer or capture, seeds, role)
     load, move = native.load_custom_model, native.move_model
     candidates = {}
 
@@ -220,9 +240,7 @@ def _run_native(payload, invoke):
         _ACTIVE.reset(token)
     if evaluator_digest() != payload["eval_config"].get("evaluator_sha256"):
         state.changes.append("evaluator_source")
-    canonical = copy.deepcopy(payload)
-    canonical.pop("_origin_stage")
-    binding = {"native_request_sha256": fingerprint(canonical),
+    binding = {"native_request_sha256": fingerprint(native_request(payload)), "role": role,
                "evaluator_sha256": payload["eval_config"].get("evaluator_sha256"),
                "device_fingerprint": result.get("metadata", {}).get("device_fingerprint"),
                "scope": NATIVE_SCOPE}
@@ -231,6 +249,10 @@ def _run_native(payload, invoke):
                 "native_timings": [{"id": row["id"], "native_call_sha256": fingerprint(row), "wall_ms": elapsed}
                                    for row, elapsed in state.timings],
                 "environment_changes": sorted(set(state.changes))}
+    if observer is not None:
+        document["counter_windows"] = observer.windows
+        document["pid"] = observer.pid
+        document["counter_simulated"] = observer.simulated
     if capture:
         if capture.extensions is not None:
             capture.bind_extensions(capture.extensions.collect(timeout=min(30, payload["eval_config"]["timeout"] / 8)))
@@ -295,7 +317,8 @@ def _coverage(document, payload):
     if ([(row["phase"], row["seed"], row["label"], row["order"]) for row in rows] != expected
             or [row["id"] for row in rows] != list(range(1, len(expected) + 1))
             or document["seeds_consumed"] != len(seeds) or document["environment_changes"]
-            or any(row["called"] is not True or row["verified"] is not True or row.get("no_grad") is not True
+            or any(row.get("role") != payload.get("_origin_role", "candidate")
+                   or row["called"] is not True or row["verified"] is not True or row.get("no_grad") is not True
                    or type(row.get("training")) is not bool or row.get("training_after") != row["training"]
                    or any(not _sha(row.get(key)) for key in ("input_content_sha256", "input_signature_sha256",
                                                              "input_layout_sha256", "output_content_sha256")) for row in rows)):
@@ -314,28 +337,21 @@ def _coverage(document, payload):
                 or receipt.get("first_timed_call_ms") != timings[0]["wall_ms"]
                 or not math.isclose(receipt.get("warmup_total_ms", -1), sum(item["wall_ms"] for item in timings[:3]), rel_tol=1e-12)):
             raise ValueError("Native performance samples differ from their observed candidate calls")
-    if target == "paired_timing" and [pair["candidate_ms"] for pair in metadata["paired_timing"]["pairs"]] != measured:
+    key = "reference_ms" if payload.get("_origin_role") == "reference" else "candidate_ms"
+    if target == "paired_timing" and [pair[key] for pair in metadata["paired_timing"]["pairs"]] != measured:
         raise ValueError("Native paired samples differ from their observed candidate calls")
     return rows
 
 
-def _replay_parts(payload, stages, raw, *, simulated):
-    """One verifier for collection and saved-report analysis; no cached verdicts."""
-    target, _, threshold = _validate(payload)
-    if type(simulated) is not bool:
-        raise ValueError("Native origin simulation state must be explicit")
-    simulated = simulated or raw.get("simulated") is not False
-    canonical = copy.deepcopy(payload)
-    canonical.update(task=target)
-    for key in ("_origin_target", "_origin_stage", "request_id", "build_root"):
-        canonical.pop(key, None)
-    if set(stages) != {"control", "profile"} or payload["eval_config"].get("evaluator_sha256") != evaluator_digest():
+def validate_native(document, payload, *, stage, simulated=False):
+    """Replay one native result, including counter-stage full call sequences."""
+    if payload["eval_config"].get("evaluator_sha256") != evaluator_digest():
         raise ValueError("Native origin stages or evaluator version differ")
-    for stage, document in stages.items():
-        binding = document["binding"]
-        metadata = document["native_result"]["metadata"]
-        if (document.get("protocol") != NATIVE_PROTOCOL or document.get("stage") != stage
-                or binding.get("native_request_sha256") != fingerprint(canonical)
+    binding = document["binding"]
+    metadata = document["native_result"]["metadata"]
+    if (document.get("protocol") != NATIVE_PROTOCOL or document.get("stage") != stage
+                or binding.get("native_request_sha256") != fingerprint(native_request(payload))
+                or binding.get("role") != payload.get("_origin_role", "candidate")
                 or binding.get("evaluator_sha256") != evaluator_digest()
                 or binding.get("scope") != NATIVE_SCOPE
                 or not isinstance(binding.get("device_fingerprint"), dict)
@@ -343,15 +359,27 @@ def _replay_parts(payload, stages, raw, *, simulated):
                 or metadata.get("reference_sha256") != fingerprint({"source": payload["ref_arch_src"]})
                 or metadata.get("kernel_sha256") != fingerprint({"source": payload["kernel_src"]})
                 or metadata.get("precision") != payload["eval_config"]["precision"]):
-            raise ValueError("Native origin stage changed its source, device or request binding")
-        if not simulated:
-            from ..analysis.calibration import identity
+        raise ValueError("Native origin stage changed its source, device or request binding")
+    if not simulated:
+        from ..analysis.calibration import identity
 
-            identity(binding["device_fingerprint"])
-    control, profiled = (_coverage(stages[stage], payload) for stage in ("control", "profile"))
+        identity(binding["device_fingerprint"])
+    return _coverage(document, payload)
+
+
+def _replay_parts(payload, stages, raw, *, simulated):
+    """One verifier for collection and saved-report analysis; no cached verdicts."""
+    _, _, threshold = _validate(payload)
+    if type(simulated) is not bool:
+        raise ValueError("Native origin simulation state must be explicit")
+    simulated = simulated or raw.get("simulated") is not False
+    if set(stages) != {"control", "profile"}:
+        raise ValueError("Native origin control/profile stages are incomplete")
+    control, profiled = (validate_native(stages[stage], payload, stage=stage, simulated=simulated) for stage in ("control", "profile"))
     if control != profiled or stages["control"]["binding"] != stages["profile"]["binding"]:
         raise ValueError("Control/profile native input, output, mode observations or device differ")
-    if (raw.get("candidate_sha256") != hashlib.sha256(payload["kernel_src"].encode()).hexdigest()
+    source = payload["ref_arch_src"] if payload.get("_origin_role") == "reference" else payload["kernel_src"]
+    if (raw.get("candidate_sha256") != hashlib.sha256(source.encode()).hexdigest()
             or raw.get("candidate_windows_only") is not True or raw.get("binding") != stages["profile"]["binding"]
             or len(raw.get("windows", [])) != len(profiled)
             or any(window.get("id") != row["id"] or window.get("native_call_sha256") != fingerprint(row)
@@ -387,7 +415,7 @@ def replay(report, *, allow_simulated=False):
         raise ValueError("Incomplete or invalid native origin report") from exc
 
 
-def audit(payload, *, run=None):
+def audit(payload, *, run=None, budget_seconds=None):
     from ..evaluation.evaluate_task import validate_sources
     from ..evaluation.tool_runner import environment, process
 
@@ -401,11 +429,14 @@ def audit(payload, *, run=None):
         if (not abi_supported() or any(version(package).split("+")[0] != expected for package, expected in (
                 ("cupti-python", "13.3.0"), ("triton", "3.7.0"), ("torch", "2.12.0")))):
             raise ValueError("Native origin requires its pinned CUPTI/Triton/Torch packages and Linux ABI")
-    limit = (payload["eval_config"]["timeout"] - 10) / 2
+    budget = payload["eval_config"]["timeout"] if budget_seconds is None else budget_seconds
+    if not math.isfinite(budget) or budget > payload["eval_config"]["timeout"]:
+        raise ValueError("Origin collection cannot exceed its request budget")
+    limit = (budget - 10) / 2
     if not math.isfinite(limit) or limit <= 0:
         raise ValueError("Origin control/profile need positive budgets including process cleanup")
     runner, stages = run or process, {}
-    deadline = time.monotonic() + payload["eval_config"]["timeout"]
+    deadline = time.monotonic() + budget
 
     def failed(reason, directory):
         log = directory / "worker.log"
@@ -436,11 +467,9 @@ def audit(payload, *, run=None):
                 document = read_json(output)
             except (ValueError, OSError) as exc:
                 return failed(f"Native origin {stage} result cannot be decoded: {exc}", directory)
-            canonical = copy.deepcopy(child)
-            canonical.pop("_origin_stage")
             if (not isinstance(document, dict) or document.get("protocol") != NATIVE_PROTOCOL or document.get("stage") != stage
                     or not isinstance(document.get("binding"), dict)
-                    or document.get("binding", {}).get("native_request_sha256") != fingerprint(canonical)):
+                    or document.get("binding", {}).get("native_request_sha256") != fingerprint(native_request(child))):
                 stages[stage] = document
                 return failed("Native origin worker changed its request binding or stage", directory)
             document["worker_wall_seconds"] = outcome.get("request_wall_seconds")

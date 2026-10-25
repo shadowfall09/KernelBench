@@ -106,7 +106,7 @@ def decomposition(wall_ms, busy_ms, sol_algorithm_ms, *, sol_execution_ms=None, 
             "execution_model_replayed": measured, "work_evidence_kind": evidence_kind}
 
 
-def native_timeline(report, *, allow_simulated=False):
+def native_timeline(report, *, counter_report=None, calibration=None, bound=None, allow_simulated=False):
     """Join replayed native calls to wall and activity intervals from one clock.
 
     CUPTI window duration includes the candidate invocation and completion
@@ -116,12 +116,32 @@ def native_timeline(report, *, allow_simulated=False):
     from ..provenance.origin_task import replay
 
     summary = replay(report, allow_simulated=allow_simulated)
+    models = None
+    if (calibration is None) != (bound is None) or calibration is not None and counter_report is None:
+        raise ValueError("Native A/E requires counters, same-device calibration and reviewed algorithm certificates together")
+    if counter_report is not None:
+        from ..provenance.counter_task import execution_models, validate
+
+        validate(counter_report, allow_simulated=allow_simulated)
+        if counter_report["origin"]["receipt_sha256"] != report["receipt_sha256"]:
+            raise ValueError("Native counters belong to a different source capture/request")
+        if calibration is not None:
+            models = execution_models(counter_report, calibration, allow_simulated=allow_simulated)["calls"]
     raw, coverage = report["raw"], report["native_coverage"]
     if (raw.get("capture_complete") is not True or raw.get("source_intact") is not True
             or raw.get("hooks_intact") is not True or raw.get("errors") != []
             or type(raw.get("dropped_records")) is not int or raw["dropped_records"] != 0):
         raise ValueError("Native timeline requires complete source-bound capture and drop accounting")
     calls, totals = [], {}
+    certificates = {}
+    if models is not None:
+        for item in bound if isinstance(bound, list) else [bound]:
+            if not isinstance(item, dict) or not isinstance(item.get("input_signature"), list):
+                raise ValueError("Native algorithm certificate lacks its input geometry")
+            key = fingerprint({"signature": item["input_signature"]})
+            if key in certificates:
+                raise ValueError("Each native geometry requires exactly one algorithm certificate")
+            certificates[key] = item
     native_times = {stage: {item["id"]: item["wall_ms"] for item in document["native_timings"]}
                     for stage, document in report["native_runs"].items()}
     for observed, window, activity in zip(report["native_runs"]["profile"]["calls"], raw["windows"], summary["calls"], strict=True):
@@ -143,6 +163,26 @@ def native_timeline(report, *, allow_simulated=False):
                       "origin_union_ms": {key: value / 1e6 for key, value in activity["by_origin_union_ns"].items()},
                       "custom_exclusive_fraction_lower_bound": activity["custom_exclusive_fraction_lower_bound"],
                       "origin_verdicts": activity["track_verdicts"]})
+        if models is not None:
+            import hashlib
+
+            from .headroom import certificate
+
+            model = models[len(calls) - 1]
+            if model["id"] != observed["id"] or model["native_call_sha256"] != fingerprint(observed):
+                raise ValueError("Native execution model belongs to another call")
+            selected = certificates.get(observed["input_signature_sha256"])
+            if selected is None:
+                raise ValueError("Each native call needs exactly one reviewed algorithm certificate for its geometry")
+            metadata = {"device_fingerprint": raw["binding"]["device_fingerprint"],
+                        "input_signature": window["input_signature"], "precision": report["native_request"]["eval_config"]["precision"]}
+            checked = certificate(selected, calibration, metadata,
+                                  source_sha256=hashlib.sha256(report["native_request"]["ref_arch_src"].encode()).hexdigest(),
+                                  digest=report["native_request"]["eval_config"]["evaluator_sha256"])
+            algorithm, execution = checked["sol_algorithm_ms"], model["sol_execution_ms"]
+            calls[-1].update(sol_algorithm_ms=algorithm, sol_execution_ms=execution, A=execution / algorithm,
+                             E=busy / execution if busy else None, AE=busy / algorithm if busy else None,
+                             model_consistent=bool(busy and algorithm <= execution <= busy))
         group = totals.setdefault(observed["phase"], {"calls": 0, "profile_window_wall_ms": 0., "observed_device_busy_ms": 0.})
         group["calls"] += 1
         group["profile_window_wall_ms"] += wall
@@ -152,12 +192,24 @@ def native_timeline(report, *, allow_simulated=False):
         group["device_busy_ms"] = group["observed_device_busy_ms"] if complete else None
         group["O"] = group["profile_window_wall_ms"] / group["observed_device_busy_ms"] if complete else None
         group["complete"] = complete
+        if models is not None:
+            selected = [row for row in calls if row["phase"] == phase]
+            algorithm = sum(row["sol_algorithm_ms"] for row in selected)
+            execution = sum(row["sol_execution_ms"] for row in selected)
+            group.update(sol_algorithm_ms=algorithm, sol_execution_ms=execution, A=execution / algorithm,
+                         E=group["observed_device_busy_ms"] / execution if complete else None,
+                         AE=group["observed_device_busy_ms"] / algorithm if complete else None)
     value = {"protocol": "kernelbench_pro_native_timeline_v1", "origin_receipt_sha256": report["receipt_sha256"],
              "status": ("simulated" if coverage["simulated"] else "measured") if all(row["complete"] for row in totals.values()) else "not_measured",
              "calls": calls, "by_phase": totals, "device_fingerprint": raw["binding"]["device_fingerprint"],
              "scope": "same_CUPTI_window_invocation_and_completion; input_output_hashing_and_reference_excluded",
-             "counter_native_call_join_implemented": False, "formal_qualification_implemented": False,
-             "hardware_counters_collected": False, "timings_are_diagnostic": True, "scored_wall_times_replaced": False}
+             "counter_native_call_join_implemented": True, "counter_report_joined": counter_report is not None,
+             "counter_receipt_sha256": counter_report["receipt_sha256"] if counter_report is not None else None,
+             "calibration_sha256": calibration["receipt_sha256"] if models is not None else None,
+             "bound_sha256": fingerprint({"certificates": bound}) if models is not None else None,
+             "execution_model_replayed": models is not None, "formal_qualification_implemented": False,
+             "hardware_counters_collected": counter_report is not None and counter_report["simulated"] is False,
+             "timings_are_diagnostic": True, "scored_wall_times_replaced": False}
     value["receipt_sha256"] = fingerprint(value)
     return value
 

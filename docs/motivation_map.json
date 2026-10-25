@@ -1555,7 +1555,6 @@
         "kb_workflows/provenance/kernel_origin.py",
         "kb_workflows/provenance/work_counters.py",
         "kb_workflows/provenance/counter_task.py",
-        "kb_workflows/provenance/counter_worker.py",
         "scripts/audit_work_counters.py",
         "tests/provenance/test_work_counters.py",
         "docs/WORK_COUNTERS.md",
@@ -1569,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源诊断、launch_only和审核A/E；Neuron完整Parquet/DMA、字节/core采集、快照与Explorer关联及资源模型已有软件实现。现有保存原生报告的请求/源码/设备/输出/窗口重放，逐次绑定对照与采集的原生时间，按同一窗口计算busy/O；原生计数器逐调用关联、Neuron执行所有权与正式归因门继续实现，未运行设备、模型或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA现复用原生完整序列做三进程来源/计数采集，逐次NVTX/输出/模式/launch关联，真实配对参考角色、按调用审核SOL及离线A/E/O已接入。Neuron完整Parquet/DMA、字节/core、快照/Explorer及资源模型已有软件实现；未覆盖内存探针/非kernel工作、Neuron原生所有权与正式归因门继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -4658,10 +4657,10 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/provenance/counter_worker.py",
+        "kb_workflows/provenance/counter_task.py",
         "docs/WORK_COUNTERS.md"
       ],
-      "reason": "初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改"
+      "reason": "初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改；原单次worker已由V50的完整原生序列采集替换"
     },
     {
       "id": "V42-05",
@@ -5108,6 +5107,30 @@
         "docs/KERNEL_ORIGIN.md"
       ],
       "reason": "保存可重放请求，原生计时样本逐项绑定实际调用，重算窗口来源与同一时钟的busy/O；避免借用其他调用的时间、重叠累计和把缺活动当零成本，未关联的计数器不能产生A/E"
+    },
+    {
+      "id": "V50-01",
+      "title": "原生序列计数器与逐调用A/E关联",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/counter_task.py",
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/provenance/work_counters.py",
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/analysis/performance.py",
+        "kb_workflows/runtime/queue_worker.py",
+        "scripts/audit_work_counters.py",
+        "scripts/analyze_device_trace.py",
+        "tests/provenance/test_work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "删除另造初始实例的单次worker，复用原生调用序列和真实配对基线；完整字节/模式、唯一NVTX窗口与source launch数均匹配后，按当前调用计数、同设备校准及审核算法证书重算A/E，避免把其他状态、基线或计数器时间借进正式测量"
     }
   ]
 }
