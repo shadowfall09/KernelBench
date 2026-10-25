@@ -973,12 +973,20 @@ def native_origin_runner(tmp_path, monkeypatch):
         if role == "reference":
             payload["_origin_role"] = role
         return origin_task.audit(payload, run=runner)
-    audit.runner, audit.invoke = runner, invoke
+    def scored(request):
+        payload = origin_task.native_request(request)
+        payload.pop("_origin_timing_seeds", None)
+        payload["eval_config"]["evidence_level"] = "L1"
+        payload["build_root"] = str(tmp_path / "scored-build")
+        return origin_task.native_policy(invoke)(payload)
+
+    audit.runner, audit.invoke, audit.scored = runner, invoke, scored
     return audit
 
 
 def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(native_origin_runner):
-    from kb_workflows.provenance.origin_task import replay
+    from kb_workflows.analysis.performance import native_timeline
+    from kb_workflows.provenance.origin_task import audit, replay, validate_scored
 
     for target, hidden, expected in (("evaluate", False, 8), ("evaluate", True, 8), ("paired_timing", False, 13)):
         result = native_origin_runner(target=target, hidden=hidden)
@@ -989,6 +997,84 @@ def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(nati
         assert all(row["output_verified"] and row["native_call_sha256"] for row in result["raw"]["windows"])
         assert replay(result, allow_simulated=True) == result["summary"]
         assert result["native_coverage"]["memory_probe_included"] is (target == "evaluate" and not hidden)
+        actual = native_origin_runner.scored(result["native_request"])
+        frozen, observed = validate_scored(actual, allow_simulated=True)
+        assert len(observed["calls"]) == expected
+        assert not observed["timed_callable_wrapped"] and not observed["execution_origin_collected"]
+        assert "_origin_timing_seeds" not in observed["native_request"]
+        frozen.update(task="origin_audit", _origin_target=target, _scored_result=actual)
+        linked = audit(frozen, run=native_origin_runner.runner)
+        assert linked["native_coverage"]["scored_call_observations_match"]
+        assert not linked["native_coverage"]["uninstrumented_path_equivalence_proven"]
+        assert not linked["formal_qualification_implemented"] and replay(linked, allow_simulated=True) == linked["summary"]
+        timeline = native_timeline(linked, allow_simulated=True)
+        times = {row["id"]: row["wall_ms"] for row in observed["native_timings"]}
+        assert [row["native_scored_wall_ms"] for row in timeline["calls"]] == [times.get(row["id"]) for row in timeline["calls"]]
+
+
+def test_scored_call_binding_rejects_wrappers_changed_results_and_claimed_qualification(native_origin_runner, monkeypatch, tmp_path, capsys):
+    from kb_workflows.evaluation import evidence
+    from kb_workflows.provenance import origin_task
+
+    original, observed = origin_task._Calls.call, []
+    def call(state, model, args, **scope):
+        execute, row = original(state, model, args, **scope)
+        if state.scored:
+            observed.append(execute is model)
+        return execute, row
+    monkeypatch.setattr(origin_task._Calls, "call", call)
+    template = native_origin_runner()
+    actual = native_origin_runner.scored(template["native_request"])
+    frozen, _ = origin_task.validate_scored(actual, allow_simulated=True)
+    assert observed and all(observed)
+    with pytest.raises(ValueError, match="physical device UUID"):
+        origin_task.validate_scored(actual)
+    for damage in (
+        lambda value: value["metadata"]["native_call_receipt"].update(timed_callable_wrapped=True),
+        lambda value: value["metadata"]["native_call_receipt"]["calls"].pop(),
+        lambda value: value["metadata"]["native_call_receipt"]["calls"][0].update(training_after=False),
+        lambda value: value["metadata"]["native_call_receipt"]["native_timings"][-1].update(wall_ms=999),
+        lambda value: value["runtime_stats"].update(samples_ms=[999, 999]),
+        lambda value: value["metadata"]["native_call_receipt"]["timing_seed_plan"].reverse(),
+    ):
+        changed = copy.deepcopy(actual)
+        damage(changed)
+        receipt = changed["metadata"]["native_call_receipt"]
+        receipt["receipt_sha256"] = fingerprint({k: v for k, v in receipt.items() if k != "receipt_sha256"})
+        with pytest.raises(ValueError):
+            origin_task.validate_scored(changed, allow_simulated=True)
+    changed = copy.deepcopy(frozen)
+    changed["eval_config"]["fp32_tolerance"] = 1
+    with pytest.raises(ValueError, match="observation contract"):
+        origin_task.validate_scored(actual, changed, allow_simulated=True)
+    passed = evidence.check("passed", reason="Synthetic claim without runtime evidence")
+    actual["metadata"]["evidence_receipt"] = evidence.receipt(
+        {name: passed for names in evidence.LEVELS.values() for name in names}, requested="L1")
+    missing = copy.deepcopy(actual)
+    missing["metadata"].pop("native_call_receipt")
+    assert evidence.score_issue(missing, {"evidence_level": "L1"}, "standard") == "missing_or_invalid_scored_call_receipt"
+    assert evidence.score_issue(actual, {"evidence_level": "L1"}, "standard") == "missing_or_invalid_scored_call_receipt"
+    from scripts import audit_kernel_origin as command
+
+    # Only this explicitly simulated CPU fixture bypasses physical identity.
+    # The public CLI and score gate above retain the real-device requirement.
+    validator = origin_task.validate_scored
+    monkeypatch.setattr(origin_task, "validate_scored", lambda result, payload=None, **kwargs:
+                        validator(result, payload, allow_simulated=True))
+    monkeypatch.setattr(command, "task_payload", lambda *args, **kwargs:
+                        copy.deepcopy(actual["metadata"]["native_call_receipt"]["native_request"]))
+    monkeypatch.setattr(command, "evaluate_tasks", lambda *args: pytest.fail("Preview cannot dispatch experiments"))
+    config = tmp_path / "scored.toml"
+    config.write_text('[gpu]\nprofile="H100"\ndevices=[0]\n[run]\nstart=2\nend=2\nevidence_level="L1"\n')
+    results = tmp_path / "results.json"
+    results.write_text(json.dumps({"2_0": actual}))
+    output = tmp_path / "new-preview" / "report.json"
+    capsys.readouterr()
+    assert command.main(["--config", str(config), "--problem", "2", "--scored-result", str(results),
+                         "--output", str(output)]) == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["actual_scored_calls_requested"] and preview["timing_seed_count"] == len(frozen["_origin_timing_seeds"])
+    assert not preview["experiments_started"] and not output.parent.exists()
 
 
 def test_saved_native_replay_rejects_resealed_binding_coverage_and_source_changes(native_origin_runner):

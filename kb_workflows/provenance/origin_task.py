@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import math
 import os
 import sys
@@ -59,22 +60,28 @@ def _validate(payload):
 
 def native_request(payload):
     """Normalize instrumentation and transport without changing native settings."""
-    result = copy.deepcopy(payload)
-    result["task"] = result.get("_origin_target", result.get("task", "evaluate"))
-    for key in ("_origin_target", "_origin_stage", "_native_counter", "request_id", "build_root"):
-        result.pop(key, None)
+    ignored = {"_origin_target", "_origin_stage", "_native_counter", "_scored_result", "request_id", "build_root"}
+    result = copy.deepcopy({key: value for key, value in payload.items() if key not in ignored})
+    result["task"] = payload.get("_origin_target", payload.get("task", "evaluate"))
     return result
 
 
 class _Calls:
-    def __init__(self, capture, seeds, role="candidate"):
+    def __init__(self, capture, seeds, role="candidate", *, scored=False):
         self.capture, self.seeds = capture, seeds
+        self.scored = scored
         self.role = role
         self.rows, self.windows, self.changes = [], {}, []
         self.timings = []
         self.cursor, self.last_seed = 0, None
 
     def next_seed(self):
+        if self.scored:
+            from ..evaluation.measurement import _SEED
+
+            if len(self.seeds) >= MAX_RECORDS:
+                raise ValueError("Excessive native timing seed coverage")
+            self.seeds.append(_SEED(63))
         if self.cursor >= len(self.seeds):
             raise ValueError("Native timing requested more inputs than its frozen plan")
         self.last_seed = self.seeds[self.cursor]
@@ -103,6 +110,12 @@ class _Calls:
                "input_layout_sha256": fingerprint(aliases),
                "called": False, "verified": False, "output_content_sha256": None}
         self.rows.append(row)
+        if self.scored:
+            # This is the callable used by the actual timer. Hashing and mode
+            # observations surround its scope; no forwarding wrapper or extra
+            # synchronization is inserted into the measured interval.
+            row.update(called=True, training=model.training, no_grad=not torch.is_grad_enabled())
+            return model, row
 
         def execute(*values):
             if row["called"]:
@@ -134,7 +147,17 @@ def next_seed():
 def candidate_call(model, args, *, role="candidate", **scope):
     """Inactive calls retain the exact original callable, with no timed wrapper."""
     state = _ACTIVE.get()
-    yield state.call(model, args, **scope) if state is not None and state.role == role else (model, None)
+    if state is None or state.role != role:
+        yield model, None
+        return
+    execute, row = state.call(model, args, **scope)
+    try:
+        yield execute, row
+    finally:
+        if state.scored:
+            import torch
+
+            row.update(training_after=model.training, no_grad=row["no_grad"] and not torch.is_grad_enabled())
 
 
 def snapshot_output(row, output):
@@ -166,6 +189,11 @@ def native_policy(function):
     def wrapped(payload, *args, **kwargs):
         stage = payload.get("_origin_stage")
         if stage is None:
+            settings = payload["eval_config"]
+            if (settings.get("evidence_level") in {"L1", "L2"} and not settings.get("diagnostic_stage")
+                    and settings.get("device_backend", "cuda") == "cuda"
+                    and payload.get("task", "evaluate") in {"evaluate", "paired_timing"}):
+                return _run_scored(payload, lambda: function(payload, *args, **kwargs))
             return function(payload, *args, **kwargs)
         if stage not in {"control", "profile", "counter"}:
             raise ValueError("Unknown native origin worker stage")
@@ -176,6 +204,37 @@ def native_policy(function):
             observer = Profiler(payload)
         return _run_native(payload, lambda: function(payload, *args, **kwargs), observer=observer)
     return wrapped
+
+
+def _document(payload, result, state, stage):
+    binding = {"native_request_sha256": fingerprint(native_request(payload)), "role": state.role,
+               "evaluator_sha256": payload["eval_config"].get("evaluator_sha256"),
+               "device_fingerprint": result.get("metadata", {}).get("device_fingerprint"), "scope": NATIVE_SCOPE}
+    return {"protocol": NATIVE_PROTOCOL, "stage": stage, "binding": binding,
+            "native_result": result, "calls": state.rows, "seeds_consumed": state.cursor,
+            "native_timings": [{"id": row["id"], "native_call_sha256": fingerprint(row), "wall_ms": elapsed}
+                               for row, elapsed in state.timings],
+            "environment_changes": sorted(set(state.changes))}
+
+
+def _run_scored(payload, invoke):
+    if _ACTIVE.get() is not None or "_origin_timing_seeds" in payload:
+        raise ValueError("Scored calls cannot inherit a diagnostic observer or predeclared timing seed plan")
+    request = native_request(payload)
+    state = _Calls(None, [], scored=True)
+    token = _ACTIVE.set(state)
+    try:
+        result = invoke()
+    finally:
+        _ACTIVE.reset(token)
+    frozen = {**request, "_origin_timing_seeds": state.seeds}
+    document = _document(frozen, result, state, "scored")
+    document.pop("native_result")
+    document.update(native_request=request, timing_seed_plan=state.seeds,
+                    timed_callable_wrapped=False, execution_origin_collected=False)
+    document["receipt_sha256"] = fingerprint(document)
+    result.setdefault("metadata", {})["native_call_receipt"] = document
+    return result
 
 
 def _run_native(payload, invoke, *, observer=None):
@@ -240,15 +299,8 @@ def _run_native(payload, invoke, *, observer=None):
         _ACTIVE.reset(token)
     if evaluator_digest() != payload["eval_config"].get("evaluator_sha256"):
         state.changes.append("evaluator_source")
-    binding = {"native_request_sha256": fingerprint(native_request(payload)), "role": role,
-               "evaluator_sha256": payload["eval_config"].get("evaluator_sha256"),
-               "device_fingerprint": result.get("metadata", {}).get("device_fingerprint"),
-               "scope": NATIVE_SCOPE}
-    document = {"protocol": NATIVE_PROTOCOL, "stage": payload["_origin_stage"], "binding": binding,
-                "native_result": result, "calls": state.rows, "seeds_consumed": state.cursor,
-                "native_timings": [{"id": row["id"], "native_call_sha256": fingerprint(row), "wall_ms": elapsed}
-                                   for row, elapsed in state.timings],
-                "environment_changes": sorted(set(state.changes))}
+    document = _document(payload, result, state, payload["_origin_stage"])
+    binding = document["binding"]
     if observer is not None:
         document["counter_windows"] = observer.windows
         document["pid"] = observer.pid
@@ -380,6 +432,54 @@ def validate_native(document, payload, *, stage, simulated=False):
     return _coverage(document, payload)
 
 
+def _scored_contract(payload):
+    request = native_request(payload)
+    request.pop("_origin_timing_seeds", None)
+    request["eval_config"].pop("origin_minimum_custom_fraction", None)
+    return request
+
+
+def validate_scored(result, payload=None, *, allow_simulated=False):
+    """Replay actual timer observations without granting execution ownership."""
+    from ..evaluation.evaluate_task import validate_sources
+
+    try:
+        record = result["metadata"]["native_call_receipt"]
+        request = record["native_request"]
+        if (record.get("timed_callable_wrapped") is not False or record.get("execution_origin_collected") is not False
+                or record.get("receipt_sha256") != fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
+                or request.get("task", "evaluate") not in {"evaluate", "paired_timing"}
+                or "_origin_timing_seeds" in request or request.get("_origin_role", "candidate") != "candidate"
+                or request["eval_config"].get("evidence_level") not in {"L1", "L2"}
+                or request["eval_config"].get("diagnostic_stage")
+                or payload is not None and _scored_contract(request) != _scored_contract(payload)):
+            raise ValueError("Scored native calls changed their receipt, request or observation contract")
+        validate_sources(request)
+        frozen = {**request, "_origin_timing_seeds": record["timing_seed_plan"]}
+        document = {**record, "native_result": result}
+        validate_native(document, frozen, stage="scored", simulated=allow_simulated)
+        return frozen, document
+    except (KeyError, TypeError, AttributeError, OverflowError) as exc:
+        raise ValueError("Missing or invalid actual scored native calls") from exc
+
+
+def read_scored(path, problem, sample, task="evaluate"):
+    """Read one existing native artifact for both origin and counter previews."""
+    if path is None:
+        return None
+    path = Path(path)
+    if not path.is_file() or path.is_symlink():
+        raise ValueError("Scored results must be an existing regular JSON file")
+    with path.open("rb") as stream:
+        data = stream.read(MAX_REPORT_BYTES + 1)
+    if len(data) > MAX_REPORT_BYTES:
+        raise ValueError("Scored results exceed the report byte limit")
+    result = json.loads(data)
+    if isinstance(result, dict) and "metadata" not in result:
+        result = result[f"{problem}_{sample}" + (":0" if task == "paired_timing" else "")]
+    return result
+
+
 def _replay_parts(payload, stages, raw, *, simulated):
     """One verifier for collection and saved-report analysis; no cached verdicts."""
     _, _, threshold = _validate(payload)
@@ -406,6 +506,12 @@ def _replay_parts(payload, stages, raw, *, simulated):
                 "memory_probe_included": bool(payload.get("_origin_target", payload.get("task")) == "evaluate"
                                                and payload.get("_origin_timing_seeds")),
                 "uninstrumented_path_equivalence_proven": False}
+    if "_scored_result" in payload:
+        _, scored = validate_scored(payload["_scored_result"], payload, allow_simulated=simulated)
+        if (scored["calls"] != control
+                or scored["binding"]["device_fingerprint"] != stages["control"]["binding"]["device_fingerprint"]):
+            raise ValueError("Origin replay differs from actual scored calls, outputs, modes or device")
+        coverage["scored_call_observations_match"] = True
     return coverage, summarize(raw, minimum_custom_fraction=threshold)
 
 
@@ -436,6 +542,8 @@ def audit(payload, *, run=None, budget_seconds=None):
 
     target, _, _ = _validate(payload)
     validate_sources(payload)
+    if "_scored_result" in payload:
+        validate_scored(payload["_scored_result"], payload, allow_simulated=run is not None)
     if run is None:
         from importlib.metadata import version
 
@@ -470,6 +578,7 @@ def audit(payload, *, run=None, budget_seconds=None):
             child = copy.deepcopy(payload)
             child.update(task=target, _origin_stage=stage, build_root=str(directory / "build"))
             child.pop("_origin_target", None)
+            child.pop("_scored_result", None)
             child["request_id"] = "kb-" + fingerprint(child)
             source, output = directory / "request.json", directory / "result.json"
             atomic_json(source, child)

@@ -12,9 +12,11 @@ from kb_workflows.benchmarks.reference_population import select_run_problems
 from kb_workflows.common import atomic_json, fingerprint
 from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks, task_payload
+from kb_workflows.provenance.origin_task import read_scored
 
 
-def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate", hidden=False, variant=None, role="candidate"):
+def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate", hidden=False, variant=None, role="candidate",
+            scored_result=None):
     if config.device_backend != "cuda":
         raise ValueError("CUDA origin diagnostics cannot substitute for Neuron binary attribution")
     if config.regrade_manifest:
@@ -42,10 +44,16 @@ def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate"
         plan_for(config.level, problem, payload["ref_arch_src"], variant)
         payload["eval_config"]["paired_baseline_variant"] = variant
     count = config.num_perf_trials + 3 if task == "evaluate" and not hidden else 0
-    payload.update(task="origin_audit", _origin_target=task, _origin_timing_seeds=[secrets.randbits(63) for _ in range(count)])
+    seeds = [secrets.randbits(63) for _ in range(count)] if scored_result is None else []
+    payload.update(task="origin_audit", _origin_target=task, _origin_timing_seeds=seeds)
     if role == "reference":
         payload["_origin_role"] = role
     payload["eval_config"]["origin_minimum_custom_fraction"] = minimum_custom_fraction
+    if scored_result is not None:
+        from kb_workflows.provenance.origin_task import validate_scored
+
+        frozen, _ = validate_scored(scored_result, payload)
+        payload.update(_origin_timing_seeds=frozen["_origin_timing_seeds"], _scored_result=scored_result)
     payload["request_id"] = "kb-" + fingerprint(payload)
     return payload
 
@@ -59,14 +67,16 @@ def main(argv=None):
     parser.add_argument("--hidden", action="store_true", help="Trusted final hidden task, never development feedback")
     parser.add_argument("--baseline-variant", help="Required for paired_timing; use the selected source-bound baseline variant")
     parser.add_argument("--role", choices=("candidate", "reference"), default="candidate")
+    parser.add_argument("--scored-result", type=Path, help="Existing L1/L2 native result or result map; reuse its actual calls/seeds")
     parser.add_argument("--minimum-custom-fraction", type=float, default=0.95)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     try:
         config = parse_config(["--config", str(args.config), "--stage", "evaluate", "--generation", "local"])
+        scored = read_scored(args.scored_result, args.problem, args.sample, args.task)
         payload = prepare(config, args.problem, args.sample, minimum_custom_fraction=args.minimum_custom_fraction,
-                          task=args.task, hidden=args.hidden, variant=args.baseline_variant, role=args.role)
+                          task=args.task, hidden=args.hidden, variant=args.baseline_variant, role=args.role, scored_result=scored)
         if args.output.exists() or args.output.is_symlink():
             raise ValueError("Origin output must be a new path; saved evidence is not overwritten")
         preview = {"task": "origin_audit", "request_sha256": fingerprint(payload), "backend": config.evaluation,
@@ -74,6 +84,7 @@ def main(argv=None):
                    "hidden": payload["eval_config"]["use_hidden_tests"], "timing_seed_count": len(payload["_origin_timing_seeds"]),
                    "experiments_started": False, "scored_wall_times_replaced": False,
                    "formal_qualification_implemented": False}
+        preview["actual_scored_calls_requested"] = scored is not None
         if not args.execute:
             print(json.dumps(preview, indent=2))
             return 0

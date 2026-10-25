@@ -1428,7 +1428,7 @@
         "kb_workflows/evaluation/measurement.py",
         "kb_workflows/evaluation/paired_task.py"
       ],
-      "reason": "已有CUDA/Triton/C++、wheel库和Graph来源诊断；复用原生对照/采集，逐次绑定双顺序正确性、预热/计时、隐藏、配对与真实显存探针的完整字节/布局/模式/seed。显存输出和FP64独立覆盖、原始峰值及隔离副本增量已核对；其他独立诊断、未支持loader/compiler、Neuron来源和正式轨道门继续实现，未知不通过"
+      "reason": "已有CUDA/Triton/C++、wheel库和Graph来源诊断，完整公共/隐藏/预热/计时/配对/显存调用覆盖；L1/L2实际进程新增无转发计时包装的逐次收据，按实际seed、输出、模式和设备与重放关联，评分要求实际收据。观察一致不证明未插桩路径等价；其他诊断、未支持loader/compiler、Neuron来源及充分的正式门继续实现"
     },
     {
       "id": "R-09",
@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列现含真实显存探针的验证/峰值关联，三进程逐次NVTX/输出/模式/launch核对、配对参考角色、按调用审核SOL及离线A/E/O已接入。Neuron Parquet/DMA、字节/core、快照/Explorer及资源模型已有软件实现；其他诊断/非kernel工作、Neuron原生所有权及正式归因门继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA原生序列、显存、逐次NVTX/输出/模式/launch核对、配对参考、按调用SOL及A/E/O已接入。实际计时进程收据与重放关联，离线单列actual/control/profile时间且不混用时钟。Neuron Parquet/DMA及资源模型已有软件实现；非kernel工作、Neuron所有权和充分的正式归因门继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5194,6 +5194,29 @@
         "docs/RESOURCE_BUDGETS.md"
       ],
       "reason": "补齐原生agent使用Modal验证的资源契约：共享nonce准入阻止重放，远端父进程记录实际worker墙钟，客户端绑定请求并有界等待/取消，未知不退款且不继续花费；复用现有预算与恢复，避免再造远端账本"
+    },
+    {
+      "id": "V54-01",
+      "title": "原始计时可调用对象与实际调用收据",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/analysis/performance.py",
+        "scripts/audit_kernel_origin.py",
+        "tests/provenance/test_kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md",
+        "scripts/audit_work_counters.py",
+        "tests/provenance/test_work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "把来源重放与实际原生计时进程接起来：区间内保留原始model对象，区间外记录实际字节/模式/seed/时间，重放完整核对并分列实际时间；L1/L2缺收据不能仅靠passed标记获得资格，观察一致不被升级为执行来源证明"
     }
   ]
 }

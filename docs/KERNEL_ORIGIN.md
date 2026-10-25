@@ -62,6 +62,12 @@ v4原始收据新增`graph_updates`：保留API/context/correlation、目标节�
 
 两阶段的`native_result`和墙钟耗时仅供诊断，不能写回正式计时、基线或评分。对照阶段也带有调用观察与额外同步，因此逐次字节一致不证明未观察的原生进程采用相同执行路径。CUDA原生峰值显存前向现已验证并作为独立memory窗口纳入：核对输入、输出、原始allocator峰值及验证副本分配增量，FP64收据也有独立memory类别。其他独立诊断仍未纳入。没有通过本轮授予L1或正式轨道资格。
 
+L1/L2请求的实际CUDA `evaluate`和`paired_timing`进程现另存`metadata.native_call_receipt`。它记录实际输入/输出逻辑字节、布局、模式、调用顺序及原生计时，并在生成后冻结实际计时seed；不提前公布新seed计划。输入摘要和前后模式观察位于计时区间外，计时器仍调用原始model对象，不插入转发包装器、CUPTI或额外同步。`current`/L0和独立诊断不启用这份观察。观察增加区间外工作，可能影响缓存；未运行设备实验来量化这种影响，也不声称计时完全不受观察影响。
+
+保存的计分结果可通过`--scored-result`关联至后续诊断：它接受单个原生结果，或按题目/样本选择`eval_results.json`、隐藏结果、`paired_results.json`中的结果。请求、源码、设备、seed、原生时间样本和逐次输出均重放核对，随后对照/采集必须与实际观察一致。原生收据缺失、错配或设备身份未知会拒绝，不用新抽取的seed补造实际观察；参考角色目前不接受候选角色的实际收据。最终重复的非默认请求应通过保存的完整请求显式关联，不能借用另一重复或种子。
+
+L1/L2评分入口也要求有效的实际调用收据，不能只填一组passed标记。该要求是正式来源门的必要条件；观察匹配仍不证明未启用CUPTI时使用相同执行路径，也不建立二进制所有权或充分的正式资格。
+
 占比使用同一设备、调用窗口内GPU activity的时间区间并集。自写时间只计入没有与任何非自写活动重叠的部分；并发stream不能重复累加。分别报告custom/library/framework/runtime/unknown的区间并集，这些分类小计之间可以重叠，不能直接相加成总busy时间。每次调用分别检查，不能用一个长调用掩盖其他调用。
 
 `track_verdicts.custom`要求来源完整且每次保守自写占比达到阈值；`track_verdicts.library`允许已建立来源的库、框架和运行时工作，不要求自写占比。库优化不是错误答案，custom门失败也不修改原生正确性。缺活动、丢失记录、未平衡回调、source/hook/模式变化、SDK错误或任一未知活动使相关轨道保持`not_measured`。诊断不能建立正式轨道资格；`formal_qualification_implemented`仍为false。
@@ -97,6 +103,8 @@ python -m scripts.analyze_device_trace native /path/to/origin-result.json \
 python -m scripts.audit_kernel_origin --config configs/a6000-feedback.toml \
   --problem 2 --sample 0 --output /tmp/origin-diagnostics/result.json
 ```
+
+使用已有L1/L2计分调用观察时，在同一配置下追加`--scored-result /path/to/eval_results.json`；默认仍只预览并验证既有文件，不启动设备。旧结果没有调用收据时必须明确失败，不能事后重放并冒充原进程。
 
 只有在实验已授权且环境可用时才追加`--execute`。`--minimum-custom-fraction 0.95`可调整诊断阈值；旧`--seeds`简化循环已移除。默认复核公开原生评测；`--hidden`只用于可信最终隐藏请求；`--task paired_timing --baseline-variant eager`复核显式声明的配对基线变体；`--role reference`观察该真实基线调用，应填写实际选中的来源绑定变体。结果路径必须新建，诊断worker日志与结果放在独立目录；失败结果保留已完成阶段及有限日志前缀，不写回原运行的分数、配置或轨迹。
 

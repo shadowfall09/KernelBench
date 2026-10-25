@@ -69,4 +69,14 @@ def score_issue(result, settings, scope):
     if settings.get("strict_validation"):
         if any(not accepted(record["checks"].get(name)) for name in LEVELS["L0"]):
             return "strict_validation_evidence_incomplete"
+    if requested in {"L1", "L2"}:
+        from ..provenance.origin_task import validate_scored
+
+        try:
+            request, _ = validate_scored(result)
+        except (ValueError, OSError):
+            return "missing_or_invalid_scored_call_receipt"
+        if (request["eval_config"].get("evidence_level") != requested
+                or bool(request["eval_config"].get("use_hidden_tests")) != (scope == "hidden")):
+            return "scored_call_scope_or_level_mismatch"
     return None

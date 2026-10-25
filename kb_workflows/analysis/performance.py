@@ -144,6 +144,9 @@ def native_timeline(report, *, counter_report=None, calibration=None, bound=None
             certificates[key] = item
     native_times = {stage: {item["id"]: item["wall_ms"] for item in document["native_timings"]}
                     for stage, document in report["native_runs"].items()}
+    scored = report["native_request"].get("_scored_result")
+    scored_times = ({item["id"]: item["wall_ms"] for item in scored["metadata"]["native_call_receipt"]["native_timings"]}
+                    if scored is not None else {})
     for observed, window, activity in zip(report["native_runs"]["profile"]["calls"], raw["windows"], summary["calls"], strict=True):
         if observed["id"] != window["id"] or observed["id"] != activity["id"]:
             raise ValueError("Native timeline call/window/activity identities differ")
@@ -157,6 +160,7 @@ def native_timeline(report, *, counter_report=None, calibration=None, bound=None
                       "profile_window_wall_ms": wall, "device_busy_ms": busy if busy else None,
                       "native_control_wall_ms": native_times["control"].get(observed["id"]),
                       "native_profile_wall_ms": native_times["profile"].get(observed["id"]),
+                      "native_scored_wall_ms": scored_times.get(observed["id"]),
                       "uncovered_wall_ms": max(0, wall - busy) if busy else None, "O": wall / busy if busy else None,
                       "A": None, "E": None, "AE": None, "kernel_count": activity["kernel_count"],
                       "activity_count": activity["activity_count"], "unknown_activity_count": activity["unknown_activity_count"],

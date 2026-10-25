@@ -318,10 +318,14 @@ def native_counter_runner(tmp_path, native_origin_runner):
         atomic_json(Path(argv[index + 3]), document)
         return {"exit_code": 0, "timed_out": damage["kind"] == "timeout"}
 
-    def collect(*, target="evaluate", role="candidate", failure=None, mutation=""):
+    def collect(*, target="evaluate", role="candidate", failure=None, mutation="", scored=False):
         nonlocal report
         report = native_origin_runner(target=target, role=role, mutation=mutation, activities=True, caps=CAPS)
         payload = copy.deepcopy(report["native_request"])
+        if scored:
+            actual = native_origin_runner.scored(payload)
+            payload, _ = origin_task.validate_scored(actual, allow_simulated=True)
+            payload.update(_origin_target=target, _scored_result=actual)
         payload.update(task="counter_audit", _native_counter={"recipe": policy(complete=False)})
         damage["kind"] = failure
         events.clear()
@@ -332,12 +336,13 @@ def native_counter_runner(tmp_path, native_origin_runner):
 def test_native_counters_cover_complete_stateful_sequence_and_both_paired_roles(native_counter_runner):
     for target, role, count in (("evaluate", "candidate", 8), ("paired_timing", "candidate", 13),
                                 ("paired_timing", "reference", 13)):
-        result, events = native_counter_runner(target=target, role=role)
+        result, events = native_counter_runner(target=target, role=role, scored=role == "candidate")
         assert result["status"] == "ok", result.get("reason")
         assert result["simulated"] and len(result["calls"]) == count
         assert [event[0] for event in events] == ["push", "start", "stop", "pop"] * count
         assert all(call["work"] == {"memory_bytes": 192, "fp32_flops": 40} for call in result["calls"])
         assert result["native_run"]["calls"] == result["origin"]["native_runs"]["control"]["calls"]
+        assert result["origin"]["native_coverage"].get("scored_call_observations_match", False) is (role == "candidate")
         assert not result["scored_wall_times_replaced"] and not result["formal_qualification_implemented"]
         counter_task.validate(result, allow_simulated=True)
         with pytest.raises(ValueError, match="simulated"):
