@@ -1428,7 +1428,7 @@
         "kb_workflows/evaluation/measurement.py",
         "kb_workflows/evaluation/paired_task.py"
       ],
-      "reason": "已有CUDA/Triton/C++产物、wheel库和Graph代次诊断；现替换3-seed简化循环，复用原生主流程做独立对照/采集，逐次绑定双顺序正确性、预热/计时、隐藏和配对调用及完整字节/布局/模式/seed，并优化窗口联结。内存探针/其他诊断、Runtime/其他编译器、Neuron来源和正式轨道门仍继续实现，未知不通过"
+      "reason": "已有CUDA/Triton/C++、wheel库和Graph来源诊断；复用原生对照/采集，逐次绑定双顺序正确性、预热/计时、隐藏、配对与真实显存探针的完整字节/布局/模式/seed。显存输出和FP64独立覆盖、原始峰值及隔离副本增量已核对；其他独立诊断、未支持loader/compiler、Neuron来源和正式轨道门继续实现，未知不通过"
     },
     {
       "id": "R-09",
@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA现复用原生完整序列做三进程来源/计数采集，逐次NVTX/输出/模式/launch关联，真实配对参考角色、按调用审核SOL及离线A/E/O已接入。Neuron完整Parquet/DMA、字节/core、快照/Explorer及资源模型已有软件实现；未覆盖内存探针/非kernel工作、Neuron原生所有权与正式归因门继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列现含真实显存探针的验证/峰值关联，三进程逐次NVTX/输出/模式/launch核对、配对参考角色、按调用审核SOL及离线A/E/O已接入。Neuron Parquet/DMA、字节/core、快照/Explorer及资源模型已有软件实现；其他诊断/非kernel工作、Neuron原生所有权及正式归因门继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5131,6 +5131,29 @@
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "删除另造初始实例的单次worker，复用原生调用序列和真实配对基线；完整字节/模式、唯一NVTX窗口与source launch数均匹配后，按当前调用计数、同设备校准及审核算法证书重算A/E，避免把其他状态、基线或计数器时间借进正式测量"
+    },
+    {
+      "id": "V51-01",
+      "title": "显存前向输出、峰值与来源关联",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "src/eval.py",
+        "kb_workflows/evaluation/measurement.py",
+        "kb_workflows/evaluation/timed_numerics.py",
+        "kb_workflows/numerics/input_calibration.py",
+        "kb_workflows/provenance/origin_task.py",
+        "tests/evaluation/test_baseline_timing.py",
+        "tests/provenance/test_kernel_origin.py",
+        "tests/provenance/test_work_counters.py",
+        "docs/TIMED_NUMERICS.md"
+      ],
+      "reason": "额外显存前向也必须输出正确，不能绕过最后一次验证；隔离副本和参考检查不应污染候选峰值或RNG，原始/调整读数及独立memory覆盖进入原生来源与计数器重放"
     }
   ]
 }

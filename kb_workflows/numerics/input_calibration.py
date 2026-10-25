@@ -337,7 +337,7 @@ def issue(result, payload):
         elif phase == "paired_timing":
             required = (settings.get("paired_trials", 30) + 3) * 3
         elif phase == "evaluate" and settings.get("measure_performance", not settings.get("use_hidden_tests")):
-            required = settings["num_perf_trials"] + 3
+            required = settings["num_perf_trials"] + 3 + (settings.get("device_backend", "cuda") == "cuda")
         if (receipt.get("record_sha256") != row["receipt_sha256"] or receipt.get("recipe") != row["selected_recipe"]
                 or receipt.get("reference_population_sha256") != population_sha
                 or receipt.get("shapes_resized") is not False

@@ -30,7 +30,8 @@ def requirements(payload):
     if phase == "paired_timing":
         return {"timing": (settings.get("paired_trials", 30) + 3) * 3}
     if phase == "evaluate" and settings.get("measure_performance", not settings.get("use_hidden_tests")):
-        return {"first": 1, "timing": settings["num_perf_trials"] + 3}
+        return {"first": 1, "timing": settings["num_perf_trials"] + 3,
+                **({"memory": 1} if settings.get("device_backend", "cuda") == "cuda" else {})}
     return {}
 
 
@@ -66,10 +67,10 @@ def observe(reference, inputs, expected, actual, prepared, report):
     from .measurement import input_signature
 
     scope = prepared["scope"]
-    if scope not in {"first", "timing", "control"}:
+    if scope not in {"first", "timing", "memory", "control"}:
         raise ValueError("Unknown independent numerical output scope")
     record = state["payload"]["eval_config"].get("precision_profile")
-    if record is not None and scope in {"first", "timing"}:
+    if record is not None and scope in {"first", "timing", "memory"}:
         if fingerprint({"signature": input_signature(inputs)}) != record["fit"][0]["input_signature_sha256"]:
             raise ValueError("Nominal dimensions/dtype differ from the device-fitted precision contract")
     state["rows"].append({"label": f"output/{len(state['rows'])}", "seed": None,
@@ -127,7 +128,7 @@ def issue(result, payload):
         rows = audit.get("cases") if isinstance(audit, dict) else None
         if (not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
                 or [row.get("label") for row in rows] != [f"output/{i}" for i in range(len(rows))]
-                or any(row.get("scope") not in {"first", "timing", "control"} or row.get("seed") is not None
+                or any(row.get("scope") not in {"first", "timing", "memory", "control"} or row.get("seed") is not None
                     or row.get("pre_reference_forward") is not True for row in rows)
                 or audit.get("oracle_spec_sha256") != fingerprint(spec) or audit.get("policy") != policy
                 or audit.get("oracle_memory_mb") != payload["eval_config"]["oracle_memory_mb"]):

@@ -574,6 +574,7 @@ def test_varied_timing_replays_neuron_rng_for_the_oracle_then_restores_candidate
         get_rng_state=torch.get_rng_state, set_rng_state=torch.set_rng_state,
         neuron=SimpleNamespace(get_rng_state=lambda device: state["value"], set_rng_state=set_))
     monkeypatch.setattr(measurement, "torch", proxy)
+    monkeypatch.setattr(torch, "neuron", proxy.neuron, raising=False)
     monkeypatch.setattr(measurement, "synchronize", lambda device: None)
     def model(x):
         candidate_seeds.append(state["value"])

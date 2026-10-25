@@ -891,6 +891,9 @@ def native_origin_runner(tmp_path, monkeypatch):
     monkeypatch.setattr(origin_binaries, "Catalog", lambda: NS(collect=lambda **kwargs: {"simulated": True}))
     monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: "CPU parser fixture, not measured source evidence")
     monkeypatch.setattr(native, "set_seed", lambda seed: torch.random.default_generator.manual_seed(seed))
+    monkeypatch.setattr(torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda device: 16)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "SIMULATED")
 
     def invoke(payload):
         build = Path(payload["build_root"]) / fingerprint(payload)
@@ -912,6 +915,8 @@ def native_origin_runner(tmp_path, monkeypatch):
                 outcome.correctness = native.run_hidden_correctness_check(reference, candidate, str(hidden), metadata,
                                                                           device="cpu", precision=torch.float32)
             if payload["eval_config"]["measure_performance"] and outcome.correctness:
+                native.set_seed(42)
+                memory_inputs = [torch.rand(4)]
                 receipt = metadata["timing_receipt"] = {}
                 def inputs(trial):
                     seed = measurement.fresh_seed()
@@ -924,7 +929,11 @@ def native_origin_runner(tmp_path, monkeypatch):
                         raise ValueError(issue)
                 times = measurement.synchronized_times(candidate, [torch.zeros(4)], "cpu", num_trials=2, input_factory=inputs,
                                                       verifier=verify, receipt=receipt, origin_candidate=True)
+                memory_stats = native.get_memory_stats(candidate, *memory_inputs, device="cpu", verifier=verify,
+                                                       receipt=metadata.setdefault("memory_receipt", {}),
+                                                       input_seed=42, origin_candidate=True)
                 return {"compiled": True, "correctness": outcome.correctness, "metadata": metadata,
+                        "peak_memory": memory_stats["peak_bytes"], "memory_stats": memory_stats,
                         "runtime_stats": measurement.timing_stats(times)}
             return {"compiled": True, "correctness": outcome.correctness, "metadata": metadata}
 
@@ -971,7 +980,7 @@ def native_origin_runner(tmp_path, monkeypatch):
 def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(native_origin_runner):
     from kb_workflows.provenance.origin_task import replay
 
-    for target, hidden, expected in (("evaluate", False, 7), ("evaluate", True, 8), ("paired_timing", False, 13)):
+    for target, hidden, expected in (("evaluate", False, 8), ("evaluate", True, 8), ("paired_timing", False, 13)):
         result = native_origin_runner(target=target, hidden=hidden)
         assert result["native_coverage"]["status"] == "passed", result.get("native_coverage")
         assert result["native_coverage"]["candidate_calls"] == len(result["raw"]["windows"]) == expected
@@ -979,6 +988,7 @@ def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(nati
         assert not result["scored_wall_times_replaced"] and result["summary"]["status"] == "not_measured"
         assert all(row["output_verified"] and row["native_call_sha256"] for row in result["raw"]["windows"])
         assert replay(result, allow_simulated=True) == result["summary"]
+        assert result["native_coverage"]["memory_probe_included"] is (target == "evaluate" and not hidden)
 
 
 def test_saved_native_replay_rejects_resealed_binding_coverage_and_source_changes(native_origin_runner):
@@ -999,6 +1009,7 @@ def test_saved_native_replay_rejects_resealed_binding_coverage_and_source_change
         lambda value: value["native_runs"]["profile"]["native_timings"].pop(),
         lambda value: value["native_runs"]["profile"]["native_timings"][-1].update(wall_ms=999),
         lambda value: value["native_runs"]["profile"]["native_result"]["runtime_stats"].update(samples_ms=[1, 2]),
+        lambda value: value["native_runs"]["profile"]["native_result"]["metadata"]["memory_receipt"].update(output_verified=False),
         lambda value: value["native_runs"]["control"]["binding"].update(scope="all_calls_including_memory"),
     )
     for damage in damages:
@@ -1022,7 +1033,7 @@ def test_native_timeline_joins_same_clock_intervals_and_keeps_missing_work_unkno
     report = native_origin_runner(activities=True)
     result = native_timeline(report, allow_simulated=True)
     assert result["status"] == "simulated" and not result["formal_qualification_implemented"]
-    assert {key: row["calls"] for key, row in result["by_phase"].items()} == {"correctness": 2, "warmup": 3, "timing": 2}
+    assert {key: row["calls"] for key, row in result["by_phase"].items()} == {"correctness": 2, "warmup": 3, "timing": 2, "memory": 1}
     for row, observed in zip(result["calls"], report["native_runs"]["profile"]["calls"], strict=True):
         assert row["native_call_sha256"] == fingerprint(observed)
         assert row["profile_window_wall_ms"] == pytest.approx(0.001)
@@ -1030,7 +1041,7 @@ def test_native_timeline_joins_same_clock_intervals_and_keeps_missing_work_unkno
         assert row["unknown_activity_count"] == 2 and row["origin_verdicts"]["custom"] == "not_measured"
         assert row["A"] is row["E"] is row["AE"] is None
         for stage in ("control", "profile"):
-            if row["phase"] == "correctness":
+            if row["phase"] in {"correctness", "memory"}:
                 assert row[f"native_{stage}_wall_ms"] is None
             else:
                 observed_times = {item["id"]: item["wall_ms"] for item in report["native_runs"][stage]["native_timings"]}
@@ -1048,7 +1059,7 @@ def test_native_timeline_joins_same_clock_intervals_and_keeps_missing_work_unkno
 
 
 def test_native_origin_refuses_late_wrong_outputs_mode_changes_and_missing_windows(native_origin_runner):
-    mutations = ("        if self.calls > 4: return x + 99\n", "        self.eval()\n",
+    mutations = ("        if self.calls > 4: return x + 99\n", "        if self.calls > 5: return x + 99\n", "        self.eval()\n",
                  "        torch.set_grad_enabled(True)\n", "        import os\n        os.environ['KB_FP32_TOL'] = '1'\n",
                  "        return x + self.calls + 1.0005\n")
     for mutation in mutations:

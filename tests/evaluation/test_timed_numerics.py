@@ -51,6 +51,10 @@ def native_worker(request, *, wrong=False):
 
         times = measurement.synchronized_times(function, args, "cpu", num_trials=2,
             input_factory=lambda _: [torch.rand(2, 16) * .1 + .9], verifier=verify)
+        if request["task"] == "evaluate":
+            ticket = input_calibration.prepare_output(reference, args, scope="memory")
+            expected = reference(*copy_inputs(args))
+            input_calibration.verify_output(reference, args, expected, function(*copy_inputs(args)), prepared=ticket)
         return {"compiled": True, "baseline_correctness" if request["task"] == "baseline" else "correctness": True,
                 "runtime": sum(times)/len(times), "metadata": {"simulated_execution": True}}
 
@@ -67,6 +71,7 @@ def test_unprofiled_native_outputs_are_checked_on_first_warm_and_measured_calls(
     rows = result["metadata"]["timed_numerical_audit"]["audit"]["cases"]
     assert sum(row["scope"] == "timing" for row in rows) == 5
     assert sum(row["scope"] == "first" for row in rows) == 1
+    assert sum(row["scope"] == "memory" for row in rows) == (phase == "evaluate")
     assert all(row["precision_gate"]["reference_qualified"] and row["pre_reference_forward"] for row in rows)
     assert timed_numerics.ACTIVE.get() is None
 

@@ -19,7 +19,7 @@ from ..common import atomic_json, evaluator_digest, failure, fingerprint, read_j
 from .kernel_origin import MAX_RECORDS, _sha, summarize
 
 NATIVE_PROTOCOL = "kernelbench_pro_native_origin_v1"
-NATIVE_SCOPE = "native_correctness_both_orders_warmups_timing_and_paired; memory_probe_and_other_diagnostics_excluded"
+NATIVE_SCOPE = "native_correctness_both_orders_warmups_timing_memory_and_paired; independent_diagnostics_excluded"
 _ACTIVE = ContextVar("kernelbench_native_origin_calls", default=None)
 MAX_REPORT_BYTES = 64 * 1024**2
 
@@ -303,6 +303,8 @@ def _coverage(document, payload):
         expected += [("warmup" if index < 3 else "timing", seed, str(index), None) for index, seed in enumerate(seeds)]
         if seeds and metadata.get("timing_receipt", {}).get("input_seeds") != seeds:
             raise ValueError("Native timing did not use its complete frozen input plan")
+        if seeds:
+            expected.append(("memory", payload["eval_config"].get("evaluation_seed", 42), "memory_probe", None))
     else:
         from ..evaluation.paired_task import call_plan
 
@@ -337,6 +339,17 @@ def _coverage(document, payload):
                 or receipt.get("first_timed_call_ms") != timings[0]["wall_ms"]
                 or not math.isclose(receipt.get("warmup_total_ms", -1), sum(item["wall_ms"] for item in timings[:3]), rel_tol=1e-12)):
             raise ValueError("Native performance samples differ from their observed candidate calls")
+        memory, row = metadata["memory_receipt"], rows[-1]
+        peak = memory.get("peak_bytes")
+        raw_peak, copy_bytes = memory.get("raw_peak_bytes"), memory.get("verification_input_bytes")
+        if (type(peak) is not int or peak < 0 or memory.get("input_seed") != row["seed"]
+                or type(raw_peak) is not int or type(copy_bytes) is not int or copy_bytes < 0 or raw_peak != peak + copy_bytes
+                or memory.get("output_verified") is not True or memory.get("verification_outside_peak") is not True
+                or fingerprint({"signature": memory.get("input_signature")}) != row["input_signature_sha256"]
+                or result.get("peak_memory") != peak
+                or any(result.get("memory_stats", {}).get(key) != memory[key]
+                       for key in ("peak_bytes", "raw_peak_bytes", "verification_input_bytes"))):
+            raise ValueError("Native memory probe omitted verification, inputs or peak measurement binding")
     key = "reference_ms" if payload.get("_origin_role") == "reference" else "candidate_ms"
     if target == "paired_timing" and [pair[key] for pair in metadata["paired_timing"]["pairs"]] != measured:
         raise ValueError("Native paired samples differ from their observed candidate calls")
@@ -390,7 +403,9 @@ def _replay_parts(payload, stages, raw, *, simulated):
         raise ValueError("CUPTI windows do not bind every validated native candidate call")
     coverage = {"status": "passed", "candidate_calls": len(control), "bitwise_observable_replay": True,
                 "simulated": simulated,
-                "memory_probe_included": False, "uninstrumented_path_equivalence_proven": False}
+                "memory_probe_included": bool(payload.get("_origin_target", payload.get("task")) == "evaluate"
+                                               and payload.get("_origin_timing_seeds")),
+                "uninstrumented_path_equivalence_proven": False}
     return coverage, summarize(raw, minimum_custom_fraction=threshold)
 
 

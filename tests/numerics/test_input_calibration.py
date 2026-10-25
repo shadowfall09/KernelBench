@@ -268,13 +268,15 @@ def test_every_timed_output_uses_independent_truth_and_receipt_on_execution_devi
                 verify(args, model(*args))
             measurement.synchronized_times(model, args, "cpu", num_trials=2,
                                            input_factory=lambda _: factory(), verifier=verify)
+            if phase == "evaluate":
+                verify(args, model(*args))
         return {"correctness": True, "baseline_correctness": phase == "baseline",
                 "metadata": {"device_fingerprint": observed}}
 
     result = worker(payload)
     receipt = result["metadata"]["input_calibration"]
     assert receipt["execution_device_identity_sha256"] != receipt["calibration_device_identity_sha256"]
-    assert receipt["independent_outputs_verified"] == {"evaluate": 5, "baseline": 6, "paired_timing": 39}[phase]
+    assert receipt["independent_outputs_verified"] == {"evaluate": 6, "baseline": 6, "paired_timing": 39}[phase]
     assert input_calibration.issue(result, payload) is None
     receipt["independent_outputs_verified"] -= 1
     assert input_calibration.issue(result, payload)

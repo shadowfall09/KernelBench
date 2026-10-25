@@ -330,7 +330,7 @@ def native_counter_runner(tmp_path, native_origin_runner):
 
 
 def test_native_counters_cover_complete_stateful_sequence_and_both_paired_roles(native_counter_runner):
-    for target, role, count in (("evaluate", "candidate", 7), ("paired_timing", "candidate", 13),
+    for target, role, count in (("evaluate", "candidate", 8), ("paired_timing", "candidate", 13),
                                 ("paired_timing", "reference", 13)):
         result, events = native_counter_runner(target=target, role=role)
         assert result["status"] == "ok", result.get("reason")

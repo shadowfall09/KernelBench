@@ -804,12 +804,12 @@ def eval_kernel_against_ref(
                     set_seed(seed)
                     return _process_input_group(get_inputs(), device, precision)
 
-                def verifier(fresh, actual):
+                def verifier(fresh, actual, *, scope="timing"):
                     from kb_workflows.numerics.input_calibration import prepare_output, verify_output
 
                     from .input_groups import copy_inputs
 
-                    prepared = prepare_output(original_model, fresh)
+                    prepared = prepare_output(original_model, fresh, scope=scope)
                     expected = clone_tensors(original_model(*copy_inputs(fresh)))
                     synchronize(device)
                     verify_output(original_model, fresh, expected, actual, prepared=prepared)
@@ -832,7 +832,10 @@ def eval_kernel_against_ref(
                 kernel_exec_result.runtime = runtime_stats["mean"]
                 kernel_exec_result.runtime_stats = runtime_stats
 
-                memory_stats = get_memory_stats(model_new, *inputs, device=device)
+                memory_stats = get_memory_stats(model_new, *inputs, device=device,
+                                                verifier=lambda fresh, actual: verifier(fresh, actual, scope="memory"),
+                                                receipt=metadata.setdefault("memory_receipt", {}),
+                                                input_seed=seed_num, origin_candidate=True)
                 kernel_exec_result.peak_memory = memory_stats["peak_bytes"]
                 kernel_exec_result.memory_stats = memory_stats
         except Exception as e:
@@ -1044,8 +1047,13 @@ def get_timing_stats(elapsed_times: list[float], device: torch.device = None) ->
     return stats
 
 
-def get_memory_stats(kernel_fn: callable, *args, device: torch.device = None) -> dict:
-    """Measure peak GPU memory allocation for a single kernel invocation.
+def get_memory_stats(kernel_fn: callable, *args, device: torch.device = None, verifier=None, receipt=None,
+                     input_seed=None, origin_candidate=False) -> dict:
+    """Measure the absolute Torch CUDA allocator peak for a no-grad invocation.
+
+    Optional verification uses isolated original inputs and the pre-call Torch
+    RNG, after reading the peak. Remove the live verification-copy allocation
+    delta from the reported peak and retain both raw values for replay.
 
     Args:
         kernel_fn: Function to measure
@@ -1055,14 +1063,48 @@ def get_memory_stats(kernel_fn: callable, *args, device: torch.device = None) ->
     Returns:
         Dict with peak_bytes, hardware, device
     """
+    from kb_workflows.evaluation.measurement import synchronize, verification_rng, verify_after_call
+    from kb_workflows.provenance.origin_task import candidate_call
+
+    from .input_groups import copy_inputs
+
     if device is None:
         device = torch.cuda.current_device()
-    torch.cuda.reset_peak_memory_stats(device)
-    kernel_fn(*args)
-    torch.cuda.synchronize(device)
-    peak_bytes = torch.cuda.max_memory_allocated(device)
+    # Resetting the peak retains live input snapshots in the allocator baseline.
+    # Subtract their measured setup delta, preserving raw values for replay.
+    cuda_copy = verifier is not None and torch.device(device).type == "cuda"
+    before_copy = torch.cuda.memory_allocated(device) if cuda_copy else 0
+    validation_args = copy_inputs(args) if verifier is not None else None
+    copy_bytes = torch.cuda.memory_allocated(device) - before_copy if cuda_copy else 0
+    if type(copy_bytes) is not int or copy_bytes < 0:
+        raise RuntimeError("Cannot isolate memory-probe verification input allocation")
+    rng = verification_rng(device) if verifier is not None else None
+    from contextlib import nullcontext
+
+    scope = candidate_call(kernel_fn, args, device=device, phase="memory", seed=input_seed,
+                           label="memory_probe") if origin_candidate else nullcontext((kernel_fn, None))
+    with torch.no_grad(), scope as (execute, observed):
+        signature = input_signature(args)
+        synchronize(device)
+        torch.cuda.reset_peak_memory_stats(device)
+        output = execute(*args)
+        synchronize(device)
+        raw_peak = torch.cuda.max_memory_allocated(device)
+    if type(raw_peak) is not int or raw_peak < copy_bytes:
+        raise RuntimeError("Memory-probe allocator peak is smaller than its verification input allocation")
+    peak_bytes = raw_peak - copy_bytes
+    try:
+        verify_after_call(validation_args, output, verifier, device=device, rng=rng, observed=observed)
+    except Exception as exc:
+        raise RuntimeError(f"Memory probe output validation failed: {exc}") from exc
+    if receipt is not None:
+        receipt.update(input_seed=input_seed, input_signature=signature, output_verified=verifier is not None,
+                       peak_bytes=peak_bytes, raw_peak_bytes=raw_peak, verification_input_bytes=copy_bytes,
+                       verification_outside_peak=True)
     return {
         "peak_bytes": peak_bytes,
+        "raw_peak_bytes": raw_peak,
+        "verification_input_bytes": copy_bytes,
         "hardware": torch.cuda.get_device_name(device=device),
         "device": str(device),
     }

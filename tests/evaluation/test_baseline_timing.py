@@ -244,7 +244,7 @@ class ModelNew(nn.Module):
     with patch("torch.cuda.is_available", return_value=True), patch("torch.cuda.set_device"), \
          patch("torch.cuda.synchronize"), patch("torch.cuda.get_device_name", return_value="simulated"), \
          patch.object(native, "graceful_eval_cleanup"), \
-         patch.object(native, "get_memory_stats", return_value={"peak_bytes": 16}):
+         patch("torch.cuda.reset_peak_memory_stats"), patch("torch.cuda.max_memory_allocated", return_value=16):
         result = native.eval_kernel_against_ref(source, candidate, device=torch.device("cpu"),
                                                 measure_performance=True, num_perf_trials=3)
     assert result.correctness is (not cached)
@@ -257,6 +257,8 @@ class ModelNew(nn.Module):
         assert len(receipt["input_seeds"]) == 6
         assert result.metadata["cold_start_ms"] >= result.metadata["candidate_setup_ms"]
         assert len(result.runtime_stats["samples_ms"]) == 3
+        assert result.metadata["memory_receipt"]["output_verified"]
+        assert result.peak_memory == result.memory_stats["raw_peak_bytes"] == 16
 
 
 def test_declared_call_budget_changes_amortized_baseline():
@@ -265,6 +267,76 @@ def test_declared_call_budget_changes_amortized_baseline():
     assert select_baseline(variants, 1)["cold_winning_baseline"] == "eager"
     assert select_baseline(variants, 10000)["cold_winning_baseline"] == "compile"
     assert measurement.amortized(1, 1000, 1000) == pytest.approx(1.999)
+
+
+def test_memory_probe_isolates_inputs_verification_peak_and_post_call_rng(monkeypatch):
+    import random
+
+    import numpy as np
+
+    from src import eval as native
+
+    peak = [0]
+    monkeypatch.setattr(torch.cuda, "reset_peak_memory_stats", lambda device: peak.__setitem__(0, 0))
+    monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda device: peak[0])
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "CPU memory-boundary fixture")
+    for wrong, rejected in ((False, False), (True, False), (False, True)):
+        torch.manual_seed(17)
+        random.seed(57)
+        np.random.seed(87)
+        generator = torch.Generator().manual_seed(17)
+        torch.rand(4, generator=generator)
+        next_torch = torch.rand(4, generator=generator)
+        python = random.Random(57)
+        python.random()
+        next_python = python.random()
+        numpy = np.random.RandomState(87)
+        numpy.random_sample()
+        next_numpy = numpy.random_sample()
+        args, receipt = torch.zeros(4), {}
+
+        def candidate(x):
+            assert not torch.is_grad_enabled()
+            x.add_(1)
+            random.random()
+            np.random.random_sample()
+            peak[0] = 123
+            return 2 * x + torch.rand_like(x) + int(wrong)
+
+        def verify(fresh, actual):
+            assert not torch.is_grad_enabled() and torch.equal(fresh[0], torch.zeros(4))
+            expected = 2 * (fresh[0] + 1) + torch.rand_like(fresh[0])
+            random.random()
+            np.random.random_sample()
+            peak[0] = 999  # The trusted verifier allocates after the candidate peak was read.
+            if rejected or not torch.equal(expected, actual):
+                raise ValueError("memory output/oracle rejected")
+
+        if wrong or rejected:
+            with pytest.raises(RuntimeError, match="Memory probe output validation failed"):
+                native.get_memory_stats(candidate, args, device="cpu", verifier=verify, receipt=receipt, input_seed=17)
+            assert receipt.get("output_verified") is not True
+        else:
+            result = native.get_memory_stats(candidate, args, device="cpu", verifier=verify, receipt=receipt, input_seed=17)
+            assert result["peak_bytes"] == receipt["peak_bytes"] == 123
+            assert receipt["output_verified"] and receipt["verification_outside_peak"]
+        assert torch.equal(args, torch.ones(4))
+        assert torch.equal(torch.rand(4), next_torch)
+        assert random.random() == next_python and np.random.random_sample() == next_numpy
+    # A simulated CUDA allocator includes a live 32-byte verification snapshot.
+    # Its pre-reset allocation still contributes to max_memory_allocated.
+    allocated = iter((64, 96))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: next(allocated))
+    monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda device: 160)
+    monkeypatch.setattr(torch.cuda, "get_rng_state", lambda device: torch.get_rng_state())
+    monkeypatch.setattr(torch.cuda, "set_rng_state", lambda state, device: torch.set_rng_state(state))
+    monkeypatch.setattr(measurement, "_SYNC", lambda device: None)
+    receipt = {}
+    def verify(values, output):
+        assert torch.equal(values[0] + 1, output)
+    result = native.get_memory_stats(lambda x: x + 1, torch.zeros(4), device="cuda:0", verifier=verify, receipt=receipt)
+    assert result["peak_bytes"] == 128 and result["verification_input_bytes"] == 32
+    assert result["raw_peak_bytes"] == receipt["raw_peak_bytes"] == 160
 
 
 def test_wall_baseline_cli_defaults_and_explicit_single_baseline():

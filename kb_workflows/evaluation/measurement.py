@@ -60,6 +60,30 @@ def tensor_bytes(value):
     return 0
 
 
+def verification_rng(device):
+    """Save the pre-call Torch state for the untimed reference verifier."""
+    backend = torch.device(device).type
+    module = torch.cuda if backend == "cuda" else torch.neuron if backend == "neuron" else None
+    return torch.get_rng_state(), module, module.get_rng_state(device) if module else None
+
+
+def verify_after_call(args, output, verifier, *, device, rng, observed=None):
+    from ..provenance.origin_task import confirm, snapshot_output
+    from .determinism import preserve_rng
+
+    snapshot_output(observed, output)
+    if verifier is not None:
+        # Diagnostics must not advance or roll back the actual call's RNG state,
+        # including when the verifier raises. Python/NumPy state is also preserved.
+        with torch.no_grad(), preserve_rng(device):
+            cpu, module, state = rng
+            torch.set_rng_state(cpu)
+            if module:
+                module.set_rng_state(state, device)
+            verifier(args, output)
+        confirm(observed)
+
+
 def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=None, input_factory=None, verifier=None,
                        origin_candidate=False):
     """Include host dispatch and completion of work on every stream in this process.
@@ -70,14 +94,12 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
     times = []
     from contextlib import nullcontext
 
-    from ..provenance.origin_task import candidate_call, confirm, record_elapsed, snapshot_output
+    from ..provenance.origin_task import candidate_call, record_elapsed
     with torch.no_grad():
         for trial in range(num_warmup + num_trials):
             fresh = input_factory(trial) if input_factory else copy_inputs(args)
-            verification_args = copy_inputs(fresh) if verifier else None
-            rng = torch.get_rng_state() if verifier else None
-            cuda_rng = torch.cuda.get_rng_state(device) if verifier and torch.device(device).type == "cuda" else None
-            neuron_rng = torch.neuron.get_rng_state(device) if verifier and str(device).split(":")[0] == "neuron" else None
+            verification_args = copy_inputs(fresh) if verifier is not None else None
+            rng = verification_rng(device) if verifier is not None else None
             with preserve_backend_settings():
                 synchronize(device)
                 scope = candidate_call(fn, fresh, device=device, phase="warmup" if trial < num_warmup else "timing",
@@ -89,25 +111,7 @@ def synchronized_times(fn, args, device, num_warmup=3, num_trials=100, receipt=N
                     synchronize(device)
                     elapsed = (CLOCK() - start) * 1000
             record_elapsed(observed, elapsed)
-            snapshot_output(observed, output)
-            if verifier:
-                after_rng = torch.get_rng_state()
-                after_cuda_rng = torch.cuda.get_rng_state(device) if cuda_rng is not None else None
-                after_neuron_rng = torch.neuron.get_rng_state(device) if neuron_rng is not None else None
-                torch.set_rng_state(rng)
-                if cuda_rng is not None:
-                    torch.cuda.set_rng_state(cuda_rng, device)
-                if neuron_rng is not None:
-                    torch.neuron.set_rng_state(neuron_rng, device)
-                try:
-                    verifier(verification_args, output)
-                finally:
-                    torch.set_rng_state(after_rng)
-                    if after_cuda_rng is not None:
-                        torch.cuda.set_rng_state(after_cuda_rng, device)
-                    if after_neuron_rng is not None:
-                        torch.neuron.set_rng_state(after_neuron_rng, device)
-                confirm(observed)
+            verify_after_call(verification_args, output, verifier, device=device, rng=rng, observed=observed)
             if trial == 0 and receipt is not None:
                 receipt["first_timed_call_ms"] = elapsed
                 receipt["output_bytes"] = tensor_bytes(output)
