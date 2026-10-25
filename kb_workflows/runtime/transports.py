@@ -16,7 +16,17 @@ from pathlib import Path
 from ..agents.resource_budgets import CLEANUP_SECONDS, record_device_lease
 from ..common import ROOT, failure, fingerprint
 
-QUEUE_PROTOCOL = "kernelbench_pro_queue_v2"
+QUEUE_PROTOCOL = "kernelbench_pro_queue_v3"
+
+
+def device_environment(device, *, backend="cuda"):
+    """One device visibility contract for worker startup and per-task children."""
+    if backend == "cuda":
+        return {"CUDA_VISIBLE_DEVICES": str(device)}
+    if backend == "neuron":
+        return {"CUDA_VISIBLE_DEVICES": "", "NEURON_RT_VISIBLE_CORES": str(device),
+                "NEURON_LOGICAL_NC_CONFIG": "1", "TORCH_NEURONX_DISABLE_FALLBACK_EXECUTION": "1"}
+    raise ValueError("Unknown verification device backend")
 
 
 def resolve_devices(gpus, *, backend="cuda"):
@@ -74,13 +84,9 @@ def local_evaluate(payload, device="0", log_path=None, *, cancelled=None):
         source.write_text(json.dumps(payload))
         environment = {
             **os.environ,
-            "CUDA_VISIBLE_DEVICES": str(device),
+            **device_environment(device, backend=payload["eval_config"].get("device_backend", "cuda")),
             "PYTHONPATH": str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", ""),
         }
-        if payload["eval_config"].get("device_backend", "cuda") == "neuron":
-            environment["CUDA_VISIBLE_DEVICES"] = ""
-            environment.update(NEURON_RT_VISIBLE_CORES=str(device), NEURON_LOGICAL_NC_CONFIG="1",
-                               TORCH_NEURONX_DISABLE_FALLBACK_EXECUTION="1")
         interpreter = payload.get("worker_python") or sys.executable
         if log_path is not None:
             Path(log_path).parent.mkdir(parents=True, exist_ok=True)
@@ -146,6 +152,8 @@ def queue_evaluate(payload, config):
     from ..agents.resource_budgets import validate_device_lease
 
     lease = validate_device_lease(payload)
+    backend = payload["eval_config"].get("device_backend", "cuda")
+    negotiated = lease is not None or backend != "cuda"
     base = config.queue_url.rstrip("/")
     request_id = payload["request_id"]
     deadline = time.monotonic() + config.queue_wait_timeout
@@ -156,19 +164,21 @@ def queue_evaluate(payload, config):
 
     def checked(response):
         if (not isinstance(response, dict) or response.get("request_id") != request_id
-                or (lease and (response.get("protocol") != QUEUE_PROTOCOL or response.get("request_sha256") != signature))):
+                or (negotiated and (response.get("protocol") != QUEUE_PROTOCOL or response.get("request_sha256") != signature
+                                    or response.get("device_backend") != backend))):
             raise ValueError("Queue response does not bind the requested task and lease protocol")
         return response
 
     try:
-        if lease:
+        if negotiated:
             health = http_json("GET", base + "/health", timeout=config.queue_http_timeout, deadline=deadline)
-            if health.get("protocol") != QUEUE_PROTOCOL or health.get("status") != "ok":
-                raise ValueError("Device budgets require a queue with cancellation and bounded-lease support")
+            if (health.get("protocol") != QUEUE_PROTOCOL or health.get("status") != "ok"
+                    or health.get("device_backend") != backend):
+                raise ValueError("Device budgets and Neuron require a healthy backend-matched bounded-lease queue")
         # Even a lost POST response may have admitted work. Cancel by our own ID.
         submitted = True
         response = http_json("POST", base + config.queue_submit_path, payload, config.queue_http_timeout, deadline=deadline)
-        if not lease and isinstance(response, dict) and isinstance(response.get("request_id"), str) and response["request_id"]:
+        if not negotiated and isinstance(response, dict) and isinstance(response.get("request_id"), str) and response["request_id"]:
             # Legacy compatible services may assign their own job IDs.
             request_id = response["request_id"]
             path = config.queue_result_path.format(request_id=urllib.parse.quote(request_id, safe=""))

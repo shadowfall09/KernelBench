@@ -413,6 +413,7 @@ CPU/模拟测试、实际 Harbor Task schema 校验和离线 wheel 校验不等�
 | V45-06 默认预览与离线处理入口 | 默认不查工具、不创建路径；显式execute只处理已有采集，超时及工件/表行数/解码估计可配，拒绝覆写，工具调用与设备工作标记分开记录 | — | [analyze_device_trace.py](../scripts/analyze_device_trace.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V45-07 自动处理关联与失败反例 | 真实文件/Parquet及注入runner覆盖字节/core、完整快照、工具/输入/输出/目录替换、晚到修改、超时/资源门、收据重封和模型/CLI拒绝降级；不运行Explorer或设备 | M2, M3 | [test_neuron_processing.py](../tests/hardware/test_neuron_processing.py), [NEURON_WORK.md](../docs/NEURON_WORK.md) |
 | V46-01 按职责归类并合并重复实现 | 收拢目录与分析入口，合并重复清单和模型构造，减少维护成本同时保留评分证据门 | M2 | [README.md](../README.md), [CONTRIBUTING.md](../CONTRIBUTING.md), [common.py](../kb_workflows/common.py), [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py), [analyze_device_trace.py](../scripts/analyze_device_trace.py), [generate_leaderboard.py](../scripts/generate_leaderboard.py), [test_catalogs.py](../tests/benchmarks/test_catalogs.py), [conftest.py](../tests/conftest.py) |
+| V52-01 设备配置驱动队列与后端预算握手 | 补齐Neuron队列实际启动入口，以统一设备配置选择服务端环境，保留venv路径；状态与请求绑定后端，预算握手拒绝错设备轨道和旧协议，避免客户端选择服务端解释器 | M4 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py), [transports.py](../kb_workflows/runtime/transports.py), [config.py](../kb_workflows/config.py), [devices.py](../kb_workflows/hardware/devices.py), [test_device_adapters.py](../tests/hardware/test_device_adapters.py), [test_resource_budgets.py](../tests/agents/test_resource_budgets.py), [NEURON.md](../docs/NEURON.md), [RESOURCE_BUDGETS.md](../docs/RESOURCE_BUDGETS.md) |
 <!-- changes:end -->
 
 ## 设计与实现的差额

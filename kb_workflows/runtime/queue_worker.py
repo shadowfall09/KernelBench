@@ -1,4 +1,4 @@
-"""Persistent HTTP verification queue; one active task per worker GPU."""
+"""Persistent HTTP verification queue; one active task per configured device."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import argparse
 import json
 import os
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,11 +16,14 @@ from urllib.parse import unquote, urlparse
 
 from ..agents.resource_budgets import record_device_lease, stamp_device_lease, validate_device_lease
 from ..common import ROOT, failure, fingerprint
-from .transports import QUEUE_PROTOCOL, local_evaluate
+from .transports import QUEUE_PROTOCOL, device_environment, local_evaluate, resolve_devices
 
 
 class JobStore:
-    def __init__(self, path: Path, capacity=256):
+    def __init__(self, path: Path, capacity=256, *, backend="cuda"):
+        if backend not in {"cuda", "neuron"}:
+            raise ValueError("Queue backend must be cuda or neuron")
+        self.backend = backend
         self.path = path
         self.capacity = capacity
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -26,10 +31,17 @@ class JobStore:
         self.expiries = {}
         self.worker_error = None
         with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, signature TEXT, payload TEXT, status TEXT, result TEXT, created REAL)"
             )
             connection.execute("CREATE TABLE IF NOT EXISTS leases (nonce TEXT PRIMARY KEY, job TEXT UNIQUE)")
+            connection.execute("CREATE TABLE IF NOT EXISTS worker (id INTEGER PRIMARY KEY CHECK(id=1), backend TEXT NOT NULL)")
+            saved = connection.execute("SELECT backend FROM worker WHERE id=1").fetchone()
+            legacy = saved is None and connection.execute("SELECT 1 FROM jobs LIMIT 1").fetchone() is not None
+            if saved is not None and saved["backend"] != backend or legacy and backend != "cuda":
+                raise ValueError("Queue state belongs to another device backend; use a separate state path")
+            connection.execute("INSERT OR IGNORE INTO worker VALUES (1,?)", (backend,))
             for row in connection.execute("SELECT * FROM jobs WHERE status IN ('queued','running','cancelling')").fetchall():
                 leased = json.loads(row["payload"])["eval_config"].get("device_lease") is not None
                 if leased or row["status"] == "cancelling":
@@ -45,6 +57,10 @@ class JobStore:
         return connection
 
     def submit(self, payload):
+        if payload["eval_config"].get("device_backend", "cuda") != self.backend:
+            raise ValueError("Queue task backend differs from the configured worker")
+        if "worker_python" in payload:
+            raise ValueError("Queue interpreter is owned by the worker configuration")
         lease = validate_device_lease(payload)
         signature = fingerprint(payload)
         request_id = payload["request_id"]
@@ -81,6 +97,7 @@ class JobStore:
             return None
         return {
             "protocol": QUEUE_PROTOCOL,
+            "device_backend": self.backend,
             "request_id": row["id"],
             "request_sha256": row["signature"],
             "status": row["status"],
@@ -93,6 +110,11 @@ class JobStore:
             connection.execute("BEGIN IMMEDIATE")
             for row in connection.execute("SELECT id, payload FROM jobs WHERE status='queued' ORDER BY created").fetchall():
                 payload = json.loads(row["payload"])
+                if payload["eval_config"].get("device_backend", "cuda") != self.backend or "worker_python" in payload:
+                    connection.execute("UPDATE jobs SET status='failed', result=? WHERE id=?", (
+                        json.dumps(failure("Stored task violates the worker backend/interpreter contract")), row["id"]))
+                    self.expiries.pop(row["id"], None)
+                    continue
                 if time.monotonic() >= self.expiries.get(row["id"], float("inf")):
                     result = self.not_started(payload, "Queue device lease expired before execution")
                     connection.execute("UPDATE jobs SET status='cancelled', result=? WHERE id=?", (json.dumps(result), row["id"]))
@@ -169,7 +191,7 @@ def handler_for(store):
             path = urlparse(self.path).path
             if path == "/health":
                 self.send_json(200, {"status": "unavailable" if store.worker_error else "ok",
-                                     "protocol": QUEUE_PROTOCOL, "jobs": store.counts()})
+                                     "protocol": QUEUE_PROTOCOL, "device_backend": store.backend, "jobs": store.counts()})
             elif path.startswith("/v1/verify/"):
                 result = store.get(unquote(path[len("/v1/verify/") :]))
                 self.send_json(200 if result else 404, result or {"error": "Unknown request_id"})
@@ -284,24 +306,59 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--gpu", default="0", help="CUDA device ID, relative to the worker's CUDA_VISIBLE_DEVICES")
+    parser.add_argument("--config", type=Path, help="Shared RunConfig TOML; selects device backend, IDs and vendor Python")
+    parser.add_argument("--device", "--gpu", dest="device", type=int, help="One device ordinal within the current allocation")
+    parser.add_argument("--dry-run", action="store_true", help="Preview configuration without importing a device SDK")
     parser.add_argument("--state", type=Path, default=ROOT / "cache" / "verify_queue" / "jobs.sqlite3")
     parser.add_argument("--capacity", type=int, default=256)
     args = parser.parse_args(argv)
     if args.capacity <= 0:
         parser.error("--capacity must be positive")
-    import torch
+    try:
+        from ..config import RunConfig, file_options
+        from ..config import parser as run_parser
 
-    if not torch.cuda.is_available():
-        parser.error("A CUDA GPU is required; start this worker inside a GPU allocation")
-    devices = os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",") if os.environ.get("CUDA_VISIBLE_DEVICES") else None
-    device = devices[int(args.gpu)] if devices else args.gpu
-    store = JobStore(args.state, args.capacity)
+        options = file_options(args.config, run_parser()) if args.config else {}
+        fields = {"device_backend", "device_python", "gpus", "gpu", "gpu_arch", "hardware"}
+        # Reuse shared parsing/device validation without loading controller-only
+        # calibration, model or study artifacts on the verification machine.
+        config = RunConfig(**{key: value for key, value in options.items() if key in fields}, generation="local",
+                           enable_ncu=False, stage="evaluate").validate() if args.config else None
+        backend = config.device_backend if config else "cuda"
+        requested = str(args.device) if args.device is not None else config.gpus if config else "0"
+        if not requested.isdecimal():
+            raise ValueError("A worker requires one nonnegative configured device or an explicit --device")
+        device = resolve_devices(requested, backend=backend)[0]
+        interpreter = config.device_python if config and config.device_python else sys.executable
+        if args.dry_run:
+            print(json.dumps({"protocol": QUEUE_PROTOCOL, "device_backend": backend, "device": device,
+                              "python": interpreter, "state": str(args.state), "device_validated": False,
+                              "experiments_started": False}))
+            return
+        # Re-exec before importing the SDK. Preserve the configured venv path,
+        # not merely the binary it symlinks to, and retain repository imports.
+        if os.path.abspath(interpreter) != os.path.abspath(sys.executable):
+            os.environ["PYTHONPATH"] = str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", "")
+            os.execv(interpreter, [interpreter, "-m", "kb_workflows.runtime.queue_worker", *list(sys.argv[1:] if argv is None else argv)])
+            return
+        if sys.version_info[:2] != (3, 12):
+            raise ValueError("Verification workers require Python 3.12")
+        os.environ.update(device_environment(device, backend=backend))
+        from ..hardware.devices import adapter
+
+        caps = adapter(backend, "0").caps()
+        if caps.get("available") is not True:
+            raise ValueError("Configured verification device is unavailable")
+        if backend == "neuron" and caps.get("name") != config.hardware:
+            raise ValueError("Configured Neuron hardware differs from the observed device")
+        store = JobStore(args.state, args.capacity, backend=backend)
+    except (ValueError, OSError, ImportError, IndexError, RuntimeError, subprocess.SubprocessError) as exc:
+        parser.error(str(exc))
     stop = threading.Event()
     worker = threading.Thread(target=worker_loop, args=(store, device, stop), daemon=True)
     server = ThreadingHTTPServer((args.host, args.port), handler_for(store))
     worker.start()
-    print(f"KernelBench Pro worker: http://{args.host}:{args.port}; state: {args.state}", flush=True)
+    print(f"KernelBench Pro {backend} worker ({device}): http://{args.host}:{args.port}; state: {args.state}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -612,3 +612,118 @@ def test_neuron_small_qualification_executes_reviewed_cases_even_for_current_lev
     assert result["correctness"] and result["runtime"] == -1
     assert result["metadata"]["input_signature"] == []
     assert result["metadata"]["evidence_receipt"]["checks"]["precision_contract"]["status"] == "passed"
+
+
+def test_neuron_queue_binds_backend_state_and_negotiates_device_budgets(tmp_path):
+    import threading
+    from http.server import ThreadingHTTPServer
+
+    from kb_workflows.agents import resource_budgets as budgets
+    from kb_workflows.runtime.queue_worker import JobStore, handler_for, worker_loop
+    from kb_workflows.runtime.transports import http_json, queue_evaluate
+
+    config = neuron_config(tmp_path, evaluation="queue")
+    config.run_dir.mkdir(parents=True)
+    (config.run_dir / kernel_name(config.level, 19)).write_text("class ModelNew: pass")
+    store = JobStore(tmp_path / "neuron.sqlite3", backend="neuron")
+    stop, calls = threading.Event(), []
+    def evaluate(payload, device, log, *, cancelled=None):
+        calls.append((payload["eval_config"]["device_backend"], device))
+        return {"compiled": True, "correctness": True, "metadata": {"simulated_execution": True}}
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(store))
+    worker = threading.Thread(target=worker_loop, args=(store, "7", stop, evaluate))
+    service = threading.Thread(target=server.serve_forever)
+    worker.start()
+    service.start()
+    config.queue_url = f"http://127.0.0.1:{server.server_port}"
+    try:
+        health = http_json("GET", config.queue_url + "/health")
+        assert health["device_backend"] == "neuron"
+        ledger = budgets.Ledger(7, "device_lease_seconds")
+        lease = budgets.device_lease(ledger, 2, 7)
+        payload = engine.task_payload(config, 19)
+        payload["eval_config"].update(timeout=2, device_lease=lease)
+        payload["request_id"] = "kb-" + fingerprint(payload)
+        result = queue_evaluate(payload, config)
+        assert result["correctness"] and calls == [("neuron", "7")]
+        assert budgets.settle_device_lease(ledger, lease, result) and 0 < ledger.spent < 7
+        wrong = copy.deepcopy(payload)
+        wrong["eval_config"].update(device_backend="cuda")
+        wrong["request_id"] = "wrong-backend"
+        rejected = queue_evaluate(wrong, config)
+        assert not rejected["correctness"] and calls == [("neuron", "7")]
+        with pytest.raises(RuntimeError, match="HTTP 400"):
+            http_json("POST", config.queue_url + "/v1/verify", wrong)
+        with pytest.raises(RuntimeError, match="HTTP 400"):
+            http_json("POST", config.queue_url + "/v1/verify", {**payload, "worker_python": "/another/python"})
+        assert store.counts() == {"completed": 1}
+        assert JobStore(store.path, backend="neuron").get(payload["request_id"])["device_backend"] == "neuron"
+        with pytest.raises(ValueError, match="another device backend"):
+            JobStore(store.path, backend="cuda")
+    finally:
+        stop.set()
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+        service.join(timeout=3)
+        assert not worker.is_alive() and not service.is_alive()
+
+
+def test_worker_config_preserves_venv_python_and_selects_backend_before_sdk_loading(tmp_path, monkeypatch):
+    import os
+
+    from kb_workflows.runtime import queue_worker
+
+    vendor = tmp_path / "vendor"
+    subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(vendor)], check=True, capture_output=True)
+    interpreter = vendor / "bin/python"
+    assert interpreter.is_symlink()
+    config = tmp_path / "worker.toml"
+    config.write_text('[device]\nbackend="neuron"\nhardware="Trainium2"\ndevices=[1]\npython="vendor/bin/python"\n')
+    selected = parse_config(["--config", str(config), "--stage", "evaluate"])
+    assert selected.device_python == str(interpreter)
+    legacy_config = tmp_path / "run-python.toml"
+    legacy_config.write_text(config.read_text().replace('python="vendor/bin/python"\n', '')
+                             + '\n[run]\ndevice_python="vendor/bin/python"\n')
+    assert parse_config(["--config", str(legacy_config), "--stage", "evaluate"]).device_python == str(interpreter)
+    prefix = subprocess.check_output([selected.device_python, "-I", "-c", "import sys; print(sys.prefix)"], text=True).strip()
+    assert prefix == str(vendor)  # Resolving the symlink would lose this environment.
+    monkeypatch.setenv("NEURON_RT_VISIBLE_CORES", "3,7")
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "GPU-unrelated")
+    # Only device settings belong to the server; these controller-side records
+    # need not be mounted in the vendor environment.
+    config.write_text(config.read_text() + '\n[run]\ninput_calibration="not-on-this-machine.json"\n')
+    state = tmp_path / "worker.sqlite3"
+    argv = ["--config", str(config), "--state", str(state)]
+    code = f"import sys; sys.path.insert(0,{str(ROOT)!r}); from kb_workflows.runtime.queue_worker import main; main(sys.argv[1:]); assert not {{'torch','triton','torch_neuronx','nki'}} & set(sys.modules)"
+    preview = subprocess.check_output([sys.executable, "-I", "-c", code, *argv, "--dry-run"], text=True)
+    data = json.loads(preview)
+    assert data["device_backend"] == "neuron" and data["device"] == "7" and data["python"] == str(interpreter)
+    assert not data["device_validated"] and not state.exists()
+    legacy = subprocess.check_output([sys.executable, "-I", "-c", code, "--gpu", "1", "--dry-run"], text=True,
+                                     env={**os.environ, "CUDA_VISIBLE_DEVICES": "GPU-first,GPU-second"})
+    assert json.loads(legacy)["device"] == "GPU-second" and json.loads(legacy)["device_backend"] == "cuda"
+    executed = []
+    monkeypatch.setattr(os, "execv", lambda path, arguments: executed.append((path, arguments)))
+    monkeypatch.setattr(devices, "adapter", lambda *args: pytest.fail("SDK must load only after switching Python"))
+    queue_worker.main(argv)
+    assert executed == [(str(interpreter), [str(interpreter), "-m", "kb_workflows.runtime.queue_worker", *argv])]
+    assert not state.exists() and os.environ["NEURON_RT_VISIBLE_CORES"] == "3,7"
+    config.write_text(config.read_text().replace('python="vendor/bin/python"\n', ''))
+    observed = []
+    def adapter(backend, device):
+        observed.append((backend, device, os.environ["CUDA_VISIBLE_DEVICES"], os.environ["NEURON_RT_VISIBLE_CORES"]))
+        return SimpleNamespace(caps=lambda: {"available": True, "name": "Trainium2"})
+    monkeypatch.setattr(devices, "adapter", adapter)
+    class Server:
+        def __init__(self, address, handler):
+            pass
+        def serve_forever(self):
+            pass
+        def server_close(self):
+            pass
+    monkeypatch.setattr(queue_worker, "ThreadingHTTPServer", Server)
+    queue_worker.main(argv)
+    assert observed == [("neuron", "0", "", "7")]
+    assert os.environ["NEURON_LOGICAL_NC_CONFIG"] == "1"
+    assert os.environ["TORCH_NEURONX_DISABLE_FALLBACK_EXECUTION"] == "1" and state.exists()

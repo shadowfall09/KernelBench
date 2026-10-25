@@ -46,6 +46,19 @@ python scripts/run_batch.py --config configs/trainium2.toml --dry-run
 
 预览不会导入Neuron SDK或请求硬件。实际执行仍需显式运行相应stage。本版支持本地及HTTP queue验证、本地agent生成；CUDA Docker/Modal/Harbor环境、CUDA Graph、Inductor和Nsight选项会拒绝。设备容器接入继续属于隔离工作的范围。
 
+## HTTP验证worker
+
+worker读取同一TOML中的设备字段，无需复制控制端的模型或校准文件：
+
+```bash
+python -m kb_workflows.runtime.queue_worker --config configs/trainium2.toml \
+  --state cache/verify_queue/neuron.sqlite3 --dry-run
+```
+
+预览只显示后端、分配内映射的物理core、解释器和状态路径，不加载SDK、不创建状态库。部署时移除`--dry-run`，按需指定`--host`与`--port`；本次未启动设备服务。单worker使用一个core，多设备配置须通过`--device`选择一个相对索引。
+
+`device.python`可为相对TOML的路径或绝对路径，保留venv的`bin/python`符号链接路径；解析到基础Python二进制会丢失vendor环境。服务端在SDK加载前切换至该解释器，并设置单core、LNC=1、禁用fallback及隐藏CUDA；实际SDK与配置硬件不匹配时不启动监听。客户端不能指定服务端解释器。每个worker/core使用独立状态库，库内绑定后端，不能将旧CUDA状态改作Neuron；所有Neuron请求要求v3协议和后端匹配。详情见[队列](BATCH_WORKFLOWS.md#persistent-local-verification-queue)与[预算契约](RESOURCE_BUDGETS.md)。
+
 ## NKI提交与基线
 
 保留`ModelNew(torch.nn.Module)`接口，forward接收原生`neuron`张量。使用`import nki`、`@nki.jit`及`torch_neuronx.nki_op`注册内核；API示例见[官方NKI集成说明](https://github.com/aws-neuron/torch-neuronx#using-nki-kernels)。编译源文件实际写入独立构建目录，支持NKI源码检查；返回前再次核对源码，运行中改写文件不能获得有效结果。

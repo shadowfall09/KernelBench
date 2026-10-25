@@ -327,10 +327,11 @@ def test_queue_budget_requires_capability_and_cancels_a_lost_submission(config, 
     def http(method, url, value=None, timeout=30, *, deadline=None):
         calls.append((method, url))
         if url.endswith("/health"):
-            return {"protocol": transports.QUEUE_PROTOCOL if supported else "old-worker", "status": "ok"}
+            return {"protocol": transports.QUEUE_PROTOCOL if supported else "old-worker", "status": "ok", "device_backend": "cuda"}
         if url.endswith("/cancel"):
             result = budgets.stamp_device_lease({"correctness": False}, lease, 0.25)
             return {"request_id": "owned", "protocol": transports.QUEUE_PROTOCOL,
+                    "device_backend": "cuda",
                     "request_sha256": fingerprint(payload), "status": "cancelled", "result": result}
         raise TimeoutError("Submission response lost after server admission")
 

@@ -211,11 +211,22 @@ the default is Docker; no default architecture is injected.
 
 ## Persistent local verification queue
 
-Start one worker inside a GPU allocation:
+Start one worker inside a device allocation, using the shared hardware config:
 
 ```bash
-python scripts/local_verify_worker.py --host 0.0.0.0 --port 8000 --gpu 0
+python -m kb_workflows.runtime.queue_worker --config configs/trainium2.toml \
+  --state cache/verify_queue/neuron.sqlite3 --dry-run
 ```
+
+The preview imports no device SDK and creates no queue state. To serve requests,
+remove `--dry-run` and set the appropriate `--host`/`--port`. CUDA uses the same
+entrypoint with a CUDA TOML; the legacy `python scripts/local_verify_worker.py
+--gpu 0` command remains supported. A worker selects one allocation-relative
+device; pass `--device` to override a config containing multiple devices.
+Only device settings are loaded from the shared config, so controller calibration
+files and model settings need not exist on the worker. `device.python` selects
+the worker's own vendor environment before SDK imports; clients cannot select
+its interpreter. The actual backend must be available before the listener starts.
 
 The HTTP interface is:
 
@@ -225,7 +236,8 @@ The HTTP interface is:
 - `POST /v1/verify/{request_id}/cancel`, with `{"request_sha256": "..."}`, cancels the matching saved request. The submit/get response supplies its fingerprint.
 
 Jobs, cancellation states and lease nonce bindings persist in `cache/verify_queue/jobs.sqlite3`. Restarted unfinished leased/cancelling jobs fail with unknown usage; unleased running jobs retain the old requeue behavior. Identical requests are idempotent; the client retries transient HTTP failures. One worker processes one task at a time, and `--capacity` bounds
-pending tasks. Use a different `--state` file per worker GPU.
+pending tasks. Use a different `--state` file per worker device. Each database
+is bound to its backend; an existing CUDA database cannot be reopened as Neuron.
 
 ```bash
 ./batch_run_queue.sh --level 1 --start 1 --end 10 --run-name queue_test \
@@ -239,7 +251,7 @@ translates `127.0.0.1`/`localhost` to `host.docker.internal`. The worker must li
 on a reachable interface for containers to connect. The client and worker must
 use the same reference, evaluator and hidden-test sources.
 
-`--queue-wait-timeout` bounds submission/retries/polling, separate from each GPU task's `--timeout`. On timeout or lost communication the client requests cancellation, retaining the failed call and any confirmed server-parent usage. With `agent_device_seconds`, the worker also expires queued/running leases without requiring a live client; old workers are rejected before submission. See [resource budgets](RESOURCE_BUDGETS.md) for accounting and cleanup limits.
+`--queue-wait-timeout` bounds submission/retries/polling, separate from each device task's `--timeout`. On timeout or lost communication the client requests cancellation, retaining the failed call and any confirmed server-parent usage. With `agent_device_seconds`, the worker also expires queued/running leases without requiring a live client. Budgeted requests and all Neuron requests require a healthy `kernelbench_pro_queue_v3` worker with a matching backend; older workers must be upgraded. Legacy unbudgeted CUDA services remain compatible. See [resource budgets](RESOURCE_BUDGETS.md) for accounting and cleanup limits.
 
 The compatibility Python entrypoint still accepts common pydra options:
 

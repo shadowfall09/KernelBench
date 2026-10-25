@@ -330,7 +330,7 @@ class RunConfig:
         if self.device_backend not in {"cuda", "neuron"}:
             raise ValueError("Unknown device backend")
         if self.device_python:
-            self.device_python = str(Path(self.device_python).expanduser().resolve())
+            self.device_python = os.path.abspath(Path(self.device_python).expanduser())
         profiles = gpu_profiles()
         target = self.hardware or self.gpu
         preset = profiles.get(target, {})
@@ -553,9 +553,10 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest", "device_python"} and value:
             candidate = Path(value).expanduser()
-            value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
+            candidate = candidate if candidate.is_absolute() else path.parent / candidate
+            value = os.path.abspath(candidate) if key == "device_python" else str(candidate.resolve())
         options[key] = value
     if document.get("gpu") and document.get("device"):
         raise ValueError("Use either [gpu] or [device] for one device target")

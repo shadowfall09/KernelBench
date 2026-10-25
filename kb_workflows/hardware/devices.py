@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -45,7 +46,9 @@ def device_options(section, *, directory=None):
         if not isinstance(value, str) or not value.strip():
             raise ValueError("device.python must name an explicit Python interpreter")
         path = Path(value).expanduser()
-        result["device_python"] = str((path if path.is_absolute() else Path(directory or Path.cwd()) / path).resolve())
+        # A venv's Python is often a symlink. Resolving it selects the base
+        # interpreter and silently loses the configured vendor environment.
+        result["device_python"] = os.path.abspath(path if path.is_absolute() else Path(directory or Path.cwd()) / path)
     return result
 
 

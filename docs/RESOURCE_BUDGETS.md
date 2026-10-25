@@ -31,7 +31,7 @@ LiteLLM在请求前检查模型支持的`max_completion_tokens`/`max_tokens`参�
 
 ## HTTP队列的开发租约
 
-`evaluation = "queue"` 可搭配同一个 `agent_device_seconds`，不新增预算配置项。客户端在提交前要求 `/health` 返回 `kernelbench_pro_queue_v2` 且状态正常；旧worker不会收到带预算的任务。服务端以完整请求指纹绑定任务和唯一租约nonce，同一nonce不能换任务重花。
+`evaluation = "queue"` 可搭配同一个 `agent_device_seconds`，不新增预算配置项。客户端在提交前要求 `/health` 返回 `kernelbench_pro_queue_v3`、状态正常且`device_backend`匹配，并逐次核对响应的协议、后端与请求指纹；旧worker不会收到带预算的任务。Neuron请求即使没有设备预算也需要该握手；旧的无预算CUDA服务保持兼容。服务端以完整请求指纹绑定任务和唯一租约nonce，同一nonce不能换任务重花。worker从统一设备配置启动，状态库绑定后端，客户端不能指定服务端解释器；这些软件约束不构成GPU busy时间的物理硬限。
 
 服务端从接收租约起，以单调时钟限制排队加执行窗口；排队消耗可用窗口，但不收取设备用量。到期未启动的任务不执行；运行中的任务会通知本地验证父进程终止进程组，包括主进程退出后仍存活的子进程。服务端父进程按实际worker墙钟（含启动、校验和清理）覆盖子进程收据，客户端用匹配的请求、nonce与收据结算。它不计网络等待、GPU busy时间或账单。
 

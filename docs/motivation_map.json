@@ -5154,6 +5154,27 @@
         "docs/TIMED_NUMERICS.md"
       ],
       "reason": "额外显存前向也必须输出正确，不能绕过最后一次验证；隔离副本和参考检查不应污染候选峰值或RNG，原始/调整读数及独立memory覆盖进入原生来源与计数器重放"
+    },
+    {
+      "id": "V52-01",
+      "title": "设备配置驱动队列与后端预算握手",
+      "primary": "M5",
+      "secondary": [
+        "M4"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/runtime/queue_worker.py",
+        "kb_workflows/runtime/transports.py",
+        "kb_workflows/config.py",
+        "kb_workflows/hardware/devices.py",
+        "tests/hardware/test_device_adapters.py",
+        "tests/agents/test_resource_budgets.py",
+        "docs/NEURON.md",
+        "docs/RESOURCE_BUDGETS.md"
+      ],
+      "reason": "补齐Neuron队列实际启动入口，以统一设备配置选择服务端环境，保留venv路径；状态与请求绑定后端，预算握手拒绝错设备轨道和旧协议，避免客户端选择服务端解释器"
     }
   ]
 }
