@@ -18,9 +18,10 @@ from pathlib import Path
 
 from ..common import atomic_json, evaluator_digest, failure, fingerprint, read_json
 from .kernel_origin import MAX_RECORDS, _sha, summarize
+from .submission_source import SourceRegistry, record_sources
 
-NATIVE_PROTOCOL = "kernelbench_pro_native_origin_v1"
-NATIVE_SCOPE = "native_correctness_both_orders_warmups_timing_memory_and_paired; independent_diagnostics_excluded"
+NATIVE_PROTOCOL = "kernelbench_pro_native_origin_v2"
+NATIVE_SCOPE = "native_correctness_both_orders_warmups_timing_memory_and_paired; model_state_bound; independent_diagnostics_excluded"
 _ACTIVE = ContextVar("kernelbench_native_origin_calls", default=None)
 MAX_REPORT_BYTES = 64 * 1024**2
 
@@ -67,13 +68,22 @@ def native_request(payload):
 
 
 class _Calls:
-    def __init__(self, capture, seeds, role="candidate", *, scored=False):
+    def __init__(self, capture, seeds, role="candidate", *, scored=False, registry=None):
         self.capture, self.seeds = capture, seeds
+        self.registry = registry or SourceRegistry()
         self.scored = scored
         self.role = role
         self.rows, self.windows, self.changes = [], {}, []
         self.timings = []
         self.cursor, self.last_seed = 0, None
+
+    def model_state(self, model, args):
+        from ..evaluation.state_paths import invocation_state
+
+        try:
+            return invocation_state(model, args, callable_identity=self.registry.callable_identity)
+        except (ValueError, TypeError, RuntimeError, AttributeError, OSError) as exc:
+            return {"status": "not_measured", "reason": str(exc)[:300]}
 
     def next_seed(self):
         if self.scored:
@@ -108,7 +118,8 @@ class _Calls:
                "input_content_sha256": fingerprint({"value": signature(args, typed=True)}),
                "input_signature_sha256": fingerprint({"signature": geometry}),
                "input_layout_sha256": fingerprint(aliases),
-               "called": False, "verified": False, "output_content_sha256": None}
+               "called": False, "verified": False, "output_content_sha256": None,
+               "model_state_before": self.model_state(model, args)}
         self.rows.append(row)
         if self.scored:
             # This is the callable used by the actual timer. Hashing and mode
@@ -154,6 +165,7 @@ def candidate_call(model, args, *, role="candidate", **scope):
     try:
         yield execute, row
     finally:
+        row["model_state_after"] = state.model_state(model, args)
         if state.scored:
             import torch
 
@@ -224,10 +236,13 @@ def _run_scored(payload, invoke):
     state = _Calls(None, [], scored=True)
     token = _ACTIVE.set(state)
     try:
-        result = invoke()
+        with record_sources(state.registry):
+            result = invoke()
     finally:
         _ACTIVE.reset(token)
     frozen = {**request, "_origin_timing_seeds": state.seeds}
+    if not state.registry.intact():
+        state.changes.append("registered_source")
     document = _document(frozen, result, state, "scored")
     document.pop("native_result")
     document.update(native_request=request, timing_seed_plan=state.seeds,
@@ -249,7 +264,7 @@ def _run_native(payload, invoke, *, observer=None):
     source = payload["ref_arch_src"] if role == "reference" else payload["kernel_src"]
     capture = Capture(source, candidate_windows_only=True) if payload["_origin_stage"] == "profile" else None
     catalog = Catalog() if capture else None
-    state = _Calls(observer or capture, seeds, role)
+    state = _Calls(observer or capture, seeds, role, registry=capture.registry if capture else None)
     load, move = native.load_custom_model, native.move_model
     candidates = {}
 
@@ -283,7 +298,7 @@ def _run_native(payload, invoke, *, observer=None):
                 if not capture:
                     os.environ["TRITON_CACHE_DIR"] = cache
                 try:
-                    with capture.recording() if capture else nullcontext():
+                    with capture.recording() if capture else record_sources(state.registry):
                         result = invoke()
                 except Exception as exc:
                     result = failure(str(exc), error_name=type(exc).__name__)
@@ -299,6 +314,8 @@ def _run_native(payload, invoke, *, observer=None):
         _ACTIVE.reset(token)
     if evaluator_digest() != payload["eval_config"].get("evaluator_sha256"):
         state.changes.append("evaluator_source")
+    if not state.registry.intact():
+        state.changes.append("registered_source")
     document = _document(payload, result, state, payload["_origin_stage"])
     binding = document["binding"]
     if observer is not None:
@@ -375,7 +392,12 @@ def _coverage(document, payload):
                    or row["called"] is not True or row["verified"] is not True or row.get("no_grad") is not True
                    or type(row.get("training")) is not bool or row.get("training_after") != row["training"]
                    or any(not _sha(row.get(key)) for key in ("input_content_sha256", "input_signature_sha256",
-                                                             "input_layout_sha256", "output_content_sha256")) for row in rows)):
+                                                             "input_layout_sha256", "output_content_sha256"))
+                   or any(not isinstance(row.get(key), dict) or row[key].get("status") != "observed"
+                          or not _sha(row[key].get("sha256")) or type(row[key].get("tensor_count")) is not int
+                          or row[key]["tensor_count"] < 0
+                          or row[key].get("scope") != "module_data_entrypoints_and_input_state_aliases; no_host_control_proof"
+                          for key in ("model_state_before", "model_state_after")) for row in rows)):
         raise ValueError("Missing, changed, unverified or mode-unbound native candidate calls")
     timed = [row for row in rows if row["phase"] in {"warmup", "timing", "paired_warmup", "paired"}]
     timings = document["native_timings"]
@@ -510,7 +532,7 @@ def _replay_parts(payload, stages, raw, *, simulated):
         _, scored = validate_scored(payload["_scored_result"], payload, allow_simulated=simulated)
         if (scored["calls"] != control
                 or scored["binding"]["device_fingerprint"] != stages["control"]["binding"]["device_fingerprint"]):
-            raise ValueError("Origin replay differs from actual scored calls, outputs, modes or device")
+            raise ValueError("Origin replay differs from actual scored calls, state, entrypoints, outputs, modes or device")
         coverage["scored_call_observations_match"] = True
     return coverage, summarize(raw, minimum_custom_fraction=threshold)
 

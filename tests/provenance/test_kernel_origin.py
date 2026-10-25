@@ -175,6 +175,7 @@ def test_inspectable_source_preserves_future_import_globals_and_code_object_iden
     assert fn.__annotations__ == {"x": "Missing"}
     assert inspect.getsource(fn) == "def kernel(x: Missing):\n    return VALUE + x\n"
     assert registry.source_for(fn)["source_sha256"] == sha256(source.encode())
+    assert registry.callable_identity(fn)["kind"] == "registered_code"
     assert registry.intact()
     # Code objects compare equal by value. Equal content recompiled under the
     # exact same filename still does not inherit the registered identity.
@@ -182,6 +183,7 @@ def test_inspectable_source_preserves_future_import_globals_and_code_object_iden
     exec(compile(source, context["__file__"], "exec"), other)
     assert other["kernel"].__code__ == fn.__code__ and other["kernel"].__code__ is not fn.__code__
     assert registry.source_for(other["kernel"]) is None
+    assert registry.callable_identity(other["kernel"])["kind"] == "external_code_observation"
 
 
 def test_nested_code_is_retained_and_source_mutation_breaks_identity(tmp_path):
@@ -1075,6 +1077,70 @@ def test_scored_call_binding_rejects_wrappers_changed_results_and_claimed_qualif
     preview = json.loads(capsys.readouterr().out)
     assert preview["actual_scored_calls_requested"] and preview["timing_seed_count"] == len(frozen["_origin_timing_seeds"])
     assert not preview["experiments_started"] and not output.parent.exists()
+
+
+def test_native_state_binding_includes_parameters_aliases_and_entrypoints(native_origin_runner, monkeypatch, tmp_path):
+    from kb_workflows.evaluation.state_paths import invocation_state
+    from kb_workflows.provenance import origin_task
+
+    monkeypatch.setenv("KB_SOFTWARE_STATE", "1")
+    template = native_origin_runner()
+    request = copy.deepcopy(template["native_request"])
+    request["kernel_src"] = request["kernel_src"].replace("        self.calls = 0\n", '''        self.calls = 0
+        self.weight = torch.nn.Parameter(torch.arange(4, dtype=torch.float32))
+        self.register_buffer("view", self.weight.detach()[::2])
+        self.plan = {"factor": int(__import__("os").environ["KB_SOFTWARE_STATE"])}
+''')
+    actual = native_origin_runner.scored(request)
+    frozen, observed = origin_task.validate_scored(actual, allow_simulated=True)
+    assert all(row["model_state_before"]["tensor_count"] == 2 for row in observed["calls"])
+    assert all(row["model_state_before"]["sha256"] != row["model_state_after"]["sha256"] for row in observed["calls"])
+    frozen.update(task="origin_audit", _origin_target="evaluate", _scored_result=actual)
+    assert origin_task.audit(frozen, run=native_origin_runner.runner)["native_coverage"]["scored_call_observations_match"]
+    # Both replay processes agree and every output remains identical, but their
+    # ordinary configuration differs from the actual timing process.
+    monkeypatch.setenv("KB_SOFTWARE_STATE", "2")
+    changed = origin_task.audit(frozen, run=native_origin_runner.runner)
+    assert changed["native_coverage"]["status"] == "not_measured"
+    assert "state, entrypoints" in changed["native_coverage"]["reason"]
+    registry, context = SourceRegistry(), {}
+    with record_sources(registry):
+        execute(request["kernel_src"], context, tmp_path / "state-source")
+    model = context["ModelNew"]()
+    inputs = [model.weight.detach()]
+    before = invocation_state(model, inputs, callable_identity=registry.callable_identity)
+    model.weight.detach().add_(1)
+    updated = invocation_state(model, inputs, callable_identity=registry.callable_identity)
+    assert before["sha256"] != updated["sha256"]
+    model.view = model.view.clone()  # Same values; changes the storage relation.
+    after = invocation_state(model, inputs, callable_identity=registry.callable_identity)
+    assert updated["sha256"] != after["sha256"]
+    model.forward = context["ModelNew"].forward.__get__(context["ModelNew"]())
+    rebound = invocation_state(model, inputs, callable_identity=registry.callable_identity)
+    assert rebound["sha256"] != after["sha256"]
+    isolated = invocation_state(model, [inputs[0].clone()], callable_identity=registry.callable_identity)
+    assert isolated["sha256"] != rebound["sha256"]
+    # Descriptor discovery must not execute a candidate property.
+    class Opaque:
+        @property
+        def __dict__(self):
+            pytest.fail("Snapshot executed an opaque property")
+    model.opaque = Opaque()
+    with pytest.raises(ValueError, match="custom descriptor"):
+        invocation_state(model, inputs, callable_identity=registry.callable_identity)
+    class OpaqueClass:
+        @property
+        def __class__(self):
+            pytest.fail("Snapshot executed __class__")
+    vars(model)["opaque"] = OpaqueClass()
+    with pytest.raises(ValueError, match="opaque"):
+        invocation_state(model, inputs, callable_identity=registry.callable_identity)
+    legacy = copy.deepcopy(actual)
+    record = legacy["metadata"]["native_call_receipt"]
+    record["protocol"] = "kernelbench_pro_native_origin_v1"
+    record["receipt_sha256"] = fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
+    with pytest.raises(ValueError):
+        origin_task.validate_scored(legacy, allow_simulated=True)
 
 
 def test_saved_native_replay_rejects_resealed_binding_coverage_and_source_changes(native_origin_runner):

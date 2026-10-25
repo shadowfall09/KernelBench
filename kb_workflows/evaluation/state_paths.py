@@ -6,12 +6,29 @@ only ordinary module namespaces and builtin containers keeps lookup declarative.
 
 from __future__ import annotations
 
+import inspect
 import json
 import types
 from collections import OrderedDict
 
 MAX_STATES = 100_000
 MAX_DEPTH = 64
+
+
+def namespace(value):
+    """Read ordinary storage without calling a candidate property or iterator."""
+    if any("__slots__" in vars(cls) for cls in type(value).__mro__):
+        raise ValueError("Slotted state objects need an explicit state adapter")
+    for cls in type(value).__mro__:
+        descriptor = vars(cls).get("__dict__")
+        if descriptor is not None:
+            if type(descriptor) not in (types.GetSetDescriptorType, types.MemberDescriptorType):
+                raise ValueError("State object __dict__ must not be a custom descriptor")
+            result = object.__getattribute__(value, "__dict__")
+            if type(result) is not dict:
+                raise ValueError("State object namespace must be an ordinary dictionary")
+            return result
+    return None
 
 
 def plain_tensors(model, *, allow_meta=False):
@@ -32,20 +49,6 @@ def plain_tensors(model, *, allow_meta=False):
                 registered_objects(child)
 
     registered_objects(model)
-
-    def namespace(value):
-        if any("__slots__" in vars(cls) for cls in type(value).__mro__):
-            raise ValueError("Slotted state objects need an explicit state adapter")
-        for cls in type(value).__mro__:
-            descriptor = vars(cls).get("__dict__")
-            if descriptor is not None:
-                if type(descriptor) not in (types.GetSetDescriptorType, types.MemberDescriptorType):
-                    raise ValueError("State object __dict__ must not be a custom descriptor")
-                result = object.__getattribute__(value, "__dict__")
-                if type(result) is not dict:
-                    raise ValueError("State object namespace must be an ordinary dictionary")
-                return result
-        return None
 
     def walk(value, path, ancestors, depth):
         nonlocal visited
@@ -99,3 +102,100 @@ def plain_tensors(model, *, allow_meta=False):
 
     walk(model, "@", set(), 0)
     return found
+
+
+def invocation_state(model, inputs, *, callable_identity):
+    """Hash actual state and entrypoints, retaining input/state storage aliases.
+
+    This observes module data and callable identities, not arbitrary global
+    dependencies, host control flow or execution ownership.
+    """
+    import torch
+
+    from src.input_groups import layout
+
+    from ..common import fingerprint
+    from .determinism import signature
+
+    tensors, seen, classes, declarations, visited = [], {}, {}, [], 0
+
+    def walk(value, depth=0):
+        nonlocal visited
+        visited += 1
+        if visited > MAX_STATES or depth > MAX_DEPTH:
+            raise ValueError("Native model state exceeds its traversal envelope")
+        if value is None or type(value) in (bool, int, float, complex, str, bytes, torch.dtype, torch.device):
+            if type(value) in (str, bytes) and len(value) > 1024**2:
+                raise ValueError("Native model state contains an excessive literal")
+            if type(value) is bytes:
+                return {"type": "bytes", "hex": value.hex()}
+            if type(value) in (torch.dtype, torch.device):
+                return {"type": type(value).__name__, "value": str(value)}
+            return signature(value, typed=True)
+        if id(value) in seen:
+            return {"ref": seen[id(value)]}
+        identity = seen[id(value)] = len(seen)
+        if type(value) in (torch.Tensor, torch.nn.Parameter):
+            if value.device.type == "meta":
+                raise ValueError("Native model state must be materialized")
+            tensors.append(value)
+            return {"id": identity, "kind": type(value).__name__, "requires_grad": value.requires_grad,
+                    "value": signature(value.detach(), typed=True)}
+        cls = type(value)
+        if type(cls) is not type:
+            raise ValueError("Custom metaclasses need an explicit native state adapter")
+        if issubclass(cls, torch.Tensor):
+            raise ValueError("Native model state cannot observe tensor subclasses")
+        if type(value) in (types.FunctionType, types.MethodType, staticmethod, classmethod):
+            function = value.__func__ if type(value) is not types.FunctionType else value
+            return {"id": identity, "callable": callable_identity(value), "defaults": walk(function.__defaults__, depth + 1),
+                    "kwdefaults": walk(function.__kwdefaults__, depth + 1),
+                    "bound_to": walk(value.__self__, depth + 1) if type(value) is types.MethodType else None,
+                    "closure": [walk(cell.cell_contents, depth + 1) for cell in function.__closure__ or ()]}
+        if type(value) in (types.BuiltinFunctionType, types.MethodDescriptorType, types.WrapperDescriptorType):
+            bound = getattr(value, "__self__", None)
+            return {"id": identity, "callable": callable_identity(value),
+                    "bound_to": walk(bound, depth + 1) if type(bound) in (torch.Tensor, torch.nn.Parameter) else None}
+        if type(value) is type:
+            if id(value) not in classes:
+                raise ValueError("Class-valued state needs an observed class declaration")
+            return {"id": identity, "class_ref": classes[id(value)]}
+        if type(value) in (dict, OrderedDict):
+            if any(type(key) not in (str, int) for key in value):
+                raise ValueError("Native state dictionary keys must be strings or integers")
+            return {"id": identity, "kind": type(value).__name__, "items": [
+                [walk(key, depth + 1), walk(item, depth + 1)] for key, item in value.items()]}
+        if type(value) in (tuple, list):
+            return {"id": identity, "kind": type(value).__name__, "items": [walk(item, depth + 1) for item in value]}
+        if type(value) in (set, frozenset):
+            if any(type(item) is not str for item in value):
+                raise ValueError("Native state sets require plain string entries")
+            return {"id": identity, "kind": type(value).__name__, "items": list(value)}
+        if issubclass(cls, (dict, list, tuple, set, frozenset)):
+            raise ValueError("Container subclasses need an explicit native state adapter")
+        attributes = namespace(value)
+        if attributes is None or issubclass(cls, types.ModuleType):
+            raise ValueError("Unsupported opaque native model state")
+        result = {"id": identity}
+        if id(cls) not in classes:
+            index = classes[id(cls)] = len(declarations)
+            declarations.append(None)
+            excluded = {"__dict__", "__weakref__", "__module__", "__doc__", "__qualname__", "__annotations__"}
+            declarations[index] = {"qualname": cls.__qualname__, "attributes": walk(
+                {name: item for name, item in vars(cls).items() if name not in excluded}, depth + 1)}
+        result["class_ref"] = classes[id(cls)]
+        if issubclass(cls, torch.nn.Module):
+            result["entrypoints"] = {
+                name: walk(item, depth + 1) if type(item) in (types.FunctionType, types.MethodType, staticmethod, classmethod)
+                else callable_identity(item) if item is not None else None
+                for name in ("forward", "__call__", "__getattribute__", "__getattr__", "_call_impl", "_compiled_call_impl")
+                for item in [inspect.getattr_static(value, name, None)]}
+        result["attributes"] = walk(attributes, depth + 1)
+        return result
+
+    data = walk(model)
+    aliases = layout([inputs, tensors])
+    if aliases is None:
+        raise ValueError("Native model state storage layout is unsupported")
+    return {"status": "observed", "sha256": fingerprint({"model": data, "classes": declarations, "input_state_layout": aliases}),
+            "tensor_count": len(tensors), "scope": "module_data_entrypoints_and_input_state_aliases; no_host_control_proof"}

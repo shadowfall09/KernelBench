@@ -1428,7 +1428,7 @@
         "kb_workflows/evaluation/measurement.py",
         "kb_workflows/evaluation/paired_task.py"
       ],
-      "reason": "已有CUDA/Triton/C++、wheel库和Graph来源诊断，完整公共/隐藏/预热/计时/配对/显存调用覆盖；L1/L2实际进程新增无转发计时包装的逐次收据，按实际seed、输出、模式和设备与重放关联，评分要求实际收据。观察一致不证明未插桩路径等价；其他诊断、未支持loader/compiler、Neuron来源及充分的正式门继续实现"
+      "reason": "已有CUDA/Triton/C++、wheel库和Graph来源诊断，完整公共/隐藏/预热/计时/配对/显存覆盖；L1/L2实际调用收据按实际seed、前后模型数据/入口/别名、输出、模式及设备与重放关联，评分要求实际收据。状态观察不证明任意全局依赖或未插桩host路径等价；其他诊断、未支持loader/compiler、Neuron来源及充分的正式门继续实现"
     },
     {
       "id": "R-09",
@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA原生序列、显存、逐次NVTX/输出/模式/launch核对、配对参考、按调用SOL及A/E/O已接入。实际计时进程收据与重放关联，离线单列actual/control/profile时间且不混用时钟。Neuron Parquet/DMA及资源模型已有软件实现；非kernel工作、Neuron所有权和充分的正式归因门继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现；非kernel工作、Neuron所有权和充分的正式归因门继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5217,6 +5217,27 @@
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "把来源重放与实际原生计时进程接起来：区间内保留原始model对象，区间外记录实际字节/模式/seed/时间，重放完整核对并分列实际时间；L1/L2缺收据不能仅靠passed标记获得资格，观察一致不被升级为执行来源证明"
+    },
+    {
+      "id": "V55-01",
+      "title": "逐调用模型数据、入口与别名绑定",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/evaluation/state_paths.py",
+        "kb_workflows/provenance/submission_source.py",
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/analysis/performance.py",
+        "tests/provenance/test_kernel_origin.py",
+        "docs/KERNEL_ORIGIN.md",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "防止同输入输出下借用不同参数、普通配置或入口的执行；实际和重放逐次核对前后状态与输入/状态别名，未知对象不补空状态，摘要不进入计时或采集窗口，代码身份不由等值重编译继承。复用状态路径，仍不声称全局依赖或host控制流已证明"
     }
   ]
 }

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import marshal
 import os
 import re
 import sys
@@ -31,15 +32,19 @@ class SourceRegistry:
         self.codes = {}  # id -> retained object: code equality is insufficient.
         self.jit_text = {}
         self.literals = {}
+        self.external_codes = {}
 
     def register(self, source, path, code):
         item = {"source_sha256": sha256(source.encode()), "path": str(path)}
         self.sources.append(item)
         lines = source.splitlines(keepends=True)
         literals = self.literals.setdefault(item["source_sha256"], set())
+        position = 0
 
         def visit(node):
-            self.codes[id(node)] = (node, item)
+            nonlocal position
+            self.codes[id(node)] = (node, item, position)
+            position += 1
             # Compute the expected JIT text before executing candidate code.
             # Runtime inspect/linecache functions are not source attestations.
             block = "" if node.co_name.startswith("<") else textwrap.dedent("".join(inspect.getblock(lines[node.co_firstlineno - 1:])))
@@ -60,6 +65,28 @@ class SourceRegistry:
     def source_for_code(self, code):
         match = self.codes.get(id(code))
         return match[1] if match and match[0] is code else None
+
+    def callable_identity(self, function):
+        """Observe code identity; external code observations are not ownership proofs."""
+        if type(function) in (staticmethod, classmethod, types.MethodType):
+            function = function.__func__
+        if type(function) is types.FunctionType:
+            code = function.__code__
+            owner = self.codes.get(id(code))
+            if owner and owner[0] is code:
+                return {"kind": "registered_code", "source_sha256": owner[1]["source_sha256"],
+                        "code_index": owner[2], "qualname": code.co_qualname}
+            cached = self.external_codes.get(id(code))
+            if cached is None or cached[0] is not code:
+                def canonical(node):
+                    return node.replace(co_filename="", co_firstlineno=0, co_consts=tuple(
+                        canonical(value) if isinstance(value, types.CodeType) else value for value in node.co_consts))
+                cached = self.external_codes[id(code)] = (code, sha256(marshal.dumps(canonical(code))))
+            return {"kind": "external_code_observation", "code_sha256": cached[1], "qualname": code.co_qualname}
+        if type(function) in (types.BuiltinFunctionType, types.MethodDescriptorType, types.WrapperDescriptorType):
+            module = getattr(function, "__module__", None) or getattr(getattr(function, "__objclass__", None), "__module__", None)
+            return {"kind": "builtin_observation", "module": module, "qualname": function.__qualname__}
+        raise ValueError("Unsupported callable descriptor in native state observation")
 
     def jit_source(self, function):
         """Check the actual JIT text as well as the original Python code object."""
