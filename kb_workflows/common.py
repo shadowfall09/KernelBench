@@ -133,7 +133,7 @@ def apply_score_gate(results, run_dir):
     auxiliary_hashes = {name: fingerprint(value) for name, value in auxiliary.items()}
     for key, raw in results.items():
         options = raw.get("metadata", {}).get("evaluation_config", {})
-        capped = any(config.get(name) for name in ("agent_token_limit", "agent_output_token_limit", "agent_device_seconds"))
+        capped = any(config.get(name) for name in ("agent_token_limit", "agent_output_token_limit", "agent_device_seconds", "agent_gpu_busy_seconds"))
         required = options.get("score_gate_required", config.get("score_gate_required", False)) or options.get("anti_cheat", False) or capped
         if not required:
             gated[key] = raw
@@ -173,6 +173,16 @@ def apply_score_gate(results, run_dir):
             if capped:
                 required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
+            if valid and config.get("agent_gpu_busy_seconds"):
+                from .agents.resource_budgets import gpu_artifact_hashes
+
+                try:
+                    pid_, sid_ = map(int, key.split("_"))
+                    snapshot = auxiliary["generation_budget.json"]["slots"][key]["resource_budgets"]["gpu_busy_quota"]
+                    hashes = gpu_artifact_hashes(run_dir, pid_, sid_, snapshot)
+                    valid = all(metadata.get("score_auxiliary_files", {}).get(name) == value for name, value in hashes.items())
+                except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                    valid = False
             for option in ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
                 declared = config.get(option)
                 if declared:

@@ -140,11 +140,12 @@ def test_rl_public_hidden_gap_regrades_identical_saved_sources_without_execution
 def test_resource_budget_proof_is_required_and_invalidates_both_score_gates(run, monkeypatch, damage):
     import hashlib
 
-    from kb_workflows.agents.resource_budgets import Ledger
+    from kb_workflows.agents.resource_budgets import Ledger, device_lease, settle_gpu_lease, stamp_device_lease
     from kb_workflows.analysis.experiment import protocol, write_budget_report
 
     config, _, standard, _, _ = run
     config.agent_backend, config.model, config.agent_output_token_limit = "litellm", "fake/provider", 10
+    config.agent_gpu_busy_seconds = 6.5
     config.validate()
     monkeypatch.setattr(generation, "generation_signature", lambda *args: "cap-signature")
     atomic_json(config.run_dir / "run_config.json", config.to_dict())
@@ -154,6 +155,14 @@ def test_resource_budget_proof_is_required_and_invalidates_both_score_gates(run,
         ledger.settle(ledger.reserve(10), 3)
         receipt = {"protocol": {**protocol(config), "samples_per_problem": 1}, "model_calls": 1, "output_tokens": 3,
                    "resource_budgets": {"output_tokens": ledger.snapshot()}}
+        gpu = Ledger(6.5, "gpu_busy_upper_bound_seconds")
+        lease = device_lease(None, 30, 30, gpu_ledger=gpu)
+        worker = stamp_device_lease({"compiled": True, "correctness": True, "runtime": 1}, lease, 0.5)
+        assert settle_gpu_lease(gpu, lease, worker, index=1, task="evaluate")
+        atomic_json(config.run_dir / "work" / f"p1_s{sid}" / "rounds/001/standard.json", worker)
+        receipt.update(development_evaluations=1, profile_requests=0, gpu_execution_seconds=None,
+                       gpu_busy_charge_upper_bound_seconds=0.5)
+        receipt["resource_budgets"]["gpu_busy_quota"] = gpu.snapshot()
         key = f"1_{sid}"
         summary[key] = {"status": "success", "signature": "cap-signature", "budget": receipt,
                         "kernel_sha256": hashlib.sha256((config.run_dir / kernel_name(1, 1, sid)).read_bytes()).hexdigest()}
@@ -164,6 +173,13 @@ def test_resource_budget_proof_is_required_and_invalidates_both_score_gates(run,
     assert paper_analysis.analyze_paper(config)["bounded_gain_macro"] == pytest.approx(1)
     assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
     if damage is None:
+        path = config.run_dir / "work/p1_s0/rounds/001/standard.json"
+        worker = read_json(path)
+        worker["metadata"]["device_lease_receipt"]["elapsed_seconds"] = 0.1
+        atomic_json(path, worker)
+        assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+        changed = paper_analysis.analyze_paper(config)
+        assert changed["details"][0]["status"] == "resource_budget_gpu_evidence_changed_or_missing"
         return
     if damage == "receipt":
         (config.run_dir / "generation_budget.json").unlink()

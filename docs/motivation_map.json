@@ -1602,7 +1602,7 @@
         "scripts/run_agent.py",
         "kb_workflows/analysis/experiment.py"
       ],
-      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证共享nonce准入与有界取消。Modal原生生成复用输出token/本地worker账本，统一实际开发后端，单次CLI准入、结果/工件绑定、统一SDK期限、有界终止及评分复核；未知用量拒绝且不重花。纯GPU busy时间物理硬限及Harbor外部生成契约继续实现；未运行设备、云资源或模型实验"
+      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证共享nonce准入与有界取消。Modal原生生成复用输出token/本地worker账本，统一实际开发后端，单次CLI准入、结果/工件绑定、统一SDK期限、有界终止及评分复核；未知用量拒绝且不重花。已接入agent_gpu_busy_seconds的软件预留：在单worker进程活动完整时计量并集，其他情况按确认的worker墙钟上界扣额、实测值保留未知；与旧worker额度共同准入，逐轮工件及缓存重放，模型/最终阶段和其他进程不冒充已覆盖。整机/其他进程的纯GPU busy物理硬限及Harbor外部生成契约继续实现；未运行设备、云资源或模型实验"
     },
     {
       "id": "R-19",
@@ -5404,6 +5404,36 @@
         "tests/analysis/test_headroom_integration.py"
       ],
       "reason": "将逐版堆叠的清单改为当前能力、原Verified基准与五类motivation索引，保留全部功能ID/标题/当前证据；详细理由集中到已有MOTIVATION，历史提交与旧验证数字留在Git。同步当前来源/启动归因/预算边界，删除不再需要的隐式V6/V7编号和中文版本解析，仍严格核对清单覆盖与标题；不增加文档文件或重复测试，不把维护精简包装成研究贡献"
+    },
+    {
+      "id": "V62-01",
+      "title": "开发CUDA活动计量与软件配额",
+      "primary": "M4",
+      "secondary": [
+        "M2",
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/agents/resource_budgets.py",
+        "kb_workflows/agents/agent_loop.py",
+        "kb_workflows/config.py",
+        "kb_workflows/analysis/experiment.py",
+        "kb_workflows/analysis/budget_curves.py",
+        "kb_workflows/analysis/study_plan.py",
+        "kb_workflows/analysis/paper_analysis.py",
+        "kb_workflows/common.py",
+        "kb_workflows/runtime/modal_backend.py",
+        "kb_workflows/runtime/regrade.py",
+        "kb_workflows/agents/rl_plan.py",
+        "tests/agents/test_resource_budgets.py",
+        "tests/provenance/test_kernel_origin.py",
+        "tests/evaluation/test_scoring_recovery.py",
+        "docs/RESOURCE_BUDGETS.md"
+      ],
+      "reason": "新增可配置CUDA worker进程软件配额，复用现有租约、账本与local/Docker/队列/Modal准入，不增加运行模块。调用前同时预留worker及GPU额度并收紧超时，完整当前活动按整个进程并集计量；计量缺失或其他诊断worker未覆盖时按可信父进程墙钟上界扣额，实测GPU值保留未知，父进程用量不明则烧预留并拒绝资格。逐轮标准/profile工件、原始租约、实测/上界分离进入评分和缓存指纹，研究轴区分声明配额/观测进程busy/配额扣额；regrade清掉新生成限制，未适配RL/Harbor拒绝。其他GPU进程、模型推理/最终验证及物理抢占不在该计量范围，完整R-18继续部分实现；仅两个集中回归及既有检查扩展，无实验"
     }
   ]
 }

@@ -10,6 +10,7 @@
 | `agent_output_token_limit` | 累计输出token；供应商包含的推理token按completion usage计入 | `local-transformers`、支持completion上限参数的LiteLLM模型 |
 | `agent_max_output_tokens` | 每次调用最多输出数，默认8192；用于本地模型或开启token预留的调用 | 同上 |
 | `agent_device_seconds` | 开发编译、标准测试与profiling占用独立worker的墙钟总额，包含子进程启动与清理 | 原生local/Docker/Modal生成；Modal生成使用Sandbox内local验证，其他原生生成可选local/Docker、Modal或新版queue |
+| `agent_gpu_busy_seconds` | 已验证CUDA worker进程活动的软件配额；完整活动并集或确认的worker墙钟上界扣额，实测值另存 | 同上；CUDA限定，Harbor/交互会话/RL不使用此契约 |
 
 设备额度不包含最终验证，也不包含本地语言模型推理；`local_model_device`单独选择模型设备，默认`cpu`。worker占用时间不等于GPU busy时间、供应商账单或跨进程独占证明。
 
@@ -28,6 +29,26 @@ LiteLLM在请求前检查模型支持的`max_completion_tokens`/`max_tokens`参�
 可选[内存工具与重复检查](TOOL_CHECKS.md)在同一次验证请求的超时和设备worker墙钟内执行；插桩、版本查询及无插桩复核没有独立额度。它们的耗时不进入性能分数，但计入实际开发资源占用。
 
 受限Docker仍按父进程完整transport墙钟结算，不把容器CPU/cgroup或设备可见性当成GPU busy硬限。[产物重评分](ISOLATION_REGRADE.md)只运行新验证阶段，旧生成成本保存在历史快照，模式单独标记为`artifact-regrade`；不会把旧费用/token重新认证成新预算证明。
+
+## CUDA进程活动计量与软件配额
+
+```toml
+[run]
+agent_gpu_busy_seconds = 120.0
+agent_device_seconds = 180.0  # 可选：同时限制整个worker墙钟
+```
+
+这项软件配额的范围是验证worker进程的CUDA活动，不是整机、其他GPU进程、语言模型推理或最终验证用量。其他进程的GPU活动不在当前采集覆盖内，不能将这项配置解释成论文所需的完整纯GPU物理硬限；R-18仍为部分实现。
+
+请求前预留`min(任务超时+5秒, 剩余总墙钟, 已开启的worker额度, 剩余GPU配额)`，执行超时扣除5秒清理余量；不足余量不启动工作。可单独开启新配额，也可与原`agent_device_seconds`共同限制。local/Docker/队列/Modal沿用原来的父进程租约、唯一nonce、服务端期限和清理确认；新配额字段由父收据的完整租约摘要绑定。预算耗尽时保留此前合格候选，恢复不能重新开账。
+
+仅在当前原生L1/L2标准结果的持续CUPTI记录完整、未模拟、当前请求/租约/物理设备绑定且没有未覆盖的其他诊断worker时，统计整个记录中的kernel/memcpy/memset区间并集，包括候选计时窗口外的参考、初始化和验证工作。它与只统计候选窗口的性能来源份额不同。多设备、丢记录、来源记录改变、工具流程或无对应完整采集时，已确认的父进程worker墙钟用作保守扣额上界，`gpu_execution_seconds`保持null，不当成实测GPU用量，也不写成零。父进程用量或清理未知时扣除整笔预留，账本不合格。
+
+`gpu_busy_charge_upper_bound_seconds`是配额扣额，`gpu_execution_seconds`仅在全部请求都有合格的进程活动记录时汇总；协议显式记录进程范围和上界政策。父进程墙钟包含CPU编译/准备/清理，因此保守回落可能较早耗尽配额。这不是GPU账单、跨进程完整计量、OS安全证明或即时驱动抢占认证。
+
+每个账本条目绑定round/task、原始租约、父时间、结算方法和活动摘要。评分重放`rounds/*/standard.json`及profile反馈；这些原始工件也进入旧评分门的缓存指纹，文件改变后旧分失效。缺配额证明、超额、重复请求或伪造实测汇总不能靠修改汇总布尔值取得资格。Harbor及TRL入口未兑现这个契约时在配置阶段拒绝；已有产物regrade清掉新生成限制，保留历史成本。
+
+研究计划支持`vary="gpu_busy_seconds"`；轴分别是`declared_gpu_busy_seconds`、`observed_worker_gpu_busy_seconds`和`observed_gpu_quota_charge_seconds`。计量未知的观测轴不填零，进程范围、配额政策及其余预算进入比较分组，不能与整机GPU预算混在一起。
 
 ## HTTP队列的开发租约
 

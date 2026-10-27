@@ -1474,3 +1474,47 @@ def test_actual_paired_activity_binds_all_roles_timers_and_interval_unions(score
         scored_origin_runner.reseal(changed)
         with pytest.raises(ValueError):
             performance.scored_pairs(changed)
+
+
+def test_gpu_quota_uses_complete_worker_activity_union_and_parent_envelope(scored_origin_runner):
+    from kb_workflows.agents import resource_budgets as budgets
+    from kb_workflows.provenance import origin_task
+
+    ledger = budgets.Ledger(10, "gpu_busy_upper_bound_seconds")
+    lease = budgets.device_lease(None, 30, 30, gpu_ledger=ledger)
+    result = scored_origin_runner("custom")
+    calls = result["metadata"]["native_call_receipt"]
+    calls["native_request"]["eval_config"]["device_lease"] = lease
+    origin = result["metadata"]["origin_capture"]
+    binding = {**calls["binding"], "native_request_sha256": fingerprint({**calls["native_request"], "_origin_timing_seeds": calls["timing_seed_plan"]})}
+    for record in (calls, origin, origin["raw"]):
+        record["binding"] = binding
+    raw = origin["raw"]
+    # Complete worker accounting includes work outside candidate score windows.
+    pattern = raw["activities"][0]
+    raw["activities"] += [{**pattern, "start_ns": 0, "end_ns": 500, "correlation": 10000},
+                           {**pattern, "start_ns": 250, "end_ns": 750, "correlation": 10001}]
+    scored_origin_runner.reseal(result)
+    budgets.stamp_device_lease(result, lease, 1.0)
+    proof = budgets.gpu_charge(lease, result)
+    assert proof["method"] == "actual_worker_continuous_CUPTI_union"
+    assert proof["observed_gpu_busy_seconds"] == pytest.approx((750 + len(raw["windows"])) / 1e9)
+    assert proof["charge_upper_bound_seconds"] < proof["parent_elapsed_seconds"]
+    for damage in ("simulated", "dropped", "other_device", "diagnostics", "unconfirmed_parent"):
+        changed = copy.deepcopy(result)
+        observer = changed["metadata"]["origin_capture"]
+        if damage == "simulated":
+            observer["raw"]["simulated"] = True
+        elif damage == "dropped":
+            observer["raw"]["dropped_records"] = 1
+        elif damage == "other_device":
+            observer["raw"]["activities"][-1]["device"] = 1
+        elif damage == "diagnostics":
+            changed["metadata"]["tool_checks"] = {"uncovered_other_workers": True}
+        else:
+            changed["metadata"].pop("device_lease_receipt")
+        scored_origin_runner.reseal(changed)
+        charge = budgets.gpu_charge(lease, changed)
+        assert charge["observed_gpu_busy_seconds"] is None
+        assert charge["charge_upper_bound_seconds"] == (None if damage == "unconfirmed_parent" else 1.0)
+    assert origin_task.validate_scored(result)

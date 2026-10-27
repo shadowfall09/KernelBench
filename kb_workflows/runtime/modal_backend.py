@@ -192,7 +192,7 @@ def modal_session(config):
         _remote_evaluate
     )
     agent_image = make_image(agent=True) if config.generation == "modal" else None
-    lease_context = modal.Dict.ephemeral() if config.agent_device_seconds and config.generation != "modal" else nullcontext(None)
+    lease_context = modal.Dict.ephemeral() if (config.agent_device_seconds or config.agent_gpu_busy_seconds) and config.generation != "modal" else nullcontext(None)
     with modal.enable_output(), lease_context as leases, app.run():
         previous, _SESSION = _SESSION, (app, evaluate, agent_image, leases)
         try:

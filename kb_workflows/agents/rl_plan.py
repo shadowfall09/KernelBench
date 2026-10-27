@@ -160,7 +160,7 @@ def make_plan(specification, *, directory, base_directory=None):
     if (base.evaluation not in {"local", "docker"} or len(base.gpus.split(",")) != 1 or base.parallel != 1
             or not base.hidden_tests or not base.paired_timing or base.final_repeats < 2 or not base.score_gate_required):
         raise ValueError("RL rewards require serial one-device local/Docker verification, hidden checks, paired timing and final repeats >=2")
-    if any((base.agent_token_limit, base.agent_output_token_limit, base.agent_device_seconds)):
+    if any((base.agent_token_limit, base.agent_output_token_limit, base.agent_device_seconds, base.agent_gpu_busy_seconds)):
         raise ValueError("Native per-call reservations cannot certify TRL generation; RL uses its explicit step/token bounds and receipts")
     directory = Path(directory).resolve()
     if directory.is_relative_to(Path(training.checkpoint)) or Path(training.checkpoint).is_relative_to(directory):

@@ -56,6 +56,7 @@ class RunConfig:
     agent_output_token_limit: int = 0
     agent_max_output_tokens: int = 8192
     agent_device_seconds: float = 0.0
+    agent_gpu_busy_seconds: float = 0.0
     agent_temperature: float = 0.0
     local_model_device: str = "cpu"
     agent_profile: bool = True
@@ -186,7 +187,7 @@ class RunConfig:
         for name in ("agent_token_limit", "agent_output_token_limit", "agent_max_output_tokens"):
             if type(getattr(self, name)) is not int or getattr(self, name) < (1 if name == "agent_max_output_tokens" else 0):
                 raise ValueError(f"{name} must be an integer in its nonnegative/positive range")
-        for name in ("agent_device_seconds", "agent_temperature"):
+        for name in ("agent_device_seconds", "agent_gpu_busy_seconds", "agent_temperature"):
             value = getattr(self, name)
             if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and nonnegative")
@@ -198,8 +199,10 @@ class RunConfig:
             raise ValueError("Exact total-token caps require local-transformers; provider token estimates cannot certify this cap")
         if self.agent_output_token_limit and self.agent_backend not in {"local-transformers", "litellm"}:
             raise ValueError("Output-token reservations require local-transformers or a supported single-call LiteLLM provider")
-        if self.agent_device_seconds and self.evaluation not in {"local", "docker", "queue", "modal"}:
+        if (self.agent_device_seconds or self.agent_gpu_busy_seconds) and self.evaluation not in {"local", "docker", "queue", "modal"}:
             raise ValueError("Device lease reservations require a supported native verification transport")
+        if self.agent_gpu_busy_seconds and self.device_backend != "cuda":
+            raise ValueError("GPU busy quotas require CUDA; Neuron device leases use agent_device_seconds")
         if self.agent_backend == "local-transformers":
             if self.generation != "local":
                 raise ValueError("Local checkpoints currently require generation=local; container checkpoint mounting is unavailable")
@@ -534,7 +537,7 @@ def parser():
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)
-    for name in ("queue_poll_interval", "queue_http_timeout", "fp32_tolerance", "agent_cost_limit", "agent_device_seconds", "agent_temperature", "origin_minimum_custom_fraction"):
+    for name in ("queue_poll_interval", "queue_http_timeout", "fp32_tolerance", "agent_cost_limit", "agent_device_seconds", "agent_gpu_busy_seconds", "agent_temperature", "origin_minimum_custom_fraction"):
         p.add_argument(f"--{name.replace('_', '-')}", dest=name, type=float, default=argparse.SUPPRESS)
     return p
 

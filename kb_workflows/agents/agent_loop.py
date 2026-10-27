@@ -16,7 +16,7 @@ from ..common import atomic_json, fingerprint, kernel_name, read_json
 from ..config import RunConfig
 from ..evaluation.evidence import origin_feedback
 from .agent_models import KernelModel
-from .resource_budgets import BudgetExhausted, Ledger, device_lease, settle_device_lease
+from .resource_budgets import BudgetExhausted, Ledger, device_lease, settle_device_lease, settle_gpu_lease
 
 
 def development_evaluate(config, pid, index, remaining, task="evaluate", *, lease=None):
@@ -47,22 +47,27 @@ class KernelEnvironment:
         self.limit = 1 if config.generation_mode == "one-shot" else config.optimization_rounds
         self.development_seconds = 0.0
         self.device_budget = Ledger(config.agent_device_seconds, "device_lease_seconds") if config.agent_device_seconds else None
+        self.gpu_budget = Ledger(config.agent_gpu_busy_seconds, "gpu_busy_upper_bound_seconds") if config.agent_gpu_busy_seconds else None
         self.requests = {"evaluate": 0, "profile": 0}
 
     def evaluate(self, index, task="evaluate"):
-        lease = device_lease(self.device_budget, self.config.timeout, self.remaining()) if self.device_budget else None
+        lease = device_lease(self.device_budget, self.config.timeout, self.remaining(), gpu_ledger=self.gpu_budget) if self.device_budget or self.gpu_budget else None
         self.requests[task] += 1
         started = time.monotonic()
         try:
             result = self.evaluator(self.config, self.pid, index, self.remaining, task=task,
                                     **({"lease": lease} if lease else {}))
         except Exception:
-            if lease:
+            if self.device_budget:
                 self.device_budget.settle(lease["nonce"])
+            if self.gpu_budget:
+                self.gpu_budget.settle(lease["gpu_busy"]["nonce"])
             raise
         finally:
             self.development_seconds += time.monotonic() - started
-        if lease and not settle_device_lease(self.device_budget, lease, result):
+        device_ok = settle_device_lease(self.device_budget, lease, result) if self.device_budget else True
+        gpu_ok = settle_gpu_lease(self.gpu_budget, lease, result, index=index, task=task) if self.gpu_budget else True
+        if not device_ok or not gpu_ok:
             atomic_json(self.directory / "rounds" / f"{index:03}" / f"{task}_resource_failure.json", result)
             raise BudgetExhausted("Missing or exceeded parent-owned device lease receipt")
         return result
@@ -118,8 +123,12 @@ class KernelEnvironment:
                         raise
                     except Exception as exc:
                         row["profile"] = {"status": "unavailable", "error": type(exc).__name__}
-                        if self.device_budget:
+                        if self.device_budget or self.gpu_budget:
                             raise BudgetExhausted("Device profile request failed without complete usage evidence") from exc
+        if self.gpu_budget:
+            row["gpu_busy_quota"] = {"remaining_seconds": self.gpu_budget.remaining,
+                                     "charged_upper_bound_seconds": self.gpu_budget.spent,
+                                     "scope": "verified_worker_process; other_processes_unobserved"}
         atomic_json(round_dir / "feedback.json", row)
         # Save the best even if a later call times out or produces broken code.
         self.restore_best()
@@ -192,6 +201,8 @@ def run_loop(directory, config, pid, *, response_fn=None, evaluator=development_
     usage = model.usage()
     if environment.device_budget:
         usage["resource_budgets"]["device_lease"] = environment.device_budget.snapshot()
+    if environment.gpu_budget:
+        usage["resource_budgets"]["gpu_busy_quota"] = environment.gpu_budget.snapshot()
     budget = {**usage, "candidate_submissions": sum("kernel_sha256" in row for row in environment.rounds),
               "development_evaluations": environment.requests["evaluate"],
               "profile_requests": environment.requests["profile"],
@@ -199,6 +210,11 @@ def run_loop(directory, config, pid, *, response_fn=None, evaluator=development_
               "gpu_execution_seconds": None, "billing_cost_certified": False,
               "cost_limit_policy": "check_between_model_calls; one_call_may_exceed_estimated_cap",
               "protocol": protocol(config)}
+    if environment.gpu_budget:
+        charges = environment.gpu_budget.entries
+        measured = [row.get("basis", {}).get("observed_gpu_busy_seconds") for row in charges]
+        budget.update(gpu_busy_charge_upper_bound_seconds=environment.gpu_budget.spent,
+                      gpu_execution_seconds=sum(measured) if all(value is not None for value in measured) else None)
     result = {"status": "success" if environment.best else "failed", "budget": budget,
               "exit_status": outcome.get("exit_status", "Error"), "error": error,
               "scaffold_version": version("mini-swe-agent"), "rounds": environment.rounds,

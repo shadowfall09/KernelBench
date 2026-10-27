@@ -10,15 +10,18 @@ from .study_data import assert_session_identity, study_digest, validate_record
 from .study_statistics import aggregate, finite, interval, paired_draw
 
 AXES = {"declared_wall_seconds": None, "declared_candidates": None,
-        "declared_total_tokens": None, "declared_output_tokens": None, "declared_device_lease_seconds": None,
+        "declared_total_tokens": None, "declared_output_tokens": None, "declared_device_lease_seconds": None, "declared_gpu_busy_seconds": None,
         "observed_total_tokens": "total_tokens", "observed_output_tokens": "output_tokens",
         "observed_model_calls": "model_calls", "observed_estimated_cost_usd": "estimated_cost_usd",
-        "observed_generation_wall_seconds": "generation_wall_seconds"}
+        "observed_generation_wall_seconds": "generation_wall_seconds",
+        "observed_worker_gpu_busy_seconds": "gpu_execution_seconds",
+        "observed_gpu_quota_charge_seconds": "gpu_busy_charge_upper_bound_seconds"}
 VARY = {"wall": "wall_limit_seconds_per_sample", "candidates": "candidate_limit_per_sample",
         "total_tokens": "total_token_limit_per_sample", "output_tokens": "output_token_limit_per_sample",
-        "device_lease_seconds": "development_device_lease_seconds_per_sample"}
+        "device_lease_seconds": "development_device_lease_seconds_per_sample",
+        "gpu_busy_seconds": "development_gpu_busy_seconds_per_sample"}
 DECLARED_AXES = dict(zip(("declared_wall_seconds", "declared_candidates", "declared_total_tokens",
-                          "declared_output_tokens", "declared_device_lease_seconds"), VARY))
+                          "declared_output_tokens", "declared_device_lease_seconds", "declared_gpu_busy_seconds"), VARY))
 
 
 def area(points, left, right):

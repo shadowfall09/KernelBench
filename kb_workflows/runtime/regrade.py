@@ -85,7 +85,7 @@ def prepare(source, verifier, *, output):
         end=saved.get("end", max(ids)) if verifier.reference_population else max(ids), num_samples=samples,
         runs_dir=str(output.parent), run_name=output.name, stage="evaluate", generation="local", resume=False,
         model="", small_model="", profile="", bedrock=False, agent_token_limit=0, agent_output_token_limit=0,
-        agent_device_seconds=0, baseline=verifier.baseline + "-regrade-" + fingerprint({"output": str(output)})[:12],
+        agent_device_seconds=0, agent_gpu_busy_seconds=0, baseline=verifier.baseline + "-regrade-" + fingerprint({"output": str(output)})[:12],
         regrade_manifest=str(output / "regrade_manifest.json")).validate()
     config.require_gpu_target()
     selected = select_run_problems(config)

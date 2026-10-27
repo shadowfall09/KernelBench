@@ -107,3 +107,5 @@ python -m scripts.analyze_budget_curves --manifest study/study.json \
 Harbor预算收据还绑定trial结果文件；正式外部agent比较要求可见的输入/输出总量和有效执行时间。缺少模型调用数或美元费用时仍保持null。估算费用、声明墙钟及agent执行秒数都不等于已认证GPU账单，曲线也不声称不同方法耗用了相同设备时间。
 
 统计定义参照[SciPy Spearman文档](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html)与[Kendall文档](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kendalltau.html)；本实现使用标准库计算，不依赖SciPy运行。token接口说明见[LiteLLM用量文档](https://docs.litellm.ai/docs/completion/token_usage)。
+
+CUDA worker进程配额可用`vary="gpu_busy_seconds"`和秒数预算网格。声明配额、观测进程busy和配额扣额是三个不同的轴；缺完整观测时保留未知，不能把保守worker墙钟扣额写成实测GPU时间。范围和完整性见[资源说明](RESOURCE_BUDGETS.md#cuda进程活动计量与软件配额)，不会据此认证跨进程物理硬限。

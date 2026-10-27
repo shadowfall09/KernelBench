@@ -281,8 +281,14 @@ def test_budget_grid_and_cli_share_caps(config, tmp_path):
     assert [row["config"]["agent_output_token_limit"] for row in plan["jobs"]] == [10, 20, 10, 20]
     assert not plan["experiments_started"]
     parsed = parse_config(["--generation", "local", "--agent-backend", "litellm", "--model", "fake/provider",
-                           "--agent-output-token-limit", "99", "--agent-device-seconds", "8.5"])
-    assert parsed.agent_output_token_limit == 99 and parsed.agent_device_seconds == 8.5
+                           "--agent-output-token-limit", "99", "--agent-device-seconds", "8.5", "--agent-gpu-busy-seconds", "7.5"])
+    assert parsed.agent_output_token_limit == 99 and parsed.agent_device_seconds == 8.5 and parsed.agent_gpu_busy_seconds == 7.5
+    spec.update(vary="gpu_busy_seconds", budgets=[6.5, 8.5])
+    gpu_plan = make_plan(spec, directory=tmp_path / "gpu-plan")
+    assert [row["config"]["agent_gpu_busy_seconds"] for row in gpu_plan["jobs"]] == [6.5, 8.5, 6.5, 8.5]
+    for value in (-1, True, float("inf")):
+        with pytest.raises(ValueError):
+            RunConfig(**{**config.to_dict(), "agent_gpu_busy_seconds": value}).validate()
 
 
 def test_capped_attempt_cannot_be_restarted_with_fresh_budget(config, monkeypatch):
@@ -633,3 +639,38 @@ def test_modal_native_generation_lost_results_and_cleanup_cannot_reset_caps(moda
         with pytest.raises(ValueError, match="already has an attempt"):
             generation.generate_run(config)
         assert state.controller_calls == before + 1
+
+
+def test_gpu_quota_admits_before_work_replays_artifacts_and_keeps_measurements_unknown(config):
+    from kb_workflows.common import atomic_json
+
+    config.agent_device_seconds, config.agent_gpu_busy_seconds = 6.2, 6.5
+    reservations = []
+    def evaluate(*args, lease, **kwargs):
+        budgets.validate_device_lease({"eval_config": {"timeout": lease["execution_timeout_seconds"], "device_lease": lease}})
+        reservations.append(lease)
+        return budgets.stamp_device_lease({"compiled": True, "correctness": True, "runtime": 1}, lease, 0.6)
+    directory, result = loop(config, response, evaluate)
+    receipt = result["budget"]
+    gpu = receipt["resource_budgets"]["gpu_busy_quota"]
+    assert len(reservations) == 2 and receipt["development_evaluations"] == 2
+    assert reservations[0]["execution_timeout_seconds"] == pytest.approx(1.2)
+    assert reservations[1]["execution_timeout_seconds"] == pytest.approx(0.6)
+    assert result["status"] == "success" and result["exit_status"] == "ResourceBudgetLimit"
+    assert gpu["charged"] == pytest.approx(1.2) and budgets.validate_snapshot(gpu, 6.5, "gpu_busy_upper_bound_seconds")
+    assert receipt["gpu_execution_seconds"] is None and receipt["gpu_busy_charge_upper_bound_seconds"] == pytest.approx(1.2)
+    assert all(row["basis"]["method"] == "confirmed_worker_wall_upper_bound" for row in gpu["entries"])
+    assert budgets.validate_gpu_artifacts(config, 90, 0, gpu)
+    path = directory / "rounds/001/standard.json"
+    saved = read_json(path)
+    saved["metadata"]["device_lease_receipt"]["elapsed_seconds"] = 0.1
+    atomic_json(path, saved)
+    assert not budgets.validate_gpu_artifacts(config, 90, 0, gpu)
+    # GPU quota can be used without charging the separate worker-wall ledger.
+    only_gpu = budgets.Ledger(6, "gpu_busy_upper_bound_seconds")
+    lease = budgets.device_lease(None, 30, 30, gpu_ledger=only_gpu)
+    assert lease["gpu_busy"]["nonce"] == lease["nonce"]
+    wrong = budgets.stamp_device_lease({}, lease, 0.5)
+    wrong["metadata"]["device_lease_receipt"].pop("lease_sha256")
+    assert not budgets.settle_gpu_lease(only_gpu, lease, wrong, index=1, task="evaluate")
+    assert only_gpu.spent == 6 and not only_gpu.snapshot()["compliant"]

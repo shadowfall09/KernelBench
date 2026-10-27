@@ -40,6 +40,9 @@ def protocol(config):
         "output_token_limit_per_sample": config.agent_output_token_limit,
         "max_output_tokens_per_call": config.agent_max_output_tokens,
         "development_device_lease_seconds_per_sample": config.agent_device_seconds,
+        "development_gpu_busy_seconds_per_sample": config.agent_gpu_busy_seconds,
+        "gpu_busy_quota_policy": "activity_union_or_confirmed_worker_wall_upper_bound_v1" if config.agent_gpu_busy_seconds else None,
+        "gpu_busy_quota_scope": "verified_worker_process_CUDA; other_processes_unobserved; model_and_final_excluded" if config.agent_gpu_busy_seconds else None,
         "device_budget_scope": ("queue_worker_wall_including_cleanup; admission_TTL; not_network_wait_or_GPU_busy"
                                 if verifier == "queue" else
                                 "exclusive_development_worker_wall_including_cleanup; not_GPU_busy_or_billing"),
@@ -70,6 +73,8 @@ def write_budget_report(config, summary):
                            "attempt_counts": {key: len(values) for key, values in attempts.items()}}
     fields = ("model_calls", "candidate_submissions", "development_evaluations", "profile_requests", "input_tokens", "output_tokens",
               "total_tokens", "estimated_cost_usd", "generation_wall_seconds", "development_request_wall_seconds")
+    if config.agent_gpu_busy_seconds:
+        fields += ("gpu_execution_seconds", "gpu_busy_charge_upper_bound_seconds")
     totals = {}
     for field in fields:
         values = [item.get(field) if isinstance(item, dict) else None for item in receipts]
@@ -90,6 +95,11 @@ def write_budget_report(config, summary):
               "observed_models": sorted({model for item in receipts if isinstance(item, dict) for model in item.get("models") or []}) or None,
               "gpu_execution_seconds": None, "gpu_time_note": "Request wall time includes transport/queue/compile; GPU-only billing is not measured",
               "final_evaluation_budget_included": False}
+    if config.agent_gpu_busy_seconds:
+        for field in ("gpu_execution_seconds", "gpu_busy_charge_upper_bound_seconds"):
+            values = [item.get(field) if isinstance(item, dict) else None for item in receipts]
+            report[field] = sum(values) if not history.get("historical_attempts_unknown") and values and all(type(value) in (int, float) for value in values) else None
+        report["gpu_time_note"] = "Verified worker-process CUDA activity union only; other processes unobserved. Quota charges may use confirmed worker wall upper bounds; not billing or a physical whole-device hard limit"
     atomic_json(config.run_dir / "generation_budget.json", report)
     return report
 

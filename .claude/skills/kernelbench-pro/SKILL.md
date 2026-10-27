@@ -62,3 +62,5 @@ Then run the native `evaluate` and `analyze` stages with the original parent run
 - Compare matching settings with `python -m kb_workflows.analysis.experiment RUN_A RUN_B`. Keep one-shot, feedback, external Harbor and interactive sessions separate. Report independent sample count and per-sample limits alongside outcomes.
 
 When maintaining the repository, follow the responsibility directories in README.md and CONTRIBUTING.md. Extend existing modules and command subcommands before adding files. Reuse catalog/meta checks and shared fixtures; add tests for distinct behavior or failures, not repeated metadata assertions per task.
+
+For configured `agent_gpu_busy_seconds`, preserve joint pre-dispatch reservations and all quota scopes in `docs/RESOURCE_BUDGETS.md`. Verified worker-process activity union and conservative parent-wall charges are different facts; unknown measured GPU time stays null. Retain raw standard/profile artifacts and cache bindings, and do not claim other-process coverage or a whole-device physical hard limit from this software quota.

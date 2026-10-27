@@ -39,7 +39,7 @@ def make_plan(specification, *, directory, base_directory=None):
             or set(methods) - METHODS or len(set(methods)) != len(methods)
             or type(sessions) is not int or sessions < 1 or vary not in VARY
             or not isinstance(budgets, list) or not budgets or len(set(budgets)) != len(budgets)
-            or any((type(value) is not int if vary != "device_lease_seconds" else type(value) not in (int, float))
+            or any((type(value) is not int if vary not in {"device_lease_seconds", "gpu_busy_seconds"} else type(value) not in (int, float))
                    or not 0 < value < float("inf") for value in budgets)
             or not isinstance(levels, list) or not levels or len(set(levels)) != len(levels)):
         raise ValueError("Invalid models, methods, levels, sessions, or positive integer budget grid")
@@ -60,7 +60,8 @@ def make_plan(specification, *, directory, base_directory=None):
                         config.runs_dir = str(directory / "runs")
                         config.stage, config.dry_run, config.resume = "all", False, True
                         field = {"wall": "agent_timeout", "candidates": "optimization_rounds", "total_tokens": "agent_token_limit",
-                                 "output_tokens": "agent_output_token_limit", "device_lease_seconds": "agent_device_seconds"}[vary]
+                                 "output_tokens": "agent_output_token_limit", "device_lease_seconds": "agent_device_seconds",
+                                 "gpu_busy_seconds": "agent_gpu_busy_seconds"}[vary]
                         setattr(config, field, budget)
                         if method == "harbor":
                             config.generation, config.generation_mode = "harbor", "external"

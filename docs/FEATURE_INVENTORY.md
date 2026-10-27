@@ -14,7 +14,7 @@
 | 正确性 | 结构/dtype/离散值/非有限值比较、实际输入数值与状态审计、隐藏输入族、缓存和执行检查；[严格契约](STRICT_VALIDATION.md) |
 | 性能与评分 | 经过验证的基线组合、配对噪声、冷成本摊销、冻结复测、Headroom模型与固定分母；[评分说明](HEADROOM_SCORING.md) |
 | 来源与归因 | CUDA实际计分来源门、实际R/C/B活动并集及launch_only零分门；完整计数器/Neuron归因仍按剩余范围追踪 |
-| 预算与恢复 | token预留、受控开发worker租约、队列/Modal请求与工件绑定；[资源边界](RESOURCE_BUDGETS.md) |
+| 预算与恢复 | token预留、受控开发worker租约、CUDA进程活动/保守上界配额、队列/Modal请求与工件绑定；[资源边界](RESOURCE_BUDGETS.md) |
 | 部署与复现 | Harbor独立verifier、只读任务导出、Slurm、结果/轨迹/收据、指纹恢复与已有产物重评分 |
 
 当前23项设计中20项代码已实现、3项部分实现。未完成的是来源路径覆盖、完整性能归因，以及纯GPU时间硬预算/Harbor外部生成契约；逐项交付与剩余范围见 [23项状态](MOTIVATION.md#设计与实现的差额)。软件实现与真实实验分别验收；按用户要求，本轮不运行GPU、Trainium、真实模型、云资源、容器或训练实验。
@@ -252,6 +252,7 @@
 
 | 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
+| V62-01 | 开发CUDA活动计量与软件配额 | [resource_budgets.py](../kb_workflows/agents/resource_budgets.py) | [M4](MOTIVATION.md#m4) |
 | V7-07 | 真实 agent loop | [agent_loop.py](../kb_workflows/agents/agent_loop.py) | [M4](MOTIVATION.md#m4) |
 | V7-08 | One-shot | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |
 | V7-09 | 有界反馈 | [agent_loop.py](../kb_workflows/agents/agent_loop.py) | [M4](MOTIVATION.md#m4) |
@@ -400,6 +401,6 @@
 
 ## 维护与验证
 
-最新一批补齐实际计分工作量指纹与计数模型关联，并将本清单从逐版历史改为动机索引。A/E/O的时间来自实际计分进程；ncu进程自身尚缺同等身份采集，不能由该关联授予L2资格。详见[计数器关联](WORK_COUNTERS.md#关联实际计分时间)。
+清单按动机维护；当前新增CUDA worker进程活动计量及软件配额，实测值与保守扣额分开，范围见[资源预算](RESOURCE_BUDGETS.md#cuda进程活动计量与软件配额)。此前补齐实际计分工作量指纹与计数模型关联。A/E/O的时间来自实际计分进程；ncu进程自身尚缺同等身份采集，不能由该关联授予L2资格。详见[计数器关联](WORK_COUNTERS.md#关联实际计分时间)。
 
 清单、motivation映射和实现证据由`python -m scripts.check_motivations`核对，所有历史功能ID继续保留。软件回归和离线打包验证不替代真实设备、隔离、安全或模型效果实验。

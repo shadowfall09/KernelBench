@@ -355,6 +355,17 @@ def analyze_paper(config):
                             status = "headroom_certificate_missing_or_invalid"
                             row.update(headroom_error=str(exc), score=0, headroom_score=0)
                     slots[-1] = row["score"]
+            gpu_files = {}
+            if config.agent_gpu_busy_seconds:
+                from ..agents.resource_budgets import gpu_artifact_hashes
+
+                try:
+                    snapshot = read_json(config.run_dir / "generation_budget.json")["slots"][key]["resource_budgets"]["gpu_busy_quota"]
+                    gpu_files = gpu_artifact_hashes(config.run_dir, pid, sid, snapshot)
+                except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                    if status == "verified":
+                        status = "resource_budget_gpu_evidence_changed_or_missing"
+                        row["score"], slots[-1], bounded_slots[-1] = 0, 0, 0
             row["status"] = status
             entry = {**raw, "metadata": dict(raw.get("metadata", {})), "correctness": status == "verified"}
             if "assessed_evidence" in row:
@@ -369,7 +380,7 @@ def analyze_paper(config):
                 score_baseline_name=config.baseline, score_reference_name=path.name, score_level=config.level,
                 score_hidden_required=config.hidden_tests, score_policy="measurement_and_compatibility_v1",
                 score_problem_id=pid, score_run_config_sha256=fingerprint(read_json(config.run_dir / "run_config.json", {})),
-                score_auxiliary_files=auxiliary_files,
+                score_auxiliary_files={**auxiliary_files, **gpu_files},
                 score_external_files=external_files,
                 score_regrade_measurements_sha256=fingerprint(read_json(config.run_dir / "regrade_measurements.json", {})) if config.regrade_manifest else None,
             )
