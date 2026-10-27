@@ -10,6 +10,7 @@ LEVELS = {
     "L2": ("hardware_counters", "memory_safety", "repeat_consistency", "algorithm_certificate"),
 }
 STATES = {"passed", "failed", "not_measured", "not_applicable"}
+MEASUREMENT_CHECKS = {"paired_timing", "noise_floor", "device_calibration", "bound_certificate"}
 
 
 def check(status, *, reason, values=None):
@@ -71,19 +72,75 @@ def from_result(result, settings, *, scope="standard", additional=None):
     return receipt(checks, requested=settings.get("evidence_level", "current"), scope=scope)
 
 
-def score_issue(result, settings, scope):
+def measurement_checks(config, pid, sid, baseline, *, variant=None, paired=None):
+    """Assemble public timing evidence from independently replayed artifacts."""
+    if config.evidence_level not in {"L1", "L2"}:
+        return {}
+    from pathlib import Path
+
+    from ..analysis.calibration import validate
+    from ..analysis.headroom import certificate
+    from ..common import evaluator_digest, fingerprint, read_json
+    from .paired_task import validate_for_score
+
+    checks = {name: check("not_measured", reason="Verified public measurement evidence is missing") for name in MEASUREMENT_CHECKS}
+    if not config.paired_timing:
+        return checks
+    if paired is None:
+        if variant is None:
+            from ..engine import paired_variant
+
+            try:
+                variant = paired_variant(config, pid)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                return {name: check("not_measured", reason=str(exc)) for name in MEASUREMENT_CHECKS}
+        selected = baseline.get("variants", {}).get(variant, baseline)
+        issue, paired = validate_for_score(config, pid, sid, variant, selected)
+        if issue:
+            return {name: check("not_measured", reason=issue) for name in MEASUREMENT_CHECKS}
+    bindings = paired.get("measurement_bindings", [])
+    if not bindings:
+        return checks
+    sources = [row["result_sha256"] for row in bindings]
+    checks["paired_timing"] = check("passed", reason="Current public paired artifacts replayed with verified source and timing mode",
+                                    values={"result_sha256": sources, "pairs_sha256": fingerprint({"pairs": paired["pairs"]})})
+    checks["noise_floor"] = check("passed", reason="Public reference/control noise estimated; gain must separately clear this floor",
+                                  values={"reference_control_ci95": paired["reference_control_ci95"], "result_sha256": sources})
+    try:
+        calibration = read_json(Path(config.device_calibration)) if config.device_calibration else {}
+        for row in bindings:
+            validate(calibration, row["device_fingerprint"], digest=evaluator_digest())
+        checks["device_calibration"] = check("passed", reason="Calibration matches every actual paired timing device",
+            values={"calibration_sha256": calibration["receipt_sha256"], "result_sha256": sources})
+        specs = read_json(Path(config.problem_specs)) if config.problem_specs else {}
+        model = specs.get(f"level{config.level}", {}).get(str(pid), {}).get("headroom_certificate", {})
+        for row in bindings:
+            certificate(model, calibration, row, source_sha256=row["reference_source_sha256"], digest=evaluator_digest())
+        checks["bound_certificate"] = check("passed", reason="Reviewed bound matches every actual paired timing geometry, precision and calibration",
+            values={"certificate_sha256": fingerprint(model), "result_sha256": sources})
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        missing = "bound_certificate" if checks["device_calibration"]["status"] == "passed" else "device_calibration"
+        checks[missing] = check("not_measured", reason=str(exc)[:500] or "Measurement evidence is invalid")
+    return checks
+
+
+def score_issue(result, settings, scope, *, additional=None):
     required = settings.get("strict_validation") or settings.get("evidence_level", "current") != "current"
     if not required:
         return None
     record = result.get("metadata", {}).get("evidence_receipt", {})
     requested = settings.get("evidence_level", "current")
     try:
-        expected = receipt(record["checks"], requested=requested, scope=scope)
+        original = receipt(record["checks"], requested=requested, scope=scope)
+        if additional is not None and set(additional) - MEASUREMENT_CHECKS:
+            return "invalid_external_measurement_checks"
+        expected = receipt({**record["checks"], **(additional or {})}, requested=requested, scope=scope)
     except (KeyError, TypeError, ValueError):
         return "missing_or_invalid_evidence_receipt"
     if (record.get("protocol") != expected["protocol"] or record.get("scope") != scope
-            or record.get("requested_level") != requested or record.get("requested_level_met") is not True
-            or record.get("achieved_level") != expected["achieved_level"]
+            or record.get("requested_level") != requested
+            or record.get("requested_level_met") != original["requested_level_met"]
+            or record.get("achieved_level") != original["achieved_level"]
             or not expected["requested_level_met"]):
         return "requested_evidence_level_not_met"
     if settings.get("strict_validation"):
@@ -106,4 +163,8 @@ def score_issue(result, settings, scope):
         origin = origin_check(result)
         if not accepted(origin) or record["checks"].get("kernel_origin") != origin:
             return "actual_scored_origin_missing_or_invalid"
+        if set(additional or {}) != MEASUREMENT_CHECKS:
+            return "validated_measurement_evidence_missing"
+        if requested == "L2":
+            return "formal_counter_evidence_not_implemented"
     return None

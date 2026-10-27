@@ -2,11 +2,12 @@
 
 import copy
 import shutil
+from pathlib import Path
 
 import pytest
 
 from kb_workflows import cli, common, engine
-from kb_workflows.agents import generation
+from kb_workflows.agents import generation, rl_audit
 from kb_workflows.analysis import paper_analysis, study_data
 from kb_workflows.common import atomic_json, fingerprint, kernel_name, read_json
 from kb_workflows.config import RunConfig, parse_config
@@ -115,7 +116,6 @@ def test_throughput_review_excludes_performance_credit_and_preserves_saved_nativ
 def test_rl_public_hidden_gap_regrades_identical_saved_sources_without_execution(run, monkeypatch):
     from dataclasses import replace
 
-    from kb_workflows.agents import rl_audit
     from kb_workflows.analysis import study_data
 
     config, _, _, hidden, save = run
@@ -556,3 +556,142 @@ def test_changed_measurement_code_invalidates_resume_digest(tmp_path, monkeypatc
     path = tmp_path / "kb_workflows/evaluation/measurement.py"
     path.write_text(path.read_text() + "\n# changed measurement protocol\n")
     assert common.evaluator_digest() != before
+
+
+@pytest.fixture
+def l1_measurements(run, monkeypatch):
+    """Exercise measurement assembly; source collection is tested in provenance fixtures."""
+    import hashlib
+
+    from kb_workflows.analysis import calibration, headroom
+    from kb_workflows.analysis.paired_statistics import paired_summary
+    from kb_workflows.evaluation import evidence
+    from kb_workflows.provenance import origin_task
+
+    config, baseline, standard, secret, save = run
+    fact = evidence.check("passed", reason="Isolated source-validator fixture; no hardware claim",
+                          values={"track": "custom", "minimum_custom_fraction": 0.95})
+    def source_check(result):
+        return fact if result.get("metadata", {}).get("fixture_source_valid") else evidence.check("not_measured", reason="Changed source fixture")
+    def observer(result, **kwargs):
+        if result.get("metadata", {}).get("fixture_observer") is not True:
+            raise ValueError("Missing observer fixture")
+        return origin_task.SCORED_MODE
+    monkeypatch.setattr(origin_task, "origin_check", source_check)
+    monkeypatch.setattr(origin_task, "timing_observer", observer)
+    monkeypatch.setattr(origin_task, "validate_scored", lambda result: ({"eval_config": result["metadata"]["evaluation_config"]}, {}))
+    monkeypatch.setattr(final_verification, "select_problems", engine.select_problems)
+    monkeypatch.setattr(final_verification, "evaluator_digest", lambda: "current")
+    measured = calibration.seal(baseline["device_fingerprint"],
+        {"memory_bytes": calibration.probe_record(1000, [1] * 5, unit="bytes/s", parameters={})},
+        [0.01] * 5, settings={"fixture": "serialization only"}, digest="current")
+    reference = engine.select_problems(1)[1]
+    spec = {"protocol": headroom.PROTOCOL, "layer": "I", "reference_sha256": hashlib.sha256(reference.read_bytes()).hexdigest(),
+            "precision": "fp32", "input_signature": baseline["input_signature"],
+            "review": {"reviewer": "software fixture", "rationale": "not a measured bound"},
+            "calibration_sha256": measured["receipt_sha256"], "reference_work": {"memory_bytes": 1000},
+            "algorithm_work": {"memory_bytes": 1000}}
+    config.device_calibration = str(config.run_dir / "calibration.json")
+    config.problem_specs = str(config.run_dir / "specs.json")
+    atomic_json(Path(config.device_calibration), measured)
+    atomic_json(Path(config.problem_specs), {"level1": {"1": {"headroom_certificate": spec}}})
+
+    def prepare(*, single=False, repeats=2):
+        config.evidence_level, config.strict_validation = "L1", True
+        config.baseline_suite, config.paired_timing, config.paired_trials, config.final_repeats = not single, True, 12, repeats
+        atomic_json(config.run_dir / "run_config.json", config.to_dict())
+        generic = engine.task_payload(config, 1, task="baseline")
+        baseline["metadata"].update(evaluation_config=generic["eval_config"], workflow_signature=fingerprint(generic), fixture_observer=True)
+        if not single:
+            variant = copy.deepcopy(baseline)
+            expected = copy.deepcopy(generic)
+            expected["eval_config"]["baseline_variant"] = "eager"
+            variant["metadata"].update(evaluation_config=expected["eval_config"], workflow_signature=fingerprint(expected))
+            baseline.update(baseline_suite=True, suite_complete=True, variants={"eager": variant})
+        for hidden, originals in ((False, standard), (True, secret)):
+            for sid in range(config.num_samples):
+                payload = engine.task_payload(config, 1, sid, hidden=hidden)
+                checks = {name: evidence.check("passed", reason="Functional worker fixture") for name in evidence.LEVELS["L0"]}
+                checks["kernel_origin"] = copy.deepcopy(fact)
+                originals[f"1_{sid}"]["metadata"].update(evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload),
+                    fixture_source_valid=True, fixture_observer=True,
+                    evidence_receipt=evidence.receipt(checks, requested="L1", scope="hidden" if hidden else "standard"))
+        if repeats:
+            final_verification.freeze(config)
+        final, paired = {}, {}
+        for sid in range(config.num_samples):
+            for repeat in range(repeats or 1):
+                if repeats:
+                    for hidden, originals in ((False, standard), (True, secret)):
+                        payload = final_verification.payload_for(config, 1, sid, repeat, hidden=hidden)
+                        record = copy.deepcopy(originals[f"1_{sid}"])
+                        record["metadata"].update(evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload))
+                        attach_operator_evidence(payload, record)
+                        final[f"1_{sid}:{repeat}:{'hidden' if hidden else 'standard'}"] = record
+                payload = engine.paired_payload(config, 1, sid, repeat=repeat if repeats else None, variant="eager")
+                summary = paired_summary([{"reference_ms": 10, "candidate_ms": 5, "control_ms": 10} for _ in range(12)])
+                summary.update(baseline_variant="eager", output_consumed=True, varied_inputs=True, all_outputs_verified=True)
+                record = copy.deepcopy(standard[f"1_{sid}"])
+                record["metadata"].update(paired_timing=summary, evaluation_config=payload["eval_config"], workflow_signature=fingerprint(payload),
+                    native_call_receipt={"calls": [{"phase": "paired", "input_signature_sha256": fingerprint({"signature": baseline["input_signature"]})}]})
+                paired[f"1_{sid}:{repeat}"] = record
+        atomic_json(config.run_dir / "final_results.json", final)
+        atomic_json(config.run_dir / "paired_results.json", paired)
+        save()
+        return final, paired
+    return config, baseline, standard, secret, measured, spec, prepare, save
+
+
+def test_l1_assessment_joins_real_measurement_validators_without_rewriting_worker_receipts(l1_measurements):
+    config, _, standard, _, _, _, prepare, _ = l1_measurements
+    final, _ = prepare()
+    before = copy.deepcopy(standard)
+    assert not standard["1_0"]["metadata"]["evidence_receipt"]["requested_level_met"]
+    report = paper_analysis.analyze_paper(config)
+    assert all(row["status"] == "verified" and row["assessed_evidence"]["achieved_level"] == "L1" for row in report["details"])
+    assert report["bounded_gain_macro"] == 1
+    assert read_json(config.run_dir / "eval_results.json") == before
+    assert read_json(config.run_dir / "eval_results_scored.json")["1_0"]["metadata"]["evidence_receipt"]["requested_level_met"]
+    assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    final["1_0:0:hidden"]["metadata"]["fixture_source_valid"] = False
+    atomic_json(config.run_dir / "final_results.json", final)
+    assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    report = paper_analysis.analyze_paper(config)
+    assert report["details"][0]["status"] == "final_remeasurement_evidence_mismatch"
+    assert report["bounded_gain_macro"] == pytest.approx(2 / 3)
+
+
+def test_l1_single_baseline_and_cached_labels_cannot_hide_missing_or_changed_measurements(l1_measurements):
+    from kb_workflows.evaluation import evidence
+
+    config, _, standard, _, measured, spec, prepare, save = l1_measurements
+    _, paired = prepare(single=True, repeats=0)
+    assert all(row["status"] == "verified" for row in paper_analysis.analyze_paper(config)["details"])
+    original = copy.deepcopy(paired)
+    for damage in ("missing_pairs", "summary", "geometry", "source", "device", "certificate"):
+        paired = copy.deepcopy(original)
+        atomic_json(Path(config.device_calibration), measured)
+        atomic_json(Path(config.problem_specs), {"level1": {"1": {"headroom_certificate": spec}}})
+        if damage == "missing_pairs":
+            paired.clear()
+        elif damage == "summary":
+            paired["1_0:0"]["metadata"]["paired_timing"]["speedup_ci95"] = [100, 100]
+        elif damage == "geometry":
+            paired["1_0:0"]["metadata"]["native_call_receipt"]["calls"][0]["input_signature_sha256"] = "f" * 64
+        elif damage == "source":
+            paired["1_0:0"]["metadata"]["fixture_source_valid"] = False
+        elif damage == "device":
+            paired["1_0:0"]["metadata"]["device_fingerprint"]["uuid"] = "other physical device"
+        else:
+            changed = copy.deepcopy(spec)
+            changed["review"] = {}
+            atomic_json(Path(config.problem_specs), {"level1": {"1": {"headroom_certificate": changed}}})
+        checks = {name: evidence.check("passed", reason="Forged cached measurement claim") for name in evidence.MEASUREMENT_CHECKS}
+        checks.update({name: item for name, item in standard["1_0"]["metadata"]["evidence_receipt"]["checks"].items()
+                       if name not in evidence.MEASUREMENT_CHECKS})
+        standard["1_0"]["metadata"]["evidence_receipt"] = evidence.receipt(checks, requested="L1")
+        save()
+        atomic_json(config.run_dir / "paired_results.json", paired)
+        report = paper_analysis.analyze_paper(config)
+        assert report["details"][0]["status"] != "verified", damage
+        assert report["details"][0]["score"] == 0 and standard["1_0"]["correctness"]

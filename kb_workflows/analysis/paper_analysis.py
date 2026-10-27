@@ -141,7 +141,6 @@ def analyze_paper(config):
     from ..agents.resource_budgets import score_issue as resource_score_issue
     from ..engine import task_payload
     from ..evaluation.aggregation import sensitivity
-    from ..runtime.regrade import issue as regrade_issue
     from .experiment import existing_budget, protocol
 
     selected = select_run_problems(config)
@@ -200,7 +199,9 @@ def analyze_paper(config):
                 status = "kernel_source_changed_or_missing"
             if status == "verified":
                 status = resource_score_issue(config, pid, sid) or status
-            if status == "verified":
+            if status == "verified" and config.regrade_manifest:
+                from ..runtime.regrade import issue as regrade_issue
+
                 status = regrade_issue(config) or status
             if status == "verified":
                 if bound_issue is not None:
@@ -246,17 +247,8 @@ def analyze_paper(config):
                     status = "stale_or_incompatible_baseline_workflow"
             if status == "verified":
                 status = measurement_evidence(raw, candidate=True) or measurement_evidence(baseline) or status
-            if status == "verified":
-                options = task_payload(config, pid, sid)["eval_config"]
-                status = score_issue(raw, options, "standard") or status
-                if config.hidden_tests and status == "verified":
-                    status = score_issue(secret, options, "hidden") or status
             final_results = []
-            if status == "verified" and config.final_repeats:
-                from ..evaluation.final_verification import validate
-
-                issue, final_results = validate(config, pid, sid, baseline)
-                status = issue or status
+            measurement = {}
             # A future audit-enabled result cannot claim its unfinished gates here.
             if status == "verified" and raw.get("metadata", {}).get("evaluation_config", {}).get("anti_cheat"):
                 status = "anti_cheat_evidence_not_implemented_in_this_version"
@@ -280,7 +272,32 @@ def analyze_paper(config):
                     winner = (min(cold_options, key=lambda name: options[name]["mean"])
                               if config.score_mode == "headroom" else min(cold_options, key=cold_options.get))
                     chosen = options[winner]
-                    # Final repeats use all declared fresh processes, never their fastest member.
+                    paired_variant = winner if baseline.get("baseline_suite") else chosen.get("baseline_variant", "eager")
+                    paired = None
+                    if config.paired_timing:
+                        from ..evaluation.paired_task import validate_for_score
+
+                        issue, paired = validate_for_score(config, pid, sid, paired_variant, chosen)
+                        if issue:
+                            status = issue
+                    if status == "verified":
+                        from ..evaluation.evidence import measurement_checks, receipt
+
+                        measurement = measurement_checks(config, pid, sid, chosen, variant=paired_variant, paired=paired)
+                        options = task_payload(config, pid, sid)["eval_config"]
+                        status = score_issue(raw, options, "standard", additional=measurement) or status
+                        if config.hidden_tests and status == "verified":
+                            status = score_issue(secret, options, "hidden", additional=measurement) or status
+                        if measurement:
+                            row["measurement_checks"] = measurement
+                            row["assessed_evidence"] = receipt({**raw.get("metadata", {}).get("evidence_receipt", {}).get("checks", {}),
+                                                               **measurement}, requested=config.evidence_level)
+                    if status == "verified" and config.final_repeats:
+                        from ..evaluation.final_verification import validate
+
+                        issue, final_results = validate(config, pid, sid, chosen, measurement=measurement)
+                        status = issue or status
+                    # Final repeats use every declared process, never their fastest member.
                     final_stats = None
                     if final_results:
                         from ..evaluation.final_verification import timing_summary
@@ -288,15 +305,8 @@ def analyze_paper(config):
                         final_stats = timing_summary(final_results)
                     candidate_steady = final_stats["mean"] if final_stats else raw["runtime"]
                     baseline_steady = chosen["mean"]
-                    paired = None
-                    if config.paired_timing:
-                        from ..evaluation.paired_task import validate_for_score
-
-                        issue, paired = validate_for_score(config, pid, sid, winner, chosen)
-                        if issue:
-                            status = issue
-                        else:
-                            candidate_steady, baseline_steady = paired["candidate_mean_ms"], paired["reference_mean_ms"]
+                    if paired:
+                        candidate_steady, baseline_steady = paired["candidate_mean_ms"], paired["reference_mean_ms"]
                     reference, runtime = cold_options[winner], amortized(
                         candidate_steady, raw["metadata"]["cold_start_ms"], config.cold_calls)
                     if paired:
@@ -338,6 +348,10 @@ def analyze_paper(config):
                     slots[-1] = row["score"]
             row["status"] = status
             entry = {**raw, "metadata": dict(raw.get("metadata", {})), "correctness": status == "verified"}
+            if "assessed_evidence" in row:
+                entry["metadata"].update(evidence_receipt=row["assessed_evidence"],
+                    worker_evidence_receipt_sha256=fingerprint(raw.get("metadata", {}).get("evidence_receipt", {})),
+                    score_measurement_checks=measurement)
             entry["metadata"].update(
                 raw_correctness=raw.get("correctness", False), score_gate_status=status,
                 score_gate_evaluator_sha256=digest, score_kernel_name=kernel.name,

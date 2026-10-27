@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 from contextlib import nullcontext
@@ -200,12 +201,12 @@ def evaluate_paired(payload):
 
 def validate_for_score(config, pid, sid, variant, baseline):
     from ..analysis.paper_analysis import current_result, same_device_class
-    from ..common import evaluator_digest, read_json
+    from ..common import evaluator_digest, fingerprint, read_json
     from ..engine import paired_payload
     from ..runtime.isolation import runtime_issue
 
     results = read_json(config.run_dir / "paired_results.json", {})
-    pairs = []
+    pairs, bindings = [], []
     for repeat in range(config.final_repeats or 1):
         result = results.get(f"{pid}_{sid}:{repeat}", {})
         if result.get("compiled") is not True or result.get("correctness") is not True:
@@ -241,5 +242,22 @@ def validate_for_score(config, pid, sid, variant, baseline):
         if any(recomputed.get(field) != record.get(field) for field in
                ("protocol", "speedup_ci95", "reference_control_ci95", "reference_mean_ms", "candidate_mean_ms", "significantly_faster")):
             return "paired_measurement_summary_mismatch", None
+        if config.evidence_level in {"L1", "L2"}:
+            from ..provenance.origin_task import origin_check, timing_observer
+
+            try:
+                origin = origin_check(result)
+                if (timing_observer(baseline, baseline=True) != timing_observer(result) or origin["status"] != "passed"
+                        or metadata.get("evidence_receipt", {}).get("checks", {}).get("kernel_origin") != origin):
+                    return "paired_measurement_origin_missing_or_invalid", None
+                geometry = fingerprint({"signature": metadata["input_signature"]})
+                if any(row["input_signature_sha256"] != geometry for row in metadata["native_call_receipt"]["calls"] if row["phase"] == "paired"):
+                    return "paired_measurement_geometry_has_no_single_bound", None
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                return "paired_measurement_origin_missing_or_invalid", None
+        bindings.append({"request_sha256": fingerprint(expected), "result_sha256": fingerprint(result),
+                         "reference_source_sha256": hashlib.sha256(expected["ref_arch_src"].encode()).hexdigest(),
+                         **{key: metadata.get(key) for key in ("device_fingerprint", "input_signature", "precision",
+                                                              "reference_sha256", "kernel_sha256")}})
         pairs.extend({**row, "repeat": repeat} for row in record["pairs"])
-    return None, paired_summary(pairs)
+    return None, {**paired_summary(pairs), "measurement_bindings": bindings}

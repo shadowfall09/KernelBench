@@ -161,13 +161,15 @@ def run(config):
     return results
 
 
-def validate(config, pid, sid, baseline):
+def validate(config, pid, sid, baseline, *, measurement=None):
     from ..analysis.paper_analysis import compatible, current_result, measurement_evidence
     from ..runtime.isolation import runtime_issue
-    from .evidence import score_issue
+    from .evidence import measurement_checks, score_issue
 
     if not config.final_repeats:
         return None, []
+    if measurement is None:
+        measurement = measurement_checks(config, pid, sid, baseline)
     results = read_json(config.run_dir / "final_results.json", {})
     standard = []
     for repeat in range(config.final_repeats):
@@ -180,7 +182,7 @@ def validate(config, pid, sid, baseline):
                 payload = payload_for(config, pid, sid, repeat, hidden=hidden)
             except (KeyError, IndexError, ValueError, OSError):
                 return "final_manifest_changed_or_missing", []
-            if current_result(result, payload) or score_issue(result, payload["eval_config"], "hidden" if hidden else "standard"):
+            if current_result(result, payload) or score_issue(result, payload["eval_config"], "hidden" if hidden else "standard", additional=measurement):
                 return "final_remeasurement_evidence_mismatch", []
             if runtime_issue(baseline, result, payload["eval_config"]):
                 return "final_remeasurement_runtime_mismatch", []

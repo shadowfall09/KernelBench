@@ -1327,10 +1327,12 @@ def test_actual_scored_origin_gates_custom_library_and_unknown_tracks(native_ori
     checks = {name: passed for names in evidence.LEVELS.values() for name in names}
     checks["kernel_origin"] = origin_task.origin_check(custom)
     custom["metadata"]["evidence_receipt"] = evidence.receipt(checks, requested="L1")
-    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard") is None
+    measurement = {name: passed for name in evidence.MEASUREMENT_CHECKS}
+    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard") == "validated_measurement_evidence_missing"
+    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard", additional=measurement) is None
     assert evidence.score_issue(custom, {"evidence_level": "L1", "kernel_track": "library"}, "standard") == "scored_execution_track_mismatch"
     custom["metadata"]["evidence_receipt"]["checks"]["kernel_origin"] = passed
-    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard") == "actual_scored_origin_missing_or_invalid"
+    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard", additional=measurement) == "actual_scored_origin_missing_or_invalid"
 
 
 def test_actual_observer_baseline_and_unavailable_startup_do_not_retry_candidate(native_origin_runner, monkeypatch, tmp_path):

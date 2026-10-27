@@ -391,7 +391,7 @@ def record_baseline_suite(config):
 
 def paired_variant(config, pid):
     from .evaluation.baseline_rewrites import baseline_issue as recipe_baseline_issue
-    from .evaluation.measurement import amortized
+    from .evaluation.baseline_variants import select_baseline
     from .evaluation.timed_numerics import baseline_issue as timed_baseline_issue
 
     reference = select_problems(config.level, problem_ids=[pid])[pid]
@@ -405,9 +405,11 @@ def paired_variant(config, pid):
              and type(value.get("cold_start_ms")) in (int, float) and math.isfinite(value["cold_start_ms"]) and value["cold_start_ms"] > 0}
     if not valid:
         raise ValueError("Paired timing requires a validated baseline portfolio")
-    if config.score_mode == "headroom":
-        return min(valid, key=lambda name: valid[name]["mean"])
-    return min(valid, key=lambda name: amortized(valid[name]["mean"], valid[name]["cold_start_ms"], config.cold_calls))
+    chosen = select_baseline(valid, config.cold_calls)
+    winner = chosen.get("winning_baseline" if config.score_mode == "headroom" else "cold_winning_baseline")
+    if winner is None:
+        raise ValueError("Paired timing requires a baseline with qualified timing evidence")
+    return winner
 
 
 def paired_payload(config, pid, sid, *, repeat=None, variant=None):

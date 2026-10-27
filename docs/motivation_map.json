@@ -5319,6 +5319,29 @@
         ".claude/skills/kernelbench-pro/SKILL.md"
       ],
       "reason": "在已有受控mini-swe-agent路径兑现Modal输出token与开发worker额度：实际后端协议统一为Sandbox内local，唯一准入防重复exec，结果/源码/工件绑定与评分重放；共享SDK期限、有界终止、未知失败不补跑，保留有界未核对工件。替换不存在的Sandbox.open并传输现有政策/逐轮资料，复用本地账本且不增加运行文件，不把持卡空闲或平台终止确认当作GPU busy硬限"
+    },
+    {
+      "id": "V59-01",
+      "title": "L1测量证据汇总与评分重放",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/evaluation/final_verification.py",
+        "kb_workflows/analysis/paper_analysis.py",
+        "kb_workflows/engine.py",
+        "tests/evaluation/test_scoring_recovery.py",
+        "tests/provenance/test_kernel_origin.py",
+        "docs/STRICT_VALIDATION.md",
+        "docs/HEADROOM_SCORING.md"
+      ],
+      "reason": "修复worker尚缺外部测量证据便提前拒绝L1的评分顺序：先重放配对原始样本、实际来源和同模式基线，再核对所有测量设备的校准及输入/精度/源码绑定的审查证书，合并资格用于标准、隐藏和冻结复测；保留原始收据并另存分析判定。缓存passed标签不能替代当前材料，单基线使用真实变体名，基线选择排除缺实际计时证据的变体。L2完整计数归因仍未实现，不由通用标签授予资格；复用原模块，仅增加两个集中回归，无设备或模型实验"
     }
   ]
 }
