@@ -392,10 +392,14 @@ def _evaluate(payload, *, adapter=None):
 
                 profile_args = move(args)
                 profile_seed = settings.get("evaluation_seed", 42)
-                from ..numerics.input_calibration_task import probe
+                from src.input_groups import layout
 
-                input_probe = fingerprint({"probe": probe(profile_args)})
-                state_probe = fingerprint({"probe": probe(dict(ref.state_dict()))})
+                from ..evaluation.determinism import signature
+                from ..evaluation.state_paths import invocation_state
+                from ..provenance.submission_source import SourceRegistry
+                from .neuron_work import SCOPE
+
+                registry = SourceRegistry()
                 training = bool(ref.training)
                 if bool(model.training) != training:
                     raise ValueError("Neuron profile candidate changed the reference training mode")
@@ -406,6 +410,17 @@ def _evaluate(payload, *, adapter=None):
                     adapter.synchronize()
                 seed(profile_seed)
                 candidate_profile_args = move(profile_args)
+                aliases = layout(candidate_profile_args)
+                input_content = fingerprint({"value": signature(candidate_profile_args, typed=True)})
+
+                def candidate_state():
+                    try:
+                        return invocation_state(model, candidate_profile_args, callable_identity=registry.callable_identity)
+                    except (ValueError, TypeError, RuntimeError, AttributeError, OSError) as exc:
+                        return {"status": "not_measured", "reason": str(exc)[:300]}
+
+                state_before = candidate_state()
+                output_content = None
 
                 def profiled_forward():
                     with environment_guard(changes):
@@ -415,22 +430,28 @@ def _evaluate(payload, *, adapter=None):
                         return output
 
                 def verify_profile(output):
+                    nonlocal output_content
                     verify(profile_args, output, expected=expected_profile, prepared=profile_ticket)
                     if changes:
                         raise ValueError("Neuron profile candidate changed execution settings")
+                    output_content = fingerprint({"value": signature(output, typed=True)})
 
                 directory = ROOT / "cache/workflow" / fingerprint(payload) / "neuron_profile" / uuid.uuid4().hex
                 report = adapter.profile(profiled_forward, directory=directory, verifier=verify_profile)
+                state_after = candidate_state()
                 metadata["profile_call"] = {"seed": profile_seed, "input_signature": input_signature(profile_args),
                     "training": training, "no_grad": True, "output_verified": True,
                     "independent_oracle_ticket": profile_ticket is not None,
-                    "input_probe_sha256": input_probe, "registered_state_probe_sha256": state_probe,
+                    "input_content_sha256": input_content,
+                    "input_layout_sha256": fingerprint(aliases) if aliases is not None else None,
+                    "output_content_sha256": output_content,
+                    "model_state_before": state_before, "model_state_after": state_after,
                     "preceding_cases_sha256": fingerprint({"cases": checked}),
                     "precision_policy": {"native_tolerance": settings["fp32_tolerance"],
                         "production_contract": vars(contract) if contract else None,
                         "oracle_spec_sha256": profile_ticket.get("oracle_spec_sha256") if profile_ticket else None,
                         "independent_numerical": profile_ticket is not None},
-                    "state_scope": "continuous_state; pre_forward_reference_snapshot"}
+                    "state_scope": SCOPE}
                 return {"status": "ok", "purpose": "development_diagnostics_only", "metadata": metadata, **report}
             if strict and not all(accepted(row) for row in strict.values()):
                 raise ValueError("Required Neuron auxiliary contract failed or is unavailable")

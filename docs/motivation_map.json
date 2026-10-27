@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现；非kernel工作、Neuron所有权和充分的正式归因门继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和充分的正式归因门继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5238,6 +5238,26 @@
         "docs/WORK_COUNTERS.md"
       ],
       "reason": "防止同输入输出下借用不同参数、普通配置或入口的执行；实际和重放逐次核对前后状态与输入/状态别名，未知对象不补空状态，摘要不进入计时或采集窗口，代码身份不由等值重编译继承。复用状态路径，仍不声称全局依赖或host控制流已证明"
+    },
+    {
+      "id": "V56-01",
+      "title": "Neuron完整候选状态与内容绑定",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/hardware/neuron_work.py",
+        "kb_workflows/evaluation/state_paths.py",
+        "tests/hardware/test_device_adapters.py",
+        "tests/hardware/test_neuron_work.py",
+        "docs/NEURON_WORK.md"
+      ],
+      "reason": "用实际候选前后完整状态、入口及输入/状态别名取代参考模型的256点注册状态探针，同时绑定完整输入/输出内容与输入布局；复用现有状态遍历和流式内容摘要，不增加运行模块。采集窗口外取摘要，未知状态和旧协议不能获得完整需求模型资格，仍不证明执行所有权或原生计时等价"
     }
   ]
 }

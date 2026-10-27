@@ -450,8 +450,13 @@ def get_inputs(): return [torch.randn(2,3)]
     monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: payload["ref_arch_src"])
     result = neuron_worker.evaluate(request, adapter=ProfiledSimulatedNeuron())
     assert result["output_verified"]
-    assert result["metadata"]["profile_call"]["state_scope"] == "continuous_state; pre_forward_reference_snapshot"
-    assert not result["metadata"]["profile_call"]["independent_oracle_ticket"]
+    from kb_workflows.hardware.neuron_work import SCOPE
+
+    call = result["metadata"]["profile_call"]
+    assert call["state_scope"] == SCOPE
+    assert not call["independent_oracle_ticket"]
+    assert call["model_state_before"]["status"] == call["model_state_after"]["status"] == "observed"
+    assert call["model_state_before"]["sha256"] != call["model_state_after"]["sha256"]  # Ordinary calls counter.
 
 
 def test_neuron_profile_isolates_inputs_before_the_captured_interval(payload, monkeypatch):
@@ -471,6 +476,15 @@ def get_inputs(): return [torch.randn(2,3)]
     monkeypatch.setattr(evaluate_task, "validate_sources", lambda payload: payload["ref_arch_src"])
     active, captured_clones = False, []
     original = torch.Tensor.clone
+    from kb_workflows.evaluation import state_paths
+
+    observe = state_paths.invocation_state
+    observed_states = []
+
+    def state(*args, **kwargs):
+        assert not active
+        observed_states.append(observe(*args, **kwargs))
+        return observed_states[-1]
 
     def clone(tensor, *args, **kwargs):
         if active:
@@ -489,10 +503,13 @@ def get_inputs(): return [torch.randn(2,3)]
             return super().profile(captured, directory=directory, verifier=verifier)
 
     monkeypatch.setattr(torch.Tensor, "clone", clone)
+    monkeypatch.setattr(state_paths, "invocation_state", state)
     result = neuron_worker.evaluate(request, adapter=IntervalAdapter())
     assert captured_clones == [] and result["output_verified"]
     capture = result["capture_receipt"]
-    assert capture["simulated"] and capture["binding"]["input_probe_sha256"]
+    assert capture["simulated"] and capture["binding"]["input_content_sha256"]
+    assert capture["binding"]["input_layout_sha256"] and capture["binding"]["output_content_sha256"]
+    assert observed_states == [capture["call"]["model_state_before"], capture["call"]["model_state_after"]]
     assert capture["compiler_source_sha256"] == result["metadata"]["compiler_source_sha256"]
 
 

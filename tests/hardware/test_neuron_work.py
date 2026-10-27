@@ -49,8 +49,12 @@ def profile_result():
         "training": True,
         "no_grad": True,
         "output_verified": True,
-        "input_probe_sha256": "1" * 64,
-        "registered_state_probe_sha256": "2" * 64,
+        "input_content_sha256": "1" * 64,
+        "input_layout_sha256": "2" * 64,
+        "output_content_sha256": "4" * 64,
+        **{f"model_state_{side}": {"status": "observed", "sha256": "5" * 64,
+                                  "tensor_count": 0, "scope": neuron_work.INVOCATION_SCOPE}
+           for side in ("before", "after")},
         "preceding_cases_sha256": "3" * 64,
         "state_scope": neuron_work.SCOPE,
         "precision_policy": {
@@ -161,6 +165,27 @@ def test_model_replays_complete_parquet_work_without_promoting_annotations_to_ha
     assert factors["work_evidence_kind"] == "reviewed_neuron_instruction_annotations"
 
 
+def test_capture_rejects_legacy_partial_or_mismatched_full_state_even_when_resealed(artifacts):
+    _, _, original, _, _ = artifacts
+    for field in ("input_content_sha256", "input_layout_sha256", "output_content_sha256"):
+        changed = copy.deepcopy(original)
+        changed["call"][field] = "0" * 64
+        with pytest.raises(ValueError):
+            neuron_work.validate_capture(neuron_work.seal(changed))
+    for side in ("before", "after"):
+        for state in ({"status": "not_measured"},
+                      {**original["call"][f"model_state_{side}"], "sha256": "0" * 64},
+                      {**original["call"][f"model_state_{side}"], "tensor_count": True}):
+            changed = copy.deepcopy(original)
+            changed["call"][f"model_state_{side}"] = state
+            with pytest.raises(ValueError):
+                neuron_work.validate_capture(neuron_work.seal(changed))
+    changed = copy.deepcopy(original)
+    changed["protocol"] = "kernelbench_pro_neuron_verified_capture_v1"
+    with pytest.raises(ValueError):
+        neuron_work.validate_capture(neuron_work.seal(changed))
+
+
 @pytest.mark.parametrize(
     "damage",
     [
@@ -191,7 +216,7 @@ def test_resealed_capture_cannot_borrow_unverified_calls_or_other_source_and_dev
     elif damage == "source":
         capture["binding"]["source_sha256"] = "0" * 64
     elif damage == "input_probe":
-        capture["binding"]["input_probe_sha256"] = "0" * 64
+        capture["binding"]["input_content_sha256"] = "0" * 64
     elif damage == "seed":
         capture["call"]["seed"] = True
     elif damage == "policy":

@@ -12,14 +12,14 @@ from pathlib import PurePosixPath
 
 from ..analysis.calibration import identity, positive
 from ..common import evaluator_digest, fingerprint
+from ..evaluation.state_paths import INVOCATION_SCOPE
 from ..provenance.work_counters import sha
 from .neuron_tables import integer
 
-CAPTURE = "kernelbench_pro_neuron_verified_capture_v1"
+CAPTURE = "kernelbench_pro_neuron_verified_capture_v2"
 REVIEW = "kernelbench_pro_neuron_work_review_v1"
 MODEL = "kernelbench_pro_neuron_instruction_model_v1"
-SCOPE = "continuous_state; pre_forward_reference_snapshot"
-PROBE_SCOPE = "up_to_256_positions_per_tensor; registered_state_only; not_full_content_or_ordinary_state_hash"
+SCOPE = "continuous_state; full_candidate_state_and_input_aliases_before_and_after_profile"
 MEMORY = "instruction_hbm_annotations_only; DMA_packets_not_added"
 DTYPES = ("src1_dtype", "src2_dtype", "dst_dtype")
 RESOURCES = {"fp32_flops", "fp16_flops", "bf16_flops"}
@@ -28,8 +28,11 @@ HASHES = (
     "reference_sha256",
     "evaluation_contract_sha256",
     "input_signature_sha256",
-    "input_probe_sha256",
-    "registered_state_probe_sha256",
+    "input_content_sha256",
+    "input_layout_sha256",
+    "output_content_sha256",
+    "model_state_before_sha256",
+    "model_state_after_sha256",
     "preceding_cases_sha256",
     "policy_sha256",
 )
@@ -45,8 +48,9 @@ def capture_record(payload, result):
     metadata, settings = result["metadata"], payload["eval_config"]
     call, sources = metadata["profile_call"], metadata["compiler_source_sha256"]
     binding = {
-        key: call[key] for key in ("input_probe_sha256", "registered_state_probe_sha256", "preceding_cases_sha256")
+        key: call[key] for key in ("input_content_sha256", "input_layout_sha256", "output_content_sha256", "preceding_cases_sha256")
     }
+    binding.update({f"model_state_{side}_sha256": call[f"model_state_{side}"].get("sha256") for side in ("before", "after")})
     binding.update(
         source_sha256=sources["candidate.py"],
         reference_sha256=sources["reference.py"],
@@ -71,7 +75,6 @@ def capture_record(payload, result):
                 "exporter": result.get("exporter"),
                 "simulated": metadata["simulated_execution"],
                 "state_scope": SCOPE,
-                "probe_scope": PROBE_SCOPE,
                 "scored_wall_times_replaced": False,
                 "formal_origin_qualified": False,
             }
@@ -89,7 +92,6 @@ def validate_capture(value, *, allow_simulated=False):
         or value.get("output_verified") is not True
         or value.get("exporter") != "NeuronProfiler.export_trace"
         or value.get("state_scope") != SCOPE
-        or value.get("probe_scope") != PROBE_SCOPE
         or value.get("scored_wall_times_replaced") is not False
         or value.get("formal_origin_qualified") is not False
     ):
@@ -130,7 +132,15 @@ def validate_capture(value, *, allow_simulated=False):
         or any(
             call.get(key) != binding[key]
             for key in HASHES
-            if key.endswith("probe_sha256") or key == "preceding_cases_sha256"
+            if key in {"input_content_sha256", "input_layout_sha256", "output_content_sha256", "preceding_cases_sha256"}
+        )
+        or any(
+            not isinstance(state := call.get(f"model_state_{side}"), dict)
+            or state.get("status") != "observed"
+            or state.get("scope") != INVOCATION_SCOPE
+            or not integer(state.get("tensor_count"))
+            or state.get("sha256") != binding[f"model_state_{side}_sha256"]
+            for side in ("before", "after")
         )
         or value.get("compiler_source_sha256")
         != {"candidate.py": binding["source_sha256"], "reference.py": binding["reference_sha256"]}

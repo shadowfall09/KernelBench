@@ -13,6 +13,7 @@ from collections import OrderedDict
 
 MAX_STATES = 100_000
 MAX_DEPTH = 64
+INVOCATION_SCOPE = "module_data_entrypoints_and_input_state_aliases; no_host_control_proof"
 
 
 def namespace(value):
@@ -198,4 +199,4 @@ def invocation_state(model, inputs, *, callable_identity):
     if aliases is None:
         raise ValueError("Native model state storage layout is unsupported")
     return {"status": "observed", "sha256": fingerprint({"model": data, "classes": declarations, "input_state_layout": aliases}),
-            "tensor_count": len(tensors), "scope": "module_data_entrypoints_and_input_state_aliases; no_host_control_proof"}
+            "tensor_count": len(tensors), "scope": INVOCATION_SCOPE}
