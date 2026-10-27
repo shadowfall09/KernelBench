@@ -284,10 +284,19 @@ def analyze_paper(config):
                         from ..evaluation.evidence import measurement_checks, receipt
 
                         measurement = measurement_checks(config, pid, sid, chosen, variant=paired_variant, paired=paired)
+                        attribution = measurement.get("launch_attribution", {})
+                        if attribution.get("values") is not None:
+                            row["launch_attribution"] = attribution["values"]
+                            if attribution["values"]["launch_only"]:
+                                status = "launch_only"
+                            elif attribution["values"]["mixed_repeat_classification"]:
+                                status = "launch_attribution_inconsistent"
                         options = task_payload(config, pid, sid)["eval_config"]
-                        status = score_issue(raw, options, "standard", additional=measurement) or status
-                        if config.hidden_tests and status == "verified":
-                            status = score_issue(secret, options, "hidden", additional=measurement) or status
+                        evidence_issue = score_issue(raw, options, "standard", additional=measurement)
+                        if config.hidden_tests:
+                            evidence_issue = score_issue(secret, options, "hidden", additional=measurement) or evidence_issue
+                        if status == "verified":
+                            status = evidence_issue or status
                         if measurement:
                             row["measurement_checks"] = measurement
                             row["assessed_evidence"] = receipt({**raw.get("metadata", {}).get("evidence_receipt", {}).get("checks", {}),

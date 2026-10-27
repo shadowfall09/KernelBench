@@ -221,9 +221,10 @@ def native_timeline(report, *, counter_report=None, calibration=None, bound=None
     return value
 
 
-def launch_only(reference, candidate, *, launch_ms, speedup_ci95, noise_ci95, relative_busy_tolerance=0.05):
+def launch_only(reference, candidate, *, launch_ms, speedup_ci95, noise_ci95, relative_busy_tolerance=0.05,
+                launch_tolerance=0.2):
     """A diagnostic category, requiring a noise-separated speedup and measured launch cost."""
-    if (not positive(launch_ms) or not 0 <= relative_busy_tolerance < 1
+    if (not positive(launch_ms) or not 0 <= relative_busy_tolerance < 1 or not 0 <= launch_tolerance < 1
             or len(speedup_ci95) != 2 or len(noise_ci95) != 2
             or not all(map(positive, speedup_ci95 + noise_ci95))):
         raise ValueError("Launch attribution requires calibration and valid paired intervals")
@@ -237,8 +238,98 @@ def launch_only(reference, candidate, *, launch_ms, speedup_ci95, noise_ci95, re
     wall_saved = reference["wall_ms"] - candidate["wall_ms"]
     busy_change = abs(reference["device_busy_ms"] - candidate["device_busy_ms"]) / reference["device_busy_ms"]
     established = (speedup_ci95[0] > max(1, noise_ci95[1]) and saved_kernels > 0 and wall_saved > 0
-                   and busy_change <= relative_busy_tolerance and wall_saved <= saved_kernels * launch_ms)
+                   and busy_change <= relative_busy_tolerance
+                   and abs(wall_saved - saved_kernels * launch_ms) <= saved_kernels * launch_ms * launch_tolerance)
     return {"launch_only": established, "saved_kernel_count": saved_kernels,
             "wall_saved_ms": wall_saved, "estimated_launch_savings_ms": max(0, saved_kernels) * launch_ms,
             "relative_busy_change": busy_change, "relative_busy_tolerance": relative_busy_tolerance,
+            "launch_tolerance": launch_tolerance,
             "classification_is_diagnostic": True, "counter_evidence_substituted": False}
+
+
+def scored_pairs(result):
+    """Replay same-process reference/candidate/control windows, never a diagnostic run."""
+    from ..common import fingerprint
+    from ..evaluation.paired_task import call_plan
+    from ..provenance.kernel_origin import _sha
+    from ..provenance.origin_task import PAIRED_CAPTURE, scored_origin, validate_scored
+
+    source = scored_origin(result)
+    request, document = validate_scored(result)
+    origin = result["metadata"]["origin_capture"]
+    record = origin.get("paired_capture", {})
+    if request.get("task") != "paired_timing" or record.get("protocol") != PAIRED_CAPTURE:
+        raise ValueError("Actual paired device windows are missing")
+    expected = [(index, seed, order, role) for index, seed, order in call_plan(
+        trials=request["eval_config"].get("paired_trials", 30), warmup=3,
+        seed=request["eval_config"].get("evaluation_seed", 42)) for role in order]
+    rows, raw = record.get("calls"), origin["raw"]
+    if not isinstance(rows, list) or len(rows) != len(expected):
+        raise ValueError("Paired device windows omit reference, candidate or control calls")
+    candidates = {row["label"]: row for row in document["calls"]}
+    windows = {row["id"]: row for row in raw["windows"]}
+    times = {row["id"]: row["wall_ms"] for row in document["native_timings"]}
+    pairs = result["metadata"]["paired_timing"]["pairs"]
+    output, previous = [], -1
+    for index, (row, (trial, seed, order, role)) in enumerate(zip(rows, expected, strict=True), 1):
+        candidate = candidates[str(trial)]
+        start, end, device = (row.get(key) for key in ("start_ns", "end_ns", "device"))
+        if (row.get("id") != index or (row.get("trial"), row.get("seed"), row.get("order"), row.get("role")) != (trial, seed, order, role)
+                or row.get("output_verified") is not True or type(device) is not int or device != 0
+                or type(start) is not int or type(end) is not int or start < previous or end <= start
+                or not positive(row.get("wall_ms")) or not _sha(row.get("output_content_sha256"))
+                or row.get("input_signature_sha256") != candidate["input_signature_sha256"]):
+            raise ValueError("Paired device window changed its schedule, output, input or timing")
+        if role == "C":
+            window = windows[candidate["id"]]
+            if (row["wall_ms"] != times[candidate["id"]] or row["output_content_sha256"] != candidate["output_content_sha256"]
+                    or not window["start_ns"] <= start < end <= window["end_ns"]):
+                raise ValueError("Paired candidate window differs from its scored native call")
+        if trial >= 3 and row["wall_ms"] != pairs[trial - 3][{"R": "reference_ms", "C": "candidate_ms", "B": "control_ms"}[role]]:
+            raise ValueError("Paired device window differs from its raw performance sample")
+        activities = [{**activity, "start_ns": max(start, activity["start_ns"]), "end_ns": min(end, activity["end_ns"])}
+                      for activity in raw["activities"] if activity["device"] == device and activity["start_ns"] < end and activity["end_ns"] > start]
+        if not activities:
+            raise ValueError("Paired device call has no measured activity")
+        busy = interval_union([(activity["start_ns"], activity["end_ns"]) for activity in activities]) / 1e6
+        if busy > row["wall_ms"] * (1 + 1e-6):
+            raise ValueError("Paired device activity exceeds its actual native wall sample")
+        if trial >= 3:
+            output.append({"trial": trial, "role": role, "wall_ms": row["wall_ms"], "device_busy_ms": busy,
+                           "kernel_count": sum(activity["kind"] == "kernel" for activity in activities),
+                           "activity_count": len(activities), "O": row["wall_ms"] / busy})
+        previous = end
+    return {"protocol": "kernelbench_pro_scored_paired_activity_v1", "calls": output,
+            "origin_receipt_sha256": origin["receipt_sha256"], "result_sha256": fingerprint(result),
+            "raw_sha256": source["raw_sha256"], "device_fingerprint": document["binding"]["device_fingerprint"],
+            "timing_mode": source["native_timing_mode"], "scored_wall_times_replaced": False}
+
+
+def paired_attribution(paired, calibration):
+    """Classify every independent repeat from replayed actual device activity."""
+    from ..common import evaluator_digest, fingerprint
+    from .calibration import validate
+    from .paired_statistics import paired_summary
+
+    runs, bindings = paired.get("device_runs", []), paired["measurement_bindings"]
+    if not runs or len(runs) != len(bindings):
+        raise ValueError("Actual paired activity must cover every declared repeat")
+    groups = []
+    for repeat, (run, binding) in enumerate(zip(runs, bindings, strict=True)):
+        validate(calibration, run["device_fingerprint"], digest=evaluator_digest())
+        if run["result_sha256"] != binding["result_sha256"]:
+            raise ValueError("Actual paired activity belongs to a different measurement result")
+        rows = [row for row in paired["pairs"] if row.get("repeat", 0) == repeat]
+        summary = paired_summary(rows)
+        totals = {role: {key: sum(row[key] for row in run["calls"] if row["role"] == role)
+                         for key in ("wall_ms", "device_busy_ms", "kernel_count", "activity_count")} for role in "RCB"}
+        item = launch_only(totals["R"], totals["C"], launch_ms=calibration["launch_median_ms"],
+                           speedup_ci95=summary["speedup_ci95"], noise_ci95=summary["reference_control_ci95"])
+        groups.append({**item, "repeat": repeat, "roles": totals, "origin_receipt_sha256": run["origin_receipt_sha256"],
+                       "result_sha256": run["result_sha256"]})
+    flags = [row["launch_only"] for row in groups]
+    return {"protocol": "kernelbench_pro_scored_launch_attribution_v1", "launch_only": all(flags),
+            "mixed_repeat_classification": any(flags) and not all(flags), "repeats": groups,
+            "calibration_sha256": calibration["receipt_sha256"], "paired_sha256": fingerprint(paired),
+            "source": "actual_native_paired_calls", "scored_wall_times_replaced": False,
+            "classification_is_diagnostic": False, "algorithm_or_efficiency_gain_proven": False}

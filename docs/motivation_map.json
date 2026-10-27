@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际配对的参考/候选/控制全序列窗口、逐次原始时间/输出/输入绑定、busy并集及O进入离线核对，按每个独立repeat的噪声与校准启动成本执行launch_only零分门，分类混合或证据缺失拒绝资格；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5342,6 +5342,31 @@
         "docs/HEADROOM_SCORING.md"
       ],
       "reason": "修复worker尚缺外部测量证据便提前拒绝L1的评分顺序：先重放配对原始样本、实际来源和同模式基线，再核对所有测量设备的校准及输入/精度/源码绑定的审查证书，合并资格用于标准、隐藏和冻结复测；保留原始收据并另存分析判定。缓存passed标签不能替代当前材料，单基线使用真实变体名，基线选择排除缺实际计时证据的变体。L2完整计数归因仍未实现，不由通用标签授予资格；复用原模块，仅增加两个集中回归，无设备或模型实验"
+    },
+    {
+      "id": "V60-01",
+      "title": "实际配对设备时间与启动收益评分门",
+      "primary": "M3",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/analysis/performance.py",
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/analysis/paper_analysis.py",
+        "tests/provenance/test_kernel_origin.py",
+        "tests/evaluation/test_scoring_recovery.py",
+        "tests/analysis/test_device_headroom.py",
+        "docs/HEADROOM_SCORING.md",
+        "docs/KERNEL_ORIGIN.md",
+        "docs/STRICT_VALIDATION.md"
+      ],
+      "reason": "复用实际持续CUPTI，补齐同进程参考/候选/控制的预热与正式设备窗口，不包装计时callable、不增加同步；离线核对完整顺序/种子/输入/输出、候选窗口和原始墙钟样本，按活动并集计算busy与O。所有独立复测分别要求噪声分离、核数减少、busy变化≤5%且节省与校准启动成本±20%相符，launch_only收益置零，混合或缺证据不给L1资格；保留原始正确性及收据，不用诊断重放替代实际证据，不将未标记解释为已证明算法收益。仅新增两个集中回归、复用既有模块与夹具，无设备或模型实验"
     }
   ]
 }

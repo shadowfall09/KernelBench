@@ -11,7 +11,7 @@ kernel_track = "custom"  # 或 library；两种轨道分组报告
 origin_minimum_custom_fraction = 0.95
 ```
 
-CUDA L1/L2的`evaluate`、隐藏验证、`paired_timing`及`baseline`在实际工作进程启动持续CUPTI采集，早于候选导入；原始计时仍调用同一个model对象，不增加转发包装器或同步。计时前打开候选窗口，计时结束立即关闭，再观察模式、模型状态和输出；摘要与验证不计入自写份额。持续记录窗口外的launch/activity，使配对参考、控制及独立基线也使用同一种callback/activity模式。该模式明确标为`synchronized_wall_continuous_cupti_v1`，含真实采集开销，不声称与未采集计时等价。普通`current`/L0保留原模式。
+CUDA L1/L2的`evaluate`、隐藏验证、`paired_timing`及`baseline`在实际工作进程启动持续CUPTI采集，早于候选导入；原始计时仍调用同一个model对象，不增加转发包装器或同步。计时前打开候选窗口，计时结束立即关闭，再观察模式、模型状态和输出；摘要与验证不计入自写份额。持续记录窗口外的launch/activity，使配对参考、控制及独立基线也使用同一种callback/activity模式。实际配对还保存R/C/B各自的预热与正式窗口，绑定完整顺序、输入/输出验证与原始计时；这些窗口不改变候选来源窗口或授予参考代码自写信用。离线busy并集及启动收益评分门见[配对归因](HEADROOM_SCORING.md#实际配对归因与启动收益)。该模式明确标为`synchronized_wall_continuous_cupti_v1`，含真实采集开销，不声称与未采集计时等价。普通`current`/L0保留原模式。
 
 `metadata.origin_capture`使用`kernelbench_pro_scored_capture_v1`，只保存一份实际raw trace，并绑定请求、实际时间、设备及逐调用收据；`native_call_receipt`通过摘要引用它。基线也保留绑定实际样本及seed的采集收据。评分重算来源门，不能只写passed；同时拒绝无采集基线、混合模式、模拟/不完整/丢记录的观察。工具缺失时保留数值结果与失败原因，候选只执行一次，不重跑或补造来源。
 

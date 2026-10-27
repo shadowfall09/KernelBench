@@ -563,7 +563,7 @@ def l1_measurements(run, monkeypatch):
     """Exercise measurement assembly; source collection is tested in provenance fixtures."""
     import hashlib
 
-    from kb_workflows.analysis import calibration, headroom
+    from kb_workflows.analysis import calibration, headroom, performance
     from kb_workflows.analysis.paired_statistics import paired_summary
     from kb_workflows.evaluation import evidence
     from kb_workflows.provenance import origin_task
@@ -577,6 +577,16 @@ def l1_measurements(run, monkeypatch):
         if result.get("metadata", {}).get("fixture_observer") is not True:
             raise ValueError("Missing observer fixture")
         return origin_task.SCORED_MODE
+    def device_pairs(result):
+        rows = result["metadata"]["paired_timing"]["pairs"]
+        return {"calls": [{"trial": trial + 3, "role": role, "wall_ms": row[field],
+                           "device_busy_ms": row[field] * 0.8, "kernel_count": 2 if role == "C" else 10,
+                           "activity_count": 2 if role == "C" else 10}
+                          for trial, row in enumerate(rows) for role, field in
+                          (("R", "reference_ms"), ("C", "candidate_ms"), ("B", "control_ms"))],
+                "result_sha256": fingerprint(result), "origin_receipt_sha256": "fixture only",
+                "device_fingerprint": result["metadata"]["device_fingerprint"]}
+    monkeypatch.setattr(performance, "scored_pairs", device_pairs)
     monkeypatch.setattr(origin_task, "origin_check", source_check)
     monkeypatch.setattr(origin_task, "timing_observer", observer)
     monkeypatch.setattr(origin_task, "validate_scored", lambda result: ({"eval_config": result["metadata"]["evaluation_config"]}, {}))
@@ -695,3 +705,38 @@ def test_l1_single_baseline_and_cached_labels_cannot_hide_missing_or_changed_mea
         report = paper_analysis.analyze_paper(config)
         assert report["details"][0]["status"] != "verified", damage
         assert report["details"][0]["score"] == 0 and standard["1_0"]["correctness"]
+
+
+def test_l1_launch_only_excludes_score_without_changing_native_correctness(l1_measurements, monkeypatch):
+    from kb_workflows.analysis import performance
+
+    config, _, standard, _, measured, spec, prepare, _ = l1_measurements
+    collect = performance.scored_pairs
+    def same_busy(result):
+        run = collect(result)
+        for row in run["calls"]:
+            row["device_busy_ms"] = 4
+        return run
+    monkeypatch.setattr(performance, "scored_pairs", same_busy)
+    measured.update(launch_samples_ms=[0.625] * 5, launch_median_ms=0.625)
+    measured["receipt_sha256"] = fingerprint({k: v for k, v in measured.items() if k != "receipt_sha256"})
+    spec["calibration_sha256"] = measured["receipt_sha256"]
+    atomic_json(Path(config.device_calibration), measured)
+    atomic_json(Path(config.problem_specs), {"level1": {"1": {"headroom_certificate": spec}}})
+    prepare()
+    report = paper_analysis.analyze_paper(config)
+    assert report["bounded_gain_macro"] == 0
+    assert all(row["status"] == "launch_only" and row["launch_attribution"]["launch_only"] for row in report["details"])
+    assert standard["1_0"]["correctness"] and read_json(config.run_dir / "eval_results.json")["1_0"]["correctness"]
+    assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    def mixed_busy(result):
+        run = same_busy(result)
+        if result["metadata"]["evaluation_config"]["final_repeat"] == 1:
+            for row in run["calls"]:
+                if row["role"] == "C":
+                    row["device_busy_ms"] = 3
+        return run
+    monkeypatch.setattr(performance, "scored_pairs", mixed_busy)
+    mixed = paper_analysis.analyze_paper(config)
+    assert mixed["bounded_gain_macro"] == 0
+    assert all(row["status"] == "launch_attribution_inconsistent" for row in mixed["details"])

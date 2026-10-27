@@ -1269,10 +1269,9 @@ def test_native_activity_filter_preserves_unknown_overlaps_and_all_drop_accounti
     assert result["calls"][0]["custom_exclusive_fraction_lower_bound"] == pytest.approx(1 / 3)
 
 
-def test_actual_scored_origin_gates_custom_library_and_unknown_tracks(native_origin_runner):
+@pytest.fixture
+def scored_origin_runner(native_origin_runner):
     """Unscored serialization fixtures exercise the gate, never device evidence."""
-    from kb_workflows.evaluation import evidence
-    from kb_workflows.provenance import origin_task
     from tests.numerics.test_input_calibration import CAPS
 
     def reseal(result):
@@ -1282,8 +1281,8 @@ def test_actual_scored_origin_gates_custom_library_and_unknown_tracks(native_ori
         record["origin_capture_sha256"] = origin["receipt_sha256"]
         record["receipt_sha256"] = fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
 
-    def fixture(track, library=False, unknown=False):
-        template = native_origin_runner(caps=CAPS)
+    def fixture(track, library=False, unknown=False, *, target="evaluate"):
+        template = native_origin_runner(caps=CAPS, target=target)
         request = template["native_request"]
         request["eval_config"]["kernel_track"] = track
         result = native_origin_runner.scored(request)
@@ -1308,6 +1307,15 @@ def test_actual_scored_origin_gates_custom_library_and_unknown_tracks(native_ori
         reseal(result)
         return result
 
+    fixture.reseal = reseal
+    return fixture
+
+
+def test_actual_scored_origin_gates_custom_library_and_unknown_tracks(scored_origin_runner):
+    from kb_workflows.evaluation import evidence
+    from kb_workflows.provenance import origin_task
+
+    fixture, reseal = scored_origin_runner, scored_origin_runner.reseal
     custom = fixture("custom")
     summary = origin_task.scored_origin(custom)
     assert summary["formal_qualification_implemented"] and not summary["timings_are_diagnostic"]
@@ -1396,3 +1404,67 @@ def test_actual_observer_baseline_and_unavailable_startup_do_not_retry_candidate
     assert origin_task.origin_check(actual)["status"] == "not_measured"
     with pytest.raises(ValueError):
         origin_task.timing_observer(actual, allow_simulated=True)
+
+
+def test_actual_paired_activity_binds_all_roles_timers_and_interval_unions(scored_origin_runner):
+    from kb_workflows.analysis import performance
+    from kb_workflows.analysis.paired_statistics import paired_summary
+    from kb_workflows.provenance import origin_task
+
+    result = scored_origin_runner("custom", target="paired_timing")
+    origin = result["metadata"]["origin_capture"]
+    raw, calls = origin["raw"], result["metadata"]["native_call_receipt"]
+    windows = {row["id"]: row for row in raw["windows"]}
+    candidates = {int(row["label"]): row for row in calls["calls"]}
+    timings = {row["id"]: row for row in calls["native_timings"]}
+    raw["activities"], raw["launches"] = [], []
+    pattern = raw_capture()
+    for index, row in enumerate(origin["paired_capture"]["calls"]):
+        wall, kernels = (9, 2) if row["role"] == "C" else (10, 10)
+        start = 100_000_000 + index * 20_000_000
+        row.update(start_ns=start, end_ns=start + wall * 1_000_000, wall_ms=wall)
+        if row["role"] == "C":
+            candidate = candidates[row["trial"]]
+            windows[candidate["id"]].update(start_ns=start - 1, end_ns=row["end_ns"] + 1)
+            timings[candidate["id"]]["wall_ms"] = wall
+        for kernel in range(kernels):
+            correlation = index * 20 + kernel + 1
+            raw["activities"].append({**pattern["activities"][0], "correlation": correlation,
+                "stream": kernel + 1, "start_ns": start + 100,
+                "end_ns": start + 8_000_100})
+            if row["role"] == "C":
+                raw["launches"].append({**pattern["launches"][0], "correlation": correlation, "call": candidate["id"]})
+    pairs = result["metadata"]["paired_timing"]["pairs"]
+    for row in pairs:
+        row.update(reference_ms=10, candidate_ms=9, control_ms=10)
+    result["metadata"]["paired_timing"] = paired_summary(pairs)
+    origin["timing_sha256"] = fingerprint(origin_task._scored_timing(result))
+    scored_origin_runner.reseal(result)
+    run = performance.scored_pairs(result)
+    assert len(run["calls"]) == 30 and {row["role"] for row in run["calls"]} == {"R", "C", "B"}
+    assert all(row["device_busy_ms"] == 8 for row in run["calls"])
+    assert {row["kernel_count"] for row in run["calls"] if row["role"] == "C"} == {2}
+    assert not run["scored_wall_times_replaced"]
+    for damage in ("missing_role", "sample", "input", "output", "order", "interval", "simulated", "dropped"):
+        changed = copy.deepcopy(result)
+        other = changed["metadata"]["origin_capture"]
+        row = next(row for row in other["paired_capture"]["calls"] if row["trial"] == 3 and row["role"] == "R")
+        if damage == "missing_role":
+            other["paired_capture"]["calls"].remove(row)
+        elif damage == "sample":
+            row["wall_ms"] = 11
+        elif damage == "input":
+            row["input_signature_sha256"] = "f" * 64
+        elif damage == "output":
+            row["output_verified"] = False
+        elif damage == "order":
+            row["role"] = "B"
+        elif damage == "interval":
+            row["end_ns"] = row["start_ns"]
+        elif damage == "simulated":
+            other["raw"]["simulated"] = True
+        else:
+            other["raw"]["dropped_records"] = 1
+        scored_origin_runner.reseal(changed)
+        with pytest.raises(ValueError):
+            performance.scored_pairs(changed)

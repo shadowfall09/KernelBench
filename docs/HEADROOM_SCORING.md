@@ -90,8 +90,16 @@ score   = clip(log(T_ref / T_candidate) /
 python -m scripts.analyze_device_trace trace.json --device 0 --output activity.json
 ```
 
-`performance.decomposition()` 在没有可信、来源绑定的工作计数器时，只给出 `AE=T_dev/SOL_alg`、`O=T_wall/T_dev`，A/E 为 null。现在必须提供可重放原始计数、完整审核实例契约与同物理设备校准模型才能分开计算A/E；执行SOL自动重算，`status="measured"`字符串或手填数值不能启用。模型不一致会保留标记，见[工作计数器](WORK_COUNTERS.md)。`launch_only()` 还要求配对区间超出参考控制噪声、核数减少、busy 时间基本不变，且墙钟收益不超过校准启动成本解释的范围；这是诊断分类，不自动提供计分资格。
+`performance.decomposition()` 在没有可信、来源绑定的工作计数器时，只给出 `AE=T_dev/SOL_alg`、`O=T_wall/T_dev`，A/E 为 null。现在必须提供可重放原始计数、完整审核实例契约与同物理设备校准模型才能分开计算A/E；执行SOL自动重算，`status="measured"`字符串或手填数值不能启用。模型不一致会保留标记，见[工作计数器](WORK_COUNTERS.md)。单独调用`launch_only()`仍是对传入数值的诊断；L1评分使用下述实际证据核对后的分类。
 
 来源关联图只接受可信 verifier 的 correlation 映射，未知保持 unknown，不能根据 kernel 名字宣称自写。Nsight采集入口和计数器重放已有软件路径，未运行设备采集；[Neuron Parquet分析与审核模型](NEURON_WORK.md)可从完整逐指令注释、人工或自动处理配对、审核资源规则及同设备校准重算A/E，但不提升硬件计数或来源资格。自动处理收据绑定原始快照、固定工具、完整输出和capture/report；指定却无效的证据不会退回人工模式。与原生时间的完整来源关联及正式计分归因门仍需后续实现。
 
 实现依据：[PyTorch profiler](https://docs.pytorch.org/docs/2.12/profiler.html)、[数值精度说明](https://docs.pytorch.org/docs/2.12/notes/numerical_accuracy.html)、[NVIDIA nvidia-smi](https://docs.nvidia.com/deploy/nvidia-smi/index.html)。
+
+## 实际配对归因与启动收益
+
+CUDA L1/L2的持续CUPTI现在同时保留实际参考R、候选C、控制B的全部预热与正式窗口。窗口位于原始计时器外侧，候选状态/输入/输出哈希和输出验证仍在计时外；不增加同步、不包装原始callable。分析重放完整trial/seed/order/role、输入签名、输出验证、候选原生调用以及R/C/B的逐次原始墙钟样本；缺失、模拟、丢记录、改变或未关联的资料不给资格。
+
+busy时间按各窗口内kernel、memcpy和memset活动的区间并集计算，重叠不重复计数。实际墙钟除以busy得到O；活动时间不会替换原有性能样本。每个独立repeat分别判断以下条件：配对收益区间超过1和参考/控制噪声上界；候选kernel数减少；busy相对变化不超过5%；墙钟节省与“减少的kernel数 × 同物理设备校准launch中位成本”相差不超过20%。这些阈值是显式模型政策，不是已完成设备校准实验的结论。
+
+全部repeat符合时，报告`launch_attribution.launch_only=true`及状态`launch_only`，收益记零。分类混合时状态为`launch_attribution_inconsistent`，不能择优保留一个repeat；缺活动或校准则测量证据未知。报告保留每组R/C/B总墙钟、busy、kernel/活动数及成本模型，原始正确性和worker收据不改写。此门要求L1/L2；`current`/L0沿用既有协议。未标记启动收益不构成算法或效率收益证明，完整工作计数器、A/E归因和Neuron来源仍分别验收。

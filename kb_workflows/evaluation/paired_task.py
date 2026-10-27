@@ -35,7 +35,14 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
 
     if type(trials) is not int or trials < 10:
         raise ValueError("At least 10 paired trials are required")
-    from ..provenance.origin_task import candidate_call, confirm, record_elapsed, snapshot_output
+    from ..provenance.origin_task import (
+        candidate_call,
+        confirm,
+        confirm_paired_device,
+        paired_device_call,
+        record_elapsed,
+        snapshot_output,
+    )
 
     models = {"R": reference, "C": candidate, "B": control}
     rows, changes = [], []
@@ -65,11 +72,12 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                                            seed=case_seed, label=str(trial), order=order,
                                            role="candidate" if name == "C" else "reference") if name != "B" else nullcontext((models[name], None))
                     with scope as (execute, observed):
-                        started = clock()
-                        output = execute(*fresh)
-                        consumed = consume_output(output)
-                        synchronize(device)
-                        elapsed = (clock() - started) * 1000
+                        with paired_device_call(name, trial, case_seed, order, fresh) as device_window:
+                            started = clock()
+                            output = execute(*fresh)
+                            consumed = consume_output(output)
+                            synchronize(device)
+                            elapsed = (clock() - started) * 1000
                 record_elapsed(observed, elapsed)
                 snapshot_output(observed, output)
                 issue = compare_outputs(expected, output, tolerance)
@@ -86,6 +94,7 @@ def collect_pairs(reference, candidate, control, input_factory, oracle, *, devic
                         else:
                             verifier(args, output, expected=expected, prepared=prepared)
                 confirm(observed)
+                confirm_paired_device(device_window, elapsed, output, observed)
                 samples[name] = elapsed
                 del output, consumed, fresh
             if trial >= warmup:
@@ -206,7 +215,7 @@ def validate_for_score(config, pid, sid, variant, baseline):
     from ..runtime.isolation import runtime_issue
 
     results = read_json(config.run_dir / "paired_results.json", {})
-    pairs, bindings = [], []
+    pairs, bindings, device_runs = [], [], []
     for repeat in range(config.final_repeats or 1):
         result = results.get(f"{pid}_{sid}:{repeat}", {})
         if result.get("compiled") is not True or result.get("correctness") is not True:
@@ -250,6 +259,9 @@ def validate_for_score(config, pid, sid, variant, baseline):
                 if (timing_observer(baseline, baseline=True) != timing_observer(result) or origin["status"] != "passed"
                         or metadata.get("evidence_receipt", {}).get("checks", {}).get("kernel_origin") != origin):
                     return "paired_measurement_origin_missing_or_invalid", None
+                from ..analysis.performance import scored_pairs
+
+                device_runs.append(scored_pairs(result))
                 geometry = fingerprint({"signature": metadata["input_signature"]})
                 if any(row["input_signature_sha256"] != geometry for row in metadata["native_call_receipt"]["calls"] if row["phase"] == "paired"):
                     return "paired_measurement_geometry_has_no_single_bound", None
@@ -260,4 +272,4 @@ def validate_for_score(config, pid, sid, variant, baseline):
                          **{key: metadata.get(key) for key in ("device_fingerprint", "input_signature", "precision",
                                                               "reference_sha256", "kernel_sha256")}})
         pairs.extend({**row, "repeat": repeat} for row in record["pairs"])
-    return None, {**paired_summary(pairs), "measurement_bindings": bindings}
+    return None, {**paired_summary(pairs), "measurement_bindings": bindings, "device_runs": device_runs}

@@ -28,6 +28,7 @@ MAX_REPORT_BYTES = 64 * 1024**2
 SCORED_CAPTURE = "kernelbench_pro_scored_capture_v1"
 SCORED_MODE = "synchronized_wall_continuous_cupti_v1"
 BASELINE_SCOPE = "baseline_all_device_activities; no_candidate_origin_claim"
+PAIRED_CAPTURE = "kernelbench_pro_paired_device_windows_v1"
 
 
 def _validate(payload):
@@ -78,7 +79,7 @@ class _Calls:
         self.scored = scored
         self.role = role
         self.rows, self.windows, self.changes = [], {}, []
-        self.timings = []
+        self.timings, self.paired_windows = [], []
         self.open_windows = {}
         self.cursor, self.last_seed = 0, None
 
@@ -184,6 +185,36 @@ def candidate_call(model, args, *, role="candidate", **scope):
             if window is not None:
                 window.update(training_after=row["training_after"], no_grad=row["no_grad"])
         row["model_state_after"] = state.model_state(model, args)
+
+
+@contextmanager
+def paired_device_call(role, trial, seed, order, args):
+    """Observe all three actual paired calls; timestamps surround the native timer."""
+    state = _ACTIVE.get()
+    if state is None or not state.scored or state.capture is None:
+        yield None
+        return
+    from ..evaluation.measurement import input_signature
+
+    if len(state.paired_windows) >= MAX_RECORDS:
+        raise ValueError("Excessive paired device windows")
+    row = {"id": len(state.paired_windows) + 1, "role": role, "trial": trial, "seed": seed, "order": order,
+           "device": 0, "input_signature_sha256": fingerprint({"signature": input_signature(args)}),
+           "output_verified": False, "start_ns": int(state.capture.cupti.get_timestamp()), "end_ns": None}
+    state.paired_windows.append(row)
+    try:
+        yield row
+    finally:
+        row["end_ns"] = int(state.capture.cupti.get_timestamp())
+
+
+def confirm_paired_device(row, elapsed, output, observed):
+    if row is not None:
+        from ..evaluation.determinism import signature
+
+        row.update(wall_ms=elapsed, output_verified=True,
+                   output_content_sha256=observed["output_content_sha256"] if observed is not None else
+                       fingerprint({"value": signature(output, typed=True)}))
 
 
 def snapshot_output(row, output):
@@ -318,6 +349,8 @@ def _run_scored(payload, invoke):
               "status": "collected" if capture is not None else "not_measured", "error": unavailable,
               "binding": document["binding"], "timing_sha256": fingerprint(_scored_timing(result)),
               "raw": capture.raw if capture is not None else None}
+    if payload.get("task") == "paired_timing":
+        origin["paired_capture"] = {"protocol": PAIRED_CAPTURE, "calls": state.paired_windows}
     if payload.get("task") == "baseline":
         origin.update(native_request=request, timing_seed_plan=state.seeds)
     origin["receipt_sha256"] = fingerprint(origin)

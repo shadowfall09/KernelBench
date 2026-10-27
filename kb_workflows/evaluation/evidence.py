@@ -6,11 +6,11 @@ LEVELS = {
     "current": ("correctness",),
     "L0": ("correctness", "precision_contract", "reference_signal", "input_families",
            "input_sensitivity", "environment_integrity", "mode_state"),
-    "L1": ("paired_timing", "noise_floor", "kernel_origin", "device_calibration", "bound_certificate"),
+    "L1": ("paired_timing", "noise_floor", "kernel_origin", "device_calibration", "bound_certificate", "launch_attribution"),
     "L2": ("hardware_counters", "memory_safety", "repeat_consistency", "algorithm_certificate"),
 }
 STATES = {"passed", "failed", "not_measured", "not_applicable"}
-MEASUREMENT_CHECKS = {"paired_timing", "noise_floor", "device_calibration", "bound_certificate"}
+MEASUREMENT_CHECKS = {"paired_timing", "noise_floor", "device_calibration", "bound_certificate", "launch_attribution"}
 
 
 def check(status, *, reason, values=None):
@@ -121,6 +121,16 @@ def measurement_checks(config, pid, sid, baseline, *, variant=None, paired=None)
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         missing = "bound_certificate" if checks["device_calibration"]["status"] == "passed" else "device_calibration"
         checks[missing] = check("not_measured", reason=str(exc)[:500] or "Measurement evidence is invalid")
+    if checks["device_calibration"]["status"] == "passed":
+        from ..analysis.performance import paired_attribution
+
+        try:
+            attribution = paired_attribution(paired, calibration)
+            status = "failed" if attribution["launch_only"] else (
+                "not_measured" if attribution["mixed_repeat_classification"] else "passed")
+            checks["launch_attribution"] = check(status, reason="Actual paired device activity and calibrated launch-cost classification", values=attribution)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError) as exc:
+            checks["launch_attribution"] = check("not_measured", reason=str(exc)[:500] or "Launch attribution is invalid")
     return checks
 
 
