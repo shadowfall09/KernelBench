@@ -1018,7 +1018,7 @@ def native_origin_runner(tmp_path, monkeypatch):
     def scored(request):
         payload = origin_task.native_request(request)
         payload.pop("_origin_timing_seeds", None)
-        payload["eval_config"]["evidence_level"] = "L1"
+        payload["eval_config"].setdefault("evidence_level", "L1")
         payload["build_root"] = str(tmp_path / "scored-build")
         return origin_task.native_policy(invoke)(payload)
 

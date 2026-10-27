@@ -1568,9 +1568,12 @@
         "tests/hardware/test_neuron_processing.py",
         "kb_workflows/provenance/origin_task.py",
         "tests/provenance/test_kernel_origin.py",
-        "docs/KERNEL_ORIGIN.md"
+        "docs/KERNEL_ORIGIN.md",
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/evaluation/tool_runner.py",
+        "kb_workflows/common.py"
       ],
-      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key关联当前NEFF缓存快照，未证明实际加载身份。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、完整正式L2门。模拟资料不授予资格，未运行设备或工具实验"
+      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。CUDA L2软件已按标准/隐藏/冻结/配对重放计数器与逐内核资源模型、原始独占驱动观察及安全/重复收据，旧分数随工件变化失效；独立诊断不单独授予等级。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key关联当前NEFF缓存快照，未证明实际加载身份。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、冻结regrade的L2采集接线及跨平台完整归因。模拟资料不授予资格，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -1758,9 +1761,11 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/evaluation/evidence.py"
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/evaluation/tool_runner.py",
+        "tests/provenance/test_work_counters.py"
       ],
-      "reason": "实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级"
+      "reason": "current/L0/L1/L2按逐项原始证据判断，缺工具保持未知。CUDA L2组装重放各阶段计数、审核模型、独占观察及四工具/重复收据；不接受仅改passed标记。等级与OS隔离认证分开，未支持设备或模型不升级"
     },
     {
       "id": "V9-07",
@@ -5391,9 +5396,13 @@
         "scripts/analyze_device_trace.py",
         "tests/provenance/test_kernel_origin.py",
         "tests/provenance/test_work_counters.py",
-        "docs/WORK_COUNTERS.md"
+        "docs/WORK_COUNTERS.md",
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/evaluation/tool_runner.py",
+        "kb_workflows/common.py",
+        "scripts/audit_kernel_origin.py"
       ],
-      "reason": "实际计分与来源重放按二进制/入口/grid/block/shared多重集合、完整输入/状态/输出/物理设备关联，以实际busy/原始wall计算A/E/O。ncu同次CSV原始launch配置与自身version-7报告ELF cubin按进程/context/stream/符号/维度及完整数量核对；不同binary的同配置组、缺失/截断/压缩或未支持格式保留未知。逐调用二进制身份与实际计分再次核对，原始报告字节/哈希可离线重放；不猜内部ID，不增加CUPTI订阅、依赖、运行文件或测试函数。复制/清零/P2P保留逻辑字节与方向，不冒充DRAM或执行SOL。非kernel传输校准、Neuron原生时间关联与正式L2组装仍未完成；未运行设备/工具/模型实验"
+      "reason": "实际计分与同次ncu二进制/launch配置按完整输入/状态/输出、设备和数量关联；逐内核身份组计算资源需求、SOL、busy并集与E，不猜重复launch逐次对应。标准/隐藏/冻结/配对各用实际调用收据归档；CUDA L2评分及旧缓存重放所有必需工件、审核证书、worker/对照/ncu/基线的独占观察及四工具/重复收据。驱动XML要求直接worker归属，排除MPS/图形/其他进程，不修改模式或宣称OS隔离。未知不补零，非kernel校准与Neuron来源/计时仍待补；复用原模块和集中测试，无设备/工具/模型实验"
     },
     {
       "id": "V61-02",

@@ -402,6 +402,6 @@
 
 ## 维护与验证
 
-清单按动机维护，详细理由集中到motivation映射。CUDA worker进程活动实测值与保守配额扣额分开，范围见[资源预算](RESOURCE_BUDGETS.md#cuda进程活动计量与软件配额)。A/E/O使用实际计分时间；ncu同次报告的cubin与原始launch配置可核对实际计分身份，缺失或含糊仍保留未知，正式L2组装尚未完成，见[计数器关联](WORK_COUNTERS.md#关联实际计分时间)。
+清单按动机维护，详细理由集中到motivation映射。CUDA worker活动实测与保守扣额分开，范围见[资源预算](RESOURCE_BUDGETS.md#cuda进程活动计量与软件配额)。A/E/O使用实际计分时间；CUDA L2组装重放各阶段计数器、逐内核组模型、独占观察与安全/重复收据，缺失或含糊保持未知。支持范围及Neuron/传输缺项见[计数器与评分](WORK_COUNTERS.md#cuda-l2评分组装)。
 
 清单、motivation映射和实现证据由`python -m scripts.check_motivations`核对，所有历史功能ID继续保留。软件回归和离线打包验证不替代真实设备、隔离、安全或模型效果实验。

@@ -5,16 +5,105 @@ from __future__ import annotations
 import copy
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
+from xml.etree import ElementTree
 
 from ..common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, read_json
 from .tool_checks import ERROR_EXIT, MAX_LOG_BYTES, PROTOCOL, child_payload, coverage, derive, finish, select_tools
+
+
+@contextmanager
+def exclusive_compute(settings, *, gpu_uuid=None, run=None, binary=None):
+    """Observe existing driver policy; never change modes or reserve hardware."""
+    if settings.get("evidence_level") != "L2":
+        yield None
+        return
+    execute = run or subprocess.run
+    record = {"protocol": "kernelbench_pro_exclusive_compute_v1", "pid": os.getpid(),
+              "simulated": run is not None or binary is not None or gpu_uuid is not None,
+              "uuid": gpu_uuid, "before_xml": None, "after_xml": None, "error": None, "tool_unchanged": False}
+    try:
+        if gpu_uuid is None:
+            import torch
+
+            record["uuid"] = str(torch.cuda.get_device_properties(0).uuid)
+        path = Path(binary or shutil.which("nvidia-smi") or "").resolve()
+        if not record["uuid"] or not path.is_file():
+            raise ValueError("Driver tool or physical UUID is unavailable")
+        record["tool"] = {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+        def snapshot():
+            with tempfile.TemporaryFile() as log:
+                result = execute([str(path), "-q", "-x", "-i", record["uuid"]], stdout=log,
+                                 stderr=subprocess.STDOUT, timeout=3, check=False)
+                if result.returncode != 0 or log.tell() > 1024**2:
+                    raise ValueError("Driver inventory failed or exceeded its envelope")
+                log.seek(0)
+                return log.read(1024**2 + 1).decode("utf-8")
+        record["before_xml"] = snapshot()
+    except (OSError, ValueError, RuntimeError, ImportError, AttributeError, TypeError, subprocess.TimeoutExpired) as exc:
+        record["error"] = str(exc)[:300]
+        path = None
+    try:
+        yield record
+    finally:
+        if path is not None:
+            try:
+                record["after_xml"] = snapshot()
+                record["tool_unchanged"] = hashlib.sha256(path.read_bytes()).hexdigest() == record["tool"]["sha256"]
+            except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                record["error"] = str(exc)[:300]
+        record["receipt_sha256"] = fingerprint(record)
+
+
+def exclusive_verdict(result, *, baseline=False, native=False, allow_simulated=False):
+    """Replay driver XML, including MPS/graphics rejection, rather than a label."""
+    from .evidence import check
+
+    try:
+        metadata = result["native_result"]["metadata"] if native else result if baseline else result["metadata"]
+        origin = metadata.get("origin_capture", {})
+        holder = result if native else origin if baseline else metadata["native_call_receipt"]
+        record = holder["exclusive_compute"]
+        if (record.get("protocol") != "kernelbench_pro_exclusive_compute_v1" or record.get("error") is not None
+                or record.get("tool_unchanged") is not True or type(record.get("pid")) is not int or record["pid"] <= 0
+                or not baseline and record["pid"] != holder.get("pid")
+                or record.get("uuid") != metadata["device_fingerprint"].get("uuid")
+                or record.get("simulated") is not False and not allow_simulated
+                or not re.fullmatch(r"[0-9a-f]{64}", record.get("tool", {}).get("sha256", ""))
+                or record.get("receipt_sha256") != fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
+                or not native and origin.get("exclusive_compute_sha256") != fingerprint(record)):
+            raise ValueError("Exclusive compute observations are missing, simulated or changed")
+        for side in ("before", "after"):
+            text = record.get(side + "_xml")
+            if not isinstance(text, str) or len(text.encode()) > 1024**2:
+                raise ValueError("Missing or excessive driver inventory")
+            root = ElementTree.fromstring(text)
+            gpus = root.findall("gpu")
+            if (len(gpus) != 1 or gpus[0].findtext("uuid") != record["uuid"]
+                    or root.findtext("driver_version") != metadata["device_fingerprint"].get("driver_version")
+                    or gpus[0].findtext("compute_mode") != "Exclusive_Process"
+                    or gpus[0].findtext("display_active") != "Disabled"
+                    or gpus[0].findtext("mig_mode/current_mig") not in {"Disabled", "N/A"}
+                    or gpus[0].find("processes") is None):
+                raise ValueError("Driver has not established supported headless exclusive-process compute")
+            processes = gpus[0].findall("processes/process_info")
+            if (side == "after" and not processes or any(row.findtext("pid") != str(record["pid"])
+                    or row.findtext("type") != "C" or "mps" in row.findtext("process_name", "").lower() for row in processes)):
+                raise ValueError("Driver lists another, graphics or MPS process, or lost the scored worker")
+        return check("passed", reason="Driver exclusive-process mode, headless UUID and direct worker ownership observed before/after native execution",
+                     values={"receipt_sha256": record["receipt_sha256"], "scope": "CUDA_compute_exclusivity; pre_post_graphics_inventory; not_OS_isolation",
+                             "uuid": record["uuid"], "pid": record["pid"], "simulated": record["simulated"]})
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, ElementTree.ParseError) as exc:
+        return check("not_measured", reason=str(exc)[:500] or "Exclusive compute evidence is incomplete")
 
 
 def process(command, timeout, log, *, environment=None):

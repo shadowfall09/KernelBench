@@ -29,6 +29,94 @@ from .work_counters import (
 CONFIGURATION = "config_file_off; kernel_replay; profiler_API_native_calls; nvtx_rename; launch_metrics; base_units; all_children; cache_none; clocks_none; kernel_names_off"
 PROTOCOL = "kernelbench_pro_native_work_counters_v2"
 MODEL = "kernelbench_pro_native_execution_models_v1"
+SCORE_CHECKS = {"hardware_counters", "algorithm_certificate", "exclusive_device"}
+
+
+def artifact_path(run_dir, result):
+    """One archive per actual call receipt, including hidden/frozen repeats."""
+    checksum = result.get("metadata", {}).get("native_call_receipt", {}).get("receipt_sha256", "")
+    if not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum):
+        raise ValueError("Counter artifacts require an actual scored native-call receipt")
+    return Path(run_dir) / "counter_artifacts" / (checksum + ".json")
+
+
+def score_checks(config, pid, sid, *, allow_simulated=False):
+    """Replay the slot's standard, hidden, frozen and paired counter archives."""
+    from ..analysis.performance import scored_timeline
+    from ..common import ROOT, select_problems
+    from ..evaluation.evidence import check
+    from ..evaluation.tool_runner import exclusive_verdict
+
+    try:
+        calibration = read_json(Path(config.device_calibration)) if config.device_calibration else {}
+        specification = read_json(Path(config.problem_specs)) if config.problem_specs else {}
+        specification = specification.get(f"level{config.level}", {}).get(str(pid), {})
+        certificates = specification.get("counter_certificates", specification.get("headroom_certificate", {}))
+        key, records = f"{pid}_{sid}", []
+        for hidden in (False, True) if config.hidden_tests else (False,):
+            path = config.run_dir / ("eval_results_hidden.json" if hidden else "eval_results.json")
+            records.append((read_json(path, {}).get(key, {}), "evaluate", hidden))
+        if config.final_repeats:
+            final = read_json(config.run_dir / "final_results.json", {})
+            for repeat in range(config.final_repeats):
+                for hidden in (False, True) if config.hidden_tests else (False,):
+                    records.append((final.get(f"{key}:{repeat}:{'hidden' if hidden else 'standard'}", {}), "evaluate", hidden))
+        if config.paired_timing:
+            paired = read_json(config.run_dir / "paired_results.json", {})
+            records.extend((paired.get(f"{key}:{repeat}", {}), "paired_timing", False)
+                           for repeat in range(config.final_repeats or 1))
+        files, results, models, exclusive, variants = {}, [], [], [], set()
+        simulated = False
+        for result, task, hidden in records:
+            request, _ = origin_task.validate_scored(result, allow_simulated=allow_simulated)
+            if (request.get("level") != config.level or request.get("problem_id") != pid
+                    or request.get("sample_id", 0) != sid or request.get("task", "evaluate") != task
+                    or bool(request["eval_config"].get("use_hidden_tests")) != hidden
+                    or request["eval_config"].get("evidence_level") != "L2"):
+                raise ValueError("Counter evidence is bound to another slot, phase or level")
+            path = artifact_path(config.run_dir, result)
+            if path.is_symlink() or not path.is_file() or path.stat().st_size > 256 * 1024**2:
+                raise ValueError("Missing, linked or excessive scored counter archive")
+            archive = read_json(path)
+            model = scored_timeline(archive, result, calibration, certificates, allow_simulated=allow_simulated)
+            if (not model["counter_process_workload_identity_observed"]
+                    or not all(row["model_consistent"] and row["kernel_groups"]
+                               and all(group["model_consistent"] for group in row["kernel_groups"]) for row in model["calls"])):
+                raise ValueError("Counters lack actual binary identity or consistent complete work models")
+            simulated |= model["simulated"]
+            files[str(path.relative_to(config.run_dir))] = fingerprint(archive)
+            results.append(fingerprint(result))
+            models.append(model["receipt_sha256"])
+            exclusive.append(exclusive_verdict(result, allow_simulated=allow_simulated))
+            exclusive.extend(exclusive_verdict(document, native=True, allow_simulated=allow_simulated)
+                             for document in [archive["native_run"], *archive["origin"]["native_runs"].values()])
+            if task == "paired_timing":
+                variants.add(request["eval_config"].get("paired_baseline_variant"))
+        if config.paired_timing:
+            reference = select_problems(config.level, problem_ids=[pid])[pid]
+            baseline = read_json(ROOT / "results/timing" / config.hardware / f"{config.baseline}.json", {})
+            baseline = baseline.get(f"level{config.level}", {}).get(reference.name, {})
+            for variant in variants:
+                selected = baseline.get("variants", {}).get(variant, baseline)
+                try:
+                    origin_task.timing_observer(selected, baseline=True, allow_simulated=allow_simulated)
+                    exclusive.append(exclusive_verdict(selected, baseline=True, allow_simulated=allow_simulated))
+                except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+                    exclusive.append(check("not_measured", reason=str(exc)[:500] or "Baseline exclusive compute evidence is missing"))
+        if simulated and not allow_simulated:
+            raise ValueError("Simulated counters cannot qualify measured hardware evidence")
+        values = {"run_dir": str(config.run_dir.resolve()), "problem_id": pid, "sample_id": sid,
+                  "actual_result_sha256": results, "counter_files": files, "decomposition_sha256": models,
+                  "calibration_sha256": fingerprint(calibration), "certificates_sha256": fingerprint({"certificates": certificates}),
+                  "simulated": simulated}
+        checks = {name: check("passed", reason="Every required scored phase replays its original counter bytes, binary identity and reviewed work model",
+                              values=values) for name in SCORE_CHECKS - {"exclusive_device"}}
+        checks["exclusive_device"] = check("passed" if exclusive and all(item["status"] == "passed" for item in exclusive) else "not_measured",
+            reason="Native phases and selected paired baselines require direct headless CUDA exclusive-process observations",
+            values={**values, "observations": exclusive})
+        return checks
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError) as exc:
+        return {name: check("not_measured", reason=str(exc)[:500] or "Counter score evidence is incomplete") for name in SCORE_CHECKS}
 
 
 class Profiler:
@@ -132,11 +220,18 @@ def _observations(value, *, allow_simulated=False):
         actions = markers[window["marker"]]
         if activity["id"] != row["id"] or not actions or len(actions) != activity["kernel_count"]:
             raise ValueError("Native counter launches omit or change source-capture call coverage")
+        groups = {}
+        for action in (actions if binaries else []):
+            identity = {key: binaries[action["identity"]["ID"]][key] for key in ("binary_sha256", "symbol", "configuration")}
+            groups.setdefault(fingerprint(identity), {"kernel_identity": identity, "actions": []})["actions"].append(action)
         observations.append({"id": row["id"], "native_call_sha256": fingerprint(row),
                              "action_ids": [action["identity"]["ID"] for action in actions],
                              "launch_identities": [action["launch_identity"] for action in actions],
                              "kernel_identities": [binaries[action["identity"]["ID"]] for action in actions] if binaries else None,
                              "binary_identity_issue": binary_issue,
+                             "kernel_groups": [{"kernel_identity": group["kernel_identity"],
+                                                "action_ids": [action["identity"]["ID"] for action in group["actions"]],
+                                                "work": work_totals(group["actions"], value["recipe"])} for group in groups.values()],
                              "profile_memory_activity": activity["memory_activity"],
                              "work": work_totals(actions, value["recipe"]),
                              "non_kernel_activity_count": activity["activity_count"] - activity["kernel_count"]})
@@ -166,6 +261,8 @@ def validate(value, *, allow_simulated=False):
 
 
 def execution_models(value, calibration, *, allow_simulated=False):
+    from ..analysis.headroom import sol
+
     validate(value, allow_simulated=allow_simulated)
     payload = value["origin"]["native_request"]
     if value["recipe"]["review"].get("native_contract_sha256") != native_contract(payload):
@@ -187,7 +284,16 @@ def execution_models(value, calibration, *, allow_simulated=False):
                    "input_signature_sha256": row["input_signature_sha256"], "policy_sha256": fingerprint(policy)}
         latency, components = execution_values(binding, value["recipe"], observed["work"], calibration,
                                                digest=settings["evaluator_sha256"])
-        models.append({"id": row["id"], "native_call_sha256": fingerprint(row), "sol_execution_ms": latency, "components_ms": components})
+        groups = []
+        for group in observed["kernel_groups"]:
+            if any(group["work"].values()):
+                # Whole-call validation already checked review, units and rates.
+                demand, resources = sol({key: quantity for key, quantity in group["work"].items() if quantity > 0}, calibration)
+            else:
+                demand, resources = None, {}
+            groups.append({**group, "sol_execution_ms": demand, "components_ms": resources})
+        models.append({"id": row["id"], "native_call_sha256": fingerprint(row), "sol_execution_ms": latency,
+                       "components_ms": components, "kernel_groups": groups})
     result = {"protocol": MODEL, "counter_receipt_sha256": value["receipt_sha256"], "calibration": calibration, "calls": models,
               "simulated": value["simulated"], "hardware_counters_collected": not value["simulated"],
               "interpretation": "reviewed_per_native_call_demands_over_attained_rates; not_a_physical_lower_bound"}
@@ -201,6 +307,7 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
     Original symbols/configurations and optional cubin bytes come from the same
     ncu collection. Missing binary evidence stays unknown; memory work is separate.
     """
+    from ..analysis.performance import interval_union
     from .kernel_origin import workload_identity
 
     validate(value, allow_simulated=allow_simulated)
@@ -231,11 +338,22 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
                                for row in counted["kernel_identities"]]
             if sorted(map(fingerprint, expected)) != sorted(map(fingerprint, counted_kernels)):
                 raise ValueError("Counter-process cubin binary differs from actual scored work")
+        kernel_groups = []
+        for group in model["kernel_groups"]:
+            activities = [row for row in measured["activities"] if row["kernel_identity"] == group["kernel_identity"]]
+            if len(activities) != len(group["action_ids"]):
+                raise ValueError("Counter kernel group differs from actual launch multiplicity")
+            duration = interval_union([(row["start_ns"], row["end_ns"]) for row in activities]) / 1e6
+            demand = group["sol_execution_ms"]
+            kernel_groups.append({**group, "launch_count": len(activities), "scored_device_busy_ms": duration,
+                "E": duration / demand if demand else None, "model_consistent": demand is not None and demand <= duration,
+                "scope": "binary_symbol_configuration_group; interval_union; no_individual_launch_matching"})
         busy = measured["device_busy_ns"] / 1e6
         wall = timings.get(call["id"], {}).get("wall_ms")
         if not busy or wall is not None and busy > wall * (1 + 1e-6):
             raise ValueError("Actual scored activity is missing or exceeds its own measured timer")
         joined.append({**model, "phase": call["phase"], "seed": call["seed"], "workload": identity,
+                       "kernel_groups": kernel_groups,
                        "scored_device_busy_ms": busy, "scored_wall_ms": wall,
                        "O": wall / busy if wall is not None else None})
     simulated = bool(value["simulated"] or value["origin"]["native_coverage"]["simulated"]
@@ -266,8 +384,8 @@ def audit(payload, *, run=None, binary=None):
         directory = Path(temporary)
         try:
             settings = payload["eval_config"]
-            if settings.get("use_hidden_tests") or settings.get("device_backend", "cuda") != "cuda":
-                raise ValueError("Native Nsight counters require public CUDA evaluation or paired timing")
+            if settings.get("device_backend", "cuda") != "cuda":
+                raise ValueError("Native Nsight counters require CUDA evaluation or public paired timing")
             metrics = recipe(payload["_native_counter"]["recipe"])
             runner = run or process
             deadline = time.monotonic() + settings["timeout"]

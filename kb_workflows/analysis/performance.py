@@ -256,7 +256,7 @@ def scored_timeline(counter_report, result, calibration, bound, *, allow_simulat
     output = {**joined, "protocol": "kernelbench_pro_scored_decomposition_v1", "calls": calls,
               "bound_sha256": fingerprint({"certificates": bound}),
               "timing_source": "actual_scored_native_wall_and_continuous_CUPTI; no_profile_clock_substitution"}
-    if not all(row["model_consistent"] for row in calls):
+    if not all(row["model_consistent"] and all(group["model_consistent"] for group in row["kernel_groups"]) for row in calls):
         output["status"] = "simulated_model_inconsistent" if joined["simulated"] else "model_inconsistent"
     output.pop("receipt_sha256")
     output["receipt_sha256"] = fingerprint(output)

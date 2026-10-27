@@ -10,15 +10,15 @@ from pathlib import Path
 from kb_workflows.common import atomic_json, fingerprint, read_json
 from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks
-from kb_workflows.provenance.counter_task import MODEL, execution_models, native_contract
+from kb_workflows.provenance.counter_task import MODEL, artifact_path, execution_models, native_contract
 from kb_workflows.provenance.origin_task import read_scored
 from kb_workflows.provenance.work_counters import recipe
 from scripts.audit_kernel_origin import prepare as prepare_origin
 
 
-def prepare(config, pid, sid, policy, *, target="candidate", task="evaluate", variant=None, scored_result=None):
+def prepare(config, pid, sid, policy, *, target="candidate", task="evaluate", hidden=False, variant=None, scored_result=None):
     metrics = recipe(policy)
-    payload = prepare_origin(config, pid, sid, task=task, variant=variant, role=target,
+    payload = prepare_origin(config, pid, sid, task=task, hidden=hidden, variant=variant, role=target,
                              scored_result=scored_result)
     payload.update(task="counter_audit", _native_counter={"recipe": policy})
     payload["request_id"] = "kb-" + fingerprint(payload)
@@ -33,17 +33,23 @@ def main(argv=None):
     parser.add_argument("--sample", default=0, type=int)
     parser.add_argument("--target", choices=("candidate", "reference"), default="candidate")
     parser.add_argument("--task", choices=("evaluate", "paired_timing"), default="evaluate")
+    parser.add_argument("--hidden", action="store_true", help="Trusted final hidden phase; never development feedback")
     parser.add_argument("--baseline-variant", help="Required for paired timing; the actual source-bound baseline")
     parser.add_argument("--scored-result", type=Path, help="Existing L1/L2 native result/map; bind counters to its actual call plan")
     parser.add_argument("--calibration", type=Path)
-    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--output", type=Path, help="Defaults to the scored receipt's canonical archive when --scored-result is supplied")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     try:
         config = parse_config(["--config", str(args.config), "--stage", "evaluate", "--generation", "local"])
+        scored = read_scored(args.scored_result, args.problem, args.sample, args.task)
         payload, metrics = prepare(config, args.problem, args.sample, read_json(args.recipe), target=args.target,
-                                   task=args.task, variant=args.baseline_variant,
-                                   scored_result=read_scored(args.scored_result, args.problem, args.sample, args.task))
+                                   task=args.task, hidden=args.hidden, variant=args.baseline_variant, scored_result=scored)
+        canonical = artifact_path(config.run_dir, scored) if scored is not None else None
+        if args.output is None:
+            if canonical is None:
+                raise ValueError("--output is required without an actual --scored-result")
+            args.output = canonical
         if args.output.exists() or args.output.is_symlink():
             raise ValueError("Counter output must be a new path")
         preview = {"task": "counter_audit", "metrics": metrics, "target": args.target, "native_task": args.task,
@@ -51,6 +57,7 @@ def main(argv=None):
                    "request_sha256": fingerprint(payload), "backend": config.evaluation,
                    "calibration_sha256": fingerprint(read_json(args.calibration)) if args.calibration else None,
                    "output": str(args.output.resolve()), "experiments_started": False, "scored_wall_times_replaced": False}
+        preview.update(hidden=args.hidden, formal_archive_path=str(canonical.resolve()) if canonical else None)
         preview["actual_scored_calls_requested"] = args.scored_result is not None
         if not args.execute:
             print(json.dumps(preview, indent=2))

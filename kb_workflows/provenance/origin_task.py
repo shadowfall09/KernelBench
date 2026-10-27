@@ -268,7 +268,7 @@ def _document(payload, result, state, stage):
                "evaluator_sha256": payload["eval_config"].get("evaluator_sha256"),
                "device_fingerprint": result.get("metadata", {}).get("device_fingerprint", result.get("device_fingerprint")),
                "scope": BASELINE_SCOPE if payload.get("task") == "baseline" else NATIVE_SCOPE}
-    return {"protocol": NATIVE_PROTOCOL, "stage": stage, "binding": binding,
+    return {"protocol": NATIVE_PROTOCOL, "stage": stage, "binding": binding, "pid": os.getpid(),
             "native_result": result, "calls": state.rows, "seeds_consumed": state.cursor,
             "native_timings": [{"id": row["id"], "native_call_sha256": fingerprint(row), "wall_ms": elapsed}
                                for row, elapsed in state.timings],
@@ -315,6 +315,8 @@ def _source_guards(state, capture):
 
 
 def _run_scored(payload, invoke):
+    from ..evaluation.tool_runner import exclusive_compute
+
     if _ACTIVE.get() is not None or "_origin_timing_seeds" in payload:
         raise ValueError("Scored calls cannot inherit a diagnostic observer or predeclared timing seed plan")
     request = native_request(payload)
@@ -335,7 +337,7 @@ def _run_scored(payload, invoke):
         state = _Calls(capture, [], scored=True, registry=capture.registry if capture else None)
         token = _ACTIVE.set(state)
         try:
-            with _source_guards(state, capture), record_sources(state.registry):
+            with _source_guards(state, capture), record_sources(state.registry), exclusive_compute(payload["eval_config"]) as exclusive:
                 result = invoke()
         finally:
             _ACTIVE.reset(token)
@@ -343,16 +345,18 @@ def _run_scored(payload, invoke):
     if not state.registry.intact():
         state.changes.append("registered_source")
     document = _document(frozen, result, state, "scored")
+    document["exclusive_compute"] = exclusive
     if capture is not None:
         _finish_capture(capture, catalog, document, payload)
     origin = {"protocol": SCORED_CAPTURE, "mode": SCORED_MODE,
               "status": "collected" if capture is not None else "not_measured", "error": unavailable,
               "binding": document["binding"], "timing_sha256": fingerprint(_scored_timing(result)),
+              "exclusive_compute_sha256": fingerprint(exclusive) if exclusive is not None else None,
               "raw": capture.raw if capture is not None else None}
     if payload.get("task") == "paired_timing":
         origin["paired_capture"] = {"protocol": PAIRED_CAPTURE, "calls": state.paired_windows}
     if payload.get("task") == "baseline":
-        origin.update(native_request=request, timing_seed_plan=state.seeds)
+        origin.update(native_request=request, timing_seed_plan=state.seeds, exclusive_compute=exclusive)
     origin["receipt_sha256"] = fingerprint(origin)
     result.setdefault("metadata", {})["origin_capture"] = origin
     if payload.get("task") == "baseline":
@@ -396,6 +400,8 @@ def _finish_capture(capture, catalog, document, payload):
 
 
 def _run_native(payload, invoke, *, observer=None):
+    from ..evaluation.tool_runner import exclusive_compute
+
     _, seeds, _ = _validate(payload)
     from .cuda_origin import Capture
     from .origin_binaries import Catalog
@@ -407,7 +413,8 @@ def _run_native(payload, invoke, *, observer=None):
     state = _Calls(observer or capture, seeds, role, registry=capture.registry if capture else None)
     token = _ACTIVE.set(state)
     try:
-        with _source_guards(state, capture), tempfile.TemporaryDirectory(prefix="kb-origin-control-cache-") as cache:
+        with (_source_guards(state, capture), tempfile.TemporaryDirectory(prefix="kb-origin-control-cache-") as cache,
+              exclusive_compute(payload["eval_config"]) as exclusive):
             previous = os.environ.get("TRITON_CACHE_DIR")
             try:
                 if not capture:
@@ -429,6 +436,7 @@ def _run_native(payload, invoke, *, observer=None):
     if not state.registry.intact():
         state.changes.append("registered_source")
     document = _document(payload, result, state, payload["_origin_stage"])
+    document["exclusive_compute"] = exclusive
     if observer is not None:
         document["counter_windows"] = observer.windows
         document["pid"] = observer.pid

@@ -40,6 +40,15 @@ def prepare(config, problem, sample, *, minimum_custom_fraction=None, task="eval
             or not 0 < minimum_custom_fraction <= 1):
         raise ValueError("Minimum custom fraction must be in (0, 1]")
     payload = task_payload(config, problem, sample, task=task, hidden=hidden)
+    if scored_result is not None:
+        frozen = scored_result.get("metadata", {}).get("native_call_receipt", {}).get("native_request", {}).get("eval_config", {})
+        if "final_protocol" in frozen:
+            from kb_workflows.evaluation.final_verification import PROTOCOL, payload_for
+
+            repeat = frozen.get("final_repeat")
+            if frozen["final_protocol"] != PROTOCOL or type(repeat) is not int or not 0 <= repeat < config.final_repeats:
+                raise ValueError("Scored final result has an invalid frozen repeat")
+            payload = payload_for(config, problem, sample, repeat, hidden=hidden, task=task, variant=variant)
     if task == "paired_timing":
         from kb_workflows.evaluation.baseline_rewrites import plan_for
 

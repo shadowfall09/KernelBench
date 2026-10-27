@@ -22,7 +22,7 @@ ncu禁用用户配置和额外kernel重命名，显式关闭cache flush与时钟
 
 原生对照、来源采集和ncu三阶段必须具有相同的完整调用序列：完整逻辑输入/输出字节、布局、模式、seed、顺序、当前源码、精度和设备绑定逐项核对，所有输出仍过原来的数值检查。原生计时样本和窗口由[来源重放](KERNEL_ORIGIN.md)再次检查。显存前向新增独立memory调用，输出、原始/调整峰值与验证副本增量均须匹配各自原生收据；其他独立诊断仍不在此序列内；跨进程可观察一致不证明未插桩路径或任意参数状态等价。
 
-来源与计数器CLI共用`--scored-result FILE`读取既有L1/L2原生结果，按实际计时进程生成的seed及完整调用观察关联三阶段，不能用另抽的一组seed代表原进程。候选公共/配对请求支持该关联；参考角色不能借用候选收据。离线时间表单列`native_scored_wall_ms`，仍用CUPTI同一时钟计算O，不将实际时间与另一个进程的busy相除。默认预览只核对已有工件，关联本身不提供路径等价、真实硬件计数或正式来源资格。
+来源与计数器CLI共用`--scored-result FILE`读取既有L1/L2原生结果，按实际计时进程生成的seed及完整调用观察关联三阶段，不能用另抽的一组seed代表原进程。候选标准、显式`--hidden`最终隐藏阶段及公开配对请求支持该关联；参考角色不能借用候选收据。冻结结果按当前`final_manifest.json`重建对应repeat，复查nonce、seed及冻结源码。离线时间表单列`native_scored_wall_ms`，仍用CUPTI同一时钟计算O，不将实际时间与另一个进程的busy相除。默认预览只核对已有工件，不执行任何实验。
 
 嵌入的原生收据现为v2，实际/对照/来源/ncu按调用核对模型前后数据、入口和输入/状态别名摘要。状态更新可以合法发生，但不能把不同参数或入口下测到的工作量借给实际调用；未知状态不能补成空状态。取摘要不进入原生计时或CUPTI/NVTX窗口，也不把这组观察当作host控制流等价证明。
 
@@ -104,6 +104,26 @@ python -m scripts.analyze_device_trace native /path/to/counters.json \
 
 二进制报告与CSV必须具有相同的进程、context/stream、原始符号、grid/block组及完整launch数量。一个组若出现不同cubin就保留未知，不猜CSV action ID与供应商内部KernelID的关系。逐调用`kernel_identities`保存已关联cubin哈希、字节数和CSV共享内存配置，再与实际计分二进制/入口/完整配置多重集合比较；即使重封全部汇总，替换cubin仍会失配。缺少、过大、截断、未解析引用、压缩或其他未支持格式保留`binary_identity_issue`与空身份，仍可读取工作计数，不能借另一进程补二进制。
 
-成功关联记录`counter_process_launch_identity_observed=true`；仅当全部调用的二进制也核对一致时，`counter_process_binary_identity_observed`及`counter_process_workload_identity_observed`才为true。模拟收据保留模拟标记。`formal_qualification_implemented=false`继续保留：这批没有完成非kernel传输需求/校准、Neuron来源与原生时间关联及正式L2组装门，不能由二进制关联自动授予L2资格。
+成功关联记录`counter_process_launch_identity_observed=true`；仅当全部调用的二进制也核对一致时，`counter_process_binary_identity_observed`及`counter_process_workload_identity_observed`才为true。模拟收据保留模拟标记。独立计数报告仍为诊断，保留`formal_qualification_implemented=false`；正式等级由下一节的完整评分组装决定，不能仅凭二进制关联授予L2。
 
 采集没有增加CUPTI订阅或独立采集进程。当前固定的CUPTI Python 13.3将`allow_multiple_subscribers`固定为0，见[绑定限制](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html#cupti.cupti._SubscriberParams.allow_multiple_subscribers)；这里使用ncu自身报告的字节证据，不叠加Python采集器。软件回归另用SDK `.proto`字段定义和官方protobuf实现核对生成的报告消息；没有执行ncu或设备实验。
+
+## CUDA L2评分组装
+
+L2复用已有配置：`evidence_level="L2"`、`paired_timing=true`、`sanitizer_tools="all"`、`determinism_checks=true`，并提供当前`device_calibration`及`problem_specs`。规格中的`counter_certificates`接受覆盖全部实际几何的审核证书列表；省略时使用原`headroom_certificate`。缺少任一几何、完整需求审核或同设备校准都保留未知，不能补成零成本。
+
+每个标准、隐藏、冻结repeat及配对原始结果分别提供对应计数工件。将一个原始结果传给CLI，可省略`--output`：
+
+```bash
+python -m scripts.audit_work_counters --config /path/to/device.toml \
+  --recipe /path/to/reviewed-recipe.json --problem 2 \
+  --scored-result /path/to/one-raw-result.json
+```
+
+默认仍为预览。预览显示的规范路径是`RUN/counter_artifacts/<native-call-receipt-SHA>.json`；显式执行才写入。隐藏结果加`--hidden`，配对结果加`--task paired_timing --baseline-variant 实际变体`。冻结结果须从最终结果map选择单个原始结果，不能改写其收据。自选`--output`仍可用于诊断；正式组装读取规范路径，已有工件不会覆写。携带`regrade_manifest`的运行仍被来源采集CLI拒绝，冻结regrade的L2采集接线待补，不能用普通任务替代其冻结请求。
+
+评分在现有`measurement_checks()`中重放该slot所有必需阶段，而不是只读一个passed标记。每份工件最多256 MiB，并继续受内部CSV/二进制报告各64 MiB的包络约束。按二进制/符号/完整配置分组，报告原始action IDs、资源工作量、校准SOL、实际计分busy并集及效率E；相同身份的重复launch保留数量，不猜逐次对应关系。不同组可以重叠，不能把各组busy直接相加成整次时间。没有正需求的组保留未知，任何组模型不一致都不能取得完整计数资格。
+
+L2还核对每个实际worker、来源对照/profile、ncu worker及所选配对基线的独占观察：候选导入前保存工具路径/哈希，执行前后保留同一物理UUID的`nvidia-smi -q -x`原始XML，要求`Exclusive_Process`、无活动显示、无MIG及直接worker进程归属。前置无context可以是空进程表，后置须存在该worker；MPS、图形或其他进程、缺字段、工具变化及模拟观察均不能通过。只观察已有设置，不修改驱动模式或请求资源。依据[NVIDIA驱动说明](https://docs.nvidia.com/deploy/nvidia-smi/)及[MPS的进程归属说明](https://docs.nvidia.com/deploy/mps/appendix-tools-and-interface-reference.html)核对；独占模式本身不足以排除MPS。
+
+这项证据的范围是CUDA compute独占及前后图形进程清单，不能代替持续系统追踪或OS隔离认证。评分还重放四工具和重复一致性原始收据，要求L0/L1检查、来源、配对噪声、launch归因及审核证书全部满足。更改/丢失工件会使旧分数缓存失效。含非kernel传输却缺少原生关联/专用校准，以及Neuron来源/原生时间关联，仍不具备这条L2路径；独立诊断与模拟资料继续不能升级等级。本轮只做软件检查，没有执行上述工具或设备命令。

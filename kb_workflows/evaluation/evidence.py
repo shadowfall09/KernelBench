@@ -7,7 +7,7 @@ LEVELS = {
     "L0": ("correctness", "precision_contract", "reference_signal", "input_families",
            "input_sensitivity", "environment_integrity", "mode_state"),
     "L1": ("paired_timing", "noise_floor", "kernel_origin", "device_calibration", "bound_certificate", "launch_attribution"),
-    "L2": ("hardware_counters", "memory_safety", "repeat_consistency", "algorithm_certificate"),
+    "L2": ("hardware_counters", "memory_safety", "repeat_consistency", "algorithm_certificate", "exclusive_device"),
 }
 STATES = {"passed", "failed", "not_measured", "not_applicable"}
 MEASUREMENT_CHECKS = {"paired_timing", "noise_floor", "device_calibration", "bound_certificate", "launch_attribution"}
@@ -69,6 +69,10 @@ def from_result(result, settings, *, scope="standard", additional=None):
     checks = {"correctness": check("passed" if result.get("correctness") is True else "failed",
                                    reason="Native correctness verdict for this phase")}
     checks.update(additional or {})
+    if settings.get("evidence_level") == "L2" and "native_call_receipt" in result.get("metadata", {}):
+        from .tool_runner import exclusive_verdict
+
+        checks["exclusive_device"] = exclusive_verdict(result)
     return receipt(checks, requested=settings.get("evidence_level", "current"), scope=scope)
 
 
@@ -84,6 +88,10 @@ def measurement_checks(config, pid, sid, baseline, *, variant=None, paired=None)
     from .paired_task import validate_for_score
 
     checks = {name: check("not_measured", reason="Verified public measurement evidence is missing") for name in MEASUREMENT_CHECKS}
+    if config.evidence_level == "L2":
+        from ..provenance.counter_task import score_checks
+
+        checks.update(score_checks(config, pid, sid))
     if not config.paired_timing:
         return checks
     if paired is None:
@@ -93,11 +101,13 @@ def measurement_checks(config, pid, sid, baseline, *, variant=None, paired=None)
             try:
                 variant = paired_variant(config, pid)
             except (OSError, ValueError, KeyError, TypeError) as exc:
-                return {name: check("not_measured", reason=str(exc)) for name in MEASUREMENT_CHECKS}
+                checks.update({name: check("not_measured", reason=str(exc)) for name in MEASUREMENT_CHECKS})
+                return checks
         selected = baseline.get("variants", {}).get(variant, baseline)
         issue, paired = validate_for_score(config, pid, sid, variant, selected)
         if issue:
-            return {name: check("not_measured", reason=issue) for name in MEASUREMENT_CHECKS}
+            checks.update({name: check("not_measured", reason=issue) for name in MEASUREMENT_CHECKS})
+            return checks
     bindings = paired.get("measurement_bindings", [])
     if not bindings:
         return checks
@@ -140,9 +150,14 @@ def score_issue(result, settings, scope, *, additional=None):
         return None
     record = result.get("metadata", {}).get("evidence_receipt", {})
     requested = settings.get("evidence_level", "current")
+    allowed = MEASUREMENT_CHECKS
+    if requested == "L2":
+        from ..provenance.counter_task import SCORE_CHECKS
+
+        allowed = allowed | SCORE_CHECKS
     try:
         original = receipt(record["checks"], requested=requested, scope=scope)
-        if additional is not None and set(additional) - MEASUREMENT_CHECKS:
+        if additional is not None and set(additional) - allowed:
             return "invalid_external_measurement_checks"
         expected = receipt({**record["checks"], **(additional or {})}, requested=requested, scope=scope)
     except (KeyError, TypeError, ValueError):
@@ -173,8 +188,39 @@ def score_issue(result, settings, scope, *, additional=None):
         origin = origin_check(result)
         if not accepted(origin) or record["checks"].get("kernel_origin") != origin:
             return "actual_scored_origin_missing_or_invalid"
-        if set(additional or {}) != MEASUREMENT_CHECKS:
+        if set(additional or {}) != allowed:
             return "validated_measurement_evidence_missing"
         if requested == "L2":
-            return "formal_counter_evidence_not_implemented"
+            try:
+                from pathlib import Path
+
+                from ..common import fingerprint, read_json
+                from ..config import RunConfig
+                from ..provenance.counter_task import score_checks
+
+                values = additional["hardware_counters"]["values"]
+                directory = Path(values["run_dir"])
+                config = RunConfig(**read_json(directory / "run_config.json"))
+                pid, sid = request["problem_id"], request.get("sample_id", 0)
+                current = score_checks(config, pid, sid)
+                if (config.run_dir.resolve() != directory.resolve() or config.level != request["level"]
+                        or config.evidence_level != "L2" or values.get("simulated") is not False
+                        or fingerprint(result) not in values["actual_result_sha256"]
+                        or any(additional[name] != item or not accepted(item) for name, item in current.items())):
+                    return "counter_evidence_missing_or_invalid"
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                return "counter_evidence_missing_or_invalid"
+            try:
+                from .tool_checks import TOOLS, select_tools, validate
+
+                native = result["metadata"]["native_call_receipt"]["native_request"]
+                policy = native["eval_config"]
+                if set(select_tools(policy.get("sanitizer_tools", "none"))) != set(TOOLS) or not policy.get("determinism_checks"):
+                    return "l2_safety_and_repeat_policy_missing"
+                tools = validate(result, native)
+                if any(not accepted(tools.get(name)) or record["checks"].get(name) != tools[name]
+                       for name in ("memory_safety", "repeat_consistency")):
+                    return "l2_safety_and_repeat_evidence_invalid"
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                return "l2_safety_and_repeat_evidence_invalid"
     return None

@@ -9,10 +9,12 @@ import hashlib
 import io
 import json
 import math
+import os
 import struct
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -291,12 +293,24 @@ def test_partial_or_wrongly_bound_work_cannot_separate_algorithm_and_efficiency(
 
 
 @pytest.fixture
-def native_counter_runner(tmp_path, native_origin_runner):
+def native_counter_runner(tmp_path, native_origin_runner, monkeypatch):
+    from kb_workflows.evaluation import tool_runner
+
     report = native_origin_runner(activities=True, caps=CAPS)
     binary = tmp_path / "unscored-ncu-stub"
     binary.write_text("Unexecuted software-format fixture")
     binary.chmod(0o700)
     events, damage = [], {"kind": None}
+    observe = tool_runner.exclusive_compute
+    def inventory(argv, *, stdout, **kwargs):
+        xml = (f'<nvidia_smi_log><driver_version>{CAPS["driver_version"]}</driver_version><gpu><uuid>{CAPS["uuid"]}</uuid>'
+               '<compute_mode>Exclusive_Process</compute_mode><display_active>Disabled</display_active>'
+               '<mig_mode><current_mig>N/A</current_mig></mig_mode><processes><process_info>'
+               f'<pid>{os.getpid()}</pid><type>C</type><process_name>software fixture</process_name>'
+               '</process_info></processes></gpu></nvidia_smi_log>')
+        stdout.write(xml.encode())
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(tool_runner, "exclusive_compute", lambda settings: observe(settings, gpu_uuid=CAPS["uuid"], run=inventory, binary=binary))
 
     def runner(argv, timeout, log, **options):
         if argv[-1] == "--version":
@@ -360,11 +374,12 @@ def native_counter_runner(tmp_path, native_origin_runner):
         atomic_json(Path(argv[index + 3]), document)
         return {"exit_code": 0, "timed_out": damage["kind"] == "timeout"}
 
-    def collect(*, target="evaluate", role="candidate", failure=None, mutation="", scored=False):
+    def collect(*, target="evaluate", role="candidate", failure=None, mutation="", scored=False, level="L1", hidden=False):
         nonlocal report
-        report = native_origin_runner(target=target, role=role, mutation=mutation, activities=True, caps=CAPS)
+        report = native_origin_runner(target=target, role=role, mutation=mutation, activities=True, caps=CAPS, hidden=hidden)
         payload = copy.deepcopy(report["native_request"])
         if scored:
+            payload["eval_config"]["evidence_level"] = level
             actual = native_origin_runner.scored(payload)
             payload, _ = origin_task.validate_scored(actual, allow_simulated=True)
             payload.update(_origin_target=target, _scored_result=actual)
@@ -376,9 +391,9 @@ def native_counter_runner(tmp_path, native_origin_runner):
 
 
 def test_native_counters_cover_complete_stateful_sequence_and_both_paired_roles(native_counter_runner):
-    for target, role, count in (("evaluate", "candidate", 8), ("paired_timing", "candidate", 13),
-                                ("paired_timing", "reference", 13)):
-        result, events = native_counter_runner(target=target, role=role, scored=role == "candidate")
+    for target, role, count, hidden in (("evaluate", "candidate", 8, False), ("evaluate", "candidate", 8, True),
+                                        ("paired_timing", "candidate", 13, False), ("paired_timing", "reference", 13, False)):
+        result, events = native_counter_runner(target=target, role=role, scored=role == "candidate", hidden=hidden)
         assert result["status"] == "ok", result.get("reason")
         assert result["simulated"] and len(result["calls"]) == count
         assert [event[0] for event in events] == ["push", "start", "stop", "pop"] * count
@@ -419,6 +434,7 @@ def test_native_counters_reject_unmatched_ranges_state_outputs_and_incomplete_ca
                    lambda value: value["native_run"]["counter_windows"][0].update(range_balanced=False),
                    lambda value: value["calls"][0]["launch_identities"][0].update(symbol="forged"),
                    lambda value: value["calls"][0]["kernel_identities"][0].update(binary_sha256="f" * 64),
+                   lambda value: value["calls"][0]["kernel_groups"][0]["work"].update(memory_bytes=1),
                    lambda value: value["raw_report"].update(sha256="f" * 64),
                    lambda value: value["raw_report"].update(bytes=1),
                    lambda value: value["raw_report"].update(base64="!")):
@@ -518,6 +534,9 @@ def test_counter_cli_preview_and_queue_validation_are_sdk_light(tmp_path):
     from kb_workflows.runtime.queue_worker import validate_payload
 
     validate_payload(request)
+    hidden, _ = prepare(config, 2, 0, policy(), hidden=True)
+    validate_payload(hidden)
+    assert hidden["eval_config"]["use_hidden_tests"] and not hidden["eval_config"]["measure_performance"]
     with pytest.raises(ValueError, match="explicit paired"):
         prepare(config, 2, 0, policy(), target="reference")
     calibration_request = engine.task_payload(config, 2, task="calibrate_precision")
@@ -541,7 +560,7 @@ def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_worklo
     from scripts import analyze_device_trace
     from tests.provenance.test_kernel_origin import BINARY, frontend_receipt, raw_capture
 
-    report, _ = native_counter_runner(scored=True)
+    report, _ = native_counter_runner(scored=True, level="L2")
     payload = report["origin"]["native_request"]
     actual = payload["_scored_result"]
     source = payload["kernel_src"]
@@ -619,6 +638,11 @@ def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_worklo
     assert all(row["model_consistent"] and row["workload"]["kernel_count"] == 2 for row in joined["calls"])
     for row in joined["calls"]:
         assert row["scored_device_busy_ms"] == pytest.approx(0.0008)
+        assert len(row["kernel_groups"]) == 1
+        group = row["kernel_groups"][0]
+        assert group["launch_count"] == 2 and group["work"] == {"memory_bytes": 192, "fp32_flops": 40}
+        assert group["scored_device_busy_ms"] == pytest.approx(0.0008)
+        assert group["E"] * group["sol_execution_ms"] == pytest.approx(group["scored_device_busy_ms"])
         if row["wall_decomposition_available"]:
             assert row["sol_algorithm_ms"] * row["A"] * row["E"] * row["O"] == pytest.approx(row["scored_wall_ms"])
         else:
@@ -677,3 +701,37 @@ def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_worklo
     assert analyze_device_trace.native_main([str(report_path), "--scored-result", str(scored_path), "--problem", "2",
         "--calibration", str(cal_path), "--certificate", str(bound_path), "--output", str(output)]) == 2
     assert json.loads(output.read_text())["simulated"]
+    from kb_workflows.evaluation.tool_runner import exclusive_verdict
+
+    assert exclusive_verdict(actual)["status"] == "not_measured"
+    assert exclusive_verdict(actual, allow_simulated=True)["status"] == "passed"
+    for old, new in (("Exclusive_Process", "Default"), ("<display_active>Disabled", "<display_active>Enabled"),
+                     ("<current_mig>N/A", "<current_mig>Enabled"), ("software fixture", "nvidia-cuda-mps-server"),
+                     (f"<pid>{os.getpid()}</pid>", "<pid>1</pid>"), ("<type>C</type>", "<type>G</type>")):
+        changed = copy.deepcopy(report)
+        changed_result = changed["origin"]["native_request"]["_scored_result"]
+        record = changed_result["metadata"]["native_call_receipt"]["exclusive_compute"]
+        record["after_xml"] = record["after_xml"].replace(old, new)
+        record["receipt_sha256"] = fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
+        changed_result["metadata"]["origin_capture"]["exclusive_compute_sha256"] = fingerprint(record)
+        seal_all(changed)
+        assert exclusive_verdict(changed_result, allow_simulated=True)["status"] == "not_measured"
+    specs_path = tmp_path / "specs.json"
+    atomic_json(specs_path, {"level1": {"2": {"counter_certificates": [bound]}}})
+    config = RunConfig(runs_dir=str(tmp_path / "runs"), run_name="l2", level=1, start=2, end=2,
+                       evidence_level="L2", hidden_tests=False, device_calibration=str(cal_path), problem_specs=str(specs_path))
+    atomic_json(config.run_dir / "eval_results.json", {"2_0": actual})
+    archive_path = counter_task.artifact_path(config.run_dir, actual)
+    atomic_json(archive_path, report)
+    checks = counter_task.score_checks(config, 2, 0, allow_simulated=True)
+    assert all(item["status"] == "passed" for item in checks.values()), checks
+    assert checks["hardware_counters"]["values"]["actual_result_sha256"] == [fingerprint(actual)]
+    assert all(item["status"] == "not_measured" for item in counter_task.score_checks(config, 2, 0).values())
+    config.hidden_tests = True
+    assert all(item["status"] == "not_measured" for item in counter_task.score_checks(config, 2, 0, allow_simulated=True).values())
+    config.hidden_tests = False
+    config.final_repeats = 1
+    assert all(item["status"] == "not_measured" for item in counter_task.score_checks(config, 2, 0, allow_simulated=True).values())
+    config.final_repeats = 0
+    archive_path.unlink()
+    assert all(item["status"] == "not_measured" for item in counter_task.score_checks(config, 2, 0, allow_simulated=True).values())

@@ -173,6 +173,17 @@ def apply_score_gate(results, run_dir):
             if capped:
                 required_auxiliary += ["generation_budget.json", "generation_attempts.json", "generation_summary.json"]
             valid = valid and all(metadata.get("score_auxiliary_files", {}).get(name) == auxiliary_hashes[name] for name in required_auxiliary)
+            if valid and config.get("evidence_level") == "L2":
+                from .config import RunConfig
+                from .provenance.counter_task import score_checks
+
+                try:
+                    pid_, sid_ = map(int, key.split("_"))
+                    checks = score_checks(RunConfig(**config), pid_, sid_)
+                    saved = metadata.get("score_measurement_checks", {})
+                    valid = all(item["status"] == "passed" and saved.get(name) == item for name, item in checks.items())
+                except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                    valid = False
             if valid and config.get("agent_gpu_busy_seconds"):
                 from .agents.resource_budgets import gpu_artifact_hashes
 
