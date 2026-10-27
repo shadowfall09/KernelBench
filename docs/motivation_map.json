@@ -1598,9 +1598,11 @@
         "kb_workflows/runtime/queue_worker.py",
         "kb_workflows/runtime/transports.py",
         "tests/evaluation/test_workflows.py",
-        "kb_workflows/runtime/modal_backend.py"
+        "kb_workflows/runtime/modal_backend.py",
+        "scripts/run_agent.py",
+        "kb_workflows/analysis/experiment.py"
       ],
-      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证增加共享nonce准入、禁重试、远端结算与有界取消；未知用量拒绝且不重花。纯GPU busy时间物理硬限及Modal/Harbor生成资源契约继续实现，未运行设备、云函数或模型实验"
+      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证共享nonce准入与有界取消。Modal原生生成复用输出token/本地worker账本，统一实际开发后端，单次CLI准入、结果/工件绑定、统一SDK期限、有界终止及评分复核；未知用量拒绝且不重花。纯GPU busy时间物理硬限及Harbor外部生成契约继续实现；未运行设备、云资源或模型实验"
     },
     {
       "id": "R-19",
@@ -5295,6 +5297,28 @@
         ".claude/skills/kernelbench-pro/SKILL.md"
       ],
       "reason": "消除仅凭另跑的profiling重放推断实际计分来源的问题：CUDA L1/L2在实际候选、配对和基线进程持续采集，保留原始计时callable并在窗口外取状态/输出；完整来源事实进入自写/库轨道门并由评分重算。缺工具只失去来源资格、候选不重跑；阈值/轨道进入提示、配置、恢复和比较，独立诊断继续不授予资格，不宣称安全或因果证明。复用已有源码保护、采集与窗口验证，不增运行文件；组合基线仅在满足声明计时要求的变体中选最快者，保留所有失败记录，不让失去采集的快变体挤掉合格项；反馈与互动桥接以数值及来源均合格作为最佳候选选择条件，保留独立正确性和紧凑来源反馈，最终评分仍重算完整证据"
+    },
+    {
+      "id": "V58-01",
+      "title": "Modal原生生成预算与工件核对",
+      "primary": "M4",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/runtime/modal_backend.py",
+        "scripts/run_agent.py",
+        "kb_workflows/config.py",
+        "kb_workflows/analysis/experiment.py",
+        "kb_workflows/agents/resource_budgets.py",
+        "tests/agents/test_resource_budgets.py",
+        "docs/RESOURCE_BUDGETS.md",
+        ".claude/skills/kernelbench-pro/SKILL.md"
+      ],
+      "reason": "在已有受控mini-swe-agent路径兑现Modal输出token与开发worker额度：实际后端协议统一为Sandbox内local，唯一准入防重复exec，结果/源码/工件绑定与评分重放；共享SDK期限、有界终止、未知失败不补跑，保留有界未核对工件。替换不存在的Sandbox.open并传输现有政策/逐轮资料，复用本地账本且不增加运行文件，不把持卡空闲或平台终止确认当作GPU busy硬限"
     }
   ]
 }

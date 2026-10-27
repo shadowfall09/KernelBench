@@ -3,19 +3,138 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import math
 import os
 import shlex
 import subprocess
 import time
+import uuid
 from contextlib import contextmanager, nullcontext
+from pathlib import Path, PurePosixPath
 
 from ..agents.resource_budgets import CLEANUP_SECONDS, record_device_lease, validate_device_lease
-from ..common import ROOT, atomic_json, failure, fingerprint, kernel_name
+from ..common import ROOT, atomic_json, evaluator_digest, failure, fingerprint, kernel_name, read_json
 
 _SESSION = None
 LEASE_PROTOCOL = "kernelbench_pro_modal_lease_v1"
+GENERATION_PROTOCOL = "kernelbench_pro_modal_generation_v1"
+AGENT_INPUTS = ("model.py", "verify.py", "input_calibration.json", "precision_calibration.json", "determinism_policy.json")
+AGENT_ARTIFACTS = ("agent.log", "trajectory.json", "development_history.json", "best_candidate.json", "claude.stderr.log")
+
+
+def generation_binding(job, inputs, nonce):
+    """Bind the actual sandbox job and uploaded text, without loading Modal."""
+    if (not isinstance(nonce, str) or len(nonce) != 32 or any(c not in "0123456789abcdef" for c in nonce)
+            or job.get("generation") != "modal" or job.get("evaluation") != "local" or job.get("gpus") != "0"
+            or job.get("device_backend", "cuda") != "cuda" or job.get("profile") != ""
+            or not {"model.py", "verify.py"} <= set(inputs) <= set(AGENT_INPUTS)
+            or any(not isinstance(value, str) for value in inputs.values())):
+        raise ValueError("Invalid native Modal generation admission")
+    return {"protocol": GENERATION_PROTOCOL, "nonce": nonce, "input_files": sorted(inputs),
+            "evaluator_sha256": evaluator_digest(), "request_sha256": fingerprint({"job": job, "inputs": inputs})}
+
+
+def generation_result_sha(result):
+    # Parent bookkeeping is attached after the remote controller has completed.
+    ignored = {"modal_generation_receipt", "modal_cleanup", "elapsed", "signature", "kernel_sha256"}
+    return fingerprint({key: value for key, value in result.items() if key not in ignored})
+
+
+def admitted_generation(directory, job, admission, invoke):
+    """One controller per sandbox, even if the exec RPC is replayed."""
+    directory = Path(directory)
+    inputs = {name: (directory / name).read_text() for name in AGENT_INPUTS if (directory / name).is_file()}
+    binding = generation_binding(job, inputs, admission.get("nonce"))
+    if binding != admission:
+        raise ValueError("Modal generation inputs, configuration or evaluator changed")
+    with (directory / "generation_admitted.json").open("x") as marker:
+        json.dump(binding, marker)
+    result = invoke()
+    limit = job["isolation_report_mb"] * 1024**2
+    output = f"runs/agent/{kernel_name(job['level'], job['start'])}"
+    paths = [directory / name for name in (*AGENT_ARTIFACTS, output)]
+    for name in ("rounds", "model_calls"):
+        root = directory / name
+        if root.is_symlink():
+            raise ValueError("Modal generation artifacts cannot use symlink directories")
+        for path in root.rglob("*"):
+            if len(paths) >= 10_000:
+                raise ValueError("Too many Modal generation artifacts")
+            paths.append(path)
+    artifacts, total = {}, 0
+    for path in paths:
+        if path.is_symlink() or any(parent.is_symlink() for parent in path.parents if parent.is_relative_to(directory)):
+            raise ValueError("Modal generation artifacts cannot use symlinks")
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        if size > limit - total:
+            raise ValueError("Modal generation artifacts exceed the report byte limit")
+        with path.open("rb") as stream:
+            data = stream.read(size + 1)
+        if len(data) != size:
+            raise ValueError("Modal generation artifact changed during collection")
+        total += size
+        artifacts[path.relative_to(directory).as_posix()] = {"bytes": size, "sha256": hashlib.sha256(data).hexdigest()}
+    receipt = {"binding": binding, "result_sha256": generation_result_sha(result), "artifacts": artifacts,
+               "physical_preemption_certified": False}
+    receipt["receipt_sha256"] = fingerprint(receipt)
+    result["modal_generation_receipt"] = receipt
+    return result
+
+
+def generation_receipt(result, binding, job):
+    receipt = result.get("modal_generation_receipt", {})
+    if (not isinstance(receipt, dict) or receipt.get("binding") != binding
+            or receipt.get("receipt_sha256") != fingerprint({k: v for k, v in receipt.items() if k != "receipt_sha256"})
+            or receipt.get("result_sha256") != generation_result_sha(result)
+            or receipt.get("physical_preemption_certified") is not False):
+        raise ValueError("Modal generation result does not bind the admitted controller")
+    artifacts = receipt.get("artifacts")
+    if not isinstance(artifacts, dict) or len(artifacts) > 10_000:
+        raise ValueError("Invalid Modal generation artifact inventory")
+    total = 0
+    output = f"runs/agent/{kernel_name(job['level'], job['start'])}"
+    allowed = {*AGENT_ARTIFACTS, output}
+    for name, row in artifacts.items():
+        path = PurePosixPath(name)
+        if (path.is_absolute() or ".." in path.parts or path.as_posix() != name
+                or not path.parts or name not in allowed and not (len(path.parts) > 1 and path.parts[0] in {"rounds", "model_calls"})
+                or not isinstance(row, dict) or type(row.get("bytes")) is not int or row["bytes"] < 0
+                or not isinstance(row.get("sha256"), str) or len(row["sha256"]) != 64
+                or any(c not in "0123456789abcdef" for c in row["sha256"])):
+            raise ValueError("Invalid Modal generation artifact identity")
+        total += row["bytes"]
+    if total > job["isolation_report_mb"] * 1024**2:
+        raise ValueError("Modal generation artifacts exceed the report byte limit")
+    return artifacts
+
+
+def validate_generation(result, directory):
+    """Recheck the transferred controller/ledger artifacts during scoring."""
+    directory = Path(directory)
+    job = read_json(directory / "job_config.json")
+    job["profile"] = ""
+    inputs = {name: (directory / name).read_text() for name in AGENT_INPUTS if (directory / name).is_file()}
+    binding = generation_binding(job, inputs, result["modal_generation_receipt"]["binding"]["nonce"])
+    artifacts = generation_receipt(result, binding, job)
+    cleanup = result.get("modal_cleanup", {})
+    output = f"runs/agent/{kernel_name(job['level'], job['start'])}"
+    if (cleanup.get("binding") != binding or cleanup.get("termination_wait_completed") is not True
+            or type(cleanup.get("returncode")) is not int
+            or result.get("status") == "success" and (output not in artifacts or artifacts[output]["bytes"] == 0)):
+        raise ValueError("Modal generation lacks completed termination or selected source")
+    for name, expected in artifacts.items():
+        path = directory / name
+        if path.is_symlink() or not path.resolve().is_relative_to(directory.resolve()):
+            raise ValueError("Modal generation artifact is outside its job")
+        with path.open("rb") as stream:
+            data = stream.read(expected["bytes"] + 1)
+        if len(data) != expected["bytes"] or hashlib.sha256(data).hexdigest() != expected["sha256"]:
+            raise ValueError("Modal generation artifact is missing or changed")
+    return binding
 
 
 def _remote_evaluate(payload, leases=None):
@@ -73,7 +192,7 @@ def modal_session(config):
         _remote_evaluate
     )
     agent_image = make_image(agent=True) if config.generation == "modal" else None
-    lease_context = modal.Dict.ephemeral() if config.agent_device_seconds else nullcontext(None)
+    lease_context = modal.Dict.ephemeral() if config.agent_device_seconds and config.generation != "modal" else nullcontext(None)
     with modal.enable_output(), lease_context as leases, app.run():
         previous, _SESSION = _SESSION, (app, evaluate, agent_image, leases)
         try:
@@ -168,58 +287,94 @@ def run_modal_agent(directory, config, pid):
 
     if _SESSION is None:
         raise RuntimeError("Modal generation must run within modal_session")
-    job = json.loads((directory / "job_config.json").read_text())
-    job["profile"] = ""  # Runtime credentials/secrets do not need an AWS profile file.
+    job = read_json(directory / "job_config.json")
+    job["profile"] = ""  # Credentials come from runtime secrets, not a host profile file.
+    inputs = {name: (directory / name).read_text() for name in AGENT_INPUTS if (directory / name).is_file()}
+    binding = generation_binding(job, inputs, uuid.uuid4().hex)
     environment = agent_environment(config)
     environment.pop("AWS_PROFILE", None)
-    sandbox = modal.Sandbox.create(
-        app=_SESSION[0],
-        image=_SESSION[2],
-        gpu=config.gpu,
-        env=environment,
-        secrets=sandbox_secrets(config),
-        timeout=config.agent_timeout + 120,
-        workdir="/app/KernelBench",
-        cpu=4.0,
-        memory=32768,
-    )
-    result = {"status": "failed"}
-    try:
-        mkdir = sandbox.exec("mkdir", "-p", "/work/runs/agent")
-        mkdir.wait()
-        for name, content in (
-            ("job_config.json", json.dumps(job)),
-            ("model.py", (directory / "model.py").read_text()),
-            ("verify.py", (directory / "verify.py").read_text()),
-        ):
-            with sandbox.open(f"/work/{name}", "w") as stream:
-                stream.write(content)
-        command = [
-            "python",
-            "/app/KernelBench/scripts/run_agent.py",
-            "--config",
-            "/work/job_config.json",
-            "--directory",
-            "/work",
-        ]
-        process = sandbox.exec(
-            "bash", "-c", shlex.join(command) + " > /work/sandbox.log 2>&1", timeout=config.agent_timeout + 60
-        )
-        process.wait()
-    finally:
-        # Download before termination; partial kernels/logs remain useful after agent failure.
-        for name in ("agent_result.json", "agent.log", "sandbox.log", "trajectory.json", "development_history.json",
-                     "best_candidate.json", f"runs/agent/{kernel_name(config.level, pid)}"):
-            try:
-                with sandbox.open(f"/work/{name}", "r") as stream:
-                    content = stream.read()
-                target = directory / name
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(content)
-                if name == "agent_result.json":
-                    result = json.loads(content)
-            except (FileNotFoundError, modal.exception.Error):
-                continue
-        sandbox.terminate()
-    atomic_json(directory / "agent_result.json", result)
-    return result
+    session = _SESSION
+    limit = config.isolation_report_mb * 1024**2
+    # This bounds cloud orchestration, not worker leases or GPU allocation billing.
+    window = config.agent_timeout + 120
+    deadline = time.monotonic() + window
+
+    async def execute():
+        sandbox, result = None, {"status": "error", "budget": None, "resource_receipt_incomplete": True,
+                                 "modal_cleanup": {"binding": binding, "termination_wait_completed": False}}
+        complete = False
+        output = f"runs/agent/{kernel_name(config.level, pid)}"
+
+        async def bounded(method, *args, **kwargs):
+            return await asyncio.wait_for(method.aio(*args, **kwargs), timeout=max(0, deadline - time.monotonic()))
+
+        async def read(name, maximum):
+            info = await bounded(sandbox.filesystem.stat, "/work/" + name)
+            if type(info.size) is not int or not 0 <= info.size <= maximum:
+                raise ValueError("Modal generation artifact exceeds its byte limit")
+            data = await bounded(sandbox.filesystem.read_bytes, "/work/" + name)
+            if not isinstance(data, bytes) or len(data) != info.size:
+                raise ValueError("Modal generation artifact changed during transfer")
+            return data
+
+        def save(name, data):
+            target = directory / name
+            if target.is_symlink() or not target.resolve().is_relative_to(directory.resolve()):
+                raise ValueError("Modal generation artifact is outside its local job")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+
+        try:
+            sandbox = await bounded(modal.Sandbox.create, app=session[0], image=session[2], gpu=config.gpu,
+                                    env=environment, secrets=sandbox_secrets(config), timeout=window,
+                                    workdir="/app/KernelBench", cpu=4.0, memory=32768)
+            await bounded(sandbox.filesystem.make_directory, "/work/runs/agent")
+            for name, content in {**inputs, "job_config.json": json.dumps(job),
+                                  "generation_admission.json": json.dumps(binding)}.items():
+                await bounded(sandbox.filesystem.write_text, content, "/work/" + name)
+            command = ["python", "/app/KernelBench/scripts/run_agent.py", "--config", "/work/job_config.json",
+                       "--directory", "/work", "--admission", "/work/generation_admission.json"]
+            process = await bounded(sandbox.exec, "bash", "-c", shlex.join(command) + " > /work/sandbox.log 2>&1",
+                                    timeout=max(1, min(config.agent_timeout + 60, math.ceil(deadline - time.monotonic()))))
+            await bounded(process.wait)
+            remote = json.loads(await read("agent_result.json", limit))
+            artifacts = generation_receipt(remote, binding, job)
+            if remote.get("status") == "success" and (output not in artifacts or artifacts[output]["bytes"] == 0):
+                raise ValueError("Modal generation success lacks its selected source")
+            for name in sorted(artifacts, key=lambda name: (name != output, name)):
+                expected = artifacts[name]
+                data = await read(name, expected["bytes"])
+                if hashlib.sha256(data).hexdigest() != expected["sha256"]:
+                    raise ValueError("Modal generation artifact bytes differ from the controller receipt")
+                save(name, data)
+            if time.monotonic() > deadline:
+                raise TimeoutError("Modal generation orchestration deadline expired")
+            result = remote
+            complete = True
+        except Exception as exc:
+            result.update(status="error", budget=None, resource_receipt_incomplete=True,
+                          error=f"{type(exc).__name__}: {exc}"[:1000])
+        finally:
+            if sandbox is not None:
+                if not complete:
+                    # Retain useful but unqualified partial work only while the
+                    # original deadline still allows it. Never reset the clock.
+                    for name in (output, "best_candidate.json", "agent.log", "sandbox.log"):
+                        try:
+                            save(name, await read(name, limit))
+                            result["partial_artifacts_unverified"] = True
+                        except Exception:
+                            pass
+                try:
+                    code = await asyncio.wait_for(sandbox.terminate.aio(wait=True), timeout=CLEANUP_SECONDS)
+                    if type(code) is not int:
+                        raise ValueError("Modal sandbox termination has no terminal return code")
+                    result["modal_cleanup"] = {"binding": binding, "termination_wait_completed": True, "returncode": code}
+                except Exception as exc:
+                    result.update(status="error", budget=None, resource_receipt_incomplete=True,
+                                  error=f"Modal sandbox termination unconfirmed: {type(exc).__name__}"[:1000])
+                    result["modal_cleanup"] = {"binding": binding, "termination_wait_completed": False}
+        atomic_json(directory / "agent_result.json", result)
+        return result
+
+    return asyncio.run(execute())

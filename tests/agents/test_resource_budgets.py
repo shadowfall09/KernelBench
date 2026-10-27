@@ -438,6 +438,10 @@ def test_modal_budget_runs_the_native_loop_with_remote_parent_receipts(config, m
     with start_session(config):
         assert modal_backend._SESSION[0] is app and modal_backend._SESSION[3] is leases
     assert modal_backend._SESSION is previous and function_options["retries"] == 0
+    config.generation = "modal"
+    with start_session(config):
+        assert modal_backend._SESSION[3] is None  # Sandbox-local leases need no extra cloud Dict.
+    assert modal_backend._SESSION is previous
 
 
 def test_modal_unknown_submission_binding_and_cleanup_burn_the_reservation(config, monkeypatch):
@@ -482,3 +486,150 @@ def test_modal_unknown_submission_binding_and_cleanup_burn_the_reservation(confi
         if mode != "missing_receipt":
             assert not result["correctness"] and result["metadata"]["resource_usage_unknown"]
         assert cancellations == ([True] if mode in {"blocked_cleanup", "wrong_request"} else [])
+
+
+@pytest.fixture
+def modal_generator(config, tmp_path, monkeypatch):
+    """Local files and real controller accounting behind an inert cloud API."""
+    import asyncio
+    import sys
+    import time
+
+    from kb_workflows.common import atomic_json
+    from kb_workflows.runtime import modal_backend
+    from scripts import run_agent as entrypoint
+
+    config.generation, config.evaluation, config.stage = "modal", "queue", "generate"
+    config.hardware, config.gpu, config.gpu_arch = "H100", "H100", "Hopper"
+    config.agent_backend, config.model = "litellm", "fake/provider"
+    config.agent_output_token_limit, config.agent_max_output_tokens, config.agent_device_seconds = 6, 3, 6.2
+    config.validate()
+    state = SimpleNamespace(mode="success", boxes=[], controller_calls=0, evaluations=0, real_time=time)
+
+    def api(function):
+        async def call(*args, **kwargs):
+            value = function(*args, **kwargs)
+            return await value if hasattr(value, "__await__") else value
+        return SimpleNamespace(aio=call)
+
+    @budgets.record_device_lease
+    def worker(payload):
+        state.evaluations += 1
+        return {"compiled": True, "correctness": True, "runtime": 1,
+                "metadata": {"device_lease_receipt": {"elapsed_seconds": 0}}}
+
+    def evaluate(child, pid, index, remaining, task="evaluate", *, lease=None):
+        assert child.evaluation == "local" and lease is not None
+        return worker({"eval_config": {"timeout": lease["execution_timeout_seconds"], "device_lease": lease}})
+
+    def controlled_run(directory, child, pid):
+        state.controller_calls += 1
+        child = RunConfig(**{**child.to_dict(), "runs_dir": str(directory / "runs")}).validate()
+        return agent_loop.run_loop(directory, child, pid, response_fn=response, evaluator=evaluate)
+    monkeypatch.setattr(entrypoint, "run_agent", controlled_run)
+
+    class Box:
+        def __init__(self):
+            self.root = tmp_path / f"remote-{len(state.boxes)}"
+            self.root.mkdir()
+            self.terminated = 0
+            def path(name):
+                assert name.startswith("/work/")
+                return self.root / name.removeprefix("/work/")
+            def write(data, name):
+                path(name).parent.mkdir(parents=True, exist_ok=True)
+                path(name).write_text(data)
+            self.filesystem = SimpleNamespace(
+                make_directory=api(lambda name: path(name).mkdir(parents=True, exist_ok=True)),
+                write_text=api(write), stat=api(lambda name: SimpleNamespace(size=path(name).stat().st_size)),
+                read_bytes=api(lambda name: path(name).read_bytes()))
+            self.exec, self.terminate = api(self.execute), api(self.stop)
+
+        def execute(self, *args, **kwargs):
+            assert args[:2] == ("bash", "-c") and "--admission" in args[2] and kwargs["timeout"] > 0
+            job = read_json(self.root / "job_config.json")
+            self.job, self.admission = job, read_json(self.root / "generation_admission.json")
+            assert entrypoint.main(["--config", str(self.root / "job_config.json"), "--directory", str(self.root),
+                                    "--admission", str(self.root / "generation_admission.json")]) == 0
+            result = read_json(self.root / "agent_result.json")
+            if state.mode == "binding":
+                result["modal_generation_receipt"]["binding"]["nonce"] = "0" * 32
+            elif state.mode == "missing":
+                result.pop("modal_generation_receipt")
+            elif state.mode == "path":
+                receipt = result["modal_generation_receipt"]
+                receipt["artifacts"]["../outside"] = {"bytes": 0, "sha256": "0" * 64}
+                receipt["receipt_sha256"] = fingerprint({k: v for k, v in receipt.items() if k != "receipt_sha256"})
+            atomic_json(self.root / "agent_result.json", result)
+            (self.root / "sandbox.log").write_text("Explicit CPU simulation; no Modal or device execution")
+            if state.mode == "lost":
+                raise OSError("exec response lost after the single controller completed")
+            if state.mode == "deadline":
+                expired = time.monotonic() + config.agent_timeout + 121
+                monkeypatch.setattr(modal_backend, "time", SimpleNamespace(monotonic=lambda: expired))
+            async def wait():
+                if state.mode == "deadline":
+                    await asyncio.Future()
+                return 0
+            return SimpleNamespace(wait=api(wait))
+
+        def stop(self, *, wait):
+            assert wait is True
+            self.terminated += 1
+            if state.mode == "cleanup":
+                raise OSError("termination acknowledgement lost")
+            return 0
+
+    def create(**kwargs):
+        assert kwargs["timeout"] == config.agent_timeout + 120 and kwargs["gpu"] == "H100"
+        box = Box()
+        state.boxes.append(box)
+        return box
+    monkeypatch.setitem(sys.modules, "modal", SimpleNamespace(Sandbox=SimpleNamespace(create=api(create))))
+    monkeypatch.setattr(modal_backend, "_SESSION", (None, None, "inert-image", None))
+    monkeypatch.setattr(modal_backend, "sandbox_secrets", lambda config: [])
+    return config, state
+
+
+def test_modal_native_generation_reuses_token_and_device_ledgers_with_single_admission(modal_generator):
+    from kb_workflows.runtime import modal_backend
+
+    config, state = modal_generator
+    assert generation.generate_run(config)
+    summary = read_json(config.run_dir / "generation_summary.json")["90_0"]
+    assert summary["status"] == "success" and state.controller_calls == 1 and state.evaluations == 3
+    assert summary["budget"]["output_tokens"] == 6 and summary["budget"]["model_calls"] == 3
+    assert summary["budget"]["protocol"]["development_verifier"] == "modal_sandbox_local"
+    assert state.boxes[0].job["evaluation"] == "local" and config.evaluation == "queue"
+    assert state.boxes[0].terminated == 1 and budgets.score_issue(config, 90, 0) is None
+    directory = config.run_dir / "work/p90_s0"
+    assert (directory / "model_calls/001.json").is_file() and (directory / "rounds/003/candidate.py").is_file()
+    modal_backend.validate_generation(summary, directory)
+    box = state.boxes[0]
+    with pytest.raises(FileExistsError):
+        modal_backend.admitted_generation(box.root, box.job, box.admission, lambda: pytest.fail("duplicate controller"))
+    source = directory / "rounds/001/candidate.py"
+    source.write_text("changed after transfer")
+    assert budgets.score_issue(config, 90, 0) == "resource_budget_modal_generation_missing_or_invalid"
+    config.resume = True
+    generation.generate_run(config)
+    assert state.controller_calls == 1  # Resume never buys another cloud attempt.
+
+
+def test_modal_native_generation_lost_results_and_cleanup_cannot_reset_caps(modal_generator, monkeypatch):
+    from kb_workflows.runtime import modal_backend
+
+    config, state = modal_generator
+    for mode in ("binding", "missing", "path", "lost", "deadline", "cleanup"):
+        state.mode, config.run_name = mode, "modal_" + mode
+        monkeypatch.setattr(modal_backend, "time", state.real_time)
+        before = state.controller_calls
+        assert not generation.generate_run(config)
+        summary = read_json(config.run_dir / "generation_summary.json")["90_0"]
+        assert summary["status"] == "error" and summary["budget"] is None and summary["resource_receipt_incomplete"]
+        assert state.controller_calls == before + 1 and state.boxes[-1].terminated == 1
+        assert budgets.score_issue(config, 90, 0) is not None
+        assert summary["modal_cleanup"]["termination_wait_completed"] is (mode != "cleanup")
+        with pytest.raises(ValueError, match="already has an attempt"):
+            generation.generate_run(config)
+        assert state.controller_calls == before + 1

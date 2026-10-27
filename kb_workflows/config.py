@@ -192,8 +192,8 @@ class RunConfig:
                 raise ValueError(f"{name} must be finite and nonnegative")
         from .agents.resource_budgets import active
 
-        if active(self) and self.generation not in {"local", "docker"}:
-            raise ValueError("Resource reservations require native local/docker generation; Modal/Harbor generation enforcement is unavailable")
+        if active(self) and self.generation not in {"local", "docker", "modal"}:
+            raise ValueError("Resource reservations require native local/docker/Modal generation; external Harbor enforcement is unavailable")
         if self.agent_token_limit and self.agent_backend != "local-transformers":
             raise ValueError("Exact total-token caps require local-transformers; provider token estimates cannot certify this cap")
         if self.agent_output_token_limit and self.agent_backend not in {"local-transformers", "litellm"}:

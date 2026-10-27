@@ -207,6 +207,13 @@ def score_issue(config, pid, sid):
             return "resource_budget_missing_unknown_or_exceeded"
     # The current snapshot is also tied to the actual completed generation summary.
     summary = read_json(config.run_dir / "generation_summary.json", {}).get(f"{pid}_{sid}", {})
+    if config.generation == "modal":
+        from ..runtime.modal_backend import validate_generation
+
+        try:
+            validate_generation(summary, config.run_dir / "work" / f"p{pid}_s{sid}")
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return "resource_budget_modal_generation_missing_or_invalid"
     if (summary.get("budget") != receipt or summary.get("status") != "success" or attempts[0].get("status") != "success"
             or summary.get("signature") != attempts[0].get("signature")
             or summary.get("signature") != generation_signature(config, pid, sid)):
