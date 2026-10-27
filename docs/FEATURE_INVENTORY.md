@@ -17,7 +17,7 @@
 | 预算与恢复 | token预留、受控开发worker租约、CUDA进程活动/保守上界配额、队列/Modal请求与工件绑定；[资源边界](RESOURCE_BUDGETS.md) |
 | 部署与复现 | Harbor独立verifier、只读任务导出、Slurm、结果/轨迹/收据、指纹恢复与已有产物重评分 |
 
-当前23项设计中20项代码已实现、3项部分实现。未完成的是来源路径覆盖、完整性能归因，以及纯GPU时间硬预算/Harbor外部生成契约；逐项交付与剩余范围见 [23项状态](MOTIVATION.md#设计与实现的差额)。软件实现与真实实验分别验收；按用户要求，本轮不运行GPU、Trainium、真实模型、云资源、容器或训练实验。
+当前23项设计中20项代码已实现、3项部分实现。未完成的是来源路径覆盖、完整性能归因，以及纯GPU时间硬预算/Harbor其他agent及设备资源契约；逐项交付与剩余范围见 [23项状态](MOTIVATION.md#设计与实现的差额)。软件实现与真实实验分别验收；按用户要求，本轮不运行GPU、Trainium、真实模型、云资源、容器或训练实验。
 
 此前搁置的整合与清理继续保存在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，没有恢复。
 
@@ -252,6 +252,7 @@
 
 | 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
+| V63-01 | Harbor受控输出额度与评分恢复 | [harbor_budget.py](../kb_workflows/runtime/harbor_budget.py) | [M4](MOTIVATION.md#m4) |
 | V62-01 | 开发CUDA活动计量与软件配额 | [resource_budgets.py](../kb_workflows/agents/resource_budgets.py) | [M4](MOTIVATION.md#m4) |
 | V7-07 | 真实 agent loop | [agent_loop.py](../kb_workflows/agents/agent_loop.py) | [M4](MOTIVATION.md#m4) |
 | V7-08 | One-shot | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |

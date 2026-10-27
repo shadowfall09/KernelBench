@@ -10,10 +10,12 @@ import pytest
 
 from kb_workflows import cli, engine
 from kb_workflows.agents import generation
-from kb_workflows.analysis import paper_analysis
+from kb_workflows.analysis import paper_analysis, study_plan
 from kb_workflows.common import atomic_json, evaluator_digest, kernel_name, read_json
 from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.runtime import harbor, harbor_verifier
+from tests.evaluation.test_scoring_recovery import run as scoring_fixture
+from tests.support._operator_evidence import attach_operator_evidence
 
 
 @pytest.fixture
@@ -299,3 +301,146 @@ def test_bounded_reward_never_counts_an_incorrect_submission(verifier):
     state.update(correct=False, gain=0.6)
     atomic_json(manifest, spec)
     assert harbor_verifier.verify(manifest, candidate, logs)["reward"] == 0
+
+
+@pytest.fixture
+def scoring_run(tmp_path, monkeypatch):
+    return scoring_fixture.__wrapped__(tmp_path, monkeypatch)
+
+
+@pytest.fixture
+def controlled_harbor(scoring_run, monkeypatch):
+    import asyncio
+    from datetime import datetime, timezone
+
+    import litellm
+    from harbor.agents.factory import AgentFactory
+    from harbor.agents.terminus_2 import Terminus2
+    from harbor.llms import lite_llm
+    from harbor.models.trial.config import AgentConfig
+
+    from kb_workflows.common import fingerprint
+    from kb_workflows.runtime import harbor_budget
+
+    config = scoring_run[0]
+    config.generation, config.generation_mode, config.num_samples = "harbor", "external", 1
+    config.harbor_agent, config.model = "terminus-2", "openai/fixture-model"
+    config.agent_output_token_limit, config.agent_max_output_tokens, config.parallel = 5, 3, 1
+    config.validate()
+    atomic_json(config.run_dir / "run_config.json", config.to_dict())
+    monkeypatch.setattr(generation, "evaluator_digest", lambda: "current")
+    monkeypatch.setattr(harbor, "evaluator_digest", lambda: "current")
+    monkeypatch.setattr(study_plan, "evaluator_digest", lambda: "current")
+    monkeypatch.setattr(generation, "resolve_devices", lambda *a, **k: ["GPU-software-fixture"])
+    action = {"requests": [], "fault": None, "commands": []}
+    monkeypatch.setattr(litellm, "get_supported_openai_params", lambda **kwargs: ["max_tokens"])
+    monkeypatch.setattr(lite_llm, "get_supported_openai_params", lambda *a, **k: ["max_tokens"])
+    monkeypatch.setattr(litellm, "completion_cost", lambda **kwargs: 0.01)
+    async def provider(**kwargs):
+        action["requests"].append(kwargs)
+        assert kwargs["drop_params"] is False and kwargs["max_retries"] == kwargs["num_retries"] == 0 and kwargs["stream"] is False and kwargs["n"] == 1
+        count = min(2, kwargs["max_tokens"])
+        response = litellm.ModelResponse(model="fixture-model", choices=[{"index": 0,
+            "message": {"role": "assistant", "content": "A JSON terminal response"}, "finish_reason": "stop"}],
+            usage={"prompt_tokens": 3, "completion_tokens": count, "total_tokens": 3 + count})
+        if action["fault"] == "missing":
+            response.usage.completion_tokens = None
+        elif action["fault"] == "overrun":
+            response.usage.completion_tokens = kwargs["max_tokens"] + 1
+        elif action["fault"] == "lost":
+            raise TimeoutError("Uncertain provider reply")
+        return response
+    monkeypatch.setattr(litellm, "acompletion", provider)
+    async def stock_driver(self, *args, **kwargs):
+        # Real Harbor LiteLLM handles both normal and summary-style calls.
+        for index in range(5):
+            await self._llm.call("summary" if index % 2 else "normal", message_history=[])
+    monkeypatch.setattr(Terminus2, "run", stock_driver)
+    def popen(command, **kwargs):
+        action["commands"].append(command)
+        assert command[command.index("-a") + 1] == harbor_budget.ADAPTER
+        assert command[command.index("--max-retries") + 1] == "0"
+        options = [command[index + 1] for index, item in enumerate(command[:-1]) if item == "--agent-kwarg"]
+        options = dict(item.split("=", 1) for item in options)
+        agent = AgentFactory.create_agent_from_config(AgentConfig(name=harbor_budget.ADAPTER, model_name=config.model, kwargs=options),
+            logs_dir=Path(options["budget_admission"]).parent / "logs")
+        asyncio.run(agent.run())
+        assert litellm.acompletion is provider
+        target = Path(command[command.index("--jobs-dir") + 1]) / command[command.index("--job-name") + 1] / "attempt"
+        candidate = target / "artifacts/app/solution.py"
+        candidate.parent.mkdir(parents=True)
+        candidate.write_text("class ModelNew: pass\n")
+        stamp = datetime.now(timezone.utc).isoformat()
+        atomic_json(target / "result.json", {"agent_result": {"n_input_tokens": 0, "n_output_tokens": 0, "n_cache_tokens": 0,
+            "cost_usd": 0, "model_usage": {"fixture-model": {}}}, "agent_execution": {"started_at": stamp, "finished_at": stamp}})
+        # This is a host SDK/CLI double. No Harbor environment or real agent is started.
+        return SimpleNamespace(wait=lambda **kw: 0, poll=lambda: 0, returncode=0)
+    monkeypatch.setattr(harbor.subprocess, "Popen", popen)
+    monkeypatch.setattr(harbor, "terminate", lambda process: None)
+    return config, action, harbor_budget, fingerprint
+
+
+def test_controlled_harbor_output_quota_covers_actual_sdk_calls_and_durable_admission(controlled_harbor, scoring_run):
+
+    config, action, module, fingerprint = controlled_harbor
+    assert generation.generate_run(config)
+    directory = config.run_dir / "work/p1_s0"
+    state = read_json(directory / "harbor_quota/state.json")
+    assert state["ledger"]["charged"] == 5 and state["ledger"]["compliant"]
+    assert [row["max_tokens"] for row in action["requests"]] == [3, 3, 1]
+    receipt = read_json(config.run_dir / "generation_summary.json")["1_0"]["budget"]
+    assert receipt["model_calls"] == 3 and receipt["output_tokens"] == 5 and receipt["input_tokens"] == 9
+    assert module.score_issue(config, 1, 0) is None
+    base = {**config.to_dict(), "harbor_agent": "claude-code", "hardware": "RTX_A6000", "gpu": "RTX_A6000"}
+    plan = study_plan.make_plan({"base_config": base, "models": [config.model], "methods": ["harbor"],
+                                "vary": "output_tokens", "budgets": [5, 10], "sessions": 1,
+                                "harbor_agent": "terminus-2"}, directory=config.run_dir / "study")
+    assert [job["config"]["agent_output_token_limit"] for job in plan["jobs"]] == [5, 10]
+    assert not plan["experiments_started"]
+    _, _, standard, hidden, save = scoring_run
+    for secret, records in ((False, standard), (True, hidden)):
+        payload = engine.task_payload(config, 1, 0, hidden=secret)
+        records["1_0"]["metadata"].update(workflow_signature=fingerprint(payload), evaluation_config=payload["eval_config"],
+                                       kernel_sha256=fingerprint({"source": payload["kernel_src"]}))
+        attach_operator_evidence(payload, records["1_0"])
+    save()
+    from kb_workflows import common
+
+    assert paper_analysis.analyze_paper(config)["bounded_gain_macro"] == 1
+    assert common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    task = Path(action["commands"][0][action["commands"][0].index("-p") + 1])
+    manifest = read_json(task / "tests/config.json")
+    assert manifest["config"]["agent_output_token_limit"] == 0
+    assert tomllib.loads((task / "task.toml").read_text())["agent"]["network_mode"] == "no-network"
+    assert "tmux asciinema" in (task / "environment/Dockerfile").read_text()
+    gate = module.OutputGate(directory / "harbor_quota/admission.json", fingerprint(state["binding"]))
+    with pytest.raises(FileExistsError):
+        gate.begin()
+    config.resume = True
+    assert generation.generate_run(config) and len(action["requests"]) == 3
+    state["calls"][0]["output_tokens"] += 1
+    state["receipt_sha256"] = fingerprint({key: value for key, value in state.items() if key != "receipt_sha256"})
+    atomic_json(directory / "harbor_quota/state.json", state)
+    assert module.score_issue(config, 1, 0).startswith("resource_budget")
+    assert not common.apply_score_gate(standard, config.run_dir)["1_0"]["correctness"]
+    assert paper_analysis.analyze_paper(config)["details"][0]["score"] == 0
+
+
+def test_controlled_harbor_refuses_missing_exceeded_or_lost_usage_without_retries(controlled_harbor):
+    from dataclasses import replace
+
+    from kb_workflows.agents.resource_budgets import score_issue
+
+    config, action, _, _ = controlled_harbor
+    for fault in ("missing", "overrun", "lost"):
+        trial = replace(config, run_name="quota-" + fault)
+        action["fault"] = fault
+        before = len(action["requests"])
+        generation.generate_run(trial)
+        assert len(action["requests"]) == before + 1
+        summary = read_json(trial.run_dir / "generation_summary.json")["1_0"]
+        assert summary["status"] != "success"
+        assert score_issue(trial, 1, 0).startswith("resource_budget")
+    for kwargs in ({"harbor_agent": "claude-code"}, {"agent_token_limit": 10}, {"agent_gpu_busy_seconds": 10}, {"model": ""}, {"harbor_agent_hosts": "api.example.com"}, {"stage": "export-harbor"}):
+        with pytest.raises(ValueError):
+            replace(config, **kwargs).validate()

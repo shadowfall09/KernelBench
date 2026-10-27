@@ -275,6 +275,10 @@ def active(config):
 def score_issue(config, pid, sid):
     if not active(config):
         return None
+    if config.generation == "harbor":
+        from ..runtime.harbor_budget import score_issue as harbor_issue
+
+        return harbor_issue(config, pid, sid)
     from ..analysis.experiment import existing_budget, protocol
     from ..common import read_json
     from .generation import generation_signature

@@ -356,6 +356,16 @@ def analyze_paper(config):
                             row.update(headroom_error=str(exc), score=0, headroom_score=0)
                     slots[-1] = row["score"]
             gpu_files = {}
+            if config.generation == "harbor" and config.agent_output_token_limit:
+                from ..runtime.harbor_budget import quota_artifact_hashes
+
+                try:
+                    summary = read_json(config.run_dir / "generation_summary.json")[key]
+                    gpu_files = quota_artifact_hashes(config.run_dir, pid, sid, summary, level=config.level)
+                except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                    if status == "verified":
+                        status = "resource_budget_harbor_output_evidence_missing_or_invalid"
+                        row["score"], slots[-1], bounded_slots[-1] = 0, 0, 0
             if config.agent_gpu_busy_seconds:
                 from ..agents.resource_budgets import gpu_artifact_hashes
 

@@ -26,7 +26,7 @@
 
 `base_config` 也可指向相对该spec文件的现有TOML。原生agent/backend、GPU目标、精度、题集、验证等级等沿用RunConfig。每个job在生成计划时就经过配置及选题校验；每个会话、预算和层使用独立run目录。
 
-`vary`还支持`total_tokens`、`output_tokens`、`device_lease_seconds`，分别改变`agent_token_limit`、`agent_output_token_limit`和`agent_device_seconds`，并提供对应`declared_*`曲线横轴。token额度是正整数，设备额度可为正小数；后端支持范围、设备占用口径和证明要求见[资源预算](RESOURCE_BUDGETS.md)。Harbor只能使用wall网格。
+`vary`还支持`total_tokens`、`output_tokens`、`device_lease_seconds`，分别改变`agent_token_limit`、`agent_output_token_limit`和`agent_device_seconds`，并提供对应`declared_*`曲线横轴。token额度是正整数，设备额度可为正小数；后端支持范围、设备占用口径和证明要求见[资源预算](RESOURCE_BUDGETS.md)。Harbor支持wall网格；受控`terminus-2`还支持`output_tokens`网格，其他资源网格拒绝。
 
 ```bash
 python -m scripts.plan_study --spec study_spec.json --output-dir study
@@ -40,7 +40,7 @@ python -m scripts.plan_study --plan study/plan.json --execute
 
 runner串行运行已审查的job，复用原生resume逻辑并记录退出状态；失败默认停止，`--keep-going`才继续后面的job。原生任务内部仍可使用其配置的多设备并行。初始化、镜像、verifier与agent执行时间有各自边界，不把墙钟声称为GPU账单。
 
-one-shot始终只生成一个候选且无开发反馈。`vary="candidates"`时，one-shot只保留预算1，其他点明确跳过；Harbor没有原生候选次数保证，因此此网格拒绝包含Harbor。Harbor可用于共同的声明墙钟预算网格，其agent时间上限写入真实Task配置。独立会话是分开的声明尝试，不证明provider随机性可控，也不证明GPU时间或token硬预算已经落实；后者仍属于R-18。
+one-shot始终只生成一个候选且无开发反馈。`vary="candidates"`时，one-shot只保留预算1，其他点明确跳过；Harbor没有原生候选次数保证，因此此网格拒绝包含Harbor。Harbor可用于共同的声明墙钟预算网格，其agent时间上限写入真实Task配置。独立会话是分开的声明尝试，不证明provider随机性可控，也不证明GPU时间或token硬预算已经落实；受控Terminus 2输出额度已实现，其他缺口仍属于R-18。
 
 ## 从当前证据导出
 

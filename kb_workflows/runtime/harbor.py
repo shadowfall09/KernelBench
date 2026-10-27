@@ -15,7 +15,7 @@ from pathlib import Path
 from ..agents.generation import agent_environment, prompt_source
 from ..benchmarks.reference_population import select_run_problems
 from ..benchmarks.suites import selection_receipt
-from ..common import ROOT, atomic_json, evaluator_digest, kernel_name, select_problems
+from ..common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
 from .transports import terminate
 
 HARBOR_SOURCE = "b53b8134e1241686dca7759af188f987ecc48e8b"
@@ -121,7 +121,9 @@ def write_task(directory, config, pid, sid=0, device=None):
         shutil.copy2(ROOT / "LICENSE", target / "LICENSE")
         if (ROOT / "NOTICE.md").exists():
             shutil.copy2(ROOT / "NOTICE.md", target / "NOTICE.md")
-    (environment / "Dockerfile").write_text(BASE_IMAGE + "COPY model.py LICENSE /app/\n")
+    terminal_setup = ("RUN apt-get update && apt-get install -y --no-install-recommends tmux asciinema "
+                      "&& rm -rf /var/lib/apt/lists/*\n") if config.generation == "harbor" and config.agent_output_token_limit else ""
+    (environment / "Dockerfile").write_text(BASE_IMAGE + terminal_setup + "COPY model.py LICENSE /app/\n")
     repo = tests / "repo"
     repo.mkdir()
     for name in ("src", "kb_workflows", "scripts", "KernelBench"):
@@ -146,7 +148,8 @@ def write_task(directory, config, pid, sid=0, device=None):
                     stage="evaluate", problem_specs="", hardware=config.hardware or config.gpu,
                     runs_dir="/logs/verifier/kernelbench-pro/runs", build_image=False,
                     profile="", bedrock=False, model="", small_model="", modal_secret="",
-                    queue_url="http://127.0.0.1:8000", harbor_command="harbor")
+                    queue_url="http://127.0.0.1:8000", harbor_command="harbor",
+                    agent_token_limit=0, agent_output_token_limit=0, agent_device_seconds=0, agent_gpu_busy_seconds=0)
     # The outer Harbor Docker sandbox owns these restrictions, rather than a nested Docker daemon.
     child.isolation_mode = "standard"
     child.reference_population = ""
@@ -246,7 +249,7 @@ tags = ["cuda", "kernelbench-pro", "{config.precision}"]
 
 [agent]
 timeout_sec = {float(config.agent_timeout)}
-{('network_mode = "allowlist"' + chr(10) + 'allowed_hosts = ' + json.dumps(allowed_hosts(config.harbor_agent_hosts))) if config.harbor_agent_hosts else ('network_mode = "no-network"' if restricted else '')}
+{('network_mode = "no-network"') if config.generation == 'harbor' and config.agent_output_token_limit else (('network_mode = "allowlist"' + chr(10) + 'allowed_hosts = ' + json.dumps(allowed_hosts(config.harbor_agent_hosts))) if config.harbor_agent_hosts else ('network_mode = "no-network"' if restricted else ''))}
 
 [environment]
 {resources}
@@ -293,8 +296,18 @@ def run_harbor_agent(directory, config, pid, device=None, sid=0):
                "--n-attempts", "1", "--n-concurrent", "1"]
     if config.model:
         command += ["-m", config.model]
+    if config.agent_output_token_limit:
+        from .harbor_budget import ADAPTER, prepare_quota
+
+        admission = prepare_quota(directory, config, pid, sid)
+        command[command.index("-a") + 1] = ADAPTER
+        command += ["--agent-kwarg", "budget_admission=" + str(admission.resolve()),
+                    "--agent-kwarg", "budget_binding_sha256=" + fingerprint(read_json(admission)), "--max-retries", "0"]
+    environment = runtime_environment(config)
+    if config.agent_output_token_limit:
+        environment["PYTHONPATH"] = str(ROOT) + os.pathsep + environment.get("PYTHONPATH", "")
     with (directory / "harbor.log").open("w") as log:
-        process = subprocess.Popen(command, env=runtime_environment(config),
+        process = subprocess.Popen(command, env=environment,
                                    stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
             code = process.wait(timeout=config.agent_timeout + 4800 + verification_timeout(config, pid))
@@ -307,6 +320,13 @@ def run_harbor_agent(directory, config, pid, device=None, sid=0):
     budget = harbor_budget(jobs / job_name)
     if len(candidates) != 1 or candidates[0].is_symlink() or not candidates[0].is_file() or not candidates[0].stat().st_size:
         return {"status": "failed", "exit_code": code, "error": "Missing or ambiguous Harbor submission", "budget": budget}
+    if config.agent_output_token_limit:
+        from .harbor_budget import attach_quota
+
+        try:
+            budget = attach_quota(budget, directory, config, pid, sid)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            return {"status": "failed", "error": str(exc), "harbor_job": str(jobs / job_name), "budget": budget}
     output = directory / "runs" / "agent" / kernel_name(config.level, pid)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(candidates[0].read_bytes())

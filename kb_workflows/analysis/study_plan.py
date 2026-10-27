@@ -43,8 +43,8 @@ def make_plan(specification, *, directory, base_directory=None):
                    or not 0 < value < float("inf") for value in budgets)
             or not isinstance(levels, list) or not levels or len(set(levels)) != len(levels)):
         raise ValueError("Invalid models, methods, levels, sessions, or positive integer budget grid")
-    if vary != "wall" and "harbor" in methods:
-        raise ValueError("Harbor does not certify native candidate/token/device reservations; use a wall-time grid")
+    if vary != "wall" and "harbor" in methods and not (vary == "output_tokens" and document.get("harbor_agent", base.harbor_agent) == "terminus-2"):
+        raise ValueError("Harbor does not certify that budget grid; use wall time or controlled terminus-2 output tokens")
     jobs, skipped = [], []
     for mi, model in enumerate(models):
         for method in methods:

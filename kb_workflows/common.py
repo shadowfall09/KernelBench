@@ -183,6 +183,16 @@ def apply_score_gate(results, run_dir):
                     valid = all(metadata.get("score_auxiliary_files", {}).get(name) == value for name, value in hashes.items())
                 except (OSError, ValueError, KeyError, TypeError, AttributeError):
                     valid = False
+            if valid and config.get("generation") == "harbor" and config.get("agent_output_token_limit"):
+                from .runtime.harbor_budget import quota_artifact_hashes
+
+                try:
+                    pid_, sid_ = map(int, key.split("_"))
+                    summary = auxiliary["generation_summary.json"][key]
+                    hashes = quota_artifact_hashes(run_dir, pid_, sid_, summary, level=config["level"])
+                    valid = all(metadata.get("score_auxiliary_files", {}).get(name) == value for name, value in hashes.items())
+                except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                    valid = False
             for option in ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest"):
                 declared = config.get(option)
                 if declared:

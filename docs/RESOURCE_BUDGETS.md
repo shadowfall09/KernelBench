@@ -7,7 +7,7 @@
 | 配置 | 范围 | 支持入口 |
 | --- | --- | --- |
 | `agent_token_limit` | 累计完整prompt token IDs + 返回的生成token IDs；每轮prompt重新计入 | `local-transformers` |
-| `agent_output_token_limit` | 累计输出token；供应商包含的推理token按completion usage计入 | `local-transformers`、支持completion上限参数的LiteLLM模型 |
+| `agent_output_token_limit` | 累计输出token；供应商包含的推理token按completion usage计入 | `local-transformers`、支持completion上限参数的LiteLLM模型、受控Harbor Terminus 2 |
 | `agent_max_output_tokens` | 每次调用最多输出数，默认8192；用于本地模型或开启token预留的调用 | 同上 |
 | `agent_device_seconds` | 开发编译、标准测试与profiling占用独立worker的墙钟总额，包含子进程启动与清理 | 原生local/Docker/Modal生成；Modal生成使用Sandbox内local验证，其他原生生成可选local/Docker、Modal或新版queue |
 | `agent_gpu_busy_seconds` | 已验证CUDA worker进程活动的软件配额；完整活动并集或确认的worker墙钟上界扣额，实测值另存 | 同上；CUDA限定，Harbor/交互会话/RL不使用此契约 |
@@ -24,7 +24,7 @@ LiteLLM在请求前检查模型支持的`max_completion_tokens`/`max_tokens`参�
 
 开发worker每次执行前预留`min(任务超时+5秒清理余量, 剩余总墙钟, 剩余设备额度)`。不足5秒时不启动新任务。父进程把执行超时缩至预留减5秒，并用单调时钟测量整个transport调用，包括超时终止与清理；子进程提供的同名收据会被覆盖。profiling也要单独申请和结算。
 
-已知设备占用未超额时，预算耗尽仍可保留此前开发通过的最佳候选。缺失收据、无法完成清理或实际超额会拒绝计分资格。进程终止不能保证任意驱动或内核被立即抢占；收据明确写`physical_preemption_certified=false`，没有实现纯GPU busy时间的物理硬限。新版HTTP队列与Modal验证已有下述服务端租约；Modal原生生成复用Sandbox内的token/worker预留，Harbor外部agent仍不支持这些硬预留。
+已知设备占用未超额时，预算耗尽仍可保留此前开发通过的最佳候选。缺失收据、无法完成清理或实际超额会拒绝计分资格。进程终止不能保证任意驱动或内核被立即抢占；收据明确写`physical_preemption_certified=false`，没有实现纯GPU busy时间的物理硬限。新版HTTP队列与Modal验证已有下述服务端租约；Modal原生生成复用Sandbox内的token/worker预留，Harbor设备额度仍不支持；受控输出额度见下节。
 
 可选[内存工具与重复检查](TOOL_CHECKS.md)在同一次验证请求的超时和设备worker墙钟内执行；插桩、版本查询及无插桩复核没有独立额度。它们的耗时不进入性能分数，但计入实际开发资源占用。
 
@@ -49,6 +49,26 @@ agent_device_seconds = 180.0  # 可选：同时限制整个worker墙钟
 每个账本条目绑定round/task、原始租约、父时间、结算方法和活动摘要。评分重放`rounds/*/standard.json`及profile反馈；这些原始工件也进入旧评分门的缓存指纹，文件改变后旧分失效。缺配额证明、超额、重复请求或伪造实测汇总不能靠修改汇总布尔值取得资格。Harbor及TRL入口未兑现这个契约时在配置阶段拒绝；已有产物regrade清掉新生成限制，保留历史成本。
 
 研究计划支持`vary="gpu_busy_seconds"`；轴分别是`declared_gpu_busy_seconds`、`observed_worker_gpu_busy_seconds`和`observed_gpu_quota_charge_seconds`。计量未知的观测轴不填零，进程范围、配额政策及其余预算进入比较分组，不能与整机GPU预算混在一起。
+
+## Harbor Terminus 2 输出额度
+
+统一生成入口支持固定Harbor 0.24.0的`terminus-2`：
+
+```toml
+[run]
+generation = "harbor"
+generation_mode = "external"
+harbor_agent = "terminus-2"
+model = "openai/your-model"
+agent_output_token_limit = 32768
+agent_max_output_tokens = 4096
+```
+
+实际agent由host上的受控适配器启动。普通调用和摘要调用都经过同一个LiteLLM额度门；请求前预留`min(每次上限, 剩余额度)`，显式禁止SDK重试、回退和多结果。每次返回按规范化completion usage结算；用量缺失、超额或回复丢失时停止后续调用，保留扣额和失败证据。供应商上限仍依赖其参数契约，不认证账单或精确总token数。Harbor原先报告的用量单独保存，避免摘要等辅助调用漏计。
+
+终端运行期禁止联网，API凭据仅留在host；agent镜像构建时预装tmux/asciinema。单个任务只有一次host准入，关闭Harbor重试；恢复可复用已完成的同签名结果，不能重开账。正式评分重放准入、账本、唯一尝试、原始trial结果和源码工件；这些文件参与评分缓存摘要，改动后旧资格失效。私有最终验证清除生成限额，避免把验证阶段计入agent预算。
+
+`output_tokens`研究网格支持此路径。其他Harbor agent（包括Claude Code）、总token、worker/GPU额度仍拒绝；`export-harbor`独立导出也拒绝开启额度，因为导出文件不能强制外部启动方式。此实现未启动容器、hosted模型或真实agent实验；软件检查使用真实Harbor AgentFactory/LiteLLM接口，替换网络provider和外层执行器。
 
 ## HTTP队列的开发租约
 
@@ -113,4 +133,4 @@ devices = [0]
 
 [研究工作流](STUDIES.md)的`vary`增加`total_tokens`、`output_tokens`和`device_lease_seconds`；对应曲线横轴是`declared_total_tokens`、`declared_output_tokens`和`declared_device_lease_seconds`。配置预检按后端能力拒绝不可兑现的计划；默认仍只生成计划，不启动实验。不同口径、未变化的其他预算和硬件分别比较。
 
-R-18仍标为部分实现，剩余包括纯GPU时间物理硬限及Harbor外部agent的资源契约，均没有用worker墙钟或终止确认代替。
+R-18仍标为部分实现，剩余包括纯GPU时间物理硬限及Harbor其他agent、设备及总token契约，均没有用worker墙钟或终止确认代替。

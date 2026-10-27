@@ -1602,7 +1602,7 @@
         "scripts/run_agent.py",
         "kb_workflows/analysis/experiment.py"
       ],
-      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证共享nonce准入与有界取消。Modal原生生成复用输出token/本地worker账本，统一实际开发后端，单次CLI准入、结果/工件绑定、统一SDK期限、有界终止及评分复核；未知用量拒绝且不重花。已接入agent_gpu_busy_seconds的软件预留：在单worker进程活动完整时计量并集，其他情况按确认的worker墙钟上界扣额、实测值保留未知；与旧worker额度共同准入，逐轮工件及缓存重放，模型/最终阶段和其他进程不冒充已覆盖。整机/其他进程的纯GPU busy物理硬限及Harbor外部生成契约继续实现；未运行设备、云资源或模型实验"
+      "reason": "已实现本地精确token/API输出限额、local/Docker开发worker墙钟与评分/恢复；HTTP队列绑定请求/nonce、服务端到期及进程组清理，Modal验证共享nonce准入与有界取消。Modal原生生成复用输出token/本地worker账本，统一实际开发后端，单次CLI准入、结果/工件绑定、统一SDK期限、有界终止及评分复核；未知用量拒绝且不重花。已接入agent_gpu_busy_seconds的软件预留：在单worker进程活动完整时计量并集，其他情况按确认的worker墙钟上界扣额、实测值保留未知；与旧worker额度共同准入，逐轮工件及缓存重放，模型/最终阶段和其他进程不冒充已覆盖。Harbor Terminus 2已接入host LiteLLM输出预留，覆盖普通和摘要调用、一次准入、禁重试、未知用量拒绝、原始工件评分/缓存与预算网格；终端禁止联网，私有最终验证不继承生成额度。整机/其他进程的纯GPU busy物理硬限、Harbor其他agent及设备/总token契约仍未完成；未运行设备、云资源或模型实验"
     },
     {
       "id": "R-19",
@@ -5434,6 +5434,24 @@
         "docs/RESOURCE_BUDGETS.md"
       ],
       "reason": "新增可配置CUDA worker进程软件配额，复用现有租约、账本与local/Docker/队列/Modal准入，不增加运行模块。调用前同时预留worker及GPU额度并收紧超时，完整当前活动按整个进程并集计量；计量缺失或其他诊断worker未覆盖时按可信父进程墙钟上界扣额，实测GPU值保留未知，父进程用量不明则烧预留并拒绝资格。逐轮标准/profile工件、原始租约、实测/上界分离进入评分和缓存指纹，研究轴区分声明配额/观测进程busy/配额扣额；regrade清掉新生成限制，未适配RL/Harbor拒绝。其他GPU进程、模型推理/最终验证及物理抢占不在该计量范围，完整R-18继续部分实现；仅两个集中回归及既有检查扩展，无实验"
+    },
+    {
+      "id": "V63-01",
+      "title": "Harbor受控输出额度与评分恢复",
+      "primary": "M4",
+      "secondary": [
+        "M2",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/runtime/harbor_budget.py",
+        "kb_workflows/runtime/harbor.py",
+        "kb_workflows/analysis/study_plan.py",
+        "tests/runtime/test_harbor.py"
+      ],
+      "reason": "在已有模块接入固定Harbor 0.24 Terminus 2的host LiteLLM逐请求输出预留，覆盖普通/摘要调用与规范化usage，单次准入且关闭SDK/Harbor重试和回退。终端禁止联网，镜像预装终端工具，凭据仅在host；缺失/超额/丢失回复烧预留并停止，恢复不重开账。评分重放账本、单次尝试和原始Harbor工件，缓存按内容失效；支持output_tokens研究网格，私有最终验证清除生成额度。不支持的agent/总token/设备契约仍拒绝，独立任务导出不宣称控制额度；两个集中SDK/评分回归，无容器、模型或设备实验。"
     }
   ]
 }

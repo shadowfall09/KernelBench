@@ -193,11 +193,19 @@ class RunConfig:
                 raise ValueError(f"{name} must be finite and nonnegative")
         from .agents.resource_budgets import active
 
+        harbor_output_quota = self.generation == "harbor" and self.harbor_agent == "terminus-2" and self.agent_output_token_limit > 0
+        if harbor_output_quota and not self.model:
+            raise ValueError("Controlled Harbor output quotas require an explicit model")
+        if harbor_output_quota and self.harbor_agent_hosts:
+            raise ValueError("Controlled Harbor output quotas require a no-network terminal; model calls run on the host")
+        if self.stage == "export-harbor" and active(self):
+            raise ValueError("Harbor task exports cannot enforce agent quotas; use the controlled unified generation entry")
         if active(self) and self.generation not in {"local", "docker", "modal"}:
-            raise ValueError("Resource reservations require native local/docker/Modal generation; external Harbor enforcement is unavailable")
+            if not harbor_output_quota or self.agent_token_limit or self.agent_device_seconds or self.agent_gpu_busy_seconds:
+                raise ValueError("Harbor supports controlled terminus-2 output quotas only; other reservations require native generation")
         if self.agent_token_limit and self.agent_backend != "local-transformers":
             raise ValueError("Exact total-token caps require local-transformers; provider token estimates cannot certify this cap")
-        if self.agent_output_token_limit and self.agent_backend not in {"local-transformers", "litellm"}:
+        if self.agent_output_token_limit and not harbor_output_quota and self.agent_backend not in {"local-transformers", "litellm"}:
             raise ValueError("Output-token reservations require local-transformers or a supported single-call LiteLLM provider")
         if (self.agent_device_seconds or self.agent_gpu_busy_seconds) and self.evaluation not in {"local", "docker", "queue", "modal"}:
             raise ValueError("Device lease reservations require a supported native verification transport")
@@ -299,7 +307,7 @@ class RunConfig:
                 raise ValueError("Restricted verification requires evaluation=docker and CUDA")
             if self.generation == "harbor" and self.harbor_environment != "docker":
                 raise ValueError("Restricted Harbor verification requires its Docker provider")
-            if self.generation == "harbor" and self.stage in {"all", "generate"} and not hosts:
+            if self.generation == "harbor" and self.stage in {"all", "generate"} and not hosts and not harbor_output_quota:
                 raise ValueError("Restricted Harbor agent execution requires explicit --harbor-agent-hosts")
             if self.generation in {"docker", "modal"} and self.stage in {"all", "generate"}:
                 raise ValueError("Restricted verification requires a separate verifier; use local or Harbor generation")
