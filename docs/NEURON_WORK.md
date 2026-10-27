@@ -36,6 +36,16 @@ DMA包的read/write/transfer字节另列。它们包含不同存储端点和host
 
 `neuron_tables.validate()`从报告保留的原始投影表重算工作、busy与关联，复查文件/分片和投影收据，拒绝改汇总后重新封装的报告。这是离线一致性校验，不是设备采集的密码学认证。Metadata中的`capture_type=hardware`只记录供应商声明，不会使`hardware_counters_collected`或`formal_origin_qualified`变真，也不替代正式墙钟样本。
 
+## 运行时key与NEFF缓存快照
+
+Neuron worker与CUDA共用源码冻结、字节核对和编译注册，`source_registration=frozen_compile_code_objects`记录本次实际执行的代码对象；相同文件名或重新编译的相同文本不能借用注册身份。源文件保持可检查，旧`.pyc`不能替代本次编译；原始换行字节也参与核对。候选前后状态观察复用同一个注册表。
+
+原生profile的`runtime_neff_bindings`从导出的Chrome trace选择`privateuse1_driver`完整事件，排除显式host worker及runtime提交事件。只使用原始`neff_cache_key`与`persistent_cache_key`，不靠kernel名称猜身份。每对key调用一次在候选导入前保存的`torch_neuronx._C.get_neff_info`，要求返回的persistent key精确相同，再保存NEFF字节、SHA-256与原始事件索引。接口和事件字段分别依据固定SDK源码的[缓存查询实现](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/NeuronBindings.cpp#L2259)与[设备事件导出实现](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/profiler/Session.cpp#L691)核对，没有运行SDK或设备实验。
+
+实时采集和离线处理复用已有完整工件清单检查：默认4096文件、单文件128 MiB、总计512 MiB。trace另限64 MiB及200,000事件。不重复保存已有同哈希`.neff`；缺少时才写入`runtime_neff/<SHA-256>.neff`。清单与收据同时核对哈希、字节数及事件覆盖。缺少SDK接口、字段不完整、查询失败或key不匹配均保留未解析事件；`observed/partial/not_measured`区分完整关联、部分关联和未测量。
+
+这里观测的是执行事件key与查询时的缓存字节快照；它没有捕获编译前端到NEFF的完整生成链，也没有读取实际加载到设备的二进制。因此`loaded_binary_identity_proven`与`formal_origin_qualified`保持false，不能据此通过Neuron自写内核门或授予L1/L2资格。
+
 ## 审核后的资源需求模型
 
 Neuron worker的profile返回`kernelbench_pro_neuron_verified_capture_v2`收据。它在冻结编译源码再次核对后生成，保留候选/参考源码、配置、完整输入/输出内容摘要、输入几何和布局、此前正确性用例、实际设备/软件、模式、seed、比较政策和原生工件哈希/字节数，并记录原生worker的可见core清单。实际候选模型在采集前后分别通过共享状态遍历记录参数/buffer、普通属性、类数据、入口代码/default/closure及输入/状态别名摘要；合法状态更新可使前后摘要不同。内容摘要分块复制到主机，不再用参考模型的256点注册状态探针替代候选状态。所有摘要及输入隔离复制都在采集区间外完成，采集中只有候选前向及完成屏障。

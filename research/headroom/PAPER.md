@@ -197,6 +197,8 @@ The native counter v2 format additionally requests Nsight launch attributes in t
 
 Native CUDA activity also retains memcpy/memset payload bytes, transfer and memory kinds, and peer device/context identities. Per-call origin, timeline and counter reports separate logical payload and device-side reads/writes from hardware DRAM/cache counters. Missing fields, clipped windows, dropped records and unsupported direction/residency cannot become zero. Peer transfers do not establish single-device GPU quota measurements. Native-memory execution SOL still requires dedicated transfer calibration; these logical bytes are not added to DRAM counts. Validation remains software-only.
 
+Neuron now shares CUDA's frozen-source compiler and registers the exact executed Python code objects, avoiding stale bytecode reuse. Native Chrome device events retain runtime and persistent cache keys; one SDK lookup per key pair links events to current NEFF cache byte snapshots, reusing matching artifacts and the existing bounded file inventory. Missing or inconsistent entries remain unresolved. This establishes neither frontend-to-NEFF compilation ownership nor actual runtime-loaded binary identity, so Neuron source and formal timing attribution remain unfinished. Only software regressions and static SDK inspection were performed; [Neuron work evidence](../../docs/NEURON_WORK.md) records the fields and limits.
+
 ## 5. Motivation 4: evaluate the feedback loop and its cost
 
 ### 5.1 Implemented interaction protocols

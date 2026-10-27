@@ -1426,9 +1426,11 @@
         "tests/provenance/test_graph_updates.py",
         "kb_workflows/provenance/origin_task.py",
         "kb_workflows/evaluation/measurement.py",
-        "kb_workflows/evaluation/paired_task.py"
+        "kb_workflows/evaluation/paired_task.py",
+        "kb_workflows/hardware/neuron_work.py",
+        "kb_workflows/hardware/neuron_worker.py"
       ],
-      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron来源及未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
+      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron已有本次编译代码对象注册及运行时key/当前NEFF缓存快照，编译归属与实际加载身份仍未建立；未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
     },
     {
       "id": "R-09",
@@ -1568,7 +1570,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始名称及launch配置。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态。剩余：ncu进程二进制及memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、完整正式L2门。模拟资料不授予资格，未运行设备或工具实验"
+      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始名称及launch配置。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key关联当前NEFF缓存快照，未证明实际加载身份。剩余：ncu进程二进制及memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、完整正式L2门。模拟资料不授予资格，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -4765,9 +4767,10 @@
       "evidence": [
         "kb_workflows/hardware/neuron_device.py",
         "docs/NEURON_WORK.md",
-        "tests/hardware/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py",
+        "kb_workflows/hardware/neuron_work.py"
       ],
-      "reason": "接当前SDK的NeuronProfiler.export_trace回调，在编译前设置私有NEFF缓存并恢复环境，流式保留NEFF/NTFF与框架trace摘要"
+      "reason": "接NeuronProfiler.export_trace与编译前私有NEFF缓存；设备事件的运行时/持久化key按SDK当前缓存字节关联，每对key只查一次，保存原始事件索引、哈希和字节。复用已有NEFF，缺少才保存快照；缺失或不一致保留未知，不证明实际加载或源码编译归属"
     },
     {
       "id": "V43-05",
@@ -4931,9 +4934,10 @@
       "evidence": [
         "kb_workflows/hardware/neuron_device.py",
         "docs/NEURON_WORK.md",
-        "tests/hardware/test_device_adapters.py"
+        "tests/hardware/test_device_adapters.py",
+        "kb_workflows/hardware/neuron_processing.py"
       ],
-      "reason": "原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射"
+      "reason": "原生采集与离线处理共用完整工件清单及文件/字节上限，删除实时采集重复遍历；记录可见core，自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射"
     },
     {
       "id": "V45-02",
@@ -5257,9 +5261,10 @@
         "kb_workflows/evaluation/state_paths.py",
         "tests/hardware/test_device_adapters.py",
         "tests/hardware/test_neuron_work.py",
-        "docs/NEURON_WORK.md"
+        "docs/NEURON_WORK.md",
+        "kb_workflows/provenance/submission_source.py"
       ],
-      "reason": "用实际候选前后完整状态、入口及输入/状态别名取代参考模型的256点注册状态探针，同时绑定完整输入/输出内容与输入布局；复用现有状态遍历和流式内容摘要，不增加运行模块。采集窗口外取摘要，未知状态和旧协议不能获得完整需求模型资格，仍不证明执行所有权或原生计时等价"
+      "reason": "实际候选前后完整状态、入口和输入/状态别名绑定完整输入/输出与布局；CUDA/Neuron共用源码冻结、字节核对及本次编译代码对象注册，状态观察复用注册表，不执行旧pyc，保留原始换行。复用现有模块和测试，未知状态及旧协议不能通过完整需求模型；仍不证明执行所有权或原生计时等价"
     },
     {
       "id": "V57-01",

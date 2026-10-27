@@ -28,16 +28,14 @@ def map_tensors(value, function):
 
 def load_source(source, name, *, filename=None):
     if filename is not None:
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        if filename.exists() and filename.read_text() != source:
-            raise ValueError("Neuron compiler source file differs from the frozen payload")
-        if not filename.exists():
-            filename.write_text(source)
+        from ..provenance.submission_source import compile_source
+
+        code = compile_source(source, filename)
         module_name = name + "_" + hashlib.sha256(source.encode()).hexdigest()[:16]
         specification = importlib.util.spec_from_file_location(module_name, filename)
         module = importlib.util.module_from_spec(specification)
         sys.modules[module_name] = module
-        specification.loader.exec_module(module)
+        exec(code, vars(module))
         return vars(module)
     namespace = {"__name__": name}
     exec(compile(source, f"<{name}>", "exec"), namespace)
@@ -106,15 +104,18 @@ def profile_source_cache(payload):
 def evaluate(payload, *, adapter=None):
     import torch
 
-    with torch.no_grad(), profile_source_cache(payload):
-        result = _evaluate(payload, adapter=adapter)
+    from ..provenance.submission_source import SourceRegistry, record_sources
+
+    registry = SourceRegistry()
+    with torch.no_grad(), profile_source_cache(payload), record_sources(registry):
+        result = _evaluate(payload, adapter=adapter, registry=registry)
     build = ROOT / "cache/workflow" / fingerprint(payload)
     hashes = {}
     for key, name in (("ref_arch_src", "reference.py"), ("kernel_src", "candidate.py")):
         if key not in payload:
             continue
         path = build / name
-        if path.is_symlink() or not path.is_file() or path.read_text() != payload[key]:
+        if path.is_symlink() or not path.is_file() or path.read_bytes() != payload[key].encode():
             raise ValueError("NKI compiler source files changed during execution")
         hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
     if payload["eval_config"].get("use_hidden_tests"):
@@ -122,6 +123,9 @@ def evaluate(payload, *, adapter=None):
         if hashlib.sha256(path.read_bytes()).hexdigest() != payload["eval_config"]["hidden_source_sha256"]:
             raise ValueError("Hidden sources changed during Neuron execution")
     result.setdefault("metadata", {})["compiler_source_sha256"] = hashes
+    if not registry.intact():
+        raise ValueError("Registered Neuron compiler sources changed during execution")
+    result["metadata"]["compiler_source_registration"] = "frozen_compile_code_objects"
     if payload.get("task") == "profile":
         from .neuron_work import capture_record
 
@@ -129,7 +133,7 @@ def evaluate(payload, *, adapter=None):
     return result
 
 
-def _evaluate(payload, *, adapter=None):
+def _evaluate(payload, *, adapter=None, registry=None):
     """Run native stages. Injecting a CPU adapter produces explicitly simulated receipts."""
     import torch
 
@@ -399,7 +403,7 @@ def _evaluate(payload, *, adapter=None):
                 from ..provenance.submission_source import SourceRegistry
                 from .neuron_work import SCOPE
 
-                registry = SourceRegistry()
+                registry = registry or SourceRegistry()
                 training = bool(ref.training)
                 if bool(model.training) != training:
                     raise ValueError("Neuron profile candidate changed the reference training mode")

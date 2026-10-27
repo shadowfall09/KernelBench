@@ -61,7 +61,7 @@ python -m kb_workflows.runtime.queue_worker --config configs/trainium2.toml \
 
 ## NKI提交与基线
 
-保留`ModelNew(torch.nn.Module)`接口，forward接收原生`neuron`张量。使用`import nki`、`@nki.jit`及`torch_neuronx.nki_op`注册内核；API示例见[官方NKI集成说明](https://github.com/aws-neuron/torch-neuronx#using-nki-kernels)。编译源文件实际写入独立构建目录，支持NKI源码检查；返回前再次核对源码，运行中改写文件不能获得有效结果。
+保留`ModelNew(torch.nn.Module)`接口，forward接收原生`neuron`张量。使用`import nki`、`@nki.jit`及`torch_neuronx.nki_op`注册内核；API示例见[官方NKI集成说明](https://github.com/aws-neuron/torch-neuronx#using-nki-kernels)。CUDA与Neuron共用源码冻结与编译注册：核对文件原始字节，注册本次编译的代码对象后直接执行，支持NKI源码检查并避免复用旧`.pyc`。返回前复查源码，运行中改写文件不能获得有效结果。profile另保留[运行时key与NEFF缓存快照关联](NEURON_WORK.md#运行时key与neff缓存快照)，尚不证明源码编译归属或实际加载二进制身份。
 
 基线组合包括原生eager和`torch.compile(backend="neuron",fullgraph=True,dynamic=False)`。Production的attention、layer norm、residual RMSNorm和GQA另有经过语义回归的框架库改写变体。每个变体独立验证/计时，再取当前正确且最快者；没有把CUDA基线或CPU耗时迁移为Neuron基线。库改写不保证编译器在所有版本上选择同一个NKI库内核。
 

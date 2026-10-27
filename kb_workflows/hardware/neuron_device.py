@@ -78,6 +78,7 @@ class NeuronDevice:
             raise ValueError("This serial device adapter requires neuron devices with LNC=1")
         self.backend, self.torch = torch_neuronx, torch
         self._sync = torch_neuronx.synchronize
+        self._neff_info = getattr(getattr(torch_neuronx, "_C", None), "get_neff_info", None)
         self._clock = perf_counter
         self._versions = {"torch_neuronx": version("torch-neuronx"), "nki": version("nki"), "neuronx_cc": version("neuronx-cc")}
         if torch_neuronx.device_count() <= (self.device.index or 0):
@@ -216,12 +217,15 @@ class NeuronDevice:
         path = directory / "framework_trace.json"
         capture.export_chrome_trace(str(path))
         del output
-        from .neuron_tables import file_digest
+        from .neuron_processing import DEFAULT_LIMITS, file_manifest
+        from .neuron_work import runtime_neff_bindings
 
-        files = {str(item.relative_to(directory)): item for item in directory.rglob("*")
-                 if item.is_file() and not item.is_symlink()}
+        bindings = runtime_neff_bindings(path, directory, getattr(self, "_neff_info", None))
+
+        files = file_manifest(directory, DEFAULT_LIMITS)
         return {"framework_trace": str(path), "vendor_artifact_directory": str(directory),
-                "artifact_files": {name: file_digest(item) for name, item in files.items()},
-                "artifact_file_bytes": {name: item.stat().st_size for name, item in files.items()},
+                "artifact_files": {name: item["sha256"] for name, item in files.items()},
+                "artifact_file_bytes": {name: item["bytes"] for name, item in files.items()},
+                "runtime_neff_bindings": bindings,
                 "output_verified": verifier is not None,
                 "exporter": "NeuronProfiler.export_trace", "timings_are_diagnostic": True, "hardware_counters_collected": False}

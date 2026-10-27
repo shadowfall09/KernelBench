@@ -311,13 +311,42 @@ def test_neuron_library_baselines_preserve_production_semantics(pid, monkeypatch
     assert compare_outputs(expected, library(*args), 1e-5) is None
 
 
-def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(payload):
+def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(payload, monkeypatch):
+    import importlib.util
+    import os
+    import py_compile
+
+    from kb_workflows.provenance.submission_source import SourceRegistry, record_sources
+
     config, request = payload
     value = neuron_worker.evaluate(request, adapter=SimulatedNeuron())
     path = neuron_worker.ROOT / "cache/workflow" / fingerprint(request) / "candidate.py"
-    namespace = neuron_worker.load_source(request["kernel_src"], "inspection_test", filename=path)
+    registry = SourceRegistry()
+    with record_sources(registry):
+        namespace = neuron_worker.load_source(request["kernel_src"], "inspection_test", filename=path)
     assert "class ModelNew" in inspect.getsource(namespace["ModelNew"])
     assert value["metadata"]["compiler_source_sha256"]["candidate.py"]
+    assert value["metadata"]["compiler_source_registration"] == "frozen_compile_code_objects"
+    assert registry.source_for(namespace["ModelNew"].forward)["source_sha256"] == value["metadata"]["compiler_source_sha256"]["candidate.py"]
+    copied = {"__name__": "recompiled_neuron_source"}
+    exec(compile(request["kernel_src"], str(path), "exec", dont_inherit=True), copied)
+    assert registry.source_for(copied["ModelNew"].forward) is None
+    original, stamp = path.read_bytes(), path.stat()
+    path.write_bytes(original.replace(b"ModelNew", b"XodelNew"))
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    py_compile.compile(str(path), doraise=True, invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP)
+    path.write_bytes(original)
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    spec = importlib.util.spec_from_file_location("stale_neuron_pyc_control", path)
+    control = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, control)
+    spec.loader.exec_module(control)
+    assert "XodelNew" in vars(control) and "ModelNew" not in vars(control)
+    refreshed = neuron_worker.load_source(request["kernel_src"], "trusted_compilation", filename=path)
+    assert "ModelNew" in refreshed and "XodelNew" not in refreshed
+    crlf = copy.deepcopy(request)
+    crlf["kernel_src"] = request["kernel_src"].replace("\n", "\r\n")
+    assert neuron_worker.evaluate(crlf, adapter=SimulatedNeuron())["correctness"]
     path.write_text("# changed compiled source")
     with pytest.raises(ValueError, match="compiler source file"):
         neuron_worker.evaluate(engine.task_payload(config, 19), adapter=SimulatedNeuron())
@@ -353,6 +382,8 @@ def test_native_caps_bind_compiler_versions_and_physical_core_without_sdk_execut
 
 
 def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(tmp_path, monkeypatch):
+    from kb_workflows.hardware.neuron_work import runtime_neff_bindings, seal, validate_runtime_neff
+
     directory, observed, events = tmp_path / "profile", [], []
     monkeypatch.setenv("TORCH_NEURONX_NEFF_CACHE_DIR", str(tmp_path / "source_cache"))
     class Capture:
@@ -362,7 +393,10 @@ def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(
             observed[-1]["on_trace_ready"](self)
             events.append("capture_closed")
         def export_chrome_trace(self, path):
-            Path(path).write_text('{"traceEvents":[]}')
+            event = {"ph": "X", "cat": "privateuse1_driver", "ts": 100, "dur": 10,
+                     "args": {"neff_cache_key": "key-a", "persistent_cache_key": "persistent-a"}}
+            Path(path).write_text(json.dumps({"traceEvents": [event, event,
+                {**event, "cat": "privateuse1_runtime"}, {**event, "args": {**event["args"], "host_worker_idx": 0}}]}))
     class Exporter:
         def __init__(self, config):
             self.config = config
@@ -383,6 +417,8 @@ def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(
                                                     ProfilerActivity=SimpleNamespace(CPU="cpu", PrivateUse1="neuron")))
     instance = neuron_device.NeuronDevice.__new__(neuron_device.NeuronDevice)
     instance.device, instance.torch, instance._sync = "neuron:0", stub, lambda device: None
+    lookups = []
+    instance._neff_info = lambda key: lookups.append(key) or ("persistent-a", b"SIMULATED NEFF")
     def verify(output):
         assert events == ["capture_closed"] and output == "profiled_output"
         events.append("verified")
@@ -393,6 +429,36 @@ def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(
     assert observed[0]["experimental_config"]["neff_cache_dir"] == str(tmp_path / "source_cache")
     assert receipt["output_verified"] and events == ["capture_closed", "verified"]
     assert not receipt["hardware_counters_collected"] and receipt["timings_are_diagnostic"]
+    binding = receipt["runtime_neff_bindings"]
+    assert binding["status"] == "observed" and binding["device_event_count"] == 2 and lookups == ["key-a"]
+    assert binding["bindings"][0]["artifact"] == "fixture.neff" and binding["bindings"][0]["event_indexes"] == [0, 1]
+    assert not binding["loaded_binary_identity_proven"] and not binding["formal_origin_qualified"]
+    validate_runtime_neff(binding, receipt["artifact_files"], receipt["artifact_file_bytes"])
+    for getter in (None, lambda key: None, lambda key: ("other-key", b"SIMULATED NEFF")):
+        unknown = runtime_neff_bindings(directory / "framework_trace.json", directory, getter)
+        assert unknown["status"] == "not_measured" and unknown["unresolved_events"] == [0, 1]
+        validate_runtime_neff(unknown, receipt["artifact_files"], receipt["artifact_file_bytes"])
+    for patch in ({"ts": None}, {"dur": 0}, {"dur": float("inf")}, {"args": {
+            "neff_cache_key": "key-a", "persistent_cache_key": "persistent-a", "host_worker_idx": "0"}}):
+        bad = json.loads((directory / "framework_trace.json").read_text())["traceEvents"][0]
+        bad.update(patch)
+        trace = directory / "invalid_trace.json"
+        trace.write_text(json.dumps({"traceEvents": [bad]}))
+        unknown = runtime_neff_bindings(trace, directory, lambda key: pytest.fail("Invalid device event queried the SDK"))
+        assert unknown["status"] == "not_measured" and unknown["unresolved_events"] == [0]
+    for damage in (lambda record: record["bindings"][0].update(neff_sha256="f" * 64),
+                   lambda record: record["bindings"][0].update(neff_bytes=1),
+                   lambda record: record["bindings"][0].update(event_indexes=[0, 0]),
+                   lambda record: record.update(loaded_binary_identity_proven=True)):
+        changed = copy.deepcopy(binding)
+        damage(changed)
+        seal(changed)
+        with pytest.raises(ValueError):
+            validate_runtime_neff(changed, receipt["artifact_files"], receipt["artifact_file_bytes"])
+    snapshot = runtime_neff_bindings(directory / "framework_trace.json", directory,
+        lambda key: ("persistent-a", b"ANOTHER SIMULATED NEFF"))
+    artifact = directory / snapshot["bindings"][0]["artifact"]
+    assert artifact.read_bytes() == b"ANOTHER SIMULATED NEFF"
     with pytest.raises(ValueError, match="fresh artifact"):
         instance.profile(lambda: None, directory=directory)
 

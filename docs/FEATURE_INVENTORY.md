@@ -173,7 +173,7 @@
 | V43-06 | 推理模式统一与梯度设置恢复 | [strict_validation.py](../kb_workflows/evaluation/strict_validation.py) | [M2](MOTIVATION.md#m2) |
 | V44-01 | Neuron采集来源与调用收据 | [neuron_work.py](../kb_workflows/hardware/neuron_work.py) | [M2](MOTIVATION.md#m2) |
 | V44-04 | 显式execution身份核对 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M2](MOTIVATION.md#m2) |
-| V45-01 | 采集字节与可见core清单 | [neuron_device.py](../kb_workflows/hardware/neuron_device.py) | [M2](MOTIVATION.md#m2) |
+| V45-01 | 采集字节与可见core清单 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py) | [M2](MOTIVATION.md#m2) |
 | V45-03 | 固定Explorer处理工具与命令 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py) | [M2](MOTIVATION.md#m2) |
 | V45-04 | 输入输出复查与失败工件保留 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py) | [M2](MOTIVATION.md#m2) |
 | V48-01 | 原生调用覆盖与独立来源对照 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M2](MOTIVATION.md#m2) |
@@ -389,7 +389,7 @@
 | V42-06 | 计数器路由与精度校准队列修复 | [audit_work_counters.py](../scripts/audit_work_counters.py) | [M5](MOTIVATION.md#m5) |
 | V42-07 | 计数器反例与软件集成回归 | [test_work_counters.py](../tests/provenance/test_work_counters.py) | [M5](MOTIVATION.md#m5) |
 | V43-01 | Schema12分片完整读取与资源准入 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M5](MOTIVATION.md#m5) |
-| V43-04 | Neuron采集导出与源码缓存 | [neuron_device.py](../kb_workflows/hardware/neuron_device.py) | [M5](MOTIVATION.md#m5) |
+| V43-04 | Neuron采集导出与源码缓存 | [运行时key与NEFF缓存快照](NEURON_WORK.md#运行时key与neff缓存快照) | [M5](MOTIVATION.md#m5) |
 | V43-07 | Parquet与Neuron模拟回归 | [test_neuron_tables.py](../tests/hardware/test_neuron_tables.py) | [M5](MOTIVATION.md#m5) |
 | V44-06 | 离线模型命令与失败门 | [analyze_device_trace.py](../scripts/analyze_device_trace.py) | [M5](MOTIVATION.md#m5) |
 | V44-07 | 注释模型与篡改回归 | [test_neuron_work.py](../tests/hardware/test_neuron_work.py) | [M5](MOTIVATION.md#m5) |

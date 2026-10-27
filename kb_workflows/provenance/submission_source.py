@@ -116,11 +116,10 @@ def record_sources(registry):
         _ACTIVE.reset(token)
 
 
-def execute(source, context, build_directory):
-    """Keep source inspectable for Triton and return definitions in context."""
-    directory = Path(build_directory).resolve()
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / ("candidate_" + sha256(source.encode()) + ".py")
+def compile_source(source, path):
+    """Freeze bytes and register the exact code executed by either device loader."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     # O_EXCL + O_NOFOLLOW avoids silently executing through a reused symlink.
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -130,15 +129,22 @@ def execute(source, context, build_directory):
             import stat
 
             if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode) or handle.read(len(source.encode()) + 1) != source.encode():
-                raise ValueError("Frozen candidate source path is not the expected regular file")
+                raise ValueError("Frozen compiler source file is not the expected regular file")
     else:
         with os.fdopen(fd, "wb") as handle:
             handle.write(source.encode())
-    # Only the candidate's own future imports may change its language semantics.
+    # Only the source's own future imports may change its language semantics.
     code = compile(source, str(path), "exec", dont_inherit=True)
     registry = _ACTIVE.get()
     if registry is not None:
         registry.register(source, path, code)
+    return code
+
+
+def execute(source, context, build_directory):
+    """Keep source inspectable for Triton and return definitions in context."""
+    path = Path(build_directory).resolve() / ("candidate_" + sha256(source.encode()) + ".py")
+    code = compile_source(source, path)
     context["__name__"] = "kernelbench_candidate_" + sha256(str(path).encode())
     context["__file__"] = str(path)
     # inspect.getsource(classes), dataclasses and JIT imports consult sys.modules.
