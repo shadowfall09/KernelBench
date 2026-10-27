@@ -26,7 +26,7 @@ ncu禁用用户配置和额外kernel重命名，显式关闭cache flush与时钟
 
 嵌入的原生收据现为v2，实际/对照/来源/ncu按调用核对模型前后数据、入口和输入/状态别名摘要。状态更新可以合法发生，但不能把不同参数或入口下测到的工作量借给实际调用；未知状态不能补成空状态。取摘要不进入原生计时或CUPTI/NVTX窗口，也不把这组观察当作host控制流等价证明。
 
-报告只保留一份原始CSV、源码采集和计数器进程记录，按调用重算计数，不复制整份CSV到每个调用。协议为 `kernelbench_pro_native_work_counters_v2`；`counter_task.validate()`重放全部关联及工作量，不信任保存的passed标记或重封的汇总。旧 `kernelbench_pro_work_counters_v1` 的原始CSV读取和离线模型API仍可用于历史诊断，但不能建立本版原生调用关联。
+报告保留一份原始CSV、可用时的ncu二进制报告、源码采集和计数器进程记录，按调用重算，不向每个调用复制完整原始报告。协议为 `kernelbench_pro_native_work_counters_v2`；`counter_task.validate()`重放全部关联及工作量，不信任保存的passed标记或重封的汇总。旧 `kernelbench_pro_work_counters_v1` 的原始CSV读取和离线模型API仍可用于历史诊断，但不能建立本版原生调用关联。
 
 ## 复制与清零活动
 
@@ -100,6 +100,10 @@ python -m scripts.analyze_device_trace native /path/to/counters.json \
 
 解析要求每个action都有唯一、完整的launch属性，维度是正整数，共享内存是非负整数，单位明确且没有缩放；缺项、重复或异常值不能借独立来源采集补齐。工作计数与配置分开保存，逐调用关联时将ncu原始名称/grid/block/shared的多重集合与实际计分来源记录比较，配置或重复次数变化均拒绝关联。它复用同一份CSV，没有新进程、CUPTI订阅或独立采集。v1原生报告缺少这些字段，需重新采集；旧通用CSV读取API仍可用于历史诊断。
 
-成功关联后记录`counter_process_launch_identity_observed=true`。这仍缺少ncu进程自己的二进制来源证明，报告继续保留`counter_process_workload_identity_observed=false`和`formal_qualification_implemented=false`。Nsight的NVTX改名用于关联调用，不能替代内核身份，见[官方CLI参数](https://docs.nvidia.com/nsight-compute/NsightComputeCli/)。不能据此移除L2正式计数门或宣布模型效果、路径等价及安全认证。
+同一次ncu命令还通过`--export`保存供应商自己的二进制报告。`raw_report`只保留一份base64原始字节、大小与SHA-256，单文件上限64 MiB。现有计数器模块按[NVIDIA version-7文件格式](https://docs.nvidia.com/nsight-compute/CustomizationGuide/index.html#report-file-format)读取未压缩`NVR\0`报告，从`SourceData.Binary`提取原始ELF cubin，解析`ProfileResult`的原始符号、grid/block、context、stream及进程所属，并解析源码引用。字段依据本机SDK随附的`ProfilerReport.proto`与`ProfilerReportCommon.proto`核对；没有引入供应商生成代码、protobuf运行依赖或新运行模块。
 
-当前固定的CUPTI Python 13.3明确将`allow_multiple_subscribers`固定为0，见[该版本绑定限制](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html#cupti.cupti._SubscriberParams.allow_multiple_subscribers)。本实现因此使用ncu自身的launch指标，不在计数进程叠加现有Python采集器，也不放宽核对来绕过。完整同进程关联需要兼容的原生V2订阅或供应商提供的等价身份资料；缺失时继续保留未知。
+二进制报告与CSV必须具有相同的进程、context/stream、原始符号、grid/block组及完整launch数量。一个组若出现不同cubin就保留未知，不猜CSV action ID与供应商内部KernelID的关系。逐调用`kernel_identities`保存已关联cubin哈希、字节数和CSV共享内存配置，再与实际计分二进制/入口/完整配置多重集合比较；即使重封全部汇总，替换cubin仍会失配。缺少、过大、截断、未解析引用、压缩或其他未支持格式保留`binary_identity_issue`与空身份，仍可读取工作计数，不能借另一进程补二进制。
+
+成功关联记录`counter_process_launch_identity_observed=true`；仅当全部调用的二进制也核对一致时，`counter_process_binary_identity_observed`及`counter_process_workload_identity_observed`才为true。模拟收据保留模拟标记。`formal_qualification_implemented=false`继续保留：这批没有完成非kernel传输需求/校准、Neuron来源与原生时间关联及正式L2组装门，不能由二进制关联自动授予L2资格。
+
+采集没有增加CUPTI订阅或独立采集进程。当前固定的CUPTI Python 13.3将`allow_multiple_subscribers`固定为0，见[绑定限制](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html#cupti.cupti._SubscriberParams.allow_multiple_subscribers)；这里使用ncu自身报告的字节证据，不叠加Python采集器。软件回归另用SDK `.proto`字段定义和官方protobuf实现核对生成的报告消息；没有执行ncu或设备实验。

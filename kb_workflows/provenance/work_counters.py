@@ -7,6 +7,7 @@ import hashlib
 import io
 import math
 import re
+import struct
 from decimal import Decimal, InvalidOperation
 
 from ..analysis.calibration import identity, positive
@@ -161,6 +162,169 @@ def parse_csv(raw, policy, *, pid, device=0, launch_identity=False):
         raise ValueError("Counter work overflows its finite quantity envelope")
     return {"actions": list(actions.values()), "work": work, "messages": messages,
             "launch_count": len(actions), "report_sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def _proto(data):
+    """Read bounded protobuf wire fields; no generated/vendor runtime is needed."""
+    if not isinstance(data, (bytes, memoryview)):
+        raise ValueError("Missing Nsight protobuf message")
+    data, position, result, fields = memoryview(data), 0, {}, 0
+
+    def varint():
+        nonlocal position
+        value = 0
+        for shift in range(0, 70, 7):
+            if position >= len(data):
+                break
+            byte = data[position]
+            position += 1
+            value |= (byte & 127) << shift
+            if byte < 128 and value < 2**64:
+                return value
+        raise ValueError("Truncated or excessive Nsight protobuf integer")
+
+    while position < len(data):
+        tag = varint()
+        number, wire = tag >> 3, tag & 7
+        fields += 1
+        if not 0 < number < 2**29 or fields > MAX_ROWS:
+            raise ValueError("Invalid or excessive Nsight protobuf fields")
+        if wire == 0:
+            value = varint()
+        elif wire in (1, 2, 5):
+            size = varint() if wire == 2 else 8 if wire == 1 else 4
+            if position + size > len(data):
+                raise ValueError("Truncated Nsight protobuf field")
+            value = data[position:position + size]
+            position += size
+        else:
+            raise ValueError("Unsupported Nsight protobuf wire type")
+        result.setdefault(number, []).append((wire, value))
+    return result
+
+
+def _field(message, number, wire, default=None):
+    values = message.get(number)
+    if values is None:
+        return default
+    if len(values) != 1 or values[0][0] != wire:
+        raise ValueError("Ambiguous or mistyped Nsight protobuf field")
+    return values[0][1]
+
+
+def report_binaries(raw, *, pid):
+    """Extract original cubin bytes from an uncompressed version-7 ncu report.
+
+    Field numbers follow the installed NVIDIA ProfilerReport{,Common}.proto.
+    Unsupported formats never become binary observations through a CSV label.
+    """
+    if (not isinstance(raw, bytes) or not 8 <= len(raw) <= MAX_BYTES or raw[:4] != b"NVR\0"
+            or type(pid) is not int or pid <= 0):
+        raise ValueError("Nsight binary identity needs a bounded uncompressed report")
+    data, position, sources, results, default_pid = memoryview(raw), 4, {}, [], None
+
+    def message(end):
+        nonlocal position
+        if position + 4 > end:
+            raise ValueError("Truncated Nsight report message length")
+        size = struct.unpack_from("<I", data, position)[0]
+        position += 4
+        if position + size > end:
+            raise ValueError("Truncated Nsight report message")
+        value = _proto(data[position:position + size])
+        position += size
+        return value
+
+    if _field(message(len(data)), 1, 0) != 7:
+        raise ValueError("Unsupported Nsight report version")
+
+    def source(value, process):
+        reference, binary = _field(value, 1, 0), _field(value, 4, 2)
+        if binary is not None:
+            if len(binary) < 4 or bytes(binary[:4]) != b"\x7fELF":
+                raise ValueError("Nsight source lacks original ELF cubin bytes")
+            identity = {"binary_sha256": hashlib.sha256(binary).hexdigest(), "binary_bytes": len(binary)}
+            if reference is not None:
+                key = process, reference
+                if key in sources and sources[key] != identity:
+                    raise ValueError("Nsight source reference has conflicting cubins")
+                sources[key] = identity
+            return identity
+        if reference is None:
+            raise ValueError("Nsight launch lacks a cubin or source reference")
+        return process, reference
+
+    blocks, entries = 0, 0
+    while position < len(data):
+        header = message(len(data))
+        blocks += 1
+        counts = [_field(header, field, 0, 0) for field in (1, 2, 7)]
+        size = _field(header, 5, 0)
+        entries += sum(counts)
+        if blocks > MAX_ROWS or entries > MAX_ROWS or counts[2] or size is None or position + size > len(data):
+            raise ValueError("Unsupported or excessive Nsight report block")
+        end = position + size
+        session = _field(header, 3, 2)
+        if session is not None:
+            default_pid = _field(_proto(session), 1, 0, default_pid)
+        process_info = _field(header, 6, 2)
+        process = _field(_proto(process_info), 1, 0) if process_info is not None else default_pid
+        if counts[0] + counts[1] and process != pid:
+            raise ValueError("Nsight cubins/results belong to another or unknown process")
+        for _ in range(counts[0]):
+            value = source(message(end), process)
+            if not isinstance(value, dict):
+                raise ValueError("Nsight source definition has no binary")
+        for _ in range(counts[1]):
+            row = message(end)
+            symbol = _field(row, 5, 2)
+            symbol = bytes(symbol).decode("utf-8") if symbol is not None else ""
+            dimensions = {}
+            for name, field in (("grid", 10), ("block", 11)):
+                vector = _proto(_field(row, field, 2))
+                dimensions[name] = [_field(vector, axis, 0) for axis in (1, 2, 3)]
+            context, stream = _field(row, 22, 0), _field(row, 23, 0)
+            if (not symbol or len(symbol) > 2048 or "\x00" in symbol or context is None or stream is None
+                    or any(value is None or value == 0 for dims in dimensions.values() for value in dims)):
+                raise ValueError("Nsight launch lacks exact symbol/context/stream/dimensions")
+            results.append({"context": context, "stream": stream, "symbol": symbol, **dimensions,
+                            "binary": source(_proto(_field(row, 15, 2)), process)})
+        if position != end:
+            raise ValueError("Nsight report block has unparsed payload")
+    if not results:
+        raise ValueError("Nsight report contains no kernel results")
+    for row in results:
+        binary = row.pop("binary")
+        if not isinstance(binary, dict):
+            binary = sources.get(binary)
+        if binary is None:
+            raise ValueError("Nsight launch has an unresolved cubin reference")
+        row.update(binary)
+    return results
+
+
+def bind_report_binaries(raw, actions, *, pid):
+    """Join exact report/CSV launch groups; differing binaries are ambiguous."""
+    groups, selected = {}, {}
+    def key(context, stream, symbol, configuration):
+        return context, stream, symbol, tuple(configuration["grid"]), tuple(configuration["block"])
+    for row in report_binaries(raw, pid=pid):
+        group = groups.setdefault(key(row["context"], row["stream"], row["symbol"], row), [])
+        group.append((row["binary_sha256"], row["binary_bytes"]))
+    for action in actions:
+        launch, identity = action["launch_identity"], action["identity"]
+        selected.setdefault(key(int(identity["Context"]), int(identity["Stream"]), launch["symbol"], launch["configuration"]), []).append(action)
+    if set(groups) != set(selected):
+        raise ValueError("Nsight report and raw CSV select different launches")
+    result = {}
+    for group, launches in selected.items():
+        binaries = groups[group]
+        if len(binaries) != len(launches) or len(set(binaries)) != 1:
+            raise ValueError("Nsight report/CSV binary or launch multiplicity is ambiguous")
+        digest, size = binaries[0]
+        for action in launches:
+            result[action["identity"]["ID"]] = {**action["launch_identity"], "binary_sha256": digest, "binary_bytes": size}
+    return result
 
 
 def binding_valid(binding):

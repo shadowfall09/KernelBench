@@ -402,6 +402,6 @@
 
 ## 维护与验证
 
-清单按动机维护；当前新增CUDA worker进程活动计量及软件配额，实测值与保守扣额分开，范围见[资源预算](RESOURCE_BUDGETS.md#cuda进程活动计量与软件配额)。此前补齐实际计分工作量指纹与计数模型关联。A/E/O的时间来自实际计分进程；ncu进程自身尚缺同等身份采集，不能由该关联授予L2资格。详见[计数器关联](WORK_COUNTERS.md#关联实际计分时间)。
+清单按动机维护，详细理由集中到motivation映射。CUDA worker进程活动实测值与保守配额扣额分开，范围见[资源预算](RESOURCE_BUDGETS.md#cuda进程活动计量与软件配额)。A/E/O使用实际计分时间；ncu同次报告的cubin与原始launch配置可核对实际计分身份，缺失或含糊仍保留未知，正式L2组装尚未完成，见[计数器关联](WORK_COUNTERS.md#关联实际计分时间)。
 
 清单、motivation映射和实现证据由`python -m scripts.check_motivations`核对，所有历史功能ID继续保留。软件回归和离线打包验证不替代真实设备、隔离、安全或模型效果实验。

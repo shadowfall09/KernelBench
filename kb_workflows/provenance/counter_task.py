@@ -16,7 +16,15 @@ from pathlib import Path
 
 from ..common import atomic_json, fingerprint, read_json
 from . import origin_task
-from .work_counters import LAUNCH_METRICS, MAX_BYTES, execution_values, parse_csv, recipe, work_totals
+from .work_counters import (
+    LAUNCH_METRICS,
+    MAX_BYTES,
+    bind_report_binaries,
+    execution_values,
+    parse_csv,
+    recipe,
+    work_totals,
+)
 
 CONFIGURATION = "config_file_off; kernel_replay; profiler_API_native_calls; nvtx_rename; launch_metrics; base_units; all_children; cache_none; clocks_none; kernel_names_off"
 PROTOCOL = "kernelbench_pro_native_work_counters_v2"
@@ -64,6 +72,7 @@ def command(binary, source, target, report, metrics):
             "--target-processes", "all", "--nvtx", "--print-nvtx-rename", "kernel", "--print-kernel-base", "mangled",
             "--csv", "--page", "raw", "--print-metric-name", "name", "--print-units", "base",
             "--print-metric-instances", "none", "--print-summary", "none", "--metrics", ",".join(sorted(set(metrics) | set(LAUNCH_METRICS))),
+            "--export", str(Path(report).with_suffix(".ncu-rep")),
             "--log-file", str(report), sys.executable, "-m", "kb_workflows.evaluation.evaluate_task",
             str(source), str(target), "--native-worker"]
 
@@ -98,6 +107,21 @@ def _observations(value, *, allow_simulated=False):
             raise ValueError("Native counter window is incomplete or rebound")
         markers[window["marker"]] = []
     parsed = parse_csv(value["raw_csv"].encode(), value["recipe"], pid=child["pid"], launch_identity=True)
+    binaries, binary_issue = {}, "Missing or excessive native Nsight binary report"
+    archive = value.get("raw_report")
+    if archive is not None:
+        if (not isinstance(archive, dict) or not isinstance(archive.get("base64"), str)
+                or len(archive["base64"]) > 4 * ((MAX_BYTES + 2) // 3)):
+            raise ValueError("Invalid or excessive native Nsight binary archive")
+        raw = base64.b64decode(archive["base64"], validate=True)
+        if (len(raw) > MAX_BYTES or type(archive.get("bytes")) is not int or len(raw) != archive["bytes"]
+                or hashlib.sha256(raw).hexdigest() != archive.get("sha256")):
+            raise ValueError("Native Nsight binary archive bytes changed")
+        try:
+            binaries = bind_report_binaries(raw, parsed["actions"], pid=child["pid"])
+            binary_issue = None
+        except ValueError as exc:
+            binary_issue = str(exc)[:300]
     for action in parsed["actions"]:
         marker = action["identity"]["Kernel Name"]
         if marker not in markers:
@@ -111,6 +135,8 @@ def _observations(value, *, allow_simulated=False):
         observations.append({"id": row["id"], "native_call_sha256": fingerprint(row),
                              "action_ids": [action["identity"]["ID"] for action in actions],
                              "launch_identities": [action["launch_identity"] for action in actions],
+                             "kernel_identities": [binaries[action["identity"]["ID"]] for action in actions] if binaries else None,
+                             "binary_identity_issue": binary_issue,
                              "profile_memory_activity": activity["memory_activity"],
                              "work": work_totals(actions, value["recipe"]),
                              "non_kernel_activity_count": activity["activity_count"] - activity["kernel_count"]})
@@ -172,8 +198,8 @@ def execution_models(value, calibration, *, allow_simulated=False):
 def scored_models(value, result, calibration, *, allow_simulated=False):
     """Join counters to actual timers and source-profile workload observations.
 
-    The counter process observes original symbols/configurations, but not binaries. This
-    join cannot certify formal counter qualification from a separate profile.
+    Original symbols/configurations and optional cubin bytes come from the same
+    ncu collection. Missing binary evidence stays unknown; memory work is separate.
     """
     from .kernel_origin import workload_identity
 
@@ -199,6 +225,12 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
         expected = [{key: row["kernel_identity"][key] for key in ("symbol", "configuration")} for row in measured["activities"]]
         if sorted(map(fingerprint, expected)) != sorted(map(fingerprint, counted["launch_identities"])):
             raise ValueError("Counter-process original symbol, launch configuration or multiplicity differs from scored work")
+        if counted["kernel_identities"] is not None:
+            expected = [row["kernel_identity"] for row in measured["activities"]]
+            counted_kernels = [{key: row[key] for key in ("binary_sha256", "symbol", "configuration")}
+                               for row in counted["kernel_identities"]]
+            if sorted(map(fingerprint, expected)) != sorted(map(fingerprint, counted_kernels)):
+                raise ValueError("Counter-process cubin binary differs from actual scored work")
         busy = measured["device_busy_ns"] / 1e6
         wall = timings.get(call["id"], {}).get("wall_ms")
         if not busy or wall is not None and busy > wall * (1 + 1e-6):
@@ -208,6 +240,7 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
                        "O": wall / busy if wall is not None else None})
     simulated = bool(value["simulated"] or value["origin"]["native_coverage"]["simulated"]
                      or result["metadata"]["origin_capture"]["raw"].get("simulated") is not False)
+    binary_observed = all(call["kernel_identities"] is not None for call in value["calls"])
     output = {"protocol": "kernelbench_pro_scored_execution_models_v1", "calls": joined,
               "status": "simulated" if simulated else "measured",
               "counter_receipt_sha256": value["receipt_sha256"],
@@ -216,8 +249,10 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
               "evaluator_sha256": request["eval_config"]["evaluator_sha256"],
               "simulated": simulated,
               "counter_process_launch_identity_observed": True,
-              "counter_process_workload_identity_observed": False, "formal_qualification_implemented": False,
-              "scope": "actual_scored_calls_to_profile_binary_and_counter_symbol_configuration; counter_process_binary_unproven",
+              "counter_process_binary_identity_observed": binary_observed,
+              "counter_process_workload_identity_observed": binary_observed, "formal_qualification_implemented": False,
+              "scope": "actual_scored_calls_to_same_collection_cubin_symbol_configuration" if binary_observed else
+                       "actual_scored_calls_to_profile_binary_and_counter_symbol_configuration; counter_process_binary_unproven",
               "scored_wall_times_replaced": False}
     output["receipt_sha256"] = fingerprint(output)
     return output
@@ -262,9 +297,16 @@ def audit(payload, *, run=None, binary=None):
                 raise ValueError("Nsight executable changed during native collection")
             document = read_json(target)
             tool.update(name="ncu", configuration=CONFIGURATION, binary_unchanged=True, exit_code=0, timed_out=False)
+            archives = [path for path in (directory / "counters.ncu-rep", directory / "counters.ncu-repz") if path.exists()]
+            raw_report = None
+            if len(archives) == 1 and archives[0].is_file() and not archives[0].is_symlink() and archives[0].stat().st_size <= MAX_BYTES:
+                with archives[0].open("rb") as stream:
+                    raw = stream.read(MAX_BYTES + 1)
+                if len(raw) <= MAX_BYTES:
+                    raw_report = {"base64": base64.b64encode(raw).decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
             value = {"protocol": PROTOCOL, "status": "ok", "purpose": "native_work_counters_diagnostics_only",
                      "origin": origin, "native_run": document, "recipe": payload["_native_counter"]["recipe"], "nonce": nonce,
-                     "raw_csv": csv.read_text(encoding="utf-8-sig"), "tool": tool, "command": argv,
+                     "raw_csv": csv.read_text(encoding="utf-8-sig"), "raw_report": raw_report, "tool": tool, "command": argv,
                      "simulated": run is not None or binary is not None or document.get("counter_simulated") is not False,
                      "scored_wall_times_replaced": False, "formal_qualification_implemented": False}
             value["calls"] = _observations(value, allow_simulated=value["simulated"])
@@ -272,7 +314,7 @@ def audit(payload, *, run=None, binary=None):
             return validate(value, allow_simulated=value["simulated"])
         except (ValueError, OSError, RuntimeError, KeyError, TypeError, AttributeError, UnicodeError, ImportError) as exc:
             artifacts = {}
-            for name in ("counters.csv", "application.log", "sanitizer-version.txt", "worker.json"):
+            for name in ("counters.csv", "counters.ncu-rep", "counters.ncu-repz", "application.log", "sanitizer-version.txt", "worker.json"):
                 path = directory / name
                 if path.is_file() and not path.is_symlink():
                     size = path.stat().st_size

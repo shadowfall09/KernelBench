@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import copy
 import csv
 import hashlib
 import io
 import json
 import math
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +30,34 @@ from tests.provenance.test_kernel_origin import native_origin_runner as native_o
 READ, WRITE = "dram__bytes_read.sum", "dram__bytes_write.sum"
 FMA = "smsp__sass_thread_inst_executed_op_ffma_pred_on.sum"
 SOURCE = "import torch\nclass ModelNew(torch.nn.Module):\n    def forward(self,a,b):\n        return a @ b\n"
+
+
+def _ncu_report(pid, count, *, binary=None, symbol="fixture_kernel", inline=False):
+    """Synthetic version-7 bytes using NVIDIA's installed proto2 field numbers."""
+    from tests.provenance.test_kernel_origin import BINARY
+
+    def varint(value):
+        output = bytearray()
+        while value > 127:
+            output.append((value & 127) | 128)
+            value >>= 7
+        return bytes(output) + bytes([value])
+    def proto(*fields):
+        return b"".join(varint(number * 8 + (2 if isinstance(value, bytes) else 0)) +
+                        (varint(len(value)) + value if isinstance(value, bytes) else varint(value))
+                        for number, value in fields)
+    def sized(value):
+        return struct.pack("<I", len(value)) + value
+    source = proto((1, 77), (4, BINARY if binary is None else binary))
+    definitions = b"" if inline else sized(source)
+    payload = definitions + b"".join(sized(proto(
+        (1, 1), (2, index + 1), (3, 1), (4, index), (5, symbol.encode()), (6, symbol.encode()), (7, symbol.encode()),
+        (8, 3), (9, proto((1, 0), (2, 0), (3, 0))),
+        (10, proto((1, 1), (2, 1), (3, 1))), (11, proto((1, 32), (2, 1), (3, 1))),
+        (15, proto((1, 77 + index), (4, BINARY if binary is None else binary)) if inline else proto((1, 77))),
+        (16, 0), (22, 1), (23, 2))) for index in range(count))
+    header = proto((1, 0 if inline else 1), (2, count), (3, proto((1, pid))), (5, len(payload)))
+    return b"NVR\0" + sized(proto((1, 7))) + sized(header) + payload
 
 
 def policy(*, complete=True, source=None):
@@ -325,6 +355,7 @@ def native_counter_runner(tmp_path, native_origin_runner):
         elif damage["kind"] == "binary":
             binary.write_text("changed simulated binary")
         Path(argv[argv.index("--log-file") + 1]).write_text(raw)
+        Path(argv[argv.index("--export") + 1]).write_bytes(_ncu_report(document["pid"], action))
         Path(log).write_text("CPU native invocation simulation, no profiler or GPU loaded")
         atomic_json(Path(argv[index + 3]), document)
         return {"exit_code": 0, "timed_out": damage["kind"] == "timeout"}
@@ -356,8 +387,25 @@ def test_native_counters_cover_complete_stateful_sequence_and_both_paired_roles(
         assert result["origin"]["native_coverage"].get("scored_call_observations_match", False) is (role == "candidate")
         assert not result["scored_wall_times_replaced"] and not result["formal_qualification_implemented"]
         counter_task.validate(result, allow_simulated=True)
+        archive = base64.b64decode(result["raw_report"]["base64"])
+        identities = wc.report_binaries(archive, pid=result["native_run"]["pid"])
+        assert len(identities) == count * 2
+        assert all(call["kernel_identities"] and call["binary_identity_issue"] is None for call in result["calls"])
         with pytest.raises(ValueError, match="simulated"):
             counter_task.validate(result)
+    inline = _ncu_report(result["native_run"]["pid"], count * 2, inline=True)
+    assert wc.report_binaries(inline, pid=result["native_run"]["pid"]) == identities
+    for damaged in (archive[:-1], archive + b"\0", b"NVR\0", archive.replace(b"\x08\x07", b"\x08\x08", 1),
+                    archive.replace(b"\x08M", b"\x08N", 1),
+                    _ncu_report(result["native_run"]["pid"] + 1, 1),
+                    _ncu_report(result["native_run"]["pid"], 1, binary=b"PTX is not an ELF")):
+        with pytest.raises(ValueError):
+            wc.report_binaries(damaged, pid=result["native_run"]["pid"])
+    for data in (b"\x08\x80", b"\0", b"\x0b"):
+        with pytest.raises(ValueError):
+            wc._proto(data)
+    with pytest.raises(ValueError, match="Ambiguous"):
+        wc._field(wc._proto(b"\x08\x01\x08\x02"), 1, 0)
 
 
 def test_native_counters_reject_unmatched_ranges_state_outputs_and_incomplete_captures(native_counter_runner):
@@ -369,7 +417,11 @@ def test_native_counters_reject_unmatched_ranges_state_outputs_and_incomplete_ca
     for damage in (lambda value: value["calls"][0]["work"].update(memory_bytes=1),
                    lambda value: value["native_run"]["calls"][-1].update(input_content_sha256="e" * 64),
                    lambda value: value["native_run"]["counter_windows"][0].update(range_balanced=False),
-                   lambda value: value["calls"][0]["launch_identities"][0].update(symbol="forged")):
+                   lambda value: value["calls"][0]["launch_identities"][0].update(symbol="forged"),
+                   lambda value: value["calls"][0]["kernel_identities"][0].update(binary_sha256="f" * 64),
+                   lambda value: value["raw_report"].update(sha256="f" * 64),
+                   lambda value: value["raw_report"].update(bytes=1),
+                   lambda value: value["raw_report"].update(base64="!")):
         changed = copy.deepcopy(result)
         damage(changed)
         changed["receipt_sha256"] = counter_task._receipt(changed)
@@ -487,7 +539,7 @@ def test_counter_cli_preview_and_queue_validation_are_sdk_light(tmp_path):
 
 def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_workloads(native_counter_runner, tmp_path, monkeypatch):
     from scripts import analyze_device_trace
-    from tests.provenance.test_kernel_origin import frontend_receipt, raw_capture
+    from tests.provenance.test_kernel_origin import BINARY, frontend_receipt, raw_capture
 
     report, _ = native_counter_runner(scored=True)
     payload = report["origin"]["native_request"]
@@ -543,7 +595,27 @@ def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_worklo
     joined = performance.scored_timeline(report, actual, calibrated, bound, allow_simulated=True)
     assert joined["status"] == "simulated" and not joined["formal_qualification_implemented"]
     assert joined["counter_process_launch_identity_observed"]
-    assert not joined["counter_process_workload_identity_observed"]
+    assert joined["counter_process_workload_identity_observed"] and joined["counter_process_binary_identity_observed"]
+    # Preserve unknowns for unsupported/compressed archives, or absent binary evidence.
+    ambiguous = _ncu_report(report["native_run"]["pid"], len(report["calls"]) * 2, inline=True).replace(BINARY, BINARY[:-1] + b"X", 1)
+    for raw in (None, b"Unsupported compressed Nsight archive", ambiguous,
+                _ncu_report(report["native_run"]["pid"], len(report["calls"]) * 2 - 1)):
+        changed = copy.deepcopy(report)
+        changed["raw_report"] = None if raw is None else {"base64": base64.b64encode(raw).decode(),
+            "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        changed["calls"] = counter_task._observations(changed, allow_simulated=True)
+        seal_all(changed)
+        unknown = performance.scored_timeline(changed, actual, calibrated, bound, allow_simulated=True)
+        assert not unknown["counter_process_workload_identity_observed"] and not unknown["formal_qualification_implemented"]
+        assert all(call["binary_identity_issue"] for call in changed["calls"])
+    # Even a resealed archive with internally consistent counts cannot replace the actual cubin.
+    changed = copy.deepcopy(report)
+    raw = _ncu_report(changed["native_run"]["pid"], len(changed["calls"]) * 2, binary=b"\x7fELFother-cubin")
+    changed["raw_report"] = {"base64": base64.b64encode(raw).decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+    changed["calls"] = counter_task._observations(changed, allow_simulated=True)
+    seal_all(changed)
+    with pytest.raises(ValueError, match="Counter-process cubin"):
+        performance.scored_timeline(changed, actual, calibrated, bound, allow_simulated=True)
     assert all(row["model_consistent"] and row["workload"]["kernel_count"] == 2 for row in joined["calls"])
     for row in joined["calls"]:
         assert row["scored_device_busy_ms"] == pytest.approx(0.0008)
