@@ -1,7 +1,7 @@
 """Optional CUPTI 13.3 / Triton 3.7 source-to-launch collector.
 
-No vendor import or device work occurs at module import. This is a separate
-diagnostic worker; unsupported launch/compilation paths remain unclassified.
+No vendor import or device work occurs at module import. Both scored workers
+and separate diagnostics reuse this collector; unsupported paths stay unknown.
 The ctypes layouts below match NVIDIA's generated_cuda_meta.h and
 cupti_callbacks.h on 64-bit Linux. SDK and ABI mismatches are not auto-adapted.
 """

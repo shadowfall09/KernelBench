@@ -56,13 +56,26 @@ def prepare_baseline(model, args, device, variant, *, backend="", mode="default"
 
 
 def select_baseline(variants, cold_calls=10000):
+    def mode_valid(result):
+        metadata = result.get("metadata", {})
+        if ("origin_capture" not in metadata
+                and metadata.get("evaluation_config", {}).get("evidence_level") not in {"L1", "L2"}):
+            return True
+        from ..provenance.origin_task import timing_observer
+
+        try:
+            timing_observer(result, baseline=True)
+            return True
+        except (OSError, ValueError):
+            return False
+
     valid = {
         name: result for name, result in variants.items()
         if isinstance(result.get("mean"), (int, float)) and math.isfinite(result["mean"])
-        and result["mean"] > 0 and result.get("baseline_correctness") is True
+        and result["mean"] > 0 and result.get("baseline_correctness") is True and mode_valid(result)
     }
     if not valid:
-        return {"mean": -1, "metadata": {"error": "No baseline variant passed correctness"}, "variants": variants}
+        return {"mean": -1, "metadata": {"error": "No baseline variant passed correctness and timing requirements"}, "variants": variants}
     from .measurement import amortized
 
     winner = min(valid, key=lambda name: valid[name]["mean"])

@@ -1428,7 +1428,7 @@
         "kb_workflows/evaluation/measurement.py",
         "kb_workflows/evaluation/paired_task.py"
       ],
-      "reason": "已有CUDA/Triton/C++、wheel库和Graph来源诊断，完整公共/隐藏/预热/计时/配对/显存覆盖；L1/L2实际调用收据按实际seed、前后模型数据/入口/别名、输出、模式及设备与重放关联，评分要求实际收据。状态观察不证明任意全局依赖或未插桩host路径等价；其他诊断、未支持loader/compiler、Neuron来源及充分的正式门继续实现"
+      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron来源及未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
     },
     {
       "id": "R-09",
@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和充分的正式归因门继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5258,6 +5258,43 @@
         "docs/NEURON_WORK.md"
       ],
       "reason": "用实际候选前后完整状态、入口及输入/状态别名取代参考模型的256点注册状态探针，同时绑定完整输入/输出内容与输入布局；复用现有状态遍历和流式内容摘要，不增加运行模块。采集窗口外取摘要，未知状态和旧协议不能获得完整需求模型资格，仍不证明执行所有权或原生计时等价"
+    },
+    {
+      "id": "V57-01",
+      "title": "实际计分持续采集与自写/库轨道门",
+      "primary": "M2",
+      "secondary": [
+        "M3",
+        "M4",
+        "M5"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/origin_task.py",
+        "kb_workflows/provenance/cuda_origin.py",
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/evaluation/evidence.py",
+        "kb_workflows/config.py",
+        "kb_workflows/engine.py",
+        "kb_workflows/agents/generation.py",
+        "kb_workflows/analysis/experiment.py",
+        "kb_workflows/analysis/paper_analysis.py",
+        "scripts/audit_kernel_origin.py",
+        "scripts/audit_work_counters.py",
+        "tests/provenance/test_kernel_origin.py",
+        "tests/hardware/test_gpu_config.py",
+        "docs/KERNEL_ORIGIN.md",
+        "docs/STRICT_VALIDATION.md",
+        "kb_workflows/evaluation/baseline_variants.py",
+        "README.md",
+        "kb_workflows/agents/agent_loop.py",
+        "kb_workflows/agents/agent_task.py",
+        "tests/agents/test_agent_loop.py",
+        "kb_workflows/evaluation/tool_runner.py",
+        ".claude/skills/kernelbench-pro/SKILL.md"
+      ],
+      "reason": "消除仅凭另跑的profiling重放推断实际计分来源的问题：CUDA L1/L2在实际候选、配对和基线进程持续采集，保留原始计时callable并在窗口外取状态/输出；完整来源事实进入自写/库轨道门并由评分重算。缺工具只失去来源资格、候选不重跑；阈值/轨道进入提示、配置、恢复和比较，独立诊断继续不授予资格，不宣称安全或因果证明。复用已有源码保护、采集与窗口验证，不增运行文件；组合基线仅在满足声明计时要求的变体中选最快者，保留所有失败记录，不让失去采集的快变体挤掉合格项；反馈与互动桥接以数值及来源均合格作为最佳候选选择条件，保留独立正确性和紧凑来源反馈，最终评分仍重算完整证据"
     }
   ]
 }

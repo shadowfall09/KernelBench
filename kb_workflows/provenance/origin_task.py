@@ -1,4 +1,4 @@
-"""Native call coverage and separate control/profile origin diagnostics."""
+"""Actual scored source evidence, native call coverage and separate replay diagnostics."""
 
 from __future__ import annotations
 
@@ -11,19 +11,23 @@ import sys
 import tempfile
 import time
 import weakref
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
 
 from ..common import atomic_json, evaluator_digest, failure, fingerprint, read_json
 from .kernel_origin import MAX_RECORDS, _sha, summarize
+from .kernel_origin import PROTOCOL as RAW_PROTOCOL
 from .submission_source import SourceRegistry, record_sources
 
 NATIVE_PROTOCOL = "kernelbench_pro_native_origin_v2"
 NATIVE_SCOPE = "native_correctness_both_orders_warmups_timing_memory_and_paired; model_state_bound; independent_diagnostics_excluded"
 _ACTIVE = ContextVar("kernelbench_native_origin_calls", default=None)
 MAX_REPORT_BYTES = 64 * 1024**2
+SCORED_CAPTURE = "kernelbench_pro_scored_capture_v1"
+SCORED_MODE = "synchronized_wall_continuous_cupti_v1"
+BASELINE_SCOPE = "baseline_all_device_activities; no_candidate_origin_claim"
 
 
 def _validate(payload):
@@ -75,6 +79,7 @@ class _Calls:
         self.role = role
         self.rows, self.windows, self.changes = [], {}, []
         self.timings = []
+        self.open_windows = {}
         self.cursor, self.last_seed = 0, None
 
     def model_state(self, model, args):
@@ -126,6 +131,10 @@ class _Calls:
             # observations surround its scope; no forwarding wrapper or extra
             # synchronization is inserted into the measured interval.
             row.update(called=True, training=model.training, no_grad=not torch.is_grad_enabled())
+            if self.capture is not None:
+                scope = self.capture.call(seed=seed, signature=geometry, training=row["training"])
+                self.windows[row["id"]] = scope.__enter__()
+                self.open_windows[row["id"]] = scope
             return model, row
 
         def execute(*values):
@@ -165,11 +174,16 @@ def candidate_call(model, args, *, role="candidate", **scope):
     try:
         yield execute, row
     finally:
-        row["model_state_after"] = state.model_state(model, args)
         if state.scored:
             import torch
 
+            window = state.windows.get(row["id"])
+            if window is not None:
+                state.open_windows.pop(row["id"]).__exit__(*sys.exc_info())
             row.update(training_after=model.training, no_grad=row["no_grad"] and not torch.is_grad_enabled())
+            if window is not None:
+                window.update(training_after=row["training_after"], no_grad=row["no_grad"])
+        row["model_state_after"] = state.model_state(model, args)
 
 
 def snapshot_output(row, output):
@@ -204,7 +218,7 @@ def native_policy(function):
             settings = payload["eval_config"]
             if (settings.get("evidence_level") in {"L1", "L2"} and not settings.get("diagnostic_stage")
                     and settings.get("device_backend", "cuda") == "cuda"
-                    and payload.get("task", "evaluate") in {"evaluate", "paired_timing"}):
+                    and payload.get("task", "evaluate") in {"evaluate", "baseline", "paired_timing"}):
                 return _run_scored(payload, lambda: function(payload, *args, **kwargs))
             return function(payload, *args, **kwargs)
         if stage not in {"control", "profile", "counter"}:
@@ -221,7 +235,8 @@ def native_policy(function):
 def _document(payload, result, state, stage):
     binding = {"native_request_sha256": fingerprint(native_request(payload)), "role": state.role,
                "evaluator_sha256": payload["eval_config"].get("evaluator_sha256"),
-               "device_fingerprint": result.get("metadata", {}).get("device_fingerprint"), "scope": NATIVE_SCOPE}
+               "device_fingerprint": result.get("metadata", {}).get("device_fingerprint", result.get("device_fingerprint")),
+               "scope": BASELINE_SCOPE if payload.get("task") == "baseline" else NATIVE_SCOPE}
     return {"protocol": NATIVE_PROTOCOL, "stage": stage, "binding": binding,
             "native_result": result, "calls": state.rows, "seeds_consumed": state.cursor,
             "native_timings": [{"id": row["id"], "native_call_sha256": fingerprint(row), "wall_ms": elapsed}
@@ -229,42 +244,12 @@ def _document(payload, result, state, stage):
             "environment_changes": sorted(set(state.changes))}
 
 
-def _run_scored(payload, invoke):
-    if _ACTIVE.get() is not None or "_origin_timing_seeds" in payload:
-        raise ValueError("Scored calls cannot inherit a diagnostic observer or predeclared timing seed plan")
-    request = native_request(payload)
-    state = _Calls(None, [], scored=True)
-    token = _ACTIVE.set(state)
-    try:
-        with record_sources(state.registry):
-            result = invoke()
-    finally:
-        _ACTIVE.reset(token)
-    frozen = {**request, "_origin_timing_seeds": state.seeds}
-    if not state.registry.intact():
-        state.changes.append("registered_source")
-    document = _document(frozen, result, state, "scored")
-    document.pop("native_result")
-    document.update(native_request=request, timing_seed_plan=state.seeds,
-                    timed_callable_wrapped=False, execution_origin_collected=False)
-    document["receipt_sha256"] = fingerprint(document)
-    result.setdefault("metadata", {})["native_call_receipt"] = document
-    return result
-
-
-def _run_native(payload, invoke, *, observer=None):
-    _, seeds, _ = _validate(payload)
+@contextmanager
+def _source_guards(state, capture):
     from src import eval as native
 
     from ..evaluation.strict_validation import environment_guard
-    from .cuda_origin import Capture
-    from .origin_binaries import Catalog
 
-    role = payload.get("_origin_role", "candidate")
-    source = payload["ref_arch_src"] if role == "reference" else payload["kernel_src"]
-    capture = Capture(source, candidate_windows_only=True) if payload["_origin_stage"] == "profile" else None
-    catalog = Catalog() if capture else None
-    state = _Calls(observer or capture, seeds, role, registry=capture.registry if capture else None)
     load, move = native.load_custom_model, native.move_model
     candidates = {}
 
@@ -290,9 +275,106 @@ def _run_native(payload, invoke, *, observer=None):
         return result
 
     native.load_custom_model, native.move_model = guarded_load, guarded_move
+    try:
+        yield
+    finally:
+        if native.load_custom_model is not guarded_load or native.move_model is not guarded_move:
+            state.changes.append("native_loader_or_move_hook")
+        native.load_custom_model, native.move_model = load, move
+
+
+def _run_scored(payload, invoke):
+    if _ACTIVE.get() is not None or "_origin_timing_seeds" in payload:
+        raise ValueError("Scored calls cannot inherit a diagnostic observer or predeclared timing seed plan")
+    request = native_request(payload)
+    from .cuda_origin import Capture
+    from .origin_binaries import Catalog
+
+    capture, catalog, unavailable = None, None, None
+    with ExitStack() as stack:
+        try:
+            capture = Capture(payload.get("kernel_src", payload["ref_arch_src"]), candidate_windows_only=False)
+            catalog = Catalog()
+            stack.enter_context(capture.recording())
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            # A missing optional collector cannot turn a numerical answer into
+            # a failure. No candidate has run yet; do not retry invoke().
+            unavailable = f"{type(exc).__name__}: {exc}"[:500]
+            capture = catalog = None
+        state = _Calls(capture, [], scored=True, registry=capture.registry if capture else None)
+        token = _ACTIVE.set(state)
+        try:
+            with _source_guards(state, capture), record_sources(state.registry):
+                result = invoke()
+        finally:
+            _ACTIVE.reset(token)
+    frozen = {**request, "_origin_timing_seeds": state.seeds}
+    if not state.registry.intact():
+        state.changes.append("registered_source")
+    document = _document(frozen, result, state, "scored")
+    if capture is not None:
+        _finish_capture(capture, catalog, document, payload)
+    origin = {"protocol": SCORED_CAPTURE, "mode": SCORED_MODE,
+              "status": "collected" if capture is not None else "not_measured", "error": unavailable,
+              "binding": document["binding"], "timing_sha256": fingerprint(_scored_timing(result)),
+              "raw": capture.raw if capture is not None else None}
+    if payload.get("task") == "baseline":
+        origin.update(native_request=request, timing_seed_plan=state.seeds)
+    origin["receipt_sha256"] = fingerprint(origin)
+    result.setdefault("metadata", {})["origin_capture"] = origin
+    if payload.get("task") == "baseline":
+        return result
+    document.pop("native_result")
+    document.update(native_request=request, timing_seed_plan=state.seeds,
+                    timed_callable_wrapped=False, execution_origin_collected=capture is not None,
+                    origin_capture_sha256=origin["receipt_sha256"])
+    document["receipt_sha256"] = fingerprint(document)
+    result.setdefault("metadata", {})["native_call_receipt"] = document
+    from ..evaluation.evidence import from_result
+
+    metadata = result["metadata"]
+    additional = {**metadata.get("evidence_receipt", {}).get("checks", {}),
+                  **metadata.get("paired_checks", {}), "kernel_origin": origin_check(result)}
+    metadata["evidence_receipt"] = from_result(result, payload["eval_config"],
+        scope="hidden" if payload["eval_config"].get("use_hidden_tests") else "standard", additional=additional)
+    return result
+
+
+def _scored_timing(result):
+    metadata = result.get("metadata", {})
+    return {"runtime": result.get("runtime", result.get("mean")),
+            "samples_ms": result.get("runtime_stats", result).get("samples_ms"),
+            "timing_receipt": metadata.get("timing_receipt", result.get("timing_receipt")),
+            "paired_timing": metadata.get("paired_timing"),
+            "cold_start_ms": metadata.get("cold_start_ms", result.get("cold_start_ms"))}
+
+
+def _finish_capture(capture, catalog, document, payload):
+    try:
+        if capture.extensions is not None:
+            capture.bind_extensions(capture.extensions.collect(timeout=min(30, payload["eval_config"]["timeout"] / 8)))
+        capture.raw["binary_inventory"] = catalog.collect(timeout=min(60, payload["eval_config"]["timeout"] / 4))
+    except (OSError, RuntimeError, ValueError) as exc:
+        capture.error(f"Binary inventory: {type(exc).__name__}: {exc}"[:500])
+    capture.raw["binding"] = document["binding"]
+    capture.raw["environment_changes"] = document["environment_changes"]
+    if document["environment_changes"]:
+        capture.error("Native candidate changed process settings or installed hooks")
+
+
+def _run_native(payload, invoke, *, observer=None):
+    _, seeds, _ = _validate(payload)
+    from .cuda_origin import Capture
+    from .origin_binaries import Catalog
+
+    role = payload.get("_origin_role", "candidate")
+    source = payload["ref_arch_src"] if role == "reference" else payload["kernel_src"]
+    capture = Capture(source, candidate_windows_only=True) if payload["_origin_stage"] == "profile" else None
+    catalog = Catalog() if capture else None
+    state = _Calls(observer or capture, seeds, role, registry=capture.registry if capture else None)
     token = _ACTIVE.set(state)
     try:
-        with tempfile.TemporaryDirectory(prefix="kb-origin-control-cache-") as cache:
+        with _source_guards(state, capture), tempfile.TemporaryDirectory(prefix="kb-origin-control-cache-") as cache:
             previous = os.environ.get("TRITON_CACHE_DIR")
             try:
                 if not capture:
@@ -308,28 +390,18 @@ def _run_native(payload, invoke, *, observer=None):
                 else:
                     os.environ["TRITON_CACHE_DIR"] = previous
     finally:
-        if native.load_custom_model is not guarded_load or native.move_model is not guarded_move:
-            state.changes.append("native_loader_or_move_hook")
-        native.load_custom_model, native.move_model = load, move
         _ACTIVE.reset(token)
     if evaluator_digest() != payload["eval_config"].get("evaluator_sha256"):
         state.changes.append("evaluator_source")
     if not state.registry.intact():
         state.changes.append("registered_source")
     document = _document(payload, result, state, payload["_origin_stage"])
-    binding = document["binding"]
     if observer is not None:
         document["counter_windows"] = observer.windows
         document["pid"] = observer.pid
         document["counter_simulated"] = observer.simulated
     if capture:
-        if capture.extensions is not None:
-            capture.bind_extensions(capture.extensions.collect(timeout=min(30, payload["eval_config"]["timeout"] / 8)))
-        capture.raw["binary_inventory"] = catalog.collect(timeout=min(60, payload["eval_config"]["timeout"] / 4))
-        capture.raw["binding"] = binding
-        capture.raw["environment_changes"] = document["environment_changes"]
-        if state.changes:
-            capture.error("Native candidate changed process settings or installed hooks")
+        _finish_capture(capture, catalog, document, payload)
         document["raw"] = capture.raw
     return document
 
@@ -457,7 +529,8 @@ def validate_native(document, payload, *, stage, simulated=False):
 def _scored_contract(payload):
     request = native_request(payload)
     request.pop("_origin_timing_seeds", None)
-    request["eval_config"].pop("origin_minimum_custom_fraction", None)
+    request["eval_config"].setdefault("origin_minimum_custom_fraction", 0.95)
+    request["eval_config"].setdefault("kernel_track", "custom")
     return request
 
 
@@ -468,7 +541,7 @@ def validate_scored(result, payload=None, *, allow_simulated=False):
     try:
         record = result["metadata"]["native_call_receipt"]
         request = record["native_request"]
-        if (record.get("timed_callable_wrapped") is not False or record.get("execution_origin_collected") is not False
+        if (record.get("timed_callable_wrapped") is not False or type(record.get("execution_origin_collected")) is not bool
                 or record.get("receipt_sha256") != fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
                 or request.get("task", "evaluate") not in {"evaluate", "paired_timing"}
                 or "_origin_timing_seeds" in request or request.get("_origin_role", "candidate") != "candidate"
@@ -480,9 +553,111 @@ def validate_scored(result, payload=None, *, allow_simulated=False):
         frozen = {**request, "_origin_timing_seeds": record["timing_seed_plan"]}
         document = {**record, "native_result": result}
         validate_native(document, frozen, stage="scored", simulated=allow_simulated)
+        origin = _observer_record(result, document["binding"])
+        if (record.get("origin_capture_sha256") != origin["receipt_sha256"]
+                or record["execution_origin_collected"] != (origin["status"] == "collected")):
+            raise ValueError("Scored calls do not bind their actual origin observer")
+        if record["execution_origin_collected"]:
+            _bound_windows(origin["raw"], document, frozen, filtered=False)
         return frozen, document
     except (KeyError, TypeError, AttributeError, OverflowError) as exc:
         raise ValueError("Missing or invalid actual scored native calls") from exc
+
+
+def _observer_record(result, binding):
+    origin = result.get("metadata", {}).get("origin_capture")
+    if (not isinstance(origin, dict) or origin.get("protocol") != SCORED_CAPTURE
+            or origin.get("mode") != SCORED_MODE or origin.get("binding") != binding
+            or origin.get("receipt_sha256") != fingerprint({k: v for k, v in origin.items() if k != "receipt_sha256"})
+            or origin.get("timing_sha256") != fingerprint(_scored_timing(result))):
+        raise ValueError("Actual origin observer is missing, stale, changed or bound to other times")
+    raw = origin.get("raw")
+    if origin.get("status") == "not_measured":
+        if raw is not None or not isinstance(origin.get("error"), str) or not origin["error"]:
+            raise ValueError("Unavailable actual origin observer lacks its failure reason")
+    elif (origin.get("status") != "collected" or origin.get("error") is not None or not isinstance(raw, dict)
+          or raw.get("candidate_windows_only") is not False or raw.get("binding") != binding):
+        raise ValueError("Actual origin requires continuous collection in the scoring process")
+    return origin
+
+
+def timing_observer(result, *, baseline=False, allow_simulated=False):
+    """Verify the actual timing mode, without promoting source or work facts."""
+    from ..evaluation.evaluate_task import validate_sources
+
+    try:
+        metadata = result.get("metadata", {})
+        if "native_call_receipt" in metadata and not baseline:
+            _, document = validate_scored(result, allow_simulated=allow_simulated)
+            origin = metadata["origin_capture"]
+            device = document["binding"]["device_fingerprint"]
+        else:
+            origin = metadata["origin_capture"]
+            request = origin["native_request"]
+            validate_sources(request)
+            _validate({**request, "task": "evaluate", "_origin_timing_seeds": origin["timing_seed_plan"]})
+            device = result["device_fingerprint"]
+            binding = {"native_request_sha256": fingerprint({**request, "_origin_timing_seeds": origin["timing_seed_plan"]}),
+                       "role": "candidate", "evaluator_sha256": evaluator_digest(),
+                       "device_fingerprint": device, "scope": BASELINE_SCOPE}
+            _observer_record(result, binding)
+            if (request.get("task") != "baseline" or request["eval_config"].get("evidence_level") not in {"L1", "L2"}
+                    or request["eval_config"].get("diagnostic_stage")
+                    or request["eval_config"].get("device_backend", "cuda") != "cuda"
+                    or result.get("baseline_correctness") is not True
+                    or result.get("reference_sha256") != fingerprint({"source": request["ref_arch_src"]})
+                    or result.get("precision") != request["eval_config"]["precision"]
+                    or result.get("timing_receipt", {}).get("input_seeds") != origin["timing_seed_plan"]
+                    or origin.get("raw", {}).get("candidate_sha256") != hashlib.sha256(request["ref_arch_src"].encode()).hexdigest()
+                    or origin.get("raw", {}).get("windows") != []):
+                raise ValueError("Actual baseline observer has the wrong task or scope")
+        raw = origin.get("raw")
+        if (origin.get("status") != "collected" or not isinstance(raw, dict)
+                or raw.get("protocol") != RAW_PROTOCOL or raw.get("environment_changes") != []
+                or raw.get("capture_complete") is not True or raw.get("hooks_intact") is not True
+                or raw.get("errors") != [] or type(raw.get("dropped_records")) is not int or raw["dropped_records"] != 0
+                or type(raw.get("simulated")) is not bool
+                or raw.get("simulated") is not False and not allow_simulated):
+            raise ValueError("Actual timing observer was unavailable, incomplete, dropped records or simulated")
+        if not allow_simulated:
+            from ..analysis.calibration import identity
+
+            identity(device)
+        return SCORED_MODE
+    except (KeyError, TypeError, AttributeError, OverflowError) as exc:
+        raise ValueError("Missing or invalid actual timing observer") from exc
+
+
+def scored_origin(result, *, allow_simulated=False):
+    """Replay source-to-launch facts from the actual timed execution itself."""
+    timing_observer(result, allow_simulated=allow_simulated)
+    request, _ = validate_scored(result, allow_simulated=allow_simulated)
+    summary = summarize(result["metadata"]["origin_capture"]["raw"],
+                        minimum_custom_fraction=request["eval_config"].get("origin_minimum_custom_fraction", 0.95))
+    return {**summary, "scope": "actual_native_scored_calls", "native_timing_mode": SCORED_MODE,
+            "timings_are_diagnostic": False, "formal_qualification_implemented": True,
+            "evidence_scope": "scored_execution_origin_only; other_L1_L2_gates_required"}
+
+
+def origin_check(result):
+    """The scored path, rather than a diagnostic replay, supplies track evidence."""
+    from ..evaluation.evidence import check
+
+    try:
+        summary = scored_origin(result)
+        record = result["metadata"]["native_call_receipt"]
+        track = record["native_request"]["eval_config"].get("kernel_track", "custom")
+        if track not in {"custom", "library"}:
+            raise ValueError("Unknown execution track")
+        return check(summary["track_verdicts"][track], reason="Source-to-binary-to-launch attribution of actual timed execution",
+                     values={"track": track, "mode": SCORED_MODE, "raw_sha256": summary["raw_sha256"],
+                             "native_call_receipt_sha256": record["receipt_sha256"],
+                             "minimum_custom_fraction": summary["minimum_custom_fraction"],
+                             "calls": [{**{key: row[key] for key in ("id", "unknown_activity_count",
+                                          "custom_exclusive_fraction_lower_bound")},
+                                        "status": row["track_verdicts"][track]} for row in summary["calls"]]})
+    except (KeyError, TypeError, ValueError, OSError) as exc:
+        return check("not_measured", reason=f"Actual scored origin unavailable: {exc}"[:500])
 
 
 def read_scored(path, problem, sample, task="evaluate"):
@@ -502,6 +677,20 @@ def read_scored(path, problem, sample, task="evaluate"):
     return result
 
 
+def _bound_windows(raw, document, payload, *, filtered):
+    rows = document["calls"]
+    source = payload["ref_arch_src"] if payload.get("_origin_role") == "reference" else payload["kernel_src"]
+    if (raw.get("candidate_sha256") != hashlib.sha256(source.encode()).hexdigest()
+            or raw.get("candidate_windows_only") is not filtered or raw.get("binding") != document["binding"]
+            or len(raw.get("windows", [])) != len(rows)
+            or any(window.get("id") != row["id"] or window.get("native_call_sha256") != fingerprint(row)
+                   or window.get("seed") != row["seed"] or window.get("output_verified") is not True
+                   or fingerprint({"signature": window.get("input_signature")}) != row["input_signature_sha256"]
+                   or any(window.get(key) != row[key] for key in ("training", "training_after", "no_grad"))
+                   for window, row in zip(raw["windows"], rows))):
+        raise ValueError("CUPTI windows do not bind every validated native candidate call")
+
+
 def _replay_parts(payload, stages, raw, *, simulated):
     """One verifier for collection and saved-report analysis; no cached verdicts."""
     _, _, threshold = _validate(payload)
@@ -513,16 +702,7 @@ def _replay_parts(payload, stages, raw, *, simulated):
     control, profiled = (validate_native(stages[stage], payload, stage=stage, simulated=simulated) for stage in ("control", "profile"))
     if control != profiled or stages["control"]["binding"] != stages["profile"]["binding"]:
         raise ValueError("Control/profile native input, output, mode observations or device differ")
-    source = payload["ref_arch_src"] if payload.get("_origin_role") == "reference" else payload["kernel_src"]
-    if (raw.get("candidate_sha256") != hashlib.sha256(source.encode()).hexdigest()
-            or raw.get("candidate_windows_only") is not True or raw.get("binding") != stages["profile"]["binding"]
-            or len(raw.get("windows", [])) != len(profiled)
-            or any(window.get("id") != row["id"] or window.get("native_call_sha256") != fingerprint(row)
-                   or window.get("seed") != row["seed"] or window.get("output_verified") is not True
-                   or fingerprint({"signature": window.get("input_signature")}) != row["input_signature_sha256"]
-                   or any(window.get(key) != row[key] for key in ("training", "training_after", "no_grad"))
-                   for window, row in zip(raw["windows"], profiled))):
-        raise ValueError("CUPTI windows do not bind every validated native candidate call")
+    _bound_windows(raw, stages["profile"], payload, filtered=True)
     coverage = {"status": "passed", "candidate_calls": len(control), "bitwise_observable_replay": True,
                 "simulated": simulated,
                 "memory_probe_included": bool(payload.get("_origin_target", payload.get("task")) == "evaluate"

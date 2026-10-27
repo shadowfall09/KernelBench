@@ -116,6 +116,7 @@ def compare_runs(directories):
                     "num_perf_trials": config.num_perf_trials, "cold_calls": config.cold_calls,
                     "fp32_tolerance": config.fp32_tolerance}
         contract.update(strict_validation=config.strict_validation, evidence_level=config.evidence_level)
+        contract.update(kernel_track=config.kernel_track, origin_minimum_custom_fraction=config.origin_minimum_custom_fraction)
         contract["verifier_isolation"] = options(config)
         contract["diagnostic_contract"] = diagnostic_options(config)
         contract.update(paired_timing=config.paired_timing, paired_trials=config.paired_trials,

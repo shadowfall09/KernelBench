@@ -103,7 +103,8 @@ def build_prompt(config, pid):
         contract += (f"\nEffective device-fitted RMS/all-element FP64 policy: {row['policy']}. "
                      "This tightens the published cap; the reference and submission must both pass.\n")
     implementation = ("real NKI kernels using import nki and native torch_neuronx.nki_op registration, taking neuron tensors; keep the ModelNew torch.nn.Module interface"
-                      if config.device_backend == "neuron" else "real CUDA/Triton kernels")
+                      if config.device_backend == "neuron" else
+                      "CUDA/Triton kernels or library-assisted implementations" if config.kernel_track == "library" else "real CUDA/Triton kernels")
     return f"""Implement ModelNew for KernelBench Pro level {config.level}, problem {pid}.
 The public reference is supplied below; implement {implementation}.
 Target hardware: {config.hardware or config.gpu}; architecture: {config.gpu_arch}; requested precision family: {config.precision}.{contract}
@@ -112,6 +113,7 @@ Keep the model's algorithm, input-dependent behavior, shapes and parameters corr
 Some references intentionally omit the test harness. Implement from the supplied Model definition;
 do not inspect hidden_tests, original test inputs, or other repository problem files.
 Mode: {config.generation_mode}. Candidate budget: {1 if config.generation_mode == 'one-shot' else config.optimization_rounds}.
+Declared execution track: {config.kernel_track}. L1/L2 source qualification uses actual timed execution; the custom track requires at least {config.origin_minimum_custom_fraction:.1%} exclusively submission-owned device busy time, and the library track permits verified library/framework work. Numerical correctness is required in both.
 Wall-clock budget: {config.agent_timeout} seconds for this sample, including development evaluation.
 {"No execution or test feedback is provided before the final submission." if config.generation_mode == 'one-shot' else "After each candidate the controller returns standard correctness, timing and optional profiler diagnostics. Improve using that feedback."}
 The controller retains the fastest development-correct candidate. The hidden input distributions are evaluated only after final selection.

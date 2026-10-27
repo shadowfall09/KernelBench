@@ -986,9 +986,17 @@ def native_origin_runner(tmp_path, monkeypatch):
     return audit
 
 
-def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(native_origin_runner):
+def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(native_origin_runner, monkeypatch):
     from kb_workflows.analysis.performance import native_timeline
+    from kb_workflows.provenance import origin_task
     from kb_workflows.provenance.origin_task import audit, replay, validate_scored
+
+    observe = origin_task._Calls.model_state
+    def state(calls, model, args):
+        if calls.scored and calls.capture is not None:
+            assert not calls.capture.active_calls  # Both snapshots are outside the CUPTI window.
+        return observe(calls, model, args)
+    monkeypatch.setattr(origin_task._Calls, "model_state", state)
 
     for target, hidden, expected in (("evaluate", False, 8), ("evaluate", True, 8), ("paired_timing", False, 13)):
         result = native_origin_runner(target=target, hidden=hidden)
@@ -1002,7 +1010,11 @@ def test_native_origin_covers_actual_orders_warmups_hidden_and_paired_calls(nati
         actual = native_origin_runner.scored(result["native_request"])
         frozen, observed = validate_scored(actual, allow_simulated=True)
         assert len(observed["calls"]) == expected
-        assert not observed["timed_callable_wrapped"] and not observed["execution_origin_collected"]
+        assert not observed["timed_callable_wrapped"] and observed["execution_origin_collected"]
+        captured = actual["metadata"]["origin_capture"]
+        assert captured["raw"]["candidate_windows_only"] is False
+        assert len(captured["raw"]["windows"]) == expected
+        assert origin_task.timing_observer(actual, allow_simulated=True) == origin_task.SCORED_MODE
         assert "_origin_timing_seeds" not in observed["native_request"]
         frozen.update(task="origin_audit", _origin_target=target, _scored_result=actual)
         linked = audit(frozen, run=native_origin_runner.runner)
@@ -1255,3 +1267,130 @@ def test_native_activity_filter_preserves_unknown_overlaps_and_all_drop_accounti
     result = kernel_origin.summarize(capture.raw)
     assert result["status"] == "not_measured"
     assert result["calls"][0]["custom_exclusive_fraction_lower_bound"] == pytest.approx(1 / 3)
+
+
+def test_actual_scored_origin_gates_custom_library_and_unknown_tracks(native_origin_runner):
+    """Unscored serialization fixtures exercise the gate, never device evidence."""
+    from kb_workflows.evaluation import evidence
+    from kb_workflows.provenance import origin_task
+    from tests.numerics.test_input_calibration import CAPS
+
+    def reseal(result):
+        origin = result["metadata"]["origin_capture"]
+        origin["receipt_sha256"] = fingerprint({k: v for k, v in origin.items() if k != "receipt_sha256"})
+        record = result["metadata"]["native_call_receipt"]
+        record["origin_capture_sha256"] = origin["receipt_sha256"]
+        record["receipt_sha256"] = fingerprint({k: v for k, v in record.items() if k != "receipt_sha256"})
+
+    def fixture(track, library=False, unknown=False):
+        template = native_origin_runner(caps=CAPS)
+        request = template["native_request"]
+        request["eval_config"]["kernel_track"] = track
+        result = native_origin_runner.scored(request)
+        origin = result["metadata"]["origin_capture"]
+        raw, pattern = origin["raw"], raw_capture()
+        for key in ("modules", "functions", "proofs"):
+            raw[key] = pattern[key]
+        source = result["metadata"]["native_call_receipt"]["native_request"]["kernel_src"]
+        proof = raw["proofs"][0]
+        frontend = frontend_receipt(source)
+        proof.update(source_sha256=sha256(source.encode()), jit_source_sha256=sha256(source.encode()), frontend=frontend)
+        proof["emission"]["frontend_receipt_sha256"] = frontend["receipt_sha256"]
+        raw["launches"], raw["activities"] = [], []
+        for window in raw["windows"]:
+            raw["launches"].append({**pattern["launches"][0], "correlation": window["id"], "call": window["id"]})
+            raw["activities"].append({**pattern["activities"][0], "correlation": window["id"],
+                                      "start_ns": window["start_ns"] + 1, "end_ns": window["start_ns"] + 2})
+        if library or unknown:
+            raw["proofs"] = []
+            raw["binary_inventory"] = library_receipt() if library else None
+        raw["simulated"] = False  # Parser-only fixture; nothing is saved as a benchmark result.
+        reseal(result)
+        return result
+
+    custom = fixture("custom")
+    summary = origin_task.scored_origin(custom)
+    assert summary["formal_qualification_implemented"] and not summary["timings_are_diagnostic"]
+    assert summary["scope"] == "actual_native_scored_calls"
+    assert origin_task.origin_check(custom)["status"] == "passed"
+    assert origin_task.origin_check(fixture("custom", library=True))["status"] == "failed"
+    assert origin_task.origin_check(fixture("library", library=True))["status"] == "passed"
+    assert origin_task.origin_check(fixture("library", unknown=True))["status"] == "not_measured"
+    for damage in (lambda raw: raw["windows"].pop(), lambda raw: raw.update(candidate_windows_only=True),
+                   lambda raw: raw.update(dropped_records=1)):
+        changed = copy.deepcopy(custom)
+        damage(changed["metadata"]["origin_capture"]["raw"])
+        reseal(changed)
+        assert origin_task.origin_check(changed)["status"] == "not_measured"
+    assert custom["correctness"] is True
+    passed = evidence.check("passed", reason="Other gate fixture; not a hardware claim")
+    checks = {name: passed for names in evidence.LEVELS.values() for name in names}
+    checks["kernel_origin"] = origin_task.origin_check(custom)
+    custom["metadata"]["evidence_receipt"] = evidence.receipt(checks, requested="L1")
+    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard") is None
+    assert evidence.score_issue(custom, {"evidence_level": "L1", "kernel_track": "library"}, "standard") == "scored_execution_track_mismatch"
+    custom["metadata"]["evidence_receipt"]["checks"]["kernel_origin"] = passed
+    assert evidence.score_issue(custom, {"evidence_level": "L1"}, "standard") == "actual_scored_origin_missing_or_invalid"
+
+
+def test_actual_observer_baseline_and_unavailable_startup_do_not_retry_candidate(native_origin_runner, monkeypatch, tmp_path):
+    from contextlib import contextmanager
+
+    from kb_workflows.evaluation import measurement
+    from kb_workflows.provenance import origin_task
+    from tests.numerics.test_input_calibration import CAPS
+
+    template = native_origin_runner(caps=CAPS)
+    baseline = origin_task.native_request(template["native_request"])
+    baseline.pop("_origin_timing_seeds")
+    baseline.update(task="baseline")
+    baseline.pop("kernel_src")
+    baseline["eval_config"]["evidence_level"] = "L1"
+
+    def invoke():
+        state = origin_task._ACTIVE.get()
+        assert state.capture is not None and state.capture.raw["candidate_windows_only"] is False
+        seeds = [measurement.fresh_seed() for _ in range(5)]
+        return {"baseline_correctness": True, "precision": "fp32", "device_fingerprint": copy.deepcopy(CAPS),
+                "reference_sha256": fingerprint({"source": baseline["ref_arch_src"]}),
+                "samples_ms": [0.25, 0.25], "mean": 0.25, "timing_receipt": {"input_seeds": seeds}}
+    result = origin_task.native_policy(lambda payload: invoke())(baseline)
+    assert "native_call_receipt" not in result["metadata"]
+    assert origin_task.timing_observer(result, allow_simulated=True) == origin_task.SCORED_MODE
+    from kb_workflows.evaluation.baseline_variants import select_baseline
+
+    result["metadata"]["evaluation_config"] = {"evidence_level": "L1"}
+    origin = result["metadata"]["origin_capture"]
+    origin["raw"]["simulated"] = False  # Serialization fixture only, not measured evidence.
+    origin["receipt_sha256"] = fingerprint({k: v for k, v in origin.items() if k != "receipt_sha256"})
+    unobserved = copy.deepcopy(result)
+    unobserved["mean"] = 0.01
+    unobserved["metadata"].pop("origin_capture")
+    selected = select_baseline({"observed": result, "unobserved": unobserved})
+    assert selected["winning_baseline"] == "observed"
+    assert set(selected["variants"]) == {"observed", "unobserved"}
+    result["samples_ms"][0] = 999
+    with pytest.raises(ValueError, match="other times"):
+        origin_task.timing_observer(result, allow_simulated=True)
+
+    class Unavailable(cuda_origin.Capture):
+        @contextmanager
+        def recording(self):
+            raise ImportError("synthetic missing collector")
+            yield  # pragma: no cover
+    monkeypatch.setattr(cuda_origin, "Capture", Unavailable)
+    calls = []
+    invoke_original = native_origin_runner.invoke
+    def once(payload):
+        calls.append(1)
+        return invoke_original(payload)
+    request = origin_task.native_request(template["native_request"])
+    request.pop("_origin_timing_seeds")
+    request["eval_config"]["evidence_level"] = "L1"
+    request["build_root"] = str(tmp_path / "unavailable")
+    actual = origin_task.native_policy(once)(request)
+    assert calls == [1] and actual["correctness"] is True
+    assert actual["metadata"]["origin_capture"]["status"] == "not_measured"
+    assert origin_task.origin_check(actual)["status"] == "not_measured"
+    with pytest.raises(ValueError):
+        origin_task.timing_observer(actual, allow_simulated=True)

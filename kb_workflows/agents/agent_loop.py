@@ -14,6 +14,7 @@ from pathlib import Path
 from ..analysis.experiment import protocol
 from ..common import atomic_json, fingerprint, kernel_name, read_json
 from ..config import RunConfig
+from ..evaluation.evidence import origin_feedback
 from .agent_models import KernelModel
 from .resource_budgets import BudgetExhausted, Ledger, device_lease, settle_device_lease
 
@@ -95,9 +96,16 @@ class KernelEnvironment:
                 runtime = result.get("runtime")
                 good = (result.get("compiled") is True and result.get("correctness") is True
                         and type(runtime) in (int, float) and math.isfinite(runtime) and runtime > 0)
+                origin = origin_feedback(result, self.config.to_dict())
                 row.update(compiled=result.get("compiled", False), correctness=result.get("correctness", False),
                            runtime_ms=runtime if good else None, status="development_pass" if good else "development_failed",
                            error=str(result.get("metadata", {}).get("error", ""))[:2000])
+                if origin is not None:
+                    row["kernel_origin"] = origin
+                    if good and origin["status"] != "passed":
+                        row["status"] = "development_unqualified"
+                        good = False
+                row["performance_eligible"] = good
                 if good and (self.best is None or runtime < self.best["runtime_ms"]):
                     self.best = {"round": index, "source": source, "runtime_ms": runtime, "development_verified": True}
                 if self.best:

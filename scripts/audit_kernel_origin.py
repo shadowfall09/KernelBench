@@ -15,7 +15,7 @@ from kb_workflows.engine import evaluate_tasks, task_payload
 from kb_workflows.provenance.origin_task import read_scored
 
 
-def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate", hidden=False, variant=None, role="candidate",
+def prepare(config, problem, sample, *, minimum_custom_fraction=None, task="evaluate", hidden=False, variant=None, role="candidate",
             scored_result=None):
     if config.device_backend != "cuda":
         raise ValueError("CUDA origin diagnostics cannot substitute for Neuron binary attribution")
@@ -34,6 +34,8 @@ def prepare(config, problem, sample, *, minimum_custom_fraction, task="evaluate"
         raise ValueError("Reference capture requires the explicit paired baseline")
     import math
 
+    if minimum_custom_fraction is None:
+        minimum_custom_fraction = config.origin_minimum_custom_fraction
     if (type(minimum_custom_fraction) not in (int, float) or not math.isfinite(minimum_custom_fraction)
             or not 0 < minimum_custom_fraction <= 1):
         raise ValueError("Minimum custom fraction must be in (0, 1]")
@@ -68,7 +70,7 @@ def main(argv=None):
     parser.add_argument("--baseline-variant", help="Required for paired_timing; use the selected source-bound baseline variant")
     parser.add_argument("--role", choices=("candidate", "reference"), default="candidate")
     parser.add_argument("--scored-result", type=Path, help="Existing L1/L2 native result or result map; reuse its actual calls/seeds")
-    parser.add_argument("--minimum-custom-fraction", type=float, default=0.95)
+    parser.add_argument("--minimum-custom-fraction", type=float)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)

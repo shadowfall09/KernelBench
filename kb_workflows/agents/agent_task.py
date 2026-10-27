@@ -14,6 +14,7 @@ from ..analysis.experiment import protocol
 from ..benchmarks.reference_population import select_run_problems
 from ..common import atomic_json, kernel_name, read_json
 from ..config import RunConfig, parse_config
+from ..evaluation.evidence import origin_feedback
 from .resource_budgets import active
 
 
@@ -70,8 +71,14 @@ def verify_directory(directory, *, evaluator=None):
     runtime = result.get("runtime", -1)
     good = (result.get("compiled") is True and result.get("correctness") is True
             and type(runtime) in (int, float) and math.isfinite(runtime) and runtime > 0)
-    row = {"round": index, "correctness": good, "runtime_ms": runtime if good else None,
+    row = {"round": index, "correctness": result.get("compiled") is True and result.get("correctness") is True,
+           "runtime_ms": runtime if good else None,
            "error": str(result.get("metadata", {}).get("error", ""))[:2000], "feedback_scope": "standard_only"}
+    origin = origin_feedback(result, config.to_dict())
+    if origin is not None:
+        row["kernel_origin"] = origin
+        good = good and origin["status"] == "passed"
+    row["performance_eligible"] = good
     if good and (not state.get("best") or runtime < state["best"]["runtime_ms"]):
         state["best"] = {"round": index, "runtime_ms": runtime, "source": source}
     if good and config.agent_profile:

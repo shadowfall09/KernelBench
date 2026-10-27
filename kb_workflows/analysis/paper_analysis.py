@@ -42,6 +42,15 @@ def compatible(baseline, candidate, current_digest):
         return "device_or_software_mismatch"
     if baseline.get("timing_method") != "synchronized_wall" or metadata.get("timing_method") != "synchronized_wall":
         return "timing_protocol_mismatch"
+    if (metadata.get("evaluation_config", {}).get("evidence_level") in {"L1", "L2"}
+            or metadata.get("origin_capture") or baseline.get("metadata", {}).get("origin_capture")):
+        from ..provenance.origin_task import timing_observer
+
+        try:
+            if timing_observer(baseline, baseline=True) != timing_observer(candidate):
+                return "origin_timing_mode_mismatch"
+        except (OSError, ValueError):
+            return "origin_timing_observer_missing_or_invalid"
     if baseline.get("precision") != metadata.get("precision"):
         return "precision_mismatch"
     if (baseline.get("metadata", {}).get("evaluation_config", {}).get("fp32_tolerance")
@@ -364,6 +373,7 @@ def analyze_paper(config):
         "headroom_score_implemented": True, "score_mode": config.score_mode,
         "bounded_gain_baseline_policy": "same_selected_variant; K_optimized_in_bounded_gain_mode; steady_optimized_in_headroom_mode",
         "strict_validation": config.strict_validation, "requested_evidence_level": config.evidence_level,
+        "kernel_track": config.kernel_track, "origin_minimum_custom_fraction": config.origin_minimum_custom_fraction,
         "experiment": existing_budget(config).get("protocol", protocol(config)), "generation_budget": existing_budget(config),
         "generation_receipts_available": bool(existing_budget(config)),
         "declared_samples": config.num_samples, "cold_calls": config.cold_calls, "hidden_gated": config.hidden_tests,

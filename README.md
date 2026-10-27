@@ -33,7 +33,7 @@ LICENSE file in the root directory of this source tree.
 [动机与逐项对照](docs/MOTIVATION.md)覆盖每版改动和未完成设计；
 [统一研究稿](research/headroom/PAPER.md)说明 Headroom 目标与当前实现的差额。
 当前提供 NVIDIA CUDA 和[原生Neuron/NKI设备工作流](docs/NEURON.md)；后者为软件接入及CPU/模拟验证，实机部署与性能未验证。可选Headroom评分要求真实设备校准和可信规格，缺证据不计分。
-显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/STRICT_VALIDATION.md)。
+显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/STRICT_VALIDATION.md)。CUDA L1/L2另有[实际计分来源门](docs/KERNEL_ORIGIN.md)，自写/库轨道使用同模式基线；来源门不替代其他等级证据。
 
 ## 代码布局
 
@@ -129,7 +129,7 @@ python -m scripts.check_motivations
 | [隔离与重评分](docs/ISOLATION_REGRADE.md) | 受限验证器、Harbor网络配置、冻结产物与重评分计划 |
 | [内存工具与重复检查](docs/TOOL_CHECKS.md) | 可选Sanitizer、审核原子操作策略、证据与恢复 |
 | [精度阈值校准](docs/PRECISION_CALIBRATION.md) | 参考专用拟合、独立种子验证、固定上限与候选前冻结，默认只预览 |
-| [设备来源诊断](docs/KERNEL_ORIGIN.md) | CUDA源码/产物、可信库、Graph与轨道诊断，默认只预览 |
+| [执行来源与轨道](docs/KERNEL_ORIGIN.md) | CUDA实际计分来源门、自写/库轨道，以及默认预览的独立重放 |
 | [交替与最终计时](docs/PAIRED_TIMING.md) | 扩展基线、平衡配对、噪声控制、独立重测与恢复 |
 | [工作计数器](docs/WORK_COUNTERS.md) | 显式Nsight采集、原始计数重放与审核后的A/E模型，默认只预览 |
 | [Headroom评分](docs/HEADROOM_SCORING.md) | 设备校准、可信工作量证书、独立见证与时间线诊断 |

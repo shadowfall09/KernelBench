@@ -18,7 +18,7 @@ from scripts.audit_kernel_origin import prepare as prepare_origin
 
 def prepare(config, pid, sid, policy, *, target="candidate", task="evaluate", variant=None, scored_result=None):
     metrics = recipe(policy)
-    payload = prepare_origin(config, pid, sid, minimum_custom_fraction=0.95, task=task, variant=variant, role=target,
+    payload = prepare_origin(config, pid, sid, task=task, variant=variant, role=target,
                              scored_result=scored_result)
     payload.update(task="counter_audit", _native_counter={"recipe": policy})
     payload["request_id"] = "kb-" + fingerprint(payload)

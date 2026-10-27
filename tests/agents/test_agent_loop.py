@@ -30,8 +30,10 @@ def responses(calls, costs=None):
     return respond
 
 
-def evaluated(runtime, correct=True):
-    return {"compiled": True, "correctness": correct, "runtime": runtime, "metadata": {}}
+def evaluated(runtime, correct=True, *, origin=None):
+    metadata = {"evidence_receipt": {"checks": {"kernel_origin": {"status": origin, "reason": "CPU feedback fixture",
+        "values": {"track": "custom", "minimum_custom_fraction": 0.95}}}}} if origin else {}
+    return {"compiled": True, "correctness": correct, "runtime": runtime, "metadata": metadata}
 
 
 def test_real_mini_loop_repairs_and_retains_best_instead_of_last(config):
@@ -55,6 +57,19 @@ def test_real_mini_loop_repairs_and_retains_best_instead_of_last(config):
     trajectory = read_json(directory / "trajectory.json")
     assert trajectory["info"]["config"]["agent_type"] == "minisweagent.agents.default.DefaultAgent"
     assert not result["final_hidden_tests_run"]
+
+    config.start = config.end = 1
+    config.evidence_level = "L1"
+    directory = generation.prepare_job(config, 1, 0)
+    source_calls = []
+    def source_evaluate(child, pid, index, remaining, task="evaluate"):
+        return evaluated(4 / index, origin=["passed", "failed", "not_measured"][index - 1])
+    result = agent_loop.run_loop(directory, config, 1, response_fn=responses(source_calls), evaluator=source_evaluate)
+    assert result["selected"]["round"] == 1
+    assert [row["status"] for row in result["rounds"]] == ["development_pass", "development_unqualified", "development_unqualified"]
+    assert all(row["correctness"] for row in result["rounds"])
+    assert not result["rounds"][1]["performance_eligible"]
+    assert json.loads(source_calls[2][-1]["content"])["feedback"]["kernel_origin"]["status"] == "failed"
 
 
 def test_one_shot_has_one_call_and_zero_development_or_profile_calls(config):
@@ -252,6 +267,24 @@ def test_interactive_bridge_standard_feedback_freeze_and_no_nested_agent(config,
     assert agent_task.verify_directory(directory) == 2
     budget = read_json(config.run_dir / "generation_budget.json")
     assert budget["protocol"]["mode"] == "interactive" and budget["model_calls"] is None
+
+    config.start = config.end = 1
+    config.evidence_level = "L1"
+    directory = generation.prepare_job(config, 1, 0)
+    child = RunConfig(**read_json(directory / "job_config.json")).validate()
+    output = child.run_dir / kernel_name(1, 1)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text("qualified source")
+    destination = config.run_dir / kernel_name(1, 1)
+    atomic_json(directory / "interactive_state.json", {"rounds": [], "destination": str(destination)})
+    assert agent_task.verify_directory(directory, evaluator=lambda *a, **k: evaluated(2, origin="passed")) == 0
+    output.write_text("fast library source")
+    assert agent_task.verify_directory(directory, evaluator=lambda *a, **k: evaluated(1, origin="failed")) == 1
+    state = read_json(directory / "interactive_state.json")
+    assert state["rounds"][-1]["correctness"] and not state["rounds"][-1]["performance_eligible"]
+    assert state["best"]["source"] == "qualified source"
+    assert agent_task.main(["finalize", "--directory", str(directory)]) == 0
+    assert destination.read_text() == "qualified source"
 
 
 def fake_claude(tmp_path, monkeypatch, sleepy=False):

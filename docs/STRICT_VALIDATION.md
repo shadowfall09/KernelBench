@@ -70,3 +70,7 @@ RMS(candidate - oracle) <= norm_atol + norm_rtol * RMS(oracle)
 ## 验证范围
 
 回归包含17道真实PyTorch参考的FP64/隐藏形状运行，以及BF16冒充FP32、GELU近似、单元素错误、结构/dtype/非有限值、输入身份缓存、参数缓存、BN计数器、环境恢复、秘密值不序列化、缺工具收据与聚合分母等反例。实际CUDA、所有题目适配、GPU阈值校准和生产模型实验分别验收，不以CPU测试替代。
+
+## L1/L2的实际执行来源
+
+CUDA L1/L2现在为候选、配对参考/控制和基线启用同一种持续CUPTI模式；实际计时保留原始model对象。`kernel_track`选择custom或library，`origin_minimum_custom_fraction`默认0.95；政策绑定配置、恢复和实验分组。`kernel_origin`只从实际计分进程的源码/产物/launch与完整调用收据推导，评分离线重算，独立重放或模拟证据不能代替。采集缺失或未知来源不给资格，也不修改数值正确性。详见[实际来源门](KERNEL_ORIGIN.md#实际计分模式与来源门)。其他L1/L2门及本页严格契约覆盖要求仍须满足；这不是全等级通过、硬件实验完成或安全认证。

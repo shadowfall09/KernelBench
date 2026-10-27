@@ -39,6 +39,8 @@ def settings(config, hidden=False):
         "score_gate_required": config.score_gate_required,
         "strict_validation": config.strict_validation,
         "evidence_level": config.evidence_level,
+        "kernel_track": config.kernel_track,
+        "origin_minimum_custom_fraction": config.origin_minimum_custom_fraction,
         "evaluator_sha256": evaluator_digest(),
         **diagnostic_options(config),
         "isolation": options(config),

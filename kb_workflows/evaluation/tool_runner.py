@@ -1,4 +1,4 @@
-"""Parent-owned diagnostic processes; instrumented times never enter scores."""
+"""Parent-owned diagnostics; extra tool runs never replace native scored timings."""
 
 from __future__ import annotations
 

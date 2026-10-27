@@ -96,6 +96,8 @@ class RunConfig:
     hidden_tests: bool = True
     strict_validation: bool = False
     evidence_level: str = "current"
+    kernel_track: str = "custom"
+    origin_minimum_custom_fraction: float = 0.95
     baseline: str = ""
     record_baseline: bool = False
     compile_backend: str = ""
@@ -219,6 +221,12 @@ class RunConfig:
             raise ValueError("--suite-role requires --suite kernelbench105")
         if self.evidence_level not in {"current", "L0", "L1", "L2"}:
             raise ValueError("Unknown evidence level")
+        if self.kernel_track not in {"custom", "library"}:
+            raise ValueError("Kernel track must be custom or library")
+        if (type(self.origin_minimum_custom_fraction) not in (int, float)
+                or not math.isfinite(self.origin_minimum_custom_fraction)
+                or not 0 < self.origin_minimum_custom_fraction <= 1):
+            raise ValueError("Origin custom fraction must be in (0, 1]")
         if self.evidence_level != "current":
             self.strict_validation = True
         from .evaluation.tool_checks import select_tools
@@ -447,6 +455,7 @@ def parser():
         "score_mode": ("bounded_gain", "headroom"),
         "baseline_portfolio": ("standard", "extended"),
         "evidence_level": ("current", "L0", "L1", "L2"),
+        "kernel_track": ("custom", "library"),
         "suite": ("full", "kernelbench105", "production41"),
         "task_profile": ("small", "standard", "large"),
         "task_track": ("all", "design", "numerical", "implementation", "backward"),
@@ -470,6 +479,7 @@ def parser():
         "reference_population_scope",
         "baseline_portfolio",
         "evidence_level",
+        "kernel_track",
         "suite",
         "suite_role",
         "task_profile",
@@ -524,7 +534,7 @@ def parser():
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)
-    for name in ("queue_poll_interval", "queue_http_timeout", "fp32_tolerance", "agent_cost_limit", "agent_device_seconds", "agent_temperature"):
+    for name in ("queue_poll_interval", "queue_http_timeout", "fp32_tolerance", "agent_cost_limit", "agent_device_seconds", "agent_temperature", "origin_minimum_custom_fraction"):
         p.add_argument(f"--{name.replace('_', '-')}", dest=name, type=float, default=argparse.SUPPRESS)
     return p
 

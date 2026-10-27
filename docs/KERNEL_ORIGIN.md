@@ -1,6 +1,27 @@
-# 设备执行来源诊断
+# 设备执行来源与轨道判定
 
-R-08当前支持CUDA/Triton直接launch、受信wheel cubin匹配、不可变CUDA Graph replay以及有原生调用/节点证据的复制与memset。现支持Triton实际前端依赖/编译产物冻结、CUDA C++ object观察，以及模板/可执行Graph核参数更新的v1/v2重绑定。仍是独立进程诊断：未关联的CUDA Runtime注册路径、其他编译器/loader、整体/其他Graph更新、CUkernel、Neuron来源和正式轨道资格尚需完成。诊断结果不能写入正式`kernel_origin`证据，也不能替换原生墙钟、冷启动、配对或最终重复测量。
+CUDA L1/L2现在从实际计分进程采集源码→产物→函数→launch证据，支持Triton直接launch、受信wheel cubin、已适配的CUDA C++ object、Graph replay/核参数更新及原生复制/memset。自写/库轨道门使用这份实际证据，独立的对照/重放报告继续只作诊断。未关联的CUDA Runtime注册、其他编译器/loader、整体/其他Graph更新、CUkernel及Neuron来源保持未知；R-08仍为部分实现。
+
+## 实际计分模式与来源门
+
+```toml
+[run]
+evidence_level = "L1"
+kernel_track = "custom"  # 或 library；两种轨道分组报告
+origin_minimum_custom_fraction = 0.95
+```
+
+CUDA L1/L2的`evaluate`、隐藏验证、`paired_timing`及`baseline`在实际工作进程启动持续CUPTI采集，早于候选导入；原始计时仍调用同一个model对象，不增加转发包装器或同步。计时前打开候选窗口，计时结束立即关闭，再观察模式、模型状态和输出；摘要与验证不计入自写份额。持续记录窗口外的launch/activity，使配对参考、控制及独立基线也使用同一种callback/activity模式。该模式明确标为`synchronized_wall_continuous_cupti_v1`，含真实采集开销，不声称与未采集计时等价。普通`current`/L0保留原模式。
+
+`metadata.origin_capture`使用`kernelbench_pro_scored_capture_v1`，只保存一份实际raw trace，并绑定请求、实际时间、设备及逐调用收据；`native_call_receipt`通过摘要引用它。基线也保留绑定实际样本及seed的采集收据。评分重算来源门，不能只写passed；同时拒绝无采集基线、混合模式、模拟/不完整/丢记录的观察。工具缺失时保留数值结果与失败原因，候选只执行一次，不重跑或补造来源。
+
+原生v2在每次调用前后另取模型状态摘要：参数、buffer、普通属性与容器、类数据、实际入口代码/default/closure及输入与状态之间的存储别名。合法连续状态可以改变，要求的是实际进程与重放逐次匹配前后状态，而非强制状态不变。重新编译的等值代码不能继承本次注册的代码身份；外部Python/builtin入口只记录观察，不据名称授予所有权。未知描述符、容器/张量子类、定制metaclass或无可靠适配的对象标为未测，不作为空状态。摘要在计时区间和CUPTI/NVTX候选窗口外完成；校验不执行候选property、iterator或state_dict。 这些区间外观察可能影响缓存，未运行设备实验量化影响；它们不闭合任意全局依赖或证明其他host路径。
+
+`kernel_track="custom"`要求每次实际调用来源完整且独占自写busy时间比例达到冻结阈值；`library`允许已经建立来源的自写、库、框架及运行时工作，仍不接受未知活动。库工作是合法答案，未过自写门不改变数值正确性。轨道与阈值纳入生成提示、请求/恢复指纹、评分及实验比较组；更改声明必须生成新匹配工件。诊断CLI省略阈值时沿用配置，绑定已存实际结果时不能改变其冻结政策。
+
+`origin_task.scored_origin()`离线核对实际采集并重算事实；`origin_check()`生成`kernel_origin`证据。只有这个实际执行上下文实现来源门；通用`summarize()`和后面的独立诊断仍不授予资格。来源门通过不等于整套L1/L2通过，其他正确性、配对/噪声、校准、边界及工具门仍须分别满足。开发循环与交互式verify.py分别显示数值正确性、紧凑来源状态及performance_eligible；只有数值与当前轨道来源均合格的候选可成为最佳实现，失败不会覆盖此前合格项。开发选择使用可信worker反馈，最终评分仍重算完整来源证据；不把其他最终等级门或隐藏反馈提前交给agent。
+
+这是可信验证器工件的来源判定，不是对整份工件伪造、任意Python/native-memory攻击、输出因果用途或算法有效工作量的安全认证。实际模式无需用重放推断未插桩分支，但也不声称证明任意未观察路径。Neuron及未支持来源适配器不能借用CUDA证据。
 
 ## 源码、产物与实际执行
 
@@ -52,7 +73,7 @@ v4原始收据新增`graph_updates`：保留API/context/correlation、目标节�
 
 成功却缺匹配事件、事件错绑，或失败API伴随更新事件时，保留失效边界，后续旧实例来源未知；失败且没有更新事件时保留原快照。`cuGraphExecUpdate`整体更新、其他节点setter、设备发起Graph以及尚未关联的CUkernel继续使后续来源未知。当前只有CPU夹具、序列化篡改反例及主机ABI核对，没有执行CUPTI、GPU、nvcc或设备实验；这些更新记录仍不授予正式轨道资格。
 
-## 调用、模式与轨道诊断
+## 独立重放的调用与轨道诊断
 
 诊断已替换原先三个公开seed的独立前向循环，直接复用原生`evaluate`或`paired_timing`入口。每个请求在同一总超时内使用两个新Python进程：一个不启用CUPTI的对照，一个来源采集进程。两者分别使用私有构建和Triton缓存，复用同一组预先冻结的计时输入seed；不改变原始精度、输入族、参数或数值契约。
 
@@ -60,23 +81,15 @@ v4原始收据新增`graph_updates`：保留API/context/correlation、目标节�
 
 采集器只保留与候选窗口重叠的活动，仍保留重叠的未知后台工作；所有观察到的context/stream都参与丢记录核对。窗口发布和回调过滤使用同一把锁，防止过滤尚未发布窗口的活动。离线关联通过时间索引匹配重叠，不再对每个窗口扫描全部活动；重叠展开过多时明确拒绝。可信输出消费、摘要拷贝和参考调用不计为候选自写工作。
 
-两阶段的`native_result`和墙钟耗时仅供诊断，不能写回正式计时、基线或评分。对照阶段也带有调用观察与额外同步，因此逐次字节一致不证明未观察的原生进程采用相同执行路径。CUDA原生峰值显存前向现已验证并作为独立memory窗口纳入：核对输入、输出、原始allocator峰值及验证副本分配增量，FP64收据也有独立memory类别。其他独立诊断仍未纳入。没有通过本轮授予L1或正式轨道资格。
-
-L1/L2请求的实际CUDA `evaluate`和`paired_timing`进程现另存`metadata.native_call_receipt`。它记录实际输入/输出逻辑字节、布局、模式、调用顺序及原生计时，并在生成后冻结实际计时seed；不提前公布新seed计划。输入摘要和前后模式观察位于计时区间外，计时器仍调用原始model对象，不插入转发包装器、CUPTI或额外同步。`current`/L0和独立诊断不启用这份观察。观察增加区间外工作，可能影响缓存；未运行设备实验来量化这种影响，也不声称计时完全不受观察影响。
-
-原生v2在每次调用前后另取模型状态摘要：参数、buffer、普通属性与容器、类数据、实际入口代码/default/closure及输入与状态之间的存储别名。合法连续状态可以改变，要求的是实际进程与重放逐次匹配前后状态，而非强制状态不变。重新编译的等值代码不能继承本次注册的代码身份；外部Python/builtin入口只记录观察，不据名称授予所有权。未知描述符、容器/张量子类、定制metaclass或无可靠适配的对象标为未测，不作为空状态。摘要在计时区间和CUPTI/NVTX候选窗口外完成；校验不执行候选property、iterator或state_dict。
-
-这不是完整依赖闭包：未建立任意全局依赖、host控制流、属性求值或未插桩分支等价证明。模块/类注解等非执行元数据没有被用作控制流证明。状态一致不能独立建立正式来源资格；离线分析仅显示前后摘要和状态是否改变。
+两阶段的`native_result`和墙钟耗时仅供诊断，不能写回正式计时、基线或评分。对照阶段也带有调用观察与额外同步，因此逐次字节一致不证明未观察的原生进程采用相同执行路径。CUDA原生峰值显存前向现已验证并作为独立memory窗口纳入：核对输入、输出、原始allocator峰值及验证副本分配增量，FP64收据也有独立memory类别。其他独立诊断仍未纳入。该独立重放不授予来源门资格。
 
 保存的计分结果可通过`--scored-result`关联至后续诊断：它接受单个原生结果，或按题目/样本选择`eval_results.json`、隐藏结果、`paired_results.json`中的结果。请求、源码、设备、seed、原生时间样本和逐次输出均重放核对，随后对照/采集必须与实际观察一致。原生收据缺失、错配或设备身份未知会拒绝，不用新抽取的seed补造实际观察；参考角色目前不接受候选角色的实际收据。最终重复的非默认请求应通过保存的完整请求显式关联，不能借用另一重复或种子。
-
-L1/L2评分入口也要求有效的实际调用收据，不能只填一组passed标记。该要求是正式来源门的必要条件；观察匹配仍不证明未启用CUPTI时使用相同执行路径，也不建立二进制所有权或充分的正式资格。
 
 占比使用同一设备、调用窗口内GPU activity的时间区间并集。自写时间只计入没有与任何非自写活动重叠的部分；并发stream不能重复累加。分别报告custom/library/framework/runtime/unknown的区间并集，这些分类小计之间可以重叠，不能直接相加成总busy时间。每次调用分别检查，不能用一个长调用掩盖其他调用。
 
 `track_verdicts.custom`要求来源完整且每次保守自写占比达到阈值；`track_verdicts.library`允许已建立来源的库、框架和运行时工作，不要求自写占比。库优化不是错误答案，custom门失败也不修改原生正确性。缺活动、丢失记录、未平衡回调、source/hook/模式变化、SDK错误或任一未知活动使相关轨道保持`not_measured`。诊断不能建立正式轨道资格；`formal_qualification_implemented`仍为false。
 
-原始模块/函数/Graph/launch/activity、库提取记录及摘要一并保存。离线`summarize()`重算关联和区间，拒绝重复、冲突或失效代次。CUDA来源协议为`kernelbench_pro_cuda_origin_v4`；原生收据升级为`kernelbench_pro_native_origin_v2`，增加逐次状态与入口关联，并继续要求training后置观察、Triton实际前端/产物凭据或完整CUDA object编译凭据。原生v1缺少状态证据，不能重新封装成v2；旧CUDA v1/v2也不能冒充当前CUDA v4。默认0.95仅是论文设计中的可配置诊断阈值；历史20%与95%未做设备校准，不设为所有旧运行的默认资格门槛。
+原始模块/函数/Graph/launch/activity、库提取记录及摘要一并保存。离线`summarize()`重算关联和区间，拒绝重复、冲突或失效代次。CUDA来源协议为`kernelbench_pro_cuda_origin_v4`；原生收据升级为`kernelbench_pro_native_origin_v2`，增加逐次状态与入口关联，并继续要求training后置观察、Triton实际前端/产物凭据或完整CUDA object编译凭据。原生v1缺少状态证据，不能重新封装成v2；旧CUDA v1/v2也不能冒充当前CUDA v4。配置默认0.95是论文声明的来源政策，不是实测校准结论；只适用于新建且绑定该政策的实际计分模式，历史运行不会追认为合格。
 
 以上不能证明输出因果依赖、算法有效工作量、任意动态编译器的依赖闭包或未插桩时执行相同路径，也不提供Python/驱动安全认证。R-08继续标为部分实现。
 
@@ -99,7 +112,7 @@ python -m scripts.analyze_device_trace native /path/to/origin-result.json \
 
 ## 使用入口
 
-已有软件环境需要额外的`cupti-python==13.3.0`和`triton==3.7.0`，可选依赖为`kernelbench-pro[origin]`；CUDA C++观察器要求Torch 2.12.0和正常的nvcc/C++/Ninja工具链，库/object匹配还需cuobjdump。适配器要求64位Linux，供应商运行库和驱动仍须兼容；缺包、ABI或运行时不兼容不会自动换成名称推断。普通配置预览、模块导入、批量验证均不加载CUPTI。Docker/Modal/queue worker需事先包含可选工具；受限Docker策略仍由原有transport执行。
+已有软件环境需要额外的`cupti-python==13.3.0`和`triton==3.7.0`，可选依赖为`kernelbench-pro[origin]`；CUDA C++观察器要求Torch 2.12.0和正常的nvcc/C++/Ninja工具链，库/object匹配还需cuobjdump。适配器要求64位Linux，供应商运行库和驱动仍须兼容；缺包、ABI或运行时不兼容不会自动换成名称推断。普通配置预览、模块导入和current/L0批量验证不加载CUPTI；L1/L2请求显式需要上述采集能力。Docker/Modal/queue worker需事先包含可选工具；受限Docker策略仍由原有transport执行。
 
 下面命令默认只预览，读取已保存候选并检查任务/样本范围，不申请设备、不创建结果目录：
 

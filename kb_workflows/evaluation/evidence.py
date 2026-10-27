@@ -23,6 +23,26 @@ def accepted(item):
             and bool(item.get("reason")))
 
 
+def origin_feedback(result, settings):
+    """Compact trusted-worker feedback for selection; final scoring recomputes it."""
+    if settings.get("evidence_level", "current") not in {"L1", "L2"}:
+        return None
+    track = settings.get("kernel_track", "custom")
+    fraction = settings.get("origin_minimum_custom_fraction", 0.95)
+    try:
+        item = result["metadata"]["evidence_receipt"]["checks"]["kernel_origin"]
+        values = item.get("values") or {}
+        if (item.get("status") not in STATES or not isinstance(item.get("reason"), str) or not item["reason"]
+                or item["status"] == "passed" and (values.get("track") != track
+                    or values.get("minimum_custom_fraction") != fraction)):
+            raise ValueError("Missing or mismatched development origin policy")
+        return {"status": item["status"], "reason": item["reason"][:500], "track": track,
+                "minimum_custom_fraction": fraction}
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return {"status": "not_measured", "reason": "Missing or mismatched development origin feedback",
+                "track": track, "minimum_custom_fraction": fraction}
+
+
 def receipt(checks, *, requested="current", scope="standard"):
     if requested not in LEVELS or scope not in {"standard", "hidden"}:
         raise ValueError("Unknown evidence level or scope")
@@ -70,7 +90,7 @@ def score_issue(result, settings, scope):
         if any(not accepted(record["checks"].get(name)) for name in LEVELS["L0"]):
             return "strict_validation_evidence_incomplete"
     if requested in {"L1", "L2"}:
-        from ..provenance.origin_task import validate_scored
+        from ..provenance.origin_task import origin_check, validate_scored
 
         try:
             request, _ = validate_scored(result)
@@ -79,4 +99,11 @@ def score_issue(result, settings, scope):
         if (request["eval_config"].get("evidence_level") != requested
                 or bool(request["eval_config"].get("use_hidden_tests")) != (scope == "hidden")):
             return "scored_call_scope_or_level_mismatch"
+        if (request["eval_config"].get("kernel_track", "custom") != settings.get("kernel_track", "custom")
+                or request["eval_config"].get("origin_minimum_custom_fraction", 0.95)
+                != settings.get("origin_minimum_custom_fraction", 0.95)):
+            return "scored_execution_track_mismatch"
+        origin = origin_check(result)
+        if not accepted(origin) or record["checks"].get("kernel_origin") != origin:
+            return "actual_scored_origin_missing_or_invalid"
     return None

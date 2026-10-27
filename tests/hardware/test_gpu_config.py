@@ -57,10 +57,16 @@ parallel = 9
 precision = "bf16"
 resume = true
 hidden_tests = false
+kernel_track = "library"
+origin_minimum_custom_fraction = 0.8
 ''')
+    declared = parse_config(["--config", str(path)])
+    assert (declared.kernel_track, declared.origin_minimum_custom_fraction) == ("library", 0.8)
     config = parse_config(["--config", str(path), "--parallel", "4", "--precision", "fp32",
-                           "--no-resume", "--hidden-tests", "--gpus", "0"])
+                           "--no-resume", "--hidden-tests", "--gpus", "0", "--kernel-track", "custom",
+                           "--origin-minimum-custom-fraction", "0.95"])
     assert (config.parallel, config.precision, config.resume, config.hidden_tests, config.gpus) == (4, "fp32", False, True, "0")
+    assert (engine.settings(config)["kernel_track"], engine.settings(config)["origin_minimum_custom_fraction"]) == ("custom", 0.95)
 
 
 @pytest.mark.parametrize("target_flags", [["--gpu-profile", "H100"], ["--hardware", "H100"], ["--gpu", "H100"]])
