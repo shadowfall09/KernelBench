@@ -246,7 +246,7 @@
 | V49-01 | 保存报告重放与原生时间/设备活动关联 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M3](MOTIVATION.md#m3) |
 | V50-01 | 原生序列计数器与逐调用A/E关联 | [counter_task.py](../kb_workflows/provenance/counter_task.py) | [M3](MOTIVATION.md#m3) |
 | V60-01 | 实际配对设备时间与启动收益评分门 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M3](MOTIVATION.md#m3) |
-| V61-01 | 实际计分工作量指纹与计数模型关联 | [cuda_origin.py](../kb_workflows/provenance/cuda_origin.py) | [M3](MOTIVATION.md#m3) |
+| V61-01 | 实际计分工作量指纹与计数模型关联 | [counter_task.py](../kb_workflows/provenance/counter_task.py) | [M3](MOTIVATION.md#m3) |
 
 ### M4：现实的Agent回路与预算
 

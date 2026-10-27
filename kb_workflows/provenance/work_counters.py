@@ -21,6 +21,10 @@ FIELDS = ("ID", "Process ID", "Context", "Stream", "Device", "Kernel Name", "Met
 BINDINGS = ("source_sha256", "reference_sha256", "evaluator_sha256", "evaluation_contract_sha256",
             "input_signature_sha256", "input_probe_sha256", "state_probe_sha256", "policy_sha256")
 WORKLOAD_FIELDS = ("source_sha256", "reference_sha256", "input_signature_sha256", "policy_sha256", "precision")
+LAUNCH_METRICS = {"launch__kernel_name": {""},
+                  **{f"launch__grid_dim_{axis}": {"", "block"} for axis in "xyz"},
+                  **{f"launch__block_dim_{axis}": {"", "thread"} for axis in "xyz"},
+                  **{f"launch__shared_mem_per_block_{kind}": {"byte"} for kind in ("dynamic", "static")}}
 
 
 def sha(value):
@@ -90,7 +94,7 @@ def work_totals(actions, policy):
             for resource, rule in policy["resources"].items()}
 
 
-def parse_csv(raw, policy, *, pid, device=0):
+def parse_csv(raw, policy, *, pid, device=0, launch_identity=False):
     units = recipe(policy)
     if not isinstance(raw, bytes) or not 0 < len(raw) <= MAX_BYTES or type(pid) is not int or pid <= 0:
         raise ValueError("Counter CSV requires a bounded report and observed worker PID")
@@ -123,6 +127,20 @@ def parse_csv(raw, policy, *, pid, device=0):
         if action["identity"] != metadata:
             raise ValueError("Counter launch ID was reused with different metadata")
         name = item["Metric Name"]
+        if launch_identity and name in LAUNCH_METRICS:
+            attributes = action.setdefault("launch_attributes", {})
+            if name in attributes or item["Metric Unit"] not in LAUNCH_METRICS[name]:
+                raise ValueError("Counter launch attribute has duplicate values or an unsupported unit")
+            value = item["Metric Value"]
+            if name == "launch__kernel_name":
+                if not value or len(value) > 2048 or "\x00" in value:
+                    raise ValueError("Counter launch lacks an original kernel name")
+            else:
+                value = count(value)
+                if "_dim_" in name and value == 0:
+                    raise ValueError("Counter launch dimensions must be positive")
+            attributes[name] = value
+            continue
         if name not in units:
             continue  # NCU also emits launch/device attributes; raw bytes remain retained.
         if item["Metric Unit"] != units[name] or name in action["metrics"]:
@@ -130,6 +148,14 @@ def parse_csv(raw, policy, *, pid, device=0):
         action["metrics"][name] = {"unit": units[name], "count": count(item["Metric Value"])}
     if not actions or any(set(action["metrics"]) != set(units) for action in actions.values()):
         raise ValueError("Counter report omitted a required metric or has no measured launches")
+    if launch_identity:
+        for action in actions.values():
+            attributes = action.pop("launch_attributes", {})
+            if set(attributes) != set(LAUNCH_METRICS):
+                raise ValueError("Counter report omitted its same-process launch identity")
+            action["launch_identity"] = {"symbol": attributes["launch__kernel_name"], "configuration": {
+                **{kind: [attributes[f"launch__{kind}_dim_{axis}"] for axis in "xyz"] for kind in ("grid", "block")},
+                **{f"{kind}_shared_bytes": attributes[f"launch__shared_mem_per_block_{kind}"] for kind in ("dynamic", "static")}}}
     work = work_totals(actions.values(), policy)
     if any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in work.values()):
         raise ValueError("Counter work overflows its finite quantity envelope")

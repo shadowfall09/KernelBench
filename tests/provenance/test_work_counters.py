@@ -277,6 +277,8 @@ def native_counter_runner(tmp_path, native_origin_runner):
         if "--log-file" not in argv:
             return native_origin_runner.runner(argv, timeout, log, **options)
         assert "--nvtx" in argv and argv[argv.index("--print-nvtx-rename") + 1] == "kernel"
+        assert argv[argv.index("--print-kernel-base") + 1] == "mangled"
+        assert set(wc.LAUNCH_METRICS) <= set(argv[argv.index("--metrics") + 1].split(","))
         for flag, expected in (("--config-file", "off"), ("--profile-from-start", "off"),
                                ("--cache-control", "none"), ("--clock-control", "none"), ("--rename-kernels", "off")):
             assert argv[argv.index(flag) + 1] == expected
@@ -303,6 +305,15 @@ def native_counter_runner(tmp_path, native_origin_runner):
             for _ in range(2):
                 for metric, unit, count in ((READ, "byte", 32), (WRITE, "byte", 64), (FMA, "inst", 10)):
                     writer.writerow([action, document["pid"], 1, 2, 0, window["marker"], metric, unit, count])
+                for metric in wc.LAUNCH_METRICS:
+                    if damage["kind"] == "missing_launch_identity" and metric == "launch__kernel_name":
+                        continue
+                    unit = "byte" if "shared_mem" in metric else "thread" if "block_dim" in metric else "block" if "grid_dim" in metric else ""
+                    value = ("fixture_kernel" if metric == "launch__kernel_name" else 0 if "shared_mem" in metric else
+                             32 if metric == "launch__block_dim_x" else 1)
+                    writer.writerow([action, document["pid"], 1, 2, 0, window["marker"], metric, unit, value])
+                    if damage["kind"] == "duplicate_launch_identity" and metric == "launch__kernel_name":
+                        writer.writerow([action, document["pid"], 1, 2, 0, window["marker"], metric, unit, value])
                 action += 1
         raw = output.getvalue()
         if damage["kind"] == "unscoped":
@@ -350,14 +361,15 @@ def test_native_counters_cover_complete_stateful_sequence_and_both_paired_roles(
 
 
 def test_native_counters_reject_unmatched_ranges_state_outputs_and_incomplete_captures(native_counter_runner):
-    for failure in ("unscoped", "output", "window", "binary", "timeout"):
+    for failure in ("unscoped", "output", "window", "binary", "timeout", "missing_launch_identity", "duplicate_launch_identity"):
         result, _ = native_counter_runner(failure=failure)
         assert result["status"] == "not_measured", failure
         assert "calls" not in result and result["failure_artifacts"]
     result, _ = native_counter_runner()
     for damage in (lambda value: value["calls"][0]["work"].update(memory_bytes=1),
                    lambda value: value["native_run"]["calls"][-1].update(input_content_sha256="e" * 64),
-                   lambda value: value["native_run"]["counter_windows"][0].update(range_balanced=False)):
+                   lambda value: value["native_run"]["counter_windows"][0].update(range_balanced=False),
+                   lambda value: value["calls"][0]["launch_identities"][0].update(symbol="forged")):
         changed = copy.deepcopy(result)
         damage(changed)
         changed["receipt_sha256"] = counter_task._receipt(changed)
@@ -510,6 +522,7 @@ def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_worklo
              "reference_work": {"memory_bytes": 192}, "algorithm_work": {"memory_bytes": 96}}
     joined = performance.scored_timeline(report, actual, calibrated, bound, allow_simulated=True)
     assert joined["status"] == "simulated" and not joined["formal_qualification_implemented"]
+    assert joined["counter_process_launch_identity_observed"]
     assert not joined["counter_process_workload_identity_observed"]
     assert all(row["model_consistent"] and row["workload"]["kernel_count"] == 2 for row in joined["calls"])
     for row in joined["calls"]:
@@ -545,6 +558,23 @@ def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_worklo
         with pytest.raises(ValueError):
             performance.scored_timeline(changed, changed["origin"]["native_request"]["_scored_result"], calibrated, bound,
                                         allow_simulated=True)
+    for metric, replacement in (("launch__kernel_name", "other_kernel"), ("launch__grid_dim_x", "2"),
+                                ("launch__block_dim_x", "64"), ("launch__shared_mem_per_block_dynamic", "1"),
+                                ("launch__shared_mem_per_block_static", "1")):
+        changed = copy.deepcopy(report)
+        rows = list(csv.reader(io.StringIO(changed["raw_csv"])))
+        for row in rows[1:]:
+            if row[0] == "0" and row[6] == metric:
+                row[8] = replacement
+        output = io.StringIO()
+        csv.writer(output).writerows(rows)
+        changed["raw_csv"] = output.getvalue()
+        # Rebuild every declaration: the original ncu values must still fail
+        # association with the unchanged actual-scored source/configuration.
+        changed["calls"] = counter_task._observations(changed, allow_simulated=True)
+        seal_all(changed)
+        with pytest.raises(ValueError, match="Counter-process original"):
+            performance.scored_timeline(changed, actual, calibrated, bound, allow_simulated=True)
     # Real CLI routing; the serialization fixture remains explicitly simulated.
     report_path, scored_path, cal_path, bound_path = [tmp_path / name for name in ("counter.json", "scored.json", "cal.json", "bound.json")]
     for path, value in ((report_path, report), (scored_path, actual), (cal_path, calibrated), (bound_path, bound)):

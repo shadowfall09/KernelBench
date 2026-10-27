@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际配对的参考/候选/控制全序列窗口、逐次原始时间/输出/输入绑定、busy并集及O进入离线核对，按每个独立repeat的噪声与校准启动成本执行launch_only零分门，分类混合或证据缺失拒绝资格；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。实际计分与来源重放现按二进制/入口/grid/block/shared及调用次数关联，直接用实际busy/原始墙钟输出A/E/O，未计时调用的墙钟/O留空；ncu进程自身仍缺相同身份观测，关联明确不授予正式计数资格。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际配对的参考/候选/控制全序列窗口、逐次原始时间/输出/输入绑定、busy并集及O进入离线核对，按每个独立repeat的噪声与校准启动成本执行launch_only零分门，分类混合或证据缺失拒绝资格；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。实际计分与来源重放现按二进制/入口/grid/block/shared及调用次数关联，直接用实际busy/原始墙钟输出A/E/O，未计时调用的墙钟/O留空；ncu进程现从同次原始CSV获取真实kernel name/grid/block/shared并与实际计分核对，不增加不兼容的CUPTI订阅；仍缺该进程二进制身份，明确不授予正式计数资格。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5381,13 +5381,14 @@
         "kb_workflows/provenance/cuda_origin.py",
         "kb_workflows/provenance/kernel_origin.py",
         "kb_workflows/provenance/counter_task.py",
+        "kb_workflows/provenance/work_counters.py",
         "kb_workflows/analysis/performance.py",
         "scripts/analyze_device_trace.py",
         "tests/provenance/test_kernel_origin.py",
         "tests/provenance/test_work_counters.py",
         "docs/WORK_COUNTERS.md"
       ],
-      "reason": "复用CUPTI复制已解析入口与实际grid/block/shared配置，用二进制+入口+配置的多重集合区分并发调用；计数模型关联完整实际输入/状态/输出/物理设备及同工作量来源重放，再用实际busy和原始计时计算A/E/O。缺身份、不同内核/配置/次数或模拟资料拒绝正式路径，未计时调用保留空墙钟/O。ncu进程自身身份仍未观测，清楚保留正式计数资格false，不把来源重放指纹当作该证明；原CLI增只读关联选项，仅新增一个集中回归，无设备/工具/模型实验"
+      "reason": "复用CUPTI复制已解析入口与实际grid/block/shared配置，用二进制+入口+配置的多重集合区分并发调用；计数模型关联完整实际输入/状态/输出/物理设备及同工作量来源重放，再用实际busy和原始计时计算A/E/O。缺身份、不同内核/配置/次数或模拟资料拒绝正式路径，未计时调用保留空墙钟/O。ncu原生v2现要求同一次CSV中的原始kernel name、grid/block和静态/动态shared launch属性，保留独立NVTX调用标签，拒绝缺项、重复、单位或配置错配；与实际计分做多重集合比较，不增加CUPTI订阅、独立采集进程或额外重放。计数进程二进制身份仍未知，正式计数资格false；现有CLI和集中回归扩展，无新增运行文件/测试函数或设备/工具/模型实验"
     },
     {
       "id": "V61-02",

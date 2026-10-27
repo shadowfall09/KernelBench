@@ -193,6 +193,8 @@ Independent final remeasurement now freezes every declared source by hash, issue
 
 Scores are defined per device and protocol. No device-independent efficiency transfer or merged cross-platform ranking is claimed.
 
+The native counter v2 format additionally requests Nsight launch attributes in the same collection: original kernel name, grid/block dimensions and static/dynamic shared memory. The parser keeps these separate from NVTX call labels and raw work counts, requires complete unique attributes, and compares their multisets with actual-scored source observations. Missing attributes or changed names/configurations cannot borrow identity from the separate source profile. Launch attributes do not add a replay pass, according to the [vendor metric reference](https://docs.nvidia.com/nsight-compute/ProfilingGuide/#launch-metrics). This adds no CUPTI subscriber or collector process. It still lacks an independent binary identity in the counter process and therefore does not grant formal L2 evidence. No device or profiler experiment was run.
+
 ## 5. Motivation 4: evaluate the feedback loop and its cost
 
 ### 5.1 Implemented interaction protocols

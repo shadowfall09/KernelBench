@@ -16,10 +16,10 @@ from pathlib import Path
 
 from ..common import atomic_json, fingerprint, read_json
 from . import origin_task
-from .work_counters import MAX_BYTES, execution_values, parse_csv, recipe, work_totals
+from .work_counters import LAUNCH_METRICS, MAX_BYTES, execution_values, parse_csv, recipe, work_totals
 
-CONFIGURATION = "config_file_off; kernel_replay; profiler_API_native_calls; nvtx_rename; base_units; all_children; cache_none; clocks_none; kernel_names_off"
-PROTOCOL = "kernelbench_pro_native_work_counters_v1"
+CONFIGURATION = "config_file_off; kernel_replay; profiler_API_native_calls; nvtx_rename; launch_metrics; base_units; all_children; cache_none; clocks_none; kernel_names_off"
+PROTOCOL = "kernelbench_pro_native_work_counters_v2"
 MODEL = "kernelbench_pro_native_execution_models_v1"
 
 
@@ -61,9 +61,9 @@ class Profiler:
 def command(binary, source, target, report, metrics):
     return [binary, "--config-file", "off", "--profile-from-start", "off", "--replay-mode", "kernel",
             "--cache-control", "none", "--clock-control", "none", "--rename-kernels", "off",
-            "--target-processes", "all", "--nvtx", "--print-nvtx-rename", "kernel",
+            "--target-processes", "all", "--nvtx", "--print-nvtx-rename", "kernel", "--print-kernel-base", "mangled",
             "--csv", "--page", "raw", "--print-metric-name", "name", "--print-units", "base",
-            "--print-metric-instances", "none", "--print-summary", "none", "--metrics", ",".join(sorted(metrics)),
+            "--print-metric-instances", "none", "--print-summary", "none", "--metrics", ",".join(sorted(set(metrics) | set(LAUNCH_METRICS))),
             "--log-file", str(report), sys.executable, "-m", "kb_workflows.evaluation.evaluate_task",
             str(source), str(target), "--native-worker"]
 
@@ -97,7 +97,7 @@ def _observations(value, *, allow_simulated=False):
                 or any(window.get(key) != row[key] for key in ("training", "training_after"))):
             raise ValueError("Native counter window is incomplete or rebound")
         markers[window["marker"]] = []
-    parsed = parse_csv(value["raw_csv"].encode(), value["recipe"], pid=child["pid"])
+    parsed = parse_csv(value["raw_csv"].encode(), value["recipe"], pid=child["pid"], launch_identity=True)
     for action in parsed["actions"]:
         marker = action["identity"]["Kernel Name"]
         if marker not in markers:
@@ -110,6 +110,7 @@ def _observations(value, *, allow_simulated=False):
             raise ValueError("Native counter launches omit or change source-capture call coverage")
         observations.append({"id": row["id"], "native_call_sha256": fingerprint(row),
                              "action_ids": [action["identity"]["ID"] for action in actions],
+                             "launch_identities": [action["launch_identity"] for action in actions],
                              "work": work_totals(actions, value["recipe"]),
                              "non_kernel_activity_count": activity["activity_count"] - activity["kernel_count"]})
     return observations
@@ -170,7 +171,7 @@ def execution_models(value, calibration, *, allow_simulated=False):
 def scored_models(value, result, calibration, *, allow_simulated=False):
     """Join counters to actual timers and source-profile workload observations.
 
-    The counter process still lacks its own binary/configuration capture. This
+    The counter process observes original symbols/configurations, but not binaries. This
     join cannot certify formal counter qualification from a separate profile.
     """
     from .kernel_origin import workload_identity
@@ -189,11 +190,14 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
     models = execution_models(value, calibration, allow_simulated=allow_simulated)
     joined = []
     timings = {row["id"]: row for row in observed["native_timings"]}
-    for call, measured, replayed, model in zip(observed["calls"], actual["calls"], profiled["calls"], models["calls"], strict=True):
+    for call, measured, replayed, counted, model in zip(observed["calls"], actual["calls"], profiled["calls"], value["calls"], models["calls"], strict=True):
         identity = workload_identity(measured)
         if (identity != workload_identity(replayed) or measured["id"] != call["id"] or replayed["id"] != call["id"]
                 or model["native_call_sha256"] != fingerprint(call)):
             raise ValueError("Source-profile kernel binary, entrypoint, launch configuration or multiplicity differs from scored work")
+        expected = [{key: row["kernel_identity"][key] for key in ("symbol", "configuration")} for row in measured["activities"]]
+        if sorted(map(fingerprint, expected)) != sorted(map(fingerprint, counted["launch_identities"])):
+            raise ValueError("Counter-process original symbol, launch configuration or multiplicity differs from scored work")
         busy = measured["device_busy_ns"] / 1e6
         wall = timings.get(call["id"], {}).get("wall_ms")
         if not busy or wall is not None and busy > wall * (1 + 1e-6):
@@ -210,8 +214,9 @@ def scored_models(value, result, calibration, *, allow_simulated=False):
               "profile_origin_sha256": profiled["raw_sha256"], "calibration_sha256": calibration["receipt_sha256"],
               "evaluator_sha256": request["eval_config"]["evaluator_sha256"],
               "simulated": simulated,
+              "counter_process_launch_identity_observed": True,
               "counter_process_workload_identity_observed": False, "formal_qualification_implemented": False,
-              "scope": "actual_scored_calls_to_separate_source_profile_and_counter_model; counter_process_identity_unproven",
+              "scope": "actual_scored_calls_to_profile_binary_and_counter_symbol_configuration; counter_process_binary_unproven",
               "scored_wall_times_replaced": False}
     output["receipt_sha256"] = fingerprint(output)
     return output

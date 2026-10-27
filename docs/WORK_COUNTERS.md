@@ -26,7 +26,7 @@ ncu禁用用户配置和额外kernel重命名，显式关闭cache flush与时钟
 
 嵌入的原生收据现为v2，实际/对照/来源/ncu按调用核对模型前后数据、入口和输入/状态别名摘要。状态更新可以合法发生，但不能把不同参数或入口下测到的工作量借给实际调用；未知状态不能补成空状态。取摘要不进入原生计时或CUPTI/NVTX窗口，也不把这组观察当作host控制流等价证明。
 
-报告只保留一份原始CSV、源码采集和计数器进程记录，按调用重算计数，不复制整份CSV到每个调用。协议为 `kernelbench_pro_native_work_counters_v1`；`counter_task.validate()`重放全部关联及工作量，不信任保存的passed标记或重封的汇总。旧 `kernelbench_pro_work_counters_v1` 的原始CSV读取和离线模型API仍可用于历史诊断，但不能建立本版原生调用关联。
+报告只保留一份原始CSV、源码采集和计数器进程记录，按调用重算计数，不复制整份CSV到每个调用。协议为 `kernelbench_pro_native_work_counters_v2`；`counter_task.validate()`重放全部关联及工作量，不信任保存的passed标记或重封的汇总。旧 `kernelbench_pro_work_counters_v1` 的原始CSV读取和离线模型API仍可用于历史诊断，但不能建立本版原生调用关联。
 
 ## 指标与可信审核
 
@@ -86,6 +86,10 @@ python -m scripts.analyze_device_trace native /path/to/counters.json \
 
 每个调用的busy来自实际计分CUPTI活动并集，墙钟来自对应原始timer，A/E/O不借用另一个进程的时钟。没有原始timer的正确性/显存调用保留`scored_wall_ms=null`、`O=null`；模型与实际时间不一致会显式标记。模拟结果不能成为正式证据，CLI返回非零。
 
-这条关联只证明实际进程与独立来源采集观察到了相同工作量指纹。ncu进程自身还没有这份二进制/配置观察，报告明确保留`counter_process_workload_identity_observed=false`和`formal_qualification_implemented=false`。Nsight的NVTX改名用于关联调用，不能替代内核身份，见[官方CLI参数](https://docs.nvidia.com/nsight-compute/NsightComputeCli/)。不能据此移除L2正式计数门或宣布模型效果、路径等价及安全认证。
+原生v2在同一次ncu采集中额外请求`launch__kernel_name`、`launch__grid_dim_[xyz]`、`launch__block_dim_[xyz]`和`launch__shared_mem_per_block_{static,dynamic}`。原始kernel name独立于CSV中用于关联调用的NVTX标签；输出要求mangled名称，不猜测名称别名。launch指标的定义及不增加额外replay pass的性质见[NVIDIA指标说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/#launch-metrics)。
 
-当前固定的CUPTI Python 13.3明确将`allow_multiple_subscribers`固定为0，见[该版本绑定限制](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html#cupti.cupti._SubscriberParams.allow_multiple_subscribers)。因此不能假定在ncu旁边再启动现有Python采集器即可补齐身份，也不能放宽核对来绕过。完整同进程关联需要兼容的原生V2订阅或供应商提供的等价身份资料；缺失时继续保留未知。
+解析要求每个action都有唯一、完整的launch属性，维度是正整数，共享内存是非负整数，单位明确且没有缩放；缺项、重复或异常值不能借独立来源采集补齐。工作计数与配置分开保存，逐调用关联时将ncu原始名称/grid/block/shared的多重集合与实际计分来源记录比较，配置或重复次数变化均拒绝关联。它复用同一份CSV，没有新进程、CUPTI订阅或独立采集。v1原生报告缺少这些字段，需重新采集；旧通用CSV读取API仍可用于历史诊断。
+
+成功关联后记录`counter_process_launch_identity_observed=true`。这仍缺少ncu进程自己的二进制来源证明，报告继续保留`counter_process_workload_identity_observed=false`和`formal_qualification_implemented=false`。Nsight的NVTX改名用于关联调用，不能替代内核身份，见[官方CLI参数](https://docs.nvidia.com/nsight-compute/NsightComputeCli/)。不能据此移除L2正式计数门或宣布模型效果、路径等价及安全认证。
+
+当前固定的CUPTI Python 13.3明确将`allow_multiple_subscribers`固定为0，见[该版本绑定限制](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html#cupti.cupti._SubscriberParams.allow_multiple_subscribers)。本实现因此使用ncu自身的launch指标，不在计数进程叠加现有Python采集器，也不放宽核对来绕过。完整同进程关联需要兼容的原生V2订阅或供应商提供的等价身份资料；缺失时继续保留未知。
