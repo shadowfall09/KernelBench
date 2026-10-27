@@ -166,6 +166,7 @@ def native_timeline(report, *, counter_report=None, calibration=None, bound=None
                       "model_state_changed": observed["model_state_before"]["sha256"] != observed["model_state_after"]["sha256"],
                       "uncovered_wall_ms": max(0, wall - busy) if busy else None, "O": wall / busy if busy else None,
                       "A": None, "E": None, "AE": None, "kernel_count": activity["kernel_count"],
+                      "memory_activity": activity["memory_activity"],
                       "activity_count": activity["activity_count"], "unknown_activity_count": activity["unknown_activity_count"],
                       "origin_union_ms": {key: value / 1e6 for key, value in activity["by_origin_union_ns"].items()},
                       "custom_exclusive_fraction_lower_bound": activity["custom_exclusive_fraction_lower_bound"],

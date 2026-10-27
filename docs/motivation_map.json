@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际配对的参考/候选/控制全序列窗口、逐次原始时间/输出/输入绑定、busy并集及O进入离线核对，按每个独立repeat的噪声与校准启动成本执行launch_only零分门，分类混合或证据缺失拒绝资格；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。实际计分与来源重放现按二进制/入口/grid/block/shared及调用次数关联，直接用实际busy/原始墙钟输出A/E/O，未计时调用的墙钟/O留空；ncu进程现从同次原始CSV获取真实kernel name/grid/block/shared并与实际计分核对，不增加不兼容的CUPTI订阅；仍缺该进程二进制身份，明确不授予正式计数资格。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
+      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始名称及launch配置。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态。剩余：ncu进程二进制及memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、完整正式L2门。模拟资料不授予资格，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5388,7 +5388,7 @@
         "tests/provenance/test_work_counters.py",
         "docs/WORK_COUNTERS.md"
       ],
-      "reason": "复用CUPTI复制已解析入口与实际grid/block/shared配置，用二进制+入口+配置的多重集合区分并发调用；计数模型关联完整实际输入/状态/输出/物理设备及同工作量来源重放，再用实际busy和原始计时计算A/E/O。缺身份、不同内核/配置/次数或模拟资料拒绝正式路径，未计时调用保留空墙钟/O。ncu原生v2现要求同一次CSV中的原始kernel name、grid/block和静态/动态shared launch属性，保留独立NVTX调用标签，拒绝缺项、重复、单位或配置错配；与实际计分做多重集合比较，不增加CUPTI订阅、独立采集进程或额外重放。计数进程二进制身份仍未知，正式计数资格false；现有CLI和集中回归扩展，无新增运行文件/测试函数或设备/工具/模型实验"
+      "reason": "实际计分与来源重放按二进制/入口/grid/block/shared多重集合、完整输入/状态/输出/物理设备关联，以实际busy/原始wall计算A/E/O，未计时调用保留空wall/O。ncu原生v2从同次CSV获取原始名称及launch配置，缺项、重复、单位或配置错配拒绝关联，不额外订阅CUPTI或启动采集进程。复制/清零/P2P保留字节、方向、内存类型及peer身份，逐调用报告分清逻辑payload与设备读写；缺失/截断/丢记录不补零，不当作DRAM计数或执行SOL。ncu二进制身份、非kernel工作完整模型和正式L2仍未授予；复用原CLI和集中回归，无新增运行文件/测试函数，无设备/工具/模型实验"
     },
     {
       "id": "V61-02",
@@ -5434,7 +5434,7 @@
         "tests/evaluation/test_scoring_recovery.py",
         "docs/RESOURCE_BUDGETS.md"
       ],
-      "reason": "新增可配置CUDA worker进程软件配额，复用现有租约、账本与local/Docker/队列/Modal准入，不增加运行模块。调用前同时预留worker及GPU额度并收紧超时，完整当前活动按整个进程并集计量；计量缺失或其他诊断worker未覆盖时按可信父进程墙钟上界扣额，实测GPU值保留未知，父进程用量不明则烧预留并拒绝资格。逐轮标准/profile工件、原始租约、实测/上界分离进入评分和缓存指纹，研究轴区分声明配额/观测进程busy/配额扣额；regrade清掉新生成限制，未适配RL/Harbor拒绝。其他GPU进程、模型推理/最终验证及物理抢占不在该计量范围，完整R-18继续部分实现；仅两个集中回归及既有检查扩展，无实验"
+      "reason": "新增可配置CUDA worker进程软件配额，复用现有租约、账本与local/Docker/队列/Modal准入，不增加运行模块。调用前同时预留worker及GPU额度并收紧超时，完整当前活动按整个进程并集计量；计量缺失、peer复制跨设备或其他诊断worker未覆盖时按可信父进程墙钟上界扣额，实测GPU值保留未知，父进程用量不明则烧预留并拒绝资格。逐轮标准/profile工件、原始租约、实测/上界分离进入评分和缓存指纹，研究轴区分声明配额/观测进程busy/配额扣额；regrade清掉新生成限制，未适配RL/Harbor拒绝。其他GPU进程、模型推理/最终验证及物理抢占不在该计量范围，完整R-18继续部分实现；仅两个集中回归及既有检查扩展，无实验"
     },
     {
       "id": "V63-01",

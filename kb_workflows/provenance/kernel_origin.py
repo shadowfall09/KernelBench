@@ -239,7 +239,9 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
                     and all(_integer(configuration[key]) for key in ("dynamic_shared_bytes", "static_shared_bytes"))):
                 identity = {"binary_sha256": module["binary_sha256"], "symbol": function["symbol"],
                             "configuration": configuration}
-            rows.append({**activity, "start_ns": start, "end_ns": end, "origin": origin, "kernel_identity": identity})
+            rows.append({**activity, "start_ns": start, "end_ns": end, "origin": origin, "kernel_identity": identity,
+                         **({"memory_interval_complete": start == activity["start_ns"] and end == activity["end_ns"]}
+                            if activity["kind"] != "kernel" else {})})
         busy = interval_union([(row["start_ns"], row["end_ns"]) for row in rows])
         other = interval_union([(row["start_ns"], row["end_ns"]) for row in rows if row["origin"] != "custom"])
         custom_exclusive = max(0, busy - other)
@@ -254,6 +256,10 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
                       "device_busy_ns": busy, "custom_exclusive_ns": custom_exclusive,
                       "custom_exclusive_fraction_lower_bound": share, "unknown_activity_count": unknowns,
                       "activity_count": len(rows), "kernel_count": sum(row["kind"] == "kernel" for row in rows),
+                      "memory_activity": memory_traffic({"activities": rows}, complete=(
+                          raw.get("capture_complete") is True and raw.get("source_intact") is True
+                          and raw.get("hooks_intact") is True and _integer(raw.get("dropped_records"))
+                          and raw["dropped_records"] == 0 and raw.get("errors") == [])),
                       "by_origin_union_ns": {kind: interval_union([(row["start_ns"], row["end_ns"]) for row in rows
                                                                   if row["origin"] == kind])
                                              for kind in ("custom", "library", "framework", "runtime", "unknown")},
@@ -268,6 +274,50 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
             "graph_attribution_implemented": True,
             "output_causal_use_proven": False, "uninstrumented_path_equivalence_proven": False,
             "security_isolation_certified": False}
+
+
+def memory_traffic(call, *, complete=True):
+    """Logical transfer payload is distinct from measured DRAM/cache traffic."""
+    rows = [row for row in call["activities"] if row["kind"] in {"memcpy", "memset"}]
+    kinds = {"host": {1, 2}, "device": {3, 6}, "array": {4}}
+    directions = {1: ("host", "device"), 2: ("device", "host"), 3: ("host", "array"),
+                  4: ("array", "host"), 5: ("array", "array"), 6: ("array", "device"),
+                  7: ("device", "array"), 8: ("device", "device"), 9: ("host", "host")}
+    payload, reads, writes, unknown_payload, unknown_direction = 0, 0, 0, 0, 0
+    by_kind = {kind: {"operations": 0, "payload_bytes": 0} for kind in ("memcpy", "memset")}
+    for row in rows:
+        kind, size = row["kind"], row.get("bytes")
+        by_kind[kind]["operations"] += 1
+        if not _integer(size) or size >= 2**64 or row.get("memory_interval_complete") is not True:
+            unknown_payload += 1
+            unknown_direction += 1
+            by_kind[kind]["payload_bytes"] = None
+            continue
+        payload += size
+        if by_kind[kind]["payload_bytes"] is not None:
+            by_kind[kind]["payload_bytes"] += size
+        if kind == "memset":
+            if type(row.get("memory_kind")) is int and row["memory_kind"] in kinds["device"] | kinds["array"]:
+                writes += size
+                continue
+        else:
+            source, destination = directions.get(row.get("copy_kind") if type(row.get("copy_kind")) is int else None, (None, None))
+            if (source is not None and type(row.get("src_kind")) is int and type(row.get("dst_kind")) is int
+                    and row["src_kind"] in kinds[source] and row["dst_kind"] in kinds[destination]):
+                reads += size * (source != "host")
+                writes += size * (destination != "host")
+                continue
+        unknown_direction += 1
+    if not complete:
+        for item in by_kind.values():
+            item["payload_bytes"] = None
+    return {"operations": len(rows), "by_kind": by_kind,
+            "capture_complete": complete,
+            "payload_bytes": payload if complete and not unknown_payload else None,
+            "logical_device_read_bytes": reads if complete and not unknown_direction else None,
+            "logical_device_write_bytes": writes if complete and not unknown_direction else None,
+            "unknown_payload_operations": unknown_payload, "unknown_direction_operations": unknown_direction,
+            "basis": "whole_activity_logical_payload; not_DRAM_cache_counters_or_execution_SOL"}
 
 
 def workload_identity(call):

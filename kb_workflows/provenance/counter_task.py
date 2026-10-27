@@ -111,6 +111,7 @@ def _observations(value, *, allow_simulated=False):
         observations.append({"id": row["id"], "native_call_sha256": fingerprint(row),
                              "action_ids": [action["identity"]["ID"] for action in actions],
                              "launch_identities": [action["launch_identity"] for action in actions],
+                             "profile_memory_activity": activity["memory_activity"],
                              "work": work_totals(actions, value["recipe"]),
                              "non_kernel_activity_count": activity["activity_count"] - activity["kernel_count"]})
     return observations
@@ -153,7 +154,7 @@ def execution_models(value, calibration, *, allow_simulated=False):
     source = payload["ref_arch_src"] if payload.get("_origin_role") == "reference" else payload["kernel_src"]
     for observed, row in zip(value["calls"], value["native_run"]["calls"], strict=True):
         if observed["non_kernel_activity_count"]:
-            raise ValueError("Kernel counters cannot establish complete work for native memcpy/memset activities")
+            raise ValueError("Native memcpy/memset lacks counter-process memory identity and transfer calibration; logical payload is not DRAM traffic")
         binding = {"source_sha256": hashlib.sha256(source.encode()).hexdigest(),
                    "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
                    "device": value["native_run"]["binding"]["device_fingerprint"], "precision": settings["precision"],

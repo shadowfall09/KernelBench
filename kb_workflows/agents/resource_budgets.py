@@ -206,7 +206,7 @@ def gpu_charge(lease, result):
             raise ValueError("Actual activity does not cover this complete development request")
         summary = scored_origin(result)
         activities = result["metadata"]["origin_capture"]["raw"]["activities"]
-        if any(row["device"] != 0 for row in activities):
+        if any(row["device"] != 0 or row.get("copy_kind") == 10 for row in activities):
             raise ValueError("Development quota covers one CUDA device")
         busy = interval_union([(row["start_ns"], row["end_ns"]) for row in activities]) / 1e9
         if not amount(busy) or busy > elapsed:

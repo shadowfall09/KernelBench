@@ -237,7 +237,7 @@ def fake_sdk():
         C.c_size_t.from_address(pointer).value = 0
 
     sdk = NS(CallbackDomain=NS(DRIVER_API=1, RUNTIME_API=2, RESOURCE=3), CallbackIdResource=NS(MODULE_LOADED=8),
-             ApiCallbackSite=NS(API_ENTER=0, API_EXIT=1), ActivityKind=NS(DRIVER=4, RUNTIME=5, CONCURRENT_KERNEL=10, MEMCPY=1, MEMSET=2),
+             ApiCallbackSite=NS(API_ENTER=0, API_EXIT=1), ActivityKind=NS(DRIVER=4, RUNTIME=5, CONCURRENT_KERNEL=10, MEMCPY=1, MEMCPY2=3, MEMSET=2),
              activity_register_callbacks=lambda *args: calls.append(("register",)),
              subscribe=lambda *args: 99, enable_domain=lambda *args: calls.append(("domain", *args)),
              activity_enable=lambda value: calls.append(("enable", value)),
@@ -380,7 +380,7 @@ def test_partial_start_and_failed_flush_still_disable_and_unsubscribe():
     sdk.activity_flush_all = fail
     capture.stop()
     assert calls[-1] == ("unsubscribe", 99)
-    assert sum(row[0] == "disable" for row in calls) == 5
+    assert [row[1] for row in calls if row[0] == "disable"] == [row[1] for row in calls if row[0] == "enable"][::-1]
     assert not capture.raw["capture_complete"] and capture.raw["errors"]
 
 
@@ -421,6 +421,13 @@ def test_activity_callback_copies_vendor_fields_and_incomplete_stream_accounting
     row = capture.raw["activities"][0]
     assert row["graph_id"] == 2 and row["graph_node_id"] == 3 and row["kind"] == "kernel"
     assert row["configuration"] == {"grid": [2, 3, 1], "block": [32, 2, 1], "dynamic_shared_bytes": 128, "static_shared_bytes": 64}
+    for kind, fields in ((sdk.ActivityKind.MEMCPY, {"bytes": 64, "copy_kind": 8, "src_kind": 3, "dst_kind": 3}),
+                         (sdk.ActivityKind.MEMCPY2, {"bytes": 128, "copy_kind": 10, "src_kind": 3, "dst_kind": 3,
+                             "src_device_id": 0, "dst_device_id": 1, "src_context_id": 9, "dst_context_id": 10}),
+                         (sdk.ActivityKind.MEMSET, {"bytes": 32, "memory_kind": 3, "value": 7})):
+        capture.buffer_completed([NS(kind=kind, start=100, end=120, device_id=0, stream_id=7,
+                                    context_id=9, correlation_id=11, graph_id=0, graph_node_id=0, **fields)])
+        assert all(capture.raw["activities"][-1][key] == value for key, value in fields.items())
     capture.stop()
     assert "drop accounting" in capture.raw["errors"][0]
 
@@ -436,7 +443,8 @@ def test_start_failure_cleans_up_enabled_collection_and_subscriber(monkeypatch):
     with pytest.raises(RuntimeError, match="compiler hook"):
         with capture.recording():
             pytest.fail("failed start entered candidate")
-    assert ("unsubscribe", 99) in calls and sum(row[0] == "disable" for row in calls) == 5
+    assert ("unsubscribe", 99) in calls
+    assert [row[1] for row in calls if row[0] == "disable"] == [row[1] for row in calls if row[0] == "enable"][::-1]
 
 
 def test_submission_loader_handles_build_path_quotes_and_future_annotations(tmp_path):
@@ -745,6 +753,7 @@ def test_runtime_and_driver_activity_are_enabled_for_vendor_correlation_ids():
     capture.stop()
     enabled = {row[1] for row in calls if row[0] == "enable"}
     assert sdk.ActivityKind.DRIVER in enabled and sdk.ActivityKind.RUNTIME in enabled
+    assert sdk.ActivityKind.MEMCPY2 in enabled
     assert ("domain", 1, 99, sdk.CallbackDomain.RUNTIME_API) in calls
 
 
@@ -837,11 +846,36 @@ def test_graph_memory_node_retains_native_kind_and_never_counts_as_custom(kind):
     replay_graph(capture)
     raw = graph_fixture(capture)
     raw["activities"][0]["kind"] = kind
+    raw["activities"][0].update(bytes=64, **({"copy_kind": 8, "src_kind": 3, "dst_kind": 3}
+                                           if kind == "memcpy" else {"memory_kind": 3, "value": 0}))
     assert raw["graph_nodes"][0]["kind"] == kind
     assert raw["graph_nodes"][0]["creation_success"] is True
     result = kernel_origin.summarize(raw)
     assert result["track_verdicts"] == {"custom": "failed", "library": "passed"}
     assert result["calls"][0]["by_origin_union_ns"]["runtime"] == 100
+    memory = result["calls"][0]["memory_activity"]
+    assert memory["payload_bytes"] == 64 and memory["logical_device_write_bytes"] == 64
+    assert memory["logical_device_read_bytes"] == (64 if kind == "memcpy" else 0)
+    for change in ({"bytes": None}, {"bytes": -1}, {"bytes": True}, {"bytes": 2**64}, {"start_ns": 0}):
+        changed = copy.deepcopy(raw)
+        changed["activities"][0].update(change)
+        observed = kernel_origin.summarize(changed)["calls"][0]["memory_activity"]
+        assert observed["payload_bytes"] is None and observed["logical_device_write_bytes"] is None
+    for change in ({"dropped_records": 1}, {"capture_complete": False}):
+        changed = copy.deepcopy(raw)
+        changed.update(change)
+        assert kernel_origin.summarize(changed)["calls"][0]["memory_activity"]["payload_bytes"] is None
+    if kind == "memcpy":
+        for direction, source, destination, reads, writes in ((1, 1, 3, 0, 64), (2, 3, 2, 64, 0),
+                                                             (5, 4, 4, 64, 64), (9, 1, 2, 0, 0)):
+            changed = copy.deepcopy(raw)
+            changed["activities"][0].update(copy_kind=direction, src_kind=source, dst_kind=destination)
+            observed = kernel_origin.summarize(changed)["calls"][0]["memory_activity"]
+            assert (observed["logical_device_read_bytes"], observed["logical_device_write_bytes"]) == (reads, writes)
+    changed = copy.deepcopy(raw)
+    changed["activities"][0].update(copy_kind=10, src_kind=5, dst_kind=3, memory_kind=5)
+    observed = kernel_origin.summarize(changed)["calls"][0]["memory_activity"]
+    assert observed["payload_bytes"] == 64 and observed["logical_device_write_bytes"] is None
 
 
 def test_queue_accepts_source_bound_origin_requests_and_requires_a_candidate(tmp_path):
@@ -1500,7 +1534,7 @@ def test_gpu_quota_uses_complete_worker_activity_union_and_parent_envelope(score
     assert proof["method"] == "actual_worker_continuous_CUPTI_union"
     assert proof["observed_gpu_busy_seconds"] == pytest.approx((750 + len(raw["windows"])) / 1e9)
     assert proof["charge_upper_bound_seconds"] < proof["parent_elapsed_seconds"]
-    for damage in ("simulated", "dropped", "other_device", "diagnostics", "unconfirmed_parent"):
+    for damage in ("simulated", "dropped", "other_device", "peer_copy", "diagnostics", "unconfirmed_parent"):
         changed = copy.deepcopy(result)
         observer = changed["metadata"]["origin_capture"]
         if damage == "simulated":
@@ -1509,11 +1543,16 @@ def test_gpu_quota_uses_complete_worker_activity_union_and_parent_envelope(score
             observer["raw"]["dropped_records"] = 1
         elif damage == "other_device":
             observer["raw"]["activities"][-1]["device"] = 1
+        elif damage == "peer_copy":
+            observer["raw"]["activities"][-1].update(kind="memcpy", copy_kind=10, bytes=128,
+                src_kind=3, dst_kind=3, src_device_id=0, dst_device_id=1)
         elif damage == "diagnostics":
             changed["metadata"]["tool_checks"] = {"uncovered_other_workers": True}
         else:
             changed["metadata"].pop("device_lease_receipt")
         scored_origin_runner.reseal(changed)
+        if damage == "peer_copy":
+            origin_task.scored_origin(changed)
         charge = budgets.gpu_charge(lease, changed)
         assert charge["observed_gpu_busy_seconds"] is None
         assert charge["charge_upper_bound_seconds"] == (None if damage == "unconfirmed_parent" else 1.0)

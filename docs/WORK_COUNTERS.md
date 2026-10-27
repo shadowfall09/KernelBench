@@ -28,6 +28,16 @@ ncu禁用用户配置和额外kernel重命名，显式关闭cache flush与时钟
 
 报告只保留一份原始CSV、源码采集和计数器进程记录，按调用重算计数，不复制整份CSV到每个调用。协议为 `kernelbench_pro_native_work_counters_v2`；`counter_task.validate()`重放全部关联及工作量，不信任保存的passed标记或重封的汇总。旧 `kernelbench_pro_work_counters_v1` 的原始CSV读取和离线模型API仍可用于历史诊断，但不能建立本版原生调用关联。
 
+## 复制与清零活动
+
+持续采集除kernel外还保留`MEMCPY`、`MEMCPY2`（peer复制）和`MEMSET`。原始记录增加`bytes`，复制还保留`copy_kind/src_kind/dst_kind`，peer记录保留来源/目标设备与上下文，清零保留内存类型和写入值。字段依据[CUPTI memcpy记录](https://docs.nvidia.com/cupti/13.3.0/api/structCUpti__ActivityMemcpy6.html)与[Python绑定](https://docs.nvidia.com/cupti-python/api-reference/topics/bindings.html)。
+
+来源摘要、原生诊断时间表使用`memory_activity`；计数报告将对应数据明确命名为`profile_memory_activity`，表示它来自独立来源采集，不是ncu进程自身的memory观察。按操作类型保留次数与payload，区分逻辑设备读/写量。D2D复制n字节计逻辑读n、写n；memset计逻辑写n。Host↔device/array按方向计算设备侧逻辑读写；host↔host不产生设备侧逻辑读写。未知方向、managed或peer归属不明时，逻辑设备读写保持null，已知payload可以单独保留。peer流量不冒充单设备GPU实测，开发配额回退到确认的worker墙钟扣额，实测GPU值保持未知。
+
+字节数缺失/非法、活动只部分落在调用窗口、捕获不完整或丢记录时，相应总量保持null。零仅用于完整记录中确实没有该类操作；窗口截断不按时间比例猜测字节量。非法原始byte字段还会使当前采集记录错误。所有值从原始活动重算，修改汇总无法继承原资格。
+
+逻辑payload不是DRAM/cache硬件计数，也不包含kernel内访存、链路协议开销或managed页迁移。当前A/E模型继续拒绝含非kernel工作而没有专用传输校准的报告，不能把`2*n`直接加入DRAM计数后宣称完整执行SOL。该边界仍归R-16，未运行设备或校准实验。
+
 ## 指标与可信审核
 
 规则是显式聚合计数器、单位和正换算系数，不执行Python或正则指标表达式。例如下面只记录DRAM流量，不能声称完整工作量：

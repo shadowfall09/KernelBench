@@ -114,7 +114,7 @@ class Capture:
                     kinds = self.cupti.ActivityKind
                     if kind == int(kinds.CONCURRENT_KERNEL):
                         label = "kernel"
-                    elif kind == int(kinds.MEMCPY):
+                    elif kind in (int(kinds.MEMCPY), int(kinds.MEMCPY2)):
                         label = "memcpy"
                     elif kind == int(kinds.MEMSET):
                         label = "memset"
@@ -131,8 +131,17 @@ class Capture:
                                          "dynamic_shared_bytes": getattr(row, "dynamic_shared_memory", None),
                                          "static_shared_bytes": getattr(row, "static_shared_memory", None)}
                         copied["configuration"] = configuration
+                    else:
+                        copied["bytes"] = getattr(row, "bytes", None)
+                        if type(copied["bytes"]) is not int or not 0 <= copied["bytes"] < 2**64:
+                            self.error("Invalid memory activity byte count")
+                        fields = ("copy_kind", "src_kind", "dst_kind") if label == "memcpy" else ("memory_kind", "value")
+                        copied.update({key: getattr(row, key, None) for key in fields})
+                        if kind == int(kinds.MEMCPY2):
+                            copied.update({key: getattr(row, key, None) for key in (
+                                "src_device_id", "dst_device_id", "src_context_id", "dst_context_id")})
                     if (copied["end_ns"] <= copied["start_ns"] or any(value < 0 for key, value in copied.items()
-                                                                 if key not in {"kind", "name", "configuration"})):
+                            if key in {"start_ns", "end_ns", "device", "stream", "context_id", "correlation", "graph_id", "graph_node_id"})):
                         self.error("Invalid device activity interval or identity")
                         continue
                     queue = copied["context_id"], copied["stream"]
@@ -379,7 +388,7 @@ class Capture:
         self.cupti.enable_domain(1, self.subscriber, self.cupti.CallbackDomain.RESOURCE)
         self.cupti.enable_domain(1, self.subscriber, self.cupti.CallbackDomain.RUNTIME_API)
         # Correlation IDs require API activity, not only API callbacks.
-        for label in ("DRIVER", "RUNTIME", "CONCURRENT_KERNEL", "MEMCPY", "MEMSET"):
+        for label in ("DRIVER", "RUNTIME", "CONCURRENT_KERNEL", "MEMCPY", "MEMCPY2", "MEMSET"):
             kind = getattr(self.cupti.ActivityKind, label)
             self.cupti.activity_enable(kind)
             self.enabled.append(kind)

@@ -436,6 +436,26 @@ def test_native_counter_models_replay_per_call_work_review_and_device_rates(nati
     partial["receipt_sha256"] = counter_task._receipt(partial)
     with pytest.raises(ValueError, match="complete reviewed"):
         counter_task.execution_models(partial, device_calibration(), allow_simulated=True)
+    memory = copy.deepcopy(result)
+    origin = memory["origin"]
+    raw = origin["raw"]
+    window = raw["windows"][0]
+    raw["activities"].append({"kind": "memcpy", "start_ns": window["start_ns"] + 10,
+        "end_ns": window["start_ns"] + 90, "device": 0, "stream": 3, "context_id": 1,
+        "correlation": 800_000, "graph_id": 0, "graph_node_id": 0, "bytes": 64,
+        "copy_kind": 8, "src_kind": 3, "dst_kind": 3})
+    raw["memory_calls"] = [{"context_id": 1, "correlation": 800_000, "call": window["id"],
+                            "kind": "memcpy", "exit_success": True}]
+    origin["summary"] = origin_task.summarize(raw)
+    origin["receipt_sha256"] = fingerprint({key: value for key, value in origin.items() if key not in {"receipt_sha256", "metadata"}})
+    memory["calls"] = counter_task._observations(memory, allow_simulated=True)
+    memory["receipt_sha256"] = counter_task._receipt(memory)
+    counter_task.validate(memory, allow_simulated=True)
+    observed = performance.native_timeline(origin, counter_report=memory, allow_simulated=True)
+    assert observed["calls"][0]["memory_activity"]["payload_bytes"] == 64
+    assert memory["calls"][0]["profile_memory_activity"]["logical_device_read_bytes"] == 64
+    with pytest.raises(ValueError, match="transfer calibration"):
+        counter_task.execution_models(memory, calibrated, allow_simulated=True)
 
 
 def test_counter_cli_preview_and_queue_validation_are_sdk_light(tmp_path):
