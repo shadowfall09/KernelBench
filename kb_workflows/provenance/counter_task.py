@@ -167,6 +167,56 @@ def execution_models(value, calibration, *, allow_simulated=False):
     return result
 
 
+def scored_models(value, result, calibration, *, allow_simulated=False):
+    """Join counters to actual timers and source-profile workload observations.
+
+    The counter process still lacks its own binary/configuration capture. This
+    join cannot certify formal counter qualification from a separate profile.
+    """
+    from .kernel_origin import workload_identity
+
+    validate(value, allow_simulated=allow_simulated)
+    payload = value["origin"]["native_request"]
+    if payload.get("_origin_role", "candidate") != "candidate":
+        raise ValueError("Scored counter models require the actual candidate role")
+    request, observed = origin_task.validate_scored(result, payload, allow_simulated=allow_simulated)
+    actual = origin_task.scored_origin(result, allow_simulated=allow_simulated)
+    profiled = origin_task.replay(value["origin"], allow_simulated=allow_simulated)
+    profile_calls = value["origin"]["native_runs"]["profile"]["calls"]
+    if (observed["calls"] != profile_calls
+            or observed["binding"]["device_fingerprint"] != value["native_run"]["binding"]["device_fingerprint"]):
+        raise ValueError("Counter source profile differs from actual inputs, states, outputs, modes or physical device")
+    models = execution_models(value, calibration, allow_simulated=allow_simulated)
+    joined = []
+    timings = {row["id"]: row for row in observed["native_timings"]}
+    for call, measured, replayed, model in zip(observed["calls"], actual["calls"], profiled["calls"], models["calls"], strict=True):
+        identity = workload_identity(measured)
+        if (identity != workload_identity(replayed) or measured["id"] != call["id"] or replayed["id"] != call["id"]
+                or model["native_call_sha256"] != fingerprint(call)):
+            raise ValueError("Source-profile kernel binary, entrypoint, launch configuration or multiplicity differs from scored work")
+        busy = measured["device_busy_ns"] / 1e6
+        wall = timings.get(call["id"], {}).get("wall_ms")
+        if not busy or wall is not None and busy > wall * (1 + 1e-6):
+            raise ValueError("Actual scored activity is missing or exceeds its own measured timer")
+        joined.append({**model, "phase": call["phase"], "seed": call["seed"], "workload": identity,
+                       "scored_device_busy_ms": busy, "scored_wall_ms": wall,
+                       "O": wall / busy if wall is not None else None})
+    simulated = bool(value["simulated"] or value["origin"]["native_coverage"]["simulated"]
+                     or result["metadata"]["origin_capture"]["raw"].get("simulated") is not False)
+    output = {"protocol": "kernelbench_pro_scored_execution_models_v1", "calls": joined,
+              "status": "simulated" if simulated else "measured",
+              "counter_receipt_sha256": value["receipt_sha256"],
+              "actual_result_sha256": fingerprint(result), "actual_origin_sha256": actual["raw_sha256"],
+              "profile_origin_sha256": profiled["raw_sha256"], "calibration_sha256": calibration["receipt_sha256"],
+              "evaluator_sha256": request["eval_config"]["evaluator_sha256"],
+              "simulated": simulated,
+              "counter_process_workload_identity_observed": False, "formal_qualification_implemented": False,
+              "scope": "actual_scored_calls_to_separate_source_profile_and_counter_model; counter_process_identity_unproven",
+              "scored_wall_times_replaced": False}
+    output["receipt_sha256"] = fingerprint(output)
+    return output
+
+
 def audit(payload, *, run=None, binary=None):
     from ..evaluation.tool_runner import binary_identity, environment, process
 

@@ -225,7 +225,21 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
                     memory_ok = launch.get("kind") == activity["kind"]
                 if memory_ok:
                     origin = "runtime"
-            rows.append({**activity, "start_ns": start, "end_ns": end, "origin": origin})
+            # A binary may contain several entrypoints with different work.
+            # Keep resolved identity/configuration separate from origin credit.
+            configuration = activity.get("configuration")
+            identity = None
+            if (activity["kind"] == "kernel" and origin in {"custom", "library", "framework"}
+                    and isinstance(function.get("symbol"), str) and function["symbol"]
+                    and activity.get("name") == function["symbol"] and _sha(module.get("binary_sha256"))
+                    and isinstance(configuration, dict)
+                    and set(configuration) == {"grid", "block", "dynamic_shared_bytes", "static_shared_bytes"}
+                    and all(isinstance(configuration.get(key), list) and len(configuration[key]) == 3
+                            and all(_integer(value, positive=True) for value in configuration[key]) for key in ("grid", "block"))
+                    and all(_integer(configuration[key]) for key in ("dynamic_shared_bytes", "static_shared_bytes"))):
+                identity = {"binary_sha256": module["binary_sha256"], "symbol": function["symbol"],
+                            "configuration": configuration}
+            rows.append({**activity, "start_ns": start, "end_ns": end, "origin": origin, "kernel_identity": identity})
         busy = interval_union([(row["start_ns"], row["end_ns"]) for row in rows])
         other = interval_union([(row["start_ns"], row["end_ns"]) for row in rows if row["origin"] != "custom"])
         custom_exclusive = max(0, busy - other)
@@ -254,3 +268,12 @@ def summarize(raw, *, minimum_custom_fraction=0.95):
             "graph_attribution_implemented": True,
             "output_causal_use_proven": False, "uninstrumented_path_equivalence_proven": False,
             "security_isolation_certified": False}
+
+
+def workload_identity(call):
+    """A multiset preserves concurrent-launch multiplicity without timing order."""
+    activities = call.get("activities", [])
+    if (not activities or any(row.get("kind") != "kernel" or not isinstance(row.get("kernel_identity"), dict)
+                              for row in activities)):
+        raise ValueError("Complete kernel identity/configuration is required; native memory work is not covered")
+    return {"kernel_count": len(activities), "kernel_sha256": sorted(fingerprint(row["kernel_identity"]) for row in activities)}

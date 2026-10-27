@@ -1568,7 +1568,7 @@
         "tests/provenance/test_kernel_origin.py",
         "docs/KERNEL_ORIGIN.md"
       ],
-      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际配对的参考/候选/控制全序列窗口、逐次原始时间/输出/输入绑定、busy并集及O进入离线核对，按每个独立repeat的噪声与校准启动成本执行launch_only零分门，分类混合或证据缺失拒绝资格；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
+      "reason": "已实现CUDA/Neuron busy并集、来源与launch_only诊断及审核模型；CUDA完整原生序列、显存、逐次NVTX/输出/模式/状态/入口/launch核对、配对参考、按调用SOL和A/E/O已接入。CUDA实际计分持续trace与来源门已接入，同模式基线核对；实际配对的参考/候选/控制全序列窗口、逐次原始时间/输出/输入绑定、busy并集及O进入离线核对，按每个独立repeat的噪声与校准启动成本执行launch_only零分门，分类混合或证据缺失拒绝资格；实际计时收据与重放关联，离线区分actual/control/profile时间及状态变化，不混用时钟。实际计分与来源重放现按二进制/入口/grid/block/shared及调用次数关联，直接用实际busy/原始墙钟输出A/E/O，未计时调用的墙钟/O留空；ncu进程自身仍缺相同身份观测，关联明确不授予正式计数资格。Neuron Parquet/DMA与资源模型已有软件实现，v2采集绑定完整输入/输出及候选前后状态/入口/别名，未知状态不能组装需求模型；非kernel工作、Neuron所有权和计数/完整A/E/O的正式关联继续实现，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -5367,6 +5367,43 @@
         "docs/STRICT_VALIDATION.md"
       ],
       "reason": "复用实际持续CUPTI，补齐同进程参考/候选/控制的预热与正式设备窗口，不包装计时callable、不增加同步；离线核对完整顺序/种子/输入/输出、候选窗口和原始墙钟样本，按活动并集计算busy与O。所有独立复测分别要求噪声分离、核数减少、busy变化≤5%且节省与校准启动成本±20%相符，launch_only收益置零，混合或缺证据不给L1资格；保留原始正确性及收据，不用诊断重放替代实际证据，不将未标记解释为已证明算法收益。仅新增两个集中回归、复用既有模块与夹具，无设备或模型实验"
+    },
+    {
+      "id": "V61-01",
+      "title": "实际计分工作量指纹与计数模型关联",
+      "primary": "M3",
+      "secondary": [
+        "M2"
+      ],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "kb_workflows/provenance/cuda_origin.py",
+        "kb_workflows/provenance/kernel_origin.py",
+        "kb_workflows/provenance/counter_task.py",
+        "kb_workflows/analysis/performance.py",
+        "scripts/analyze_device_trace.py",
+        "tests/provenance/test_kernel_origin.py",
+        "tests/provenance/test_work_counters.py",
+        "docs/WORK_COUNTERS.md"
+      ],
+      "reason": "复用CUPTI复制已解析入口与实际grid/block/shared配置，用二进制+入口+配置的多重集合区分并发调用；计数模型关联完整实际输入/状态/输出/物理设备及同工作量来源重放，再用实际busy和原始计时计算A/E/O。缺身份、不同内核/配置/次数或模拟资料拒绝正式路径，未计时调用保留空墙钟/O。ncu进程自身身份仍未观测，清楚保留正式计数资格false，不把来源重放指纹当作该证明；原CLI增只读关联选项，仅新增一个集中回归，无设备/工具/模型实验"
+    },
+    {
+      "id": "V61-02",
+      "title": "功能清单按动机归类与历史重复精简",
+      "primary": "M5",
+      "secondary": [],
+      "status": "implemented",
+      "source": "committed_implementation",
+      "evidence": [
+        "docs/FEATURE_INVENTORY.md",
+        "docs/MOTIVATION.md",
+        "docs/motivation_map.json",
+        "scripts/check_motivations.py",
+        "tests/analysis/test_headroom_integration.py"
+      ],
+      "reason": "将逐版堆叠的清单改为当前能力、原Verified基准与五类motivation索引，保留全部功能ID/标题/当前证据；详细理由集中到已有MOTIVATION，历史提交与旧验证数字留在Git。同步当前来源/启动归因/预算边界，删除不再需要的隐式V6/V7编号和中文版本解析，仍严格核对清单覆盖与标题；不增加文档文件或重复测试，不把维护精简包装成研究贡献"
     }
   ]
 }

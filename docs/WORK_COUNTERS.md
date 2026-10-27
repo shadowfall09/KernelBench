@@ -70,3 +70,22 @@ python -m scripts.analyze_device_trace native /path/to/counters.json \
 每次及每个阶段按 `A=SOL_exec/SOL_alg`、`E=busy/SOL_exec`、`AE=busy/SOL_alg`、`O=window/busy` 报告，阶段使用各自总量之比。没有请求完整模型时A/E保持null；缺活动仍为未知。模型顺序与测量不一致会保留 `model_consistent=false`，不冒充错误答案。模拟输入永远保留simulated且不能成为hardware-counter证据；当前仅有CPU状态模型、模拟采集边界、vendor格式、重封篡改及软件集成回归。
 
 缺工具、工具替换、超时、输出/模式/窗口/launch错配均保存not_measured和有界失败工件。CSV及worker单文件上限64MiB，原始行数上限200000；失败日志保留各自前64KiB、长度、摘要及完整性，截断不是完整证据。来源完整性、未覆盖独立诊断/后端、正式L1/L2门和设备资源硬限继续按原23项跟踪，绝不从诊断状态直接授予资格。
+
+## 关联实际计分时间
+
+```bash
+python -m scripts.analyze_device_trace native /path/to/counters.json \
+  --scored-result /path/to/eval_results.json --problem 2 --sample 0 \
+  --calibration /path/to/calibration.json --certificate /path/to/bound.json \
+  --output /path/to/new-scored-decomposition.json
+```
+
+配对工件使用`--task paired_timing`。该入口只读既有文件，不查询或执行设备、工具和模型；要求完整计数器报告、原始L1/L2实际结果、同物理设备校准和覆盖全部几何的算法证书。
+
+实际计分与来源重放逐调用核对完整输入/状态/输出/模式及物理设备，随后比较“已关联二进制SHA、解析入口名、实际grid/block、静态/动态共享内存”的多重集合，保留并发重复次数而不假定活动完成顺序相同。入口名只有在函数/模块/launch关联和活动名称一致时才进入身份；名字本身不能建立来源。缺字段、不同内核/配置/次数或非kernel活动不能借用kernel计数模型。采集字段依据[NVIDIA CUPTI Python接口](https://docs.nvidia.com/cupti-python/api-reference/topics/bindings.html)。
+
+每个调用的busy来自实际计分CUPTI活动并集，墙钟来自对应原始timer，A/E/O不借用另一个进程的时钟。没有原始timer的正确性/显存调用保留`scored_wall_ms=null`、`O=null`；模型与实际时间不一致会显式标记。模拟结果不能成为正式证据，CLI返回非零。
+
+这条关联只证明实际进程与独立来源采集观察到了相同工作量指纹。ncu进程自身还没有这份二进制/配置观察，报告明确保留`counter_process_workload_identity_observed=false`和`formal_qualification_implemented=false`。Nsight的NVTX改名用于关联调用，不能替代内核身份，见[官方CLI参数](https://docs.nvidia.com/nsight-compute/NsightComputeCli/)。不能据此移除L2正式计数门或宣布模型效果、路径等价及安全认证。
+
+当前固定的CUPTI Python 13.3明确将`allow_multiple_subscribers`固定为0，见[该版本绑定限制](https://docs.nvidia.com/cupti-python/13.3.0/api-reference/topics/bindings.html#cupti.cupti._SubscriberParams.allow_multiple_subscribers)。因此不能假定在ncu旁边再启动现有Python采集器即可补齐身份，也不能放宽核对来绕过。完整同进程关联需要兼容的原生V2订阅或供应商提供的等价身份资料；缺失时继续保留未知。

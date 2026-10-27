@@ -40,7 +40,7 @@ def raw_capture():
     """Synthetic parser fixture, not a hardware observation or qualification."""
     return {"protocol": kernel_origin.PROTOCOL, "candidate_sha256": sha256(SOURCE.encode()),
             "modules": [{"id": 1, "handle": 100, "context": 1, "binary_sha256": sha256(BINARY), "binary_bytes": len(BINARY)}],
-            "functions": [{"id": 1, "handle": 200, "context": 1, "module": 1}],
+            "functions": [{"id": 1, "handle": 200, "context": 1, "module": 1, "symbol": "fixture_kernel"}],
             "proofs": [{"id": 1, "function": 1, "compiler": "triton-3.7.0", "source_sha256": sha256(SOURCE.encode()),
                         "binary_sha256": sha256(BINARY), "jit_source_sha256": sha256(SOURCE.encode()),
                         "frontend": frontend_receipt(),
@@ -51,7 +51,9 @@ def raw_capture():
             "windows": [{"id": 1, "start_ns": 100, "end_ns": 300, "device": 0, "seed": 42,
                          "input_signature": [], "no_grad": True, "training": True, "training_after": True, "output_verified": True}],
             "activities": [{"kind": "kernel", "start_ns": 120, "end_ns": 220, "device": 0, "context_id": 9,
-                            "stream": 7, "correlation": 10, "graph_id": 0, "graph_node_id": 0, "name": "any name"}],
+                            "stream": 7, "correlation": 10, "graph_id": 0, "graph_node_id": 0, "name": "fixture_kernel",
+                            "configuration": {"grid": [1, 1, 1], "block": [32, 1, 1],
+                                              "dynamic_shared_bytes": 0, "static_shared_bytes": 0}}],
             "capture_complete": True, "source_intact": True, "hooks_intact": True, "dropped_records": 0,
             "errors": [], "simulated": False}
 
@@ -262,7 +264,8 @@ def observe_load(capture, module_handle=100, function_handle=200, *, correlation
     data.callback_site = 1
     capture.callback(None, sdk.CallbackDomain.DRIVER_API, 0, data)
     function = C.c_void_p(function_handle)
-    lookup = cuda_origin.ModuleGetFunction(C.pointer(function), module_handle, None)
+    symbol = C.create_string_buffer(b"fixture_kernel")
+    lookup = cuda_origin.ModuleGetFunction(C.pointer(function), module_handle, C.addressof(symbol))
     data.function_name = "cuModuleGetFunction"
     data.function_params = C.addressof(lookup)
     capture.callback(None, sdk.CallbackDomain.DRIVER_API, 0, data)
@@ -412,9 +415,12 @@ def test_activity_callback_copies_vendor_fields_and_incomplete_stream_accounting
     sdk, _ = fake_sdk()
     capture = cuda_origin.Capture(SOURCE, bindings=sdk)
     capture.buffer_completed([NS(kind=10, start=100, end=120, device_id=0, stream_id=7,
-                                  context_id=9, correlation_id=10, graph_id=2, graph_node_id=3, name="test")])
+                                  context_id=9, correlation_id=10, graph_id=2, graph_node_id=3, name="test",
+                                  grid_x=2, grid_y=3, grid_z=1, block_x=32, block_y=2, block_z=1,
+                                  dynamic_shared_memory=128, static_shared_memory=64)])
     row = capture.raw["activities"][0]
     assert row["graph_id"] == 2 and row["graph_node_id"] == 3 and row["kind"] == "kernel"
+    assert row["configuration"] == {"grid": [2, 3, 1], "block": [32, 2, 1], "dynamic_shared_bytes": 128, "static_shared_bytes": 64}
     capture.stop()
     assert "drop accounting" in capture.raw["errors"][0]
 

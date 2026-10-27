@@ -5,42 +5,17 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def inventory_features(text):
-    version, header, counts = 0, "", Counter()
     features = {}
-    for line in text.splitlines():
-        match = re.match(r"## 第([一二三四五六七八九十\d]+)版", line)
-        if match:
-            raw = match[1]
-            digits = {name: i for i, name in enumerate("一二三四五六七八九", 1)}
-            if raw.isdecimal():
-                version = int(raw)
-            elif "十" in raw:
-                tens, units = raw.split("十")
-                version = 10 * (digits[tens] if tens else 1) + (digits[units] if units else 0)
-            else:
-                version = digits[raw]
-            header = ""
-        if not line.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if cells[0] in {"编号", "项目", "功能"}:
-            header = cells[1]
-            continue
-        explicit = re.fullmatch(r"V\d+-\d+", cells[0])
-        if explicit or (version == 6 and header == "当前变化" and not cells[0].startswith("-")) or (
-                version == 7 and header == "相对第六版的变化" and not cells[0].startswith("-")):
-            counts[version] += 1
-            key = cells[0] if explicit else f"V{version}-{counts[version]:02}"
-            if key in features:
-                raise ValueError(f"Duplicate inventory feature: {key}")
-            features[key] = cells[1] if explicit else cells[0]
+    for key, title in re.findall(r"^\|\s*(V\d+-\d+)\s*\|\s*([^|]+)\|", text, re.MULTILINE):
+        if key in features:
+            raise ValueError(f"Duplicate inventory feature: {key}")
+        features[key] = title.strip()
     return features
 
 

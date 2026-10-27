@@ -8,7 +8,7 @@ import math
 import sys
 from pathlib import Path
 
-from kb_workflows.analysis.performance import native_timeline, timeline
+from kb_workflows.analysis.performance import native_timeline, scored_timeline, timeline
 from kb_workflows.common import atomic_json, fingerprint, read_json
 from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, DEFAULT_TABLE_LIMITS, core_valid, process_capture
 from kb_workflows.hardware.neuron_tables import load
@@ -45,6 +45,10 @@ def native_main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--calibration", type=Path, help="Existing calibration; requires native counters and certificate")
     parser.add_argument("--certificate", type=Path, help="Reviewed algorithm certificate or list covering every native geometry")
+    parser.add_argument("--scored-result", type=Path, help="Existing actual L1/L2 result; requires counter report, calibration and certificate")
+    parser.add_argument("--problem", type=int)
+    parser.add_argument("--sample", type=int, default=0)
+    parser.add_argument("--task", choices=("evaluate", "paired_timing"), default="evaluate")
     args = parser.parse_args(argv)
     try:
         from kb_workflows.provenance.origin_task import MAX_REPORT_BYTES
@@ -61,12 +65,22 @@ def native_main(argv=None):
 
         report = json.loads(raw)
         counters = report if report.get("protocol") == COUNTERS else None
-        result = native_timeline(counters["origin"] if counters is not None else report, counter_report=counters,
-                                 calibration=read_json(args.calibration) if args.calibration else None,
-                                 bound=read_json(args.certificate) if args.certificate else None)
+        if args.scored_result:
+            from kb_workflows.provenance.origin_task import read_scored
+
+            if counters is None or not args.calibration or not args.certificate or args.problem is None:
+                raise ValueError("Actual-scored decomposition requires counters, calibration, certificate and problem identity")
+            result = scored_timeline(counters, read_scored(args.scored_result, args.problem, args.sample, args.task),
+                                    read_json(args.calibration), read_json(args.certificate))
+        else:
+            if args.problem is not None:
+                raise ValueError("Problem identity is only used with an explicit scored result")
+            result = native_timeline(counters["origin"] if counters is not None else report, counter_report=counters,
+                                     calibration=read_json(args.calibration) if args.calibration else None,
+                                     bound=read_json(args.certificate) if args.certificate else None)
         atomic_json(args.output, result)
         print(args.output)
-        return 0 if result["status"] == "measured" else 2
+        return 0 if result.get("status") == "measured" else 2
     except (ValueError, OSError, TypeError, KeyError, AttributeError, ImportError) as exc:
         print(f"Error: {exc}")
         return 2

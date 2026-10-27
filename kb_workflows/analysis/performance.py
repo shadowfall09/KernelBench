@@ -221,6 +221,47 @@ def native_timeline(report, *, counter_report=None, calibration=None, bound=None
     return value
 
 
+def scored_timeline(counter_report, result, calibration, bound, *, allow_simulated=False):
+    """Use original wall/busy times; source-profile and profiler clocks stay out."""
+    import hashlib
+
+    from ..common import fingerprint
+    from ..provenance.counter_task import scored_models
+    from ..provenance.origin_task import validate_scored
+    from .headroom import certificate
+
+    joined = scored_models(counter_report, result, calibration, allow_simulated=allow_simulated)
+    request, document = validate_scored(result, allow_simulated=allow_simulated)
+    certificates = {}
+    for item in bound if isinstance(bound, list) else [bound]:
+        key = fingerprint({"signature": item["input_signature"]})
+        if key in certificates:
+            raise ValueError("Each actual scored geometry requires exactly one reviewed algorithm certificate")
+        certificates[key] = item
+    windows = {row["id"]: row for row in result["metadata"]["origin_capture"]["raw"]["windows"]}
+    calls = []
+    for row, model in zip(document["calls"], joined["calls"], strict=True):
+        selected = certificates.get(row["input_signature_sha256"])
+        if selected is None:
+            raise ValueError("Each actual scored call requires its own reviewed algorithm geometry")
+        metadata = {"device_fingerprint": document["binding"]["device_fingerprint"],
+                    "input_signature": windows[row["id"]]["input_signature"], "precision": request["eval_config"]["precision"]}
+        checked = certificate(selected, calibration, metadata,
+            source_sha256=hashlib.sha256(request["ref_arch_src"].encode()).hexdigest(), digest=request["eval_config"]["evaluator_sha256"])
+        algorithm, execution, busy = checked["sol_algorithm_ms"], model["sol_execution_ms"], model["scored_device_busy_ms"]
+        calls.append({**model, "sol_algorithm_ms": algorithm, "A": execution / algorithm, "E": busy / execution,
+                      "AE": busy / algorithm, "model_consistent": algorithm <= execution <= busy,
+                      "wall_decomposition_available": model["scored_wall_ms"] is not None})
+    output = {**joined, "protocol": "kernelbench_pro_scored_decomposition_v1", "calls": calls,
+              "bound_sha256": fingerprint({"certificates": bound}),
+              "timing_source": "actual_scored_native_wall_and_continuous_CUPTI; no_profile_clock_substitution"}
+    if not all(row["model_consistent"] for row in calls):
+        output["status"] = "simulated_model_inconsistent" if joined["simulated"] else "model_inconsistent"
+    output.pop("receipt_sha256")
+    output["receipt_sha256"] = fingerprint(output)
+    return output
+
+
 def launch_only(reference, candidate, *, launch_ms, speedup_ci95, noise_ci95, relative_busy_tolerance=0.05,
                 launch_tolerance=0.2):
     """A diagnostic category, requiring a noise-separated speedup and measured launch cost."""

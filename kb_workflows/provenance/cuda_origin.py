@@ -125,8 +125,14 @@ class Capture:
                         "correlation": int(row.correlation_id), "graph_id": int(getattr(row, "graph_id", 0)),
                         "graph_node_id": int(getattr(row, "graph_node_id", 0)),
                         "name": str(getattr(row, "name", ""))[:2048]}
+                    if label == "kernel":
+                        configuration = {"grid": [getattr(row, "grid_" + axis, None) for axis in "xyz"],
+                                         "block": [getattr(row, "block_" + axis, None) for axis in "xyz"],
+                                         "dynamic_shared_bytes": getattr(row, "dynamic_shared_memory", None),
+                                         "static_shared_bytes": getattr(row, "static_shared_memory", None)}
+                        copied["configuration"] = configuration
                     if (copied["end_ns"] <= copied["start_ns"] or any(value < 0 for key, value in copied.items()
-                                                                 if key not in {"kind", "name"})):
+                                                                 if key not in {"kind", "name", "configuration"})):
                         self.error("Invalid device activity interval or identity")
                         continue
                     queue = copied["context_id"], copied["stream"]
@@ -263,7 +269,11 @@ class Capture:
             module = self.module_map.get((context, item.module))
             handle = item.output[0] if item.output else None
             if handle and module:
-                function = self.append("functions", {"handle": handle, "module": module["id"], "context": context})
+                symbol = C.cast(item.name, C.c_char_p).value.decode("utf-8", errors="strict") if item.name else None
+                if symbol is not None and (not symbol or len(symbol) > 2048):
+                    symbol = None  # Unsupported identity must not be truncated into a match.
+                function = self.append("functions", {"handle": handle, "module": module["id"], "context": context,
+                                                      "symbol": symbol})
                 if function:
                     self.function_map[(context, handle)] = function
         elif name == "cuModuleUnload" and success:

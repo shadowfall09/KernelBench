@@ -1,25 +1,25 @@
 # KernelBench Pro 功能改进清单（相比 KernelBench-Verified）
 
-本清单按版本维护，记录功能改进、实现入口和验证程度。第一版记录 `2bce940` 的批量工作流整合，第二版记录正确性判断与输入隔离，第三版记录基线与计时，第四版记录评分与恢复，第五版记录从相关工作引入的可靠性检查，第六版统一 KernelBench Pro 名称、Harbor 工作流与 Python 3.12，第七版统一 GPU 配置并接入有界 Agent 工作流，第八版整合 Headroom 研究、任务选集与 motivation 追踪，第九版加入显式严格契约、证据等级和聚合消融。
+本页记录当前能力，按五条 motivation 归类。`V版本-编号`保留首次交付的追踪标识；完整理由、关联动机和全部证据集中在 [Motivation](MOTIVATION.md)。历史提交、当时的环境和验证数量可在 Git 中查阅，不再逐版重复。
 
-当前能力为第一至第五十八版的累计功能；23项设计仍按代码状态和真实实验状态分别追踪，见对应版本节。此前搁置的评测完整性整合及清理草稿仍保存在原 stash 中，没有恢复；第六版的仓库清理单独完成。
+## 当前工作流
 
-当前版本继续沿用统一入口：
-
-| 能力 | 当前配置 |
+| 能力 | 实现范围 |
 | --- | --- |
-| Python | 3.12；验证依赖 Torch 2.12.0 |
-| 生成后端 | local / Docker / Modal / Harbor |
-| GPU 目标 | TOML 配置与预设，显式 CLI 参数覆盖 |
-| 生成协议 | 原生 one-shot / mini-swe-agent feedback；Harbor external；会话 skill interactive |
-| 反馈预算 | 默认每样本最多 5 次候选、2400 秒，可配置 |
-| 正式验证 | local / Docker / Modal / HTTP 队列 |
-| Harbor 任务 | 同一 CLI 的 `export-harbor` 阶段 |
-| 结果与恢复 | 原生样本编号、文件格式、基线、计时、评分及指纹 |
+| 运行环境 | Python 3.12；验证依赖 Torch 2.12.0 |
+| 任务 | 原Level 1–3、KernelBench-105选集、Production-41四轨；[研究索引](../research/headroom/README.md) |
+| 生成 | one-shot / mini-swe-agent feedback、Harbor external、coding-agent skill interactive |
+| 默认反馈预算 | 每样本最多5次候选、2400秒，可配置；开发反馈与最终隐藏验证分开 |
+| 设备与后端 | TOML/CLI硬件配置；CUDA与原生Neuron/NKI分别适配，local / Docker / Modal / HTTP队列执行 |
+| 正确性 | 结构/dtype/离散值/非有限值比较、实际输入数值与状态审计、隐藏输入族、缓存和执行检查；[严格契约](STRICT_VALIDATION.md) |
+| 性能与评分 | 经过验证的基线组合、配对噪声、冷成本摊销、冻结复测、Headroom模型与固定分母；[评分说明](HEADROOM_SCORING.md) |
+| 来源与归因 | CUDA实际计分来源门、实际R/C/B活动并集及launch_only零分门；完整计数器/Neuron归因仍按剩余范围追踪 |
+| 预算与恢复 | token预留、受控开发worker租约、队列/Modal请求与工件绑定；[资源边界](RESOURCE_BUDGETS.md) |
+| 部署与复现 | Harbor独立verifier、只读任务导出、Slurm、结果/轨迹/收据、指纹恢复与已有产物重评分 |
 
-下面各版分别记录对应提交、功能变化和验证范围。按动机组织的完整对照见 [Motivation](MOTIVATION.md)，统一研究稿见 [论文](../research/headroom/PAPER.md)。
+当前23项设计中20项代码已实现、3项部分实现。未完成的是来源路径覆盖、完整性能归因，以及纯GPU时间硬预算/Harbor外部生成契约；逐项交付与剩余范围见 [23项状态](MOTIVATION.md#设计与实现的差额)。软件实现与真实实验分别验收；按用户要求，本轮不运行GPU、Trainium、真实模型、云资源、容器或训练实验。
 
-第七版同时包含 GPU 配置、one-shot / mini-swe-agent 反馈循环和 coding-agent skill，见后文对应记录。
+此前搁置的整合与清理继续保存在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，没有恢复。
 
 ## 第一版：Verified + 批量工作流
 
@@ -34,1441 +34,372 @@
 
 这一版把 Verified 的参考题目、隐藏测试和评测器，与原 fork 的批量运行能力整合到同一条流程中。使用者可以统一配置题目范围、生成方式、验证方式和结果分析，在本地、集群或云端运行实验。
 
-### 功能清单
+## 按 Motivation 查找功能
 
-以下各项在本版均已提交。“迁移整合”表示把原 fork 的能力接入 Verified；“流程增强”表示统一配置、可靠性或结果处理的改进，不表示上游完全没有相关基础能力。
+每项列出当前实现入口之一；完整行为、局限及所有入口见对应 motivation 的统一对照表。
 
-| 编号 | 功能 | 相对 Verified 的改进与用途 | 实现入口（本版快照） | Motivation |
-| --- | --- | --- | --- | --- |
-| V1-01 | 统一批量入口 | **流程增强。** 用一套配置串联基线、生成、评测和分析；支持 `all`、`generate`、`evaluate`、`analyze`、`baseline` 五种阶段，减少多脚本间的手工传参。 | [cli.py][v1-cli]、[config.py][v1-config] | [M5](MOTIVATION.md#m5) |
-| V1-02 | 生成与最终验证独立选择后端 | **迁移整合。** 生成支持 local / Docker / Modal，验证支持 local / Docker / Modal / HTTP 队列；例如 CPU 容器生成、远端 GPU 验证。不同后端共用参考源码、评测设置与结果协议。 | [engine.py][v1-engine]、[transports.py][v1-transports]、[modal_backend.py][v1-modal] | [M5](MOTIVATION.md#m5) |
-| V1-03 | 题目范围与多样本批量生成 | **迁移整合。** 支持 level 1–3、闭区间题号和每题多次独立 agent 尝试；每次尝试有独立工作目录、日志及内核文件。 | [config.py][v1-config]、[generation.py][v1-generation] | [M1](MOTIVATION.md#m1) |
-| V1-04 | 多 GPU 调度与并发限制 | **迁移整合。** 本地 GPU 生成按选定设备限制并发；最终评测在同一 GPU 上串行、不同 GPU 间并行；远端队列可限制在途任务数。 | [generation.py][v1-generation]、[engine.py][v1-engine]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
-| V1-05 | Docker 生成与验证 | **迁移整合。** 统一 Dockerfile，提供带 CUDA 工具链的 `agent` 和用于远端验证的 CPU 生成目标 `agent-remote`；镜像包含当前 checkout 的题目、隐藏测试与评测代码。 | [Dockerfile][v1-docker]、[generation.py][v1-generation]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
-| V1-06 | Slurm 集群提交 | **迁移整合。** 提供批量作业脚本，使用提交目录、可配置 Python 和分配到的 `CUDA_VISIBLE_DEVICES`；通过环境变量指定题目、设备与后端。 | [batch_run.sbatch][v1-slurm]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
-| V1-07 | Modal 云端执行 | **迁移整合。** 支持云端最终验证及 GPU Sandbox 内的生成、迭代验证；退出 Sandbox 前收集内核和日志，使用同一套 Verified 评测入口。 | [modal_backend.py][v1-modal]、[batch_run_modal.sh][v1-modal-sh] | [M5](MOTIVATION.md#m5) |
-| V1-08 | 持久化 HTTP 验证队列 | **迁移整合与可靠性增强。** HTTP 提交/查询、SQLite 保存任务与结果、重启后重新排队未完成任务；相同请求幂等、瞬时 HTTP 错误重试，并限制待处理任务数量。 | [queue_worker.py][v1-queue]、[transports.py][v1-transports] | [M5](MOTIVATION.md#m5) |
-| V1-09 | 带内容指纹的断点恢复 | **流程增强。** 评测恢复核对参考、内核、评测器、隐藏测试和配置；生成恢复核对模型、prompt 与输出校验和。修改内核后重新执行对应的标准及隐藏评测，旧格式结果重新验证。 | [common.py][v1-common]、[engine.py][v1-engine]、[generation.py][v1-generation] | [M5](MOTIVATION.md#m5) |
-| V1-10 | 批量任务的超时与失败处理 | **流程增强。** 单次验证使用独立子进程与编译目录；超时终止进程组，Docker 验证同时清理容器；缺失内核写入失败记录，失败的重新生成不会继续使用旧内核冒充新结果。 | [transports.py][v1-transports]、[generation.py][v1-generation]、[engine.py][v1-engine] | [M5](MOTIVATION.md#m5) |
-| V1-11 | 将 Verified 隐藏门接入全部验证后端 | **评测整合。** 默认先做标准正确性、CUDA-event 计时和峰值显存，再做隐藏正确性；最终正确性要求两者通过，隐藏结果缺失也不算通过。耗时和显存保留标准评测值。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] | [M2](MOTIVATION.md#m2) |
-| V1-12 | 基线记录接入批量流程 | **流程增强。** 可在选定验证后端记录指定题目基线；完整流程自动补测缺失基线。FP32 默认 TF32，FP16/BF16 分开存储，也可显式选择 `torch.compile` 基线；记录耗时、显存与环境信息。 | [evaluate_task.py][v1-task]、[engine.py][v1-engine]、[config.py][v1-config] | [M3](MOTIVATION.md#m3) |
-| V1-13 | 子集分析、pass@k 与统一结果归档 | **流程增强。** 批量分析使用选定题目作为分母；pass@k 使用声明样本数，缺失和隐藏失败样本计失败；输出分析摘要、逐样本耗时/显存对比，并保持 Verified 结果键格式与原有指标公式。 | [engine.py][v1-engine]、[benchmark_eval_analysis.py][v1-analysis] | [M3](MOTIVATION.md#m3) |
-| V1-14 | 旧入口兼容与配置预览 | **流程增强。** 旧 shell / Python 入口转接统一配置，兼容常用 pydra 参数；`--dry-run` 预览配置与题目，不创建运行目录、不调用模型或云服务。 | [legacy.py][v1-legacy]、[cli.py][v1-cli]、[batch_run.sh][v1-shell] | [M5](MOTIVATION.md#m5) |
+### M1：题目与区分度
 
-### Verified 继承能力与本版行为
-
-TF32 基线、四分布隐藏测试、显存效率指标和特定题目的 input-blind 策略来自 Verified。本版的贡献是把它们接入上述批量流程，统一后端的配置、调用与输出。
-
-本版遵循上游 input-blind 题目列表：相应题目的生成材料去掉测试输入，隐藏测试不放进 prompt。其他题目仍按本版原有策略提供源码。工作目录和 prompt 管理不构成阻止 agent 访问文件的安全沙箱。
-
-本版关键配置如下，便于与后续版本对照：
-
-| 配置或行为 | 第一版取值 |
-| --- | --- |
-| 默认生成 / 验证后端 | Docker / local |
-| 默认隐藏测试 | 开启 |
-| 标准性能计时 | CUDA event |
-| 默认 FP32 基线名 | `baseline_time_torch_tf32` |
-| 可选编译基线 | 通过 `--compile-backend`、`--compile-mode` 显式配置 |
-| 默认 pass@k | 在样本数足够时计算 k=1、5 |
-| 恢复失败结果 | 指纹匹配时保留已记录失败；重试需修改源码/设置或关闭 resume |
-
-六类根因检查、四变体基线组合、同步墙钟计时、H1–H14、独立最终重测和新的 K 次摊销评分均不属于本版清单。它们在核对时仍是本地未提交改动，后续应另列版本。
-
-### 结果放在哪里
-
-| 路径 | 内容 |
-| --- | --- |
-| `runs/NAME/run_config.json` | 本次运行配置 |
-| `runs/NAME/generation_summary.json` | 各次生成状态与校验信息 |
-| `runs/NAME/level_L_problem_P_sample_S_kernel.py` | 生成的内核 |
-| `runs/NAME/eval_results.json` | 标准正确性、耗时与显存 |
-| `runs/NAME/eval_results_hidden.json` | 隐藏正确性 |
-| `runs/NAME/pass_at_k_results.json` | 隐藏门约束后的 pass@k |
-| `runs/NAME/analysis_summary.json` | Verified 指标与逐题比较 |
-| `runs/NAME/work/pP_sS/`、`runs/NAME/logs/` | agent 工作目录及执行日志 |
-| `results/timing/HARDWARE/BASELINE.json` | 对应硬件标签下的基线 |
-
-### 验证程度
-
-本版提交说明与随提交保存的 [工作流文档][v1-doc] 记录：**17 项工作流测试 + 4 项上游 dataset/score 测试，共 21 项通过**。测试使用临时 Python 3.10 / Torch 2.9.0 环境。测试源码见 [test_workflows.py][v1-tests]。
-
-| 检查范围 | 本版记录的验证情况 |
-| --- | --- |
-| 配置、题目范围、GPU 索引与旧参数兼容 | CPU 测试覆盖 |
-| HTTP 队列、持久化、幂等与重启恢复 | 真实 HTTP 服务配合模拟 GPU 评测器验证 |
-| 隐藏门、缺失样本、pass@k、子集分母与显存字段 | CPU / 模拟任务测试覆盖 |
-| 内核变化后的恢复、生成失败后的旧文件处理、超时与 dry-run | 工作流测试覆盖 |
-| 项目固定 Torch 2.12.0 | 依赖解析通过；运行验证仍待完成 |
-| 两个 Docker 目标 | 构建定义检查通过；未证明实际镜像构建和 GPU 运行成功 |
-| Modal | SDK 镜像定义构造通过；实际云端执行仍待完成 |
-| Slurm、真实 CUDA 内核与模型生成 | GPU 申请因节点忙未成功；完整执行仍待完成 |
-
-这里记录的是该提交已有的验证结果。本次维护清单没有重跑历史测试，也不据此宣称性能提升或全部后端已经实机跑通。
-
-## 第二版：正确性判断与输入隔离
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Fix output comparison and isolate correctness inputs |
-| 提交日期 | 2026-10-20（America/New_York） |
-| 基础提交 | `2bce940c631c01086c262eef9c9efc9d3693e1de` |
-| 本版提交 | 实现、回归测试与本节文档在同一提交；哈希可用下方命令查询 |
-| 状态 | 已提交；CPU 回归通过；真实 CUDA 验证待完成 |
-
-```bash
-git log -1 --format='%h %s' --grep='^Fix output comparison and isolate correctness inputs$'
-```
-
-本版统一标准评测和隐藏评测的输出判断，防止离散结果被浮点容差放过，以及输入或输出缓冲区被修改后污染比较。
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V2-01 | 严格比较输出结构、shape 和 dtype | 递归检查 Tensor、dict、list、tuple；核对字典键、序列类型和长度，以及各 Tensor 的 shape、dtype；记录具体不一致的输出路径。 | [validation.py](../src/validation.py)：`compare_outputs` | [M2](MOTIVATION.md#m2) |
-| V2-02 | 整数与 bool 精确比较 | 离散 Tensor 使用精确比较。比如整数索引 `100000` 与 `100001` 即使满足相对浮点容差，也会被判为不一致；整数和 bool 输入不再被统一转换为浮点精度。 | [validation.py](../src/validation.py)、[eval.py](../src/eval.py)：`_process_input_tensor` | [M2](MOTIVATION.md#m2) |
-| V2-03 | 核对 NaN、Inf 的位置与符号 | NaN、正 Inf、负 Inf 的掩码分别匹配；匹配后，仅有限数值继续按原 FP32/FP16/BF16 容差比较。 | [validation.py](../src/validation.py)：`compare_outputs` | [M2](MOTIVATION.md#m2) |
-| V2-04 | 隔离参考与候选输入 | 两个模型分别使用独立的 Tensor 副本，支持嵌套容器，避免参考或候选的原地操作修改另一方的输入和调用方原始数据。 | [validation.py](../src/validation.py)：`clone_tensors`；[eval.py](../src/eval.py)：两个正确性入口 | [M2](MOTIVATION.md#m2) |
-| V2-05 | 保存参考输出快照 | 在调用候选前保存参考结果，避免共享或复用输出缓冲区把参考答案覆盖，导致错误实现被判通过。 | [eval.py](../src/eval.py)：`run_and_check_correctness`、`run_correctness_on_fixed_inputs` | [M2](MOTIVATION.md#m2) |
-| V2-06 | 对齐 forward 随机种子 | 参考与候选 forward 使用相同种子，避免 dropout 等随机计算因执行先后产生不同结果。 | [eval.py](../src/eval.py)：两个正确性入口 | [M2](MOTIVATION.md#m2) |
-
-### 验证程度
-
-在以 `2bce940` 为基础、仅包含本版代码的独立快照中执行：
-
-```bash
-python -m pytest -q tests/evaluation/test_correctness_validation.py tests/evaluation/test_workflows.py \
-  src/unit_tests/test_dataset.py src/unit_tests/test_score.py
-```
-
-结果为 **64 passed**：43 项新增正确性回归用例，加上 21 项原有工作流与 dataset/score 测试。环境为 Python 3.10 / Torch 2.9.0。
-
-新增用例覆盖嵌套输出、结构/shape/dtype 不匹配、整数偏差、bool、非有限值位置与符号、原浮点容差、原地操作、共享输出缓冲区、嵌套输入副本及随机种子。Ruff 和 diff 格式检查通过。测试源码为 [test_correctness_validation.py](../tests/evaluation/test_correctness_validation.py)。
-
-真实 CUDA 执行和项目固定 Torch 2.12.0 的运行验证仍待完成。本版没有加入根因探针、反作弊、墙钟计时、四变体基线或新计分流程；参考报错和空隐藏测试集的处理规则也未在本版修改。
-
-本节实现入口的相对链接会打开当前 checkout；查看本版准确源码时，使用上述命令取得提交哈希，再执行 `git show <hash>:src/eval.py` 或对应文件路径。
-
-## 第三版：基线与计时
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add validated baseline portfolio and synchronized wall timing |
-| 本版提交哈希 | `d4eed06` |
-| 基础提交 | `d488df8` |
-| 本版提交 | 与本节首次加入同一提交；可用下方命令查询 |
-| 状态 | 已提交；CPU/模拟 CUDA 回归通过；真实 GPU 工具链待验证 |
-
-```bash
-git log -1 --format='%h %s' --grep='^Add validated baseline portfolio and synchronized wall timing$'
-```
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V3-01 | 默认四变体基线 | eager、compile default、compile max-autotune、CUDA Graph 各自独立任务运行；验证初次及每次计时输出，保留失败变体，在正确变体中选最优。组合的 FP32 使用 IEEE；显式单基线仍可使用 TF32。 | `baseline_variants.py`、`evaluate_task.py`、`engine.py` | [M3](MOTIVATION.md#m3) |
-| V3-02 | 同步墙钟计时 | 调用前后同步，计入 Python 调度、调用、输出消费及 GPU 完成等待；输入准备和完整参考校验在计时外。Graph 的输入复制和输出克隆计入 replay 耗时。 | `measurement.py`、`src/eval.py` | [M2](MOTIVATION.md#m2) |
-| V3-03 | 变化输入与逐次输出验证 | 批量基线和候选每次重新调用可信输入生成器，记录新种子；保留输入副本，每次检查输出，失败不作为有效性能结果。固定生成器仍可能产生相同内容。 | `measurement.py`、`evaluate_task.py`、`src/eval.py` | [M2](MOTIVATION.md#m2) |
-| V3-04 | 冷成本与 K 次摊销 | 记录构建/初始化、首次调用和预热；按 `(cold + (K-1) × steady) / K` 报告平均成本，默认 K=10000，同时保留稳态最优与摊销最优基线。 | `measurement.py`、`baseline_variants.py`、`config.py` | [M3](MOTIVATION.md#m3) |
-| V3-05 | 原始样本和测量信息 | 保存毫秒样本、均值/标准差及正态近似 95% 均值区间；记录真实设备、软件版本、输入形状/stride/dtype 和源码指纹，供后续兼容性检查。 | `measurement.py`、`evaluate_task.py` | [M3](MOTIVATION.md#m3) |
-| V3-06 | 区分旧计时与新结果 | 新默认文件名为 `baseline_time_suite_fp32_wall`；`--no-baseline-suite` 可选单基线，编译单基线需同时指定该开关；基线组合未完整记录时重新执行。 | `config.py`、`cli.py`、`engine.py` | [M3](MOTIVATION.md#m3) |
-
-验证：Python 3.10 / Torch 2.9.0 下，**84 项测试通过**，含 20 项新增基线/计时回归及此前 64 项测试。新增测试为 [test_baseline_timing.py](../tests/evaluation/test_baseline_timing.py)，包含真实 CPU 公式、模拟异步完成与 Graph replay、原评测入口的计时校验接入。Ruff、目标模块编译和 diff 检查通过。
-
-范围：本版记录摊销成本，不改变聚合评分；评分与恢复另列下一版。H1–H14、FP64 精度门、sanitizer、根因探针、独立最终重测继续暂缓。冷成本不清空编译缓存，未计进程启动和输入准备；不代表完整应用端到端成本。真实 CUDA、torch.compile、Graph 和 Torch 2.12.0 尚待部署验证。旧名 `time_execution_with_cuda_event` 保留为墙钟计时兼容入口；仅原生批量入口提供变化输入及逐次验证。
-
-## 第四版：评分与恢复
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add failure-inclusive scoring and evidence-aware recovery |
-| 基础提交 | `d4eed06` |
-| 本版提交 | 与本节首次加入同一提交；可用下方命令查询 |
-| 状态 | 已提交；CPU/持久化结果回归通过；真实 GPU 与完整反作弊实验待完成 |
-
-```bash
-git log -1 --format='%h %s' --grep='^Add failure-inclusive scoring and evidence-aware recovery$'
-```
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V4-01 | 失败和缺失样本计入分母 | 每个请求题目 × 声明样本数形成固定槽位；失败、超时、缺失、过期或比较证据不足的槽位记 0。先按题取所有样本均值，再按层宏平均，不选择最快样本作为新评分。 | `paper_analysis.py`：`analyze_paper` | [M3](MOTIVATION.md#m3) |
-| V4-02 | 按 K 摊销成本评分 | 在有当前证据的变体中，按声明 K 重新选择摊销最优基线；评分为 `clip(log(T_ref/T_cand)/log(1.25), 0, 1)`，同时要求所选基线与候选的稳态均值区间不重叠。保留稳态加速比和摊销加速比。 | `paper_analysis.py`、`measurement.py` | [M3](MOTIVATION.md#m3) |
-| V4-03 | 兼容性和测量证据检查 | 检查设备类别、Torch/CUDA/HIP、精度/容差、计时协议、输入签名、源码与任务指纹；要求变化输入、逐次校验收据、有效原始样本和冷成本。组合基线必须记录完整，具体变体也须匹配当前任务。 | `paper_analysis.py`：`compatible`、`measurement_evidence`、`current_result` | [M3](MOTIVATION.md#m3) |
-| V4-04 | 分层统计与区间 | `--problem-specs` 可声明 I/F/D 层，未声明为 `unclassified`；保留失败槽位，输出按题和样本两层重采样的 bootstrap 区间。该版本不加入设备校准或 headroom 评分。 | `config.py`、`paper_analysis.py` | [M3](MOTIVATION.md#m3) |
-| V4-05 | 扩大恢复指纹覆盖 | 指纹覆盖共享验证、计时、基线变体、配置、任务编排、传输和分析模块；版本或源码变化使旧任务失效。完整流程发现过期基线时重新记录，客户端与 worker 版本不匹配则拒绝执行。 | `common.py`、`cli.py`、`engine.py`、`evaluate_task.py` | [M5](MOTIVATION.md#m5) |
-| V4-06 | 旧分析与榜单不能绕过证据检查 | 新批量结果经 `eval_results_scored.json` 提供资格；读取时重新核对当前内核、参考题目、隐藏源码、版本、运行配置及原始结果/基线内容。缺失或过期资格拒绝计分；隐藏合并不会把标准失败覆盖为通过。 | `common.py`：`apply_score_gate`；两个分析/榜单脚本 | [M3](MOTIVATION.md#m3) |
-
-新增输出为 `paper_analysis.json` 与 `eval_results_scored.json`。前者记录固定分母评分、区间、原始与摊销加速比及逐项拒绝原因；后者保存计分资格并保留 `raw_correctness`。原 Verified 指标继续使用原有公式，只读取资格检查后的结果；pass@k 仍表示正确性统计，含义与新性能评分不同。
-
-验证：Python 3.10 / Torch 2.9.0 下，**114 项测试通过**，含 30 项新增评分/恢复回归及第三版的 84 项测试。新增测试为 [test_scoring_recovery.py](../tests/evaluation/test_scoring_recovery.py)，覆盖失败分母、置信区间、冷成本、兼容性、证据失效、旧分析接入、指纹变化重跑、过期基线重测、worker 版本拒绝和子验证器配置传递。Ruff 对工作流/共享验证/测试模块、目标模块编译与 diff 检查通过。
-
-这里的资格只证明本版要求的测量与兼容性证据齐备，报告明确写 `anti_cheat_verified=false`、`cross_device_comparison_certified=false`；不等于 H1–H14 通过。没有完整反作弊模块时，不接受标为反作弊评测的结果获得资格。置信区间为近似统计，冷成本为一次观测，不构成正式的性能或安全证明。真实 CUDA、Torch 2.12.0、跨设备实验、根因探针、sanitizer 和独立最终重测继续暂缓。
-
-## 第五版：参考相关工作的可靠性检查
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Strengthen correctness checks from kernel benchmark research |
-| 日期 | 2026-10-21 |
-| 基础提交 | `81c7055` |
-| 本版提交 | 实现、测试、来源说明和本节在同一提交；用下方命令定位 |
-| 状态 | 已提交；172 项 CPU/模拟测试通过；真实 GPU 验证尚未完成 |
-
-```bash
-git log -1 --format='%h %s' --grep='^Strengthen correctness checks from kernel benchmark research$'
-```
-
-本次核对了 KernelBench-Hard、KernelBenchX、robust-kbench 的论文/源码及 TritonRL 论文，按当前题目与工作流独立适配。各项来源、固定上游 commit、采用与未采用部分见 [可靠性说明](RELIABILITY.md)。
-
-| 编号 | 功能 | 具体变化与来源 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V5-01 | 参考前后配对检查 | 借鉴 robust-kbench 的前后调用，标准与隐藏检查均执行 C→R、R→C 两组，两个模型调用次数一致；同步、重放 RNG、输入隔离与输出快照防止当前参考缓存和共享缓冲污染。 | `src/reliability.py`、`src/eval.py` | [M2](MOTIVATION.md#m2) |
-| V5-02 | 隔离源码全局字典与后端设置 | 候选同名变量/函数不能覆盖参考定义；每次 forward 后恢复共享后端设置，防止候选改变精度设置影响参考比较。属于本地配套实现，不声称提供安全沙箱。 | `src/eval.py`、`src/reliability.py` | [M2](MOTIVATION.md#m2) |
-| V5-03 | 三个种子重新生成隐藏输入 | 借鉴 Hard 的三种子验证，分别在 42、123、456 下调用可信隐藏生成器，全部配置必须通过。硬编码生成器仍可能返回相同内容。 | `src/eval.py`：`run_hidden_correctness_check` | [M2](MOTIVATION.md#m2) |
-| V5-04 | 按输入域限定的数值压力测试 | 借鉴 Hard 的按题压力输入及 KernelBenchX 的 0.1%/×50 离群分布。29 道 Level 1 题的首个隐藏配置增加零值、×32 和稀疏离群值；不改变 shape/stride/dtype 或其他输入，不把扰动施加到未经核对的受限域。 | `src/reliability.py`：`STRESS_TASKS`、`stress_cases` | [M2](MOTIVATION.md#m2) |
-| V5-05 | 无效验证不能算通过 | 空、缺失、格式错误的隐藏集显式报错；参考报错记录来源并判验证失败；标准零次测试不能通过。是落实“所有配置必须实际验证”的本地修补。 | `src/eval.py`、`src/reliability.py` | [M2](MOTIVATION.md#m2) |
-| V5-06 | 分阶段诊断与逐项收据 | 参考 KernelBenchX/TritonRL 对编译、正确性、性能的区分，新增 `validation_summary.json`，失败/缺失样本保留分母；metadata 保存种子、配置、调用顺序和失败来源。阶段诊断不代替第四版的计分资格，也不证明功能合法性。 | `kb_workflows/engine.py`、`src/reliability.py` | [M3](MOTIVATION.md#m3) |
-| V5-07 | 新协议参与恢复指纹 | 新可靠性模块纳入 evaluator digest，使旧缓存不能继续冒充新协议结果；沿用既有 worker 版本核对和过期证据拒绝。 | `kb_workflows/common.py` | [M5](MOTIVATION.md#m5) |
-
-验证：Python 3.10 / Torch 2.9.0 下 **172 passed**，其中新增 [test_reliability.py](../tests/evaluation/test_reliability.py) 的 58 项，原有 114 项全部通过。覆盖全部 29 道适配题的小形状真实 CPU 参考执行，以及缓存答案、第二次调用错误、无效隐藏集、非法域排除、源码全局覆盖和恢复指纹回归。Ruff 与 diff 检查通过。
-
-范围与成本：原四配置隐藏集变为每题 12 次配置检查；适配题增加压力输入后为 21 次，每配置两组配对。额外检查不进入稳态计时；首次候选 forward 提前到首次参考 forward 前，冷成本仍记录。Level 2/3 本次没有新增数值扰动。保留当前浮点容差与匹配 NaN/Inf 规则，没有迁入 Hard/X 题集、SOTA 外部库、TFLOPS/带宽评分、模型裁判或 backward 验证，不宣称完整反作弊通过。
-
-本次 Slurm GPU smoke 作业 50702 因 `Requested nodes are busy` 未能启动；真实 CUDA 和固定 Torch 2.12.0 尚未验证。
-
-原先未提交的整合与清理保存在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，本次没有恢复。以后恢复需处理与本版重叠的正确性入口，并重新验证。
-
-## 第六版：KernelBench Pro、Harbor 与 Python 3.12
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Unify KernelBench Pro with Harbor and Python 3.12 |
-| 定位命令 | `git log -1 --format='%H %s' --grep='^Unify KernelBench Pro with Harbor and Python 3.12$'` |
-| 基础提交 | `66fd65c5272c72572f0144989e97da1e98778771` |
-| 记录日期 | 2026-10-21 |
-| 状态 | 已提交；CPU/模拟回归通过，真实 GPU 与 agent 端到端验证待兼容环境 |
-
-### 仓库定位与文件清理
-
-项目名称统一为 **KernelBench Pro**，包、镜像、Modal 与 Slurm 标识使用 `kernelbench-pro`。现有 checkout 路径、题库目录和 GitHub 地址保留。
-
-本版以 `66fd65c` 为基础，把仓库清理、更名、Harbor 接入和 Python 3.12 升级纳入同一次提交。此前搁置的整合改动仍在 stash `ba76365ce0dd755bce1361e38420bb5f4ec3e196`，没有恢复。
-
-| 项目 | 当前变化 | Motivation |
-| --- | --- | --- |
-| 论文与旧实验材料 | 删除 1 份上游报告 PDF、3 份 LaTeX 稿、1 份参考文献库、9 份图表、1 个论文绘图脚本和 5 份旧实验分析文档，共 20 个文件。 | [M5](MOTIVATION.md#m5) |
-| 重复生成材料 | 删除 4 份未被运行流程读取的 `stripped_prompts` 快照；输入盲化仍由可信配置动态生成。 | [M5](MOTIVATION.md#m5) |
-| 仓库入口 | README 改为本仓库的安装、能力、运行与文档入口；移除上游作者名单、论文宣传、旧榜单图与论文结论。 | [M5](MOTIVATION.md#m5) |
-| 维护方式 | 贡献与行为指南改为本仓库的 GitHub 流程，移除 Meta 内部导入、CLA 和举报渠道；LICENSE 和继承版权头保留，来源集中记录在 `NOTICE.md`。 | [M5](MOTIVATION.md#m5) |
-| 项目名称 | Python distribution 为 `kernelbench-pro`，默认镜像为 `kernelbench-pro:agent`，Modal app 为 `kernelbench-pro`，Slurm job 为 `kernelbench-pro`；CLI、生成 prompt、worker 与结果页面使用 KernelBench Pro 名称。 | [M5](MOTIVATION.md#m5) |
-| 结果页面 | 硬件标签取自本次数据；不再写死 H200、Best-of-5 或 2026 年 5 月，也不替未标注的运行猜测推理强度。 | [M3](MOTIVATION.md#m3) |
-| 忽略规则 | 按目录忽略运行产物、缓存与生成预览，补充凭据和 Slurm 日志规则；取消对全部 JSON、CUDA/C++ 源码及部分个人脚本名的全局忽略。 | [M5](MOTIVATION.md#m5) |
-| 使用中的文件 | 题库、隐藏测试、动态 prompt 示例和兼容脚本保留；`paper_analysis.py` / `paper_analysis.json` 是现有评分接口，保持名称以兼容结果读取。 | [M5](MOTIVATION.md#m5) |
-
-验证：172 项 CPU/模拟回归和 Ruff 通过；CLI dry-run、实际 HTML 生成、Python 包元数据、脚本语法、文档链接与忽略规则检查通过。270 个参考题目和 250 个隐藏测试文件完整保留，LICENSE、核心比较/计时/评分实现没有改动。此轮不恢复搁置的评测完整性整合，也不重写 Git 历史；删除的研究材料仍可从历史提交恢复。
-
-### Harbor 统一接入与 Python 3.12
-
-本轮扩展的是第一版建立的统一工作流，沿用同一个 `RunConfig`、题目范围、样本槽位、结果文件、GPU 调度、正式验证和分析；不修改第一版历史提交的能力描述。此前搁置的整合改动仍在原 stash 中。
-
-| 项目 | 当前变化 | Motivation |
-| --- | --- | --- |
-| 统一生成后端 | `--generation harbor` 调用 Harbor，每个原生样本对应一个 job/attempt；提交文件回收到原内核命名位置，再由原生正式评测和评分处理。 | [M5](MOTIVATION.md#m5) |
-| 统一任务导出 | `--stage export-harbor` 使用同一配置按题号/样本导出 schema 1.4 任务；保留当前输入盲化策略，使用新目录避免覆盖。 | [M5](MOTIVATION.md#m5) |
-| 验证与 reward | 独立 verifier 镜像保存可信代码及隐藏测试，只传递 `solution.py`；复用原生基线、正确性与证据评分，异常 reward 为 0。默认 correctness 与可选 bounded_gain 分开定义。 | [M2](MOTIVATION.md#m2) |
-| GPU 与恢复 | Docker 任务绑定原生 GPU lane，单卡串行；Harbor agent/环境/模型/协议纳入恢复指纹，正式评测不直接复用 Harbor reward。AWS profile 只解析为运行时凭据。 | [M5](MOTIVATION.md#m5) |
-| Python 升级 | `requires-python ==3.12.*`、Ruff py312、Docker Python 3.12 / Ubuntu 24.04、Modal Python 3.12；增加可选 `harbor` extra，固定 Torch 2.12.0。 | [M5](MOTIVATION.md#m5) |
-| 文档 | [Harbor 接入](HARBOR.md)、README 和批量文档同步更新；历史 Python 3.10 测试记录仍保留其真实环境。 | [M5](MOTIVATION.md#m5) |
-
-验证：Python 3.12.12 / Torch 2.12.0 / 正式发布的 Harbor 0.24.0 下 **204 passed**，含 32 项 Harbor 回归；Ruff、依赖一致性、实际 Task 模型校验和 CLI 配置解析通过。两个 Docker 目标的构建定义检查通过。Harbor Docker CPU smoke 因宿主 NAT 网络错误未启动，没有产物或 reward，不算通过；Torch CUDA 13 构建报告当前宿主驱动过旧，真实 GPU 与 agent 端到端验证仍待兼容环境。
-
-## 第七版：GPU 配置与有界 Agent 工作流
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add configurable GPU targets and bounded mini-swe-agent workflows |
-| 提交定位 | `git log -1 --format='%H %s' --grep='^Add configurable GPU targets and bounded mini-swe-agent workflows$'` |
-| 基础提交 | `d2550fb60a36e2555635072a8eab6a1411392504` |
-| 记录日期 | 2026-10-21 |
-| 功能状态 | 已提交；270 项 CPU/模拟回归通过，真实 GPU 与付费模型端到端验证待完成 |
-
-本版把 GPU 文件配置、one-shot / mini-swe-agent 反馈循环和 coding-agent skill 纳入同一次提交。此前搁置的评测完整性整合及清理草稿仍保留在原 stash，没有恢复或纳入本版。
-
-### GPU 配置统一
-
-| 功能 | 相对第六版的变化 | 实现入口 | Motivation |
+| 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
-| 文件配置 | 新增 `--config FILE.toml`，`[gpu]` 管 GPU，`[run]` 管工作流；命令行显式覆盖文件，文件覆盖默认值；检查类型、未知字段及枚举值。 | `kb_workflows/config.py`、[GPU 配置](GPU_CONFIG.md) | [M5](MOTIVATION.md#m5) |
-| GPU 预设 | 型号到架构和云端类型的映射移出 Python，集中维护在随包分发的 TOML；提供 A6000 本地和 H100 Modal 示例。 | `kb_workflows/hardware/gpu_profiles.toml`、`configs/`、`pyproject.toml` | [M5](MOTIVATION.md#m5) |
-| 自定义目标 | `[gpu]` 可直接填写硬件标签、架构、设备和云端类型；编译目标接受架构名或计算能力，不再依赖旧的固定架构白名单。 | `kb_workflows/hardware/gpu.py`、`src/utils.py` | [M5](MOTIVATION.md#m5) |
-| 明确选择硬件 | 去掉默认 H100 和未知型号回退 Hopper；未知硬件需显式架构，实际 GPU 任务要求完整目标，Modal 要求云端类型。更换 CLI 目标时清除文件中旧的目标配置。 | `kb_workflows/config.py`、`kb_workflows/cli.py` | [M3](MOTIVATION.md#m3) |
-| 后端与子任务 | 同一解析结果传给现有生成、评测、基线、调度和恢复流程；子任务保存展开后的 JSON，不依赖宿主 TOML 路径；Harbor 省略空云端类型。 | `kb_workflows/runtime/harbor.py`、原生 `RunConfig` 及任务协议 | [M5](MOTIVATION.md#m5) |
-| 集群与恢复 | Slurm 使用 `KB_CONFIG`，只让显式环境变量覆盖文件；shell 入口尊重文件后端；GPU 解析模块和预设参与 evaluator digest，切换目标影响恢复指纹。 | `batch_run.sbatch`、`batch_run.sh`、`batch_run_modal.sh`、`kb_workflows/common.py` | [M5](MOTIVATION.md#m5) |
+| V1-03 | 题目范围与多样本批量生成 | [generation.py](../kb_workflows/agents/generation.py) | [M1](MOTIVATION.md#m1) |
+| V8-04 | KernelBench-105 选集 | [kernelbench105.json](../kb_workflows/benchmarks/manifests/kernelbench105.json) | [M1](MOTIVATION.md#m1) |
+| V8-05 | 全流程统一选题 | [common.py](../kb_workflows/common.py) | [M1](MOTIVATION.md#m1) |
+| V12-01 | Production-41参数化题集 | [production_specs.py](../kb_workflows/benchmarks/production_specs.py) | [M1](MOTIVATION.md#m1) |
+| V12-02 | 独立反向轨道与梯度参考 | [production_ops.py](../kb_workflows/benchmarks/production_ops.py) | [M1](MOTIVATION.md#m1) |
+| V12-03 | 逐输入角色的dtype契约 | [production.py](../kb_workflows/production.py) | [M1](MOTIVATION.md#m1) |
+| V13-01 | 研究结果的当前证据导出 | [study_data.py](../kb_workflows/analysis/study_data.py) | [M1](MOTIVATION.md#m1) |
+| V13-02 | 选集区分度与统计不确定性 | [study_statistics.py](../kb_workflows/analysis/study_statistics.py) | [M1](MOTIVATION.md#m1) |
+| V16-01 | 显式尺寸实例与证据绑定 | [production.py](../kb_workflows/production.py) | [M1](MOTIVATION.md#m1) |
 
-GPU 配置阶段验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 下 **244 passed**，新增 40 项配置与边界回归；Ruff、脚本语法和 diff 检查通过。离线 wheel 构建成功，解包后在仓库外验证 GPU 预设可加载；配置预览不导入 Torch、Modal 或 Harbor，Harbor 任务通过实际 Task 模型校验。真实 GPU 与 agent 端到端验证仍受宿主驱动限制，未新增实机通过声明。
+### M2：正确性与执行可信度
 
-范围：一个运行配置描述一种 GPU 类别，异构卡使用独立运行和基线；执行后端仍为 NVIDIA CUDA，不代表 AMD、Intel、MPS 或 CPU 性能评测已适配。
-
-### One-shot、mini-swe-agent 与 coding-agent skill
-
-与前述 GPU 配置统一改动一起提交。采用 mini-swe-agent 发布版 2.4.6，参考 TIRx 的固定评测契约、诊断与基准分离设计；没有迁入 TIRx 编译器、NumSim、Synccheck、Racecheck 或 KCoral。此前 stash 仍未恢复。
-
-| 功能 | 相对第六版的变化 | 实现入口 | Motivation |
+| 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
-| 真实 agent loop | 使用上游 DefaultAgent 的查询/反馈循环、线性消息历史、步数/费用检查与轨迹序列化；自有 Model/Environment 适配器提交源码，控制器负责执行反馈。 | `kb_workflows/agents/agent_loop.py`、`kb_workflows/agents/agent_models.py` | [M4](MOTIVATION.md#m4) |
-| One-shot | 一个样本只发起一次模型适配器调用，不给执行反馈；Claude Code 内置工具、MCP 和自定义加载关闭。多样本采样与单次生成分别记录。 | `configs/a6000-one-shot.toml`、`generation_mode` | [M4](MOTIVATION.md#m4) |
-| 有界反馈 | 默认每样本尝试最多 5 次候选、2400 秒；CLI/TOML 可调。控制器保留开发正确且平均耗时最低的候选，后续错误或超时不覆盖已完成最佳版本。 | `configs/a6000-feedback.toml`、`kb_workflows/agents/generation.py` | [M4](MOTIVATION.md#m4) |
-| 开发与最终评测分离 | 开发任务明确关闭隐藏测试；冻结源码后原生流程重新做标准与多种子隐藏验证。新增独立 Torch profiler 诊断子任务，诊断时间不进入正式评分，也不冒充 NCU 硬件计数器。 | `kb_workflows/agents/agent_loop.py`、`kb_workflows/runtime/profile_task.py`、`kb_workflows/evaluation/evaluate_task.py` | [M4](MOTIVATION.md#m4) |
-| 资源与来源记录 | 记录调用、候选、开发/诊断次数、可观测 token 和估算费用；未知值不当作零。源码 hash 绑定生成回执；已完成失败可恢复而不自动重试，显式重复尝试累计历史成本并标为 repeated-attempts。 | `generation_budget.json`、`generation_attempts.json`、`phase_budget.json`、`kb_workflows/analysis/experiment.py` | [M4](MOTIVATION.md#m4) |
-| 模式比较 | 按模式、框架、预算、采样数、题集、硬件和精度分组，模型信息逐行记录；不跨不同实验组直接排名。生成后修改源码标为 unattributed。 | `python -m kb_workflows.analysis.experiment`、`paper_analysis.json` | [M4](MOTIVATION.md#m4) |
-| 模型与后端 | Claude Code / LiteLLM 模型入口共用 mini-swe-agent；local / Docker / Modal 生成接入同一循环；队列支持诊断任务。Harbor 保持外部 agent 模式，不冒充原生 one-shot 或受控轮数。 | `requirements.txt`、`kb_workflows/runtime/modal_backend.py`、`kb_workflows/runtime/queue_worker.py` | [M4](MOTIVATION.md#m4) |
-| Coding-agent skill | Claude Code 的 `/kernelbench-pro` 与 `.agents/skills` 共享 skill。当前会话可准备任务、提交标准开发检查、冻结最佳源码并执行最终评测，不递归启动 Claude CLI；模型调用不可观测时单列 interactive。 | [.claude/skills/kernelbench-pro/SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md)、`kb_workflows/agents/agent_task.py` | [M4](MOTIVATION.md#m4) |
-
-验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下，**270 项完整 CPU/模拟回归通过**。覆盖真实 DefaultAgent、伪模型 CLI 的完整 worker/多样本/恢复路径、LiteLLM SDK 适配、未知费用、费用超限、保留正确候选、诊断反馈、标准/隐藏分离、重试成本、来源归属和嵌套子进程超时清理。Ruff、168 个包的依赖一致性及 skill 校验通过；离线 wheel 构建后，在仓库外核对适配模块、GPU 预设与轻量导入。测试没有调用付费模型，也没有执行真实 GPU 内核；当前宿主仍报告 NVIDIA 驱动不兼容 CUDA 13，实机端到端验证待兼容的已分配 GPU。
-
-运行说明与方案比较见 [Agent loops](AGENT_LOOPS.md)。费用限制是调用间的客户端估算上限，单次可超限；GPU 计费时间保持未知，不宣称完整 OS 沙箱或反作弊认证。
-
-## 第八版：Headroom 研究与 Motivation 统一
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Integrate headroom research with motivation traceability and task suites |
-| 提交定位 | `git log -1 --format='%H %s' --grep='^Integrate headroom research with motivation traceability and task suites$'` |
-| 基础提交 | `92c27f4c020a4860d5ca546b88a50b007f629e3f` |
-| 日期 | 2026-10-21 |
-| 状态 | 已提交；验证结果见本节末尾 |
-
-本版择取用户提供的 `headroom-bench-20261021.zip`，保留研究证据、固定选集与未完成设计，按当前实现重写研究稿；不导入旧论文备份、内部对话或缺依赖的攻击/加固原型。此前 stash 没有恢复，核心正确性/计时检查没有被原型替换。
-
-| 编号 | 功能 | 变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V8-01 | 五条动机与逐项追踪 | 将历史改动归到具体问题，并校验覆盖完整性。 | `docs/MOTIVATION.md` | [M5](MOTIVATION.md#m5) |
-| V8-02 | 统一论文与能力状态 | 已实现与研究目标使用同一套名称和预算，不将设计写成实验结果。 | `research/headroom/PAPER.md` | [M5](MOTIVATION.md#m5) |
-| V8-03 | 研究证据归档与重建 | 保留逐实现审查依据与来源摘要，不执行缺依赖的原型。 | `scripts/headroom_evidence.py` | [M2](MOTIVATION.md#m2) |
-| V8-04 | KernelBench-105 选集 | 接入105个scored、5个probe、140个extended的固定选集。 | `kb_workflows/benchmarks/manifests/kernelbench105.json` | [M1](MOTIVATION.md#m1) |
-| V8-05 | 全流程统一选题 | 生成、基线、隐藏验证、评分、预算与Harbor均使用同一子集。 | `kb_workflows/common.py` | [M1](MOTIVATION.md#m1) |
-| V8-06 | 分层来源与探针隔离 | 启发式I/F/D标注来源；probe和extended分组且不标为主榜资格。 | `kb_workflows/analysis/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
-| V8-07 | 选集与参考版本证据 | 记录manifest摘要并检查参考快照，阻止静默任务漂移。 | `kb_workflows/benchmarks/suites.py` | [M5](MOTIVATION.md#m5) |
-
-KernelBench-105 使用原选集的 105 scored / 5 probe / 140 extended，暂定 I/F/D 为 30/56/19。它是原始题目上的研究选集，未实现论文输入校准，也不把启发式 D 标签当作算法证书。默认仍跑完整题集；显式选择 `--suite kernelbench105`，范围与选集取交集，probe/extended 单独运行和报告。参考源码改变时需重新审阅清单。详细用法与证据限制见 [研究索引](../research/headroom/README.md)。
-
-相对原稿，本版修正了“仅第一版实现”“默认60分钟”“已支持Trainium”“已有完整FP64/硬件计数器/Headroom评分”等过时或超前表述；当前默认仍为5候选/2400秒，计算后端仍为NVIDIA CUDA，评分仍为测量证据约束的bounded gain。完整未完成项见 Motivation 的23条差额，实验不因文档整合而记为完成。
-
-验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **287 项 CPU/模拟回归通过**，含本轮17项选集与追踪回归。覆盖三类角色与250题分区、范围交集、参考漂移拒绝、无GPU轻量预览、缺失样本分母、实际批量生成路径、基线/预算/子任务一致性、真实Harbor Task导出、层来源标记、证据摘要及全部改动的motivation覆盖。Ruff、168个包依赖一致性、来源重建逐文件比较、文档本地链接和离线wheel检查通过；wheel在仓库外可加载选集且配置不导入Torch。未运行真实GPU内核或付费模型，现有CUDA驱动兼容性限制仍保留。
-
-## 第九版：严格数值契约与证据等级（第一批设计落地）
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Implement strict numerical contracts and evidence-gated evaluation |
-| 基础提交 | `7915423553f5e0cc385dd800a9497aef276d5936` |
-| 日期 | 2026-10-21 |
-| 状态 | 已提交；368项CPU/模拟测试通过，GPU校准与实机验证待完成 |
-
-本版推进23项设计中的R-04/05/06/07/09，交付R-17聚合消融和R-22证据收据的代码。严格校验显式开启；默认既有协议保留。严格契约先覆盖17道L1（1–3、19–27、47–49、51–52），使用小规模附加实例，不改变原计时输入，也不声称原尺寸已通过FP64校准。完整差额仍在Motivation逐项记录。
-
-| 编号 | 功能 | 变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V9-01 | FP64数值契约 | 在17道已审阅L1的附加实例上，参考与候选均须通过RMS及全元素FP64门。 | `kb_workflows/numerics/numerical.py` | [M2](MOTIVATION.md#m2) |
-| V9-02 | 参考信号诊断 | 记录输出量级、非有限值、常数与容差覆盖；至少一组合法实例有信息量。 | `kb_workflows/numerics/numerical.py` | [M2](MOTIVATION.md#m2) |
-| V9-03 | 合法输入族与隐藏形状 | 限定17题的耦合维度、符号、近常数、动态范围、边界、GELU辨别输入及最终非连续stride。 | `kb_workflows/evaluation/strict_validation.py` | [M2](MOTIVATION.md#m2) |
-| V9-04 | 模式状态与同对象缓存检查 | 审计train/eval、同名buffer、参数原地更新与同对象输入修改后的响应。 | `kb_workflows/evaluation/strict_validation.py` | [M2](MOTIVATION.md#m2) |
-| V9-05 | 进程设置审计 | 记录并恢复候选导入和执行修改的后端、默认dtype、线程和环境变量；收据不含环境变量值。 | `kb_workflows/evaluation/strict_validation.py` | [M2](MOTIVATION.md#m2) |
-| V9-06 | 逐项证据等级 | 实现current/L0/L1/L2要求、逐字段状态、缺工具值为null；按真实检查决定达到的等级。 | `kb_workflows/evaluation/evidence.py` | [M5](MOTIVATION.md#m5) |
-| V9-07 | 严格评分门与协议隔离 | 显式严格模式下，未适配题、失败检查和缺失收据拒绝资格；后端设置与等级参与任务及比较指纹。 | `kb_workflows/analysis/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
-| V9-08 | 样本聚合消融 | 对同一批声明槽位计算mean、median、best-of-N，保留失败零分和成本记录，正式分数不变。 | `kb_workflows/evaluation/aggregation.py` | [M3](MOTIVATION.md#m3) |
-
-通过`--strict-validation`或`--evidence-level L0`启用；L1/L2会要求尚未实现的设备证据，缺失时不给相应等级或评分资格。未适配题在严格模式下明确失败，不退回旧容差冒充严格通过。详细契约、误差公式、范围及等级定义见[严格验证](STRICT_VALIDATION.md)。
-
-验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **368项CPU/模拟回归通过**，较第八版新增81项。17道实际参考分别以FP32、FP16、BF16执行小规模FP64及隐藏形状检查；反例覆盖BF16计算冒充FP32、GELU近似、单元素错误、缓存、参数更新、BN状态、进程设置恢复、极端量级RMS溢出、首轮原生评测篡改、评分收据缺失/伪汇总和轻量预检。Ruff、168包依赖一致性、motivation覆盖、本地链接与独立wheel轻量加载通过。真实GPU、GPU阈值校准和模型实验未执行；搁置的stash没有恢复。
-
-## 第十版：交替计时、独立最终重测与扩展基线
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add paired timing and independent frozen-source remeasurement |
-| 基础提交 | `bcab5645b8e0dbad3937226706fb405e316ef1f2` |
-| 日期 | 2026-10-21 |
-| 状态 | 已提交；404项CPU/模拟回归通过；真实GPU验收仍待完成 |
-
-本版交付R-11/12的代码并推进R-13，继续保持全部23项设计目标。新增机制可配置，不修改未启用它们的既有计分口径；当前设备相关结论仍需真实GPU验收。
-
-| 编号 | 功能 | 变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V10-01 | 交替计时与噪声对照 | 同进程平衡参考/候选/参考控制顺序，逐次验证输出，按重复进程与配对样本重采样估计倍率区间。 | `kb_workflows/evaluation/paired_task.py` | [M3](MOTIVATION.md#m3) |
-| V10-02 | 冻结后独立最终重测 | 冻结源码按新种子在独立任务重测标准和隐藏正确性，保留全部重复，正式分数使用重测而非最快重复。 | `kb_workflows/evaluation/final_verification.py` | [M3](MOTIVATION.md#m3) |
-| V10-03 | 扩展基线组合与可信改写 | 增加compile default/max-autotune各自Graph组合；3道归一化题增加源码指纹约束的框架等价改写。 | `kb_workflows/evaluation/baseline_variants.py` | [M3](MOTIVATION.md#m3) |
-| V10-04 | 附加证据与旧评分门 | 最终和交替测量必须匹配当前源码/基线/配置，收据文件及冻结内容参与旧评分资格复核。 | `kb_workflows/common.py` | [M3](MOTIVATION.md#m3) |
-| V10-05 | 重测恢复与失败分母 | 恢复保留未变样本的新种子和完成记录，仅源码改变的样本重跑；独立重测失败进入正确性pass@k分母。 | `kb_workflows/evaluation/final_verification.py` | [M5](MOTIVATION.md#m5) |
-
-新增`baseline_portfolio = "extended"`、`paired_timing = true`、`paired_trials = 30`、`final_repeats = 2`。交替计时要求已验证的组合基线；普通四变体组合仍默认。最终重测和交替计时不向agent返回隐藏反馈。原有均值槽位聚合保留，重测使用全部新进程样本，并保留原冷成本点估计。完整流程、假设和输出见[配对与最终计时](PAIRED_TIMING.md)。
-
-另外修正严格验证将受信任的`TORCH_USE_CUDA_DSA`编译设置误记为候选修改的风险：设置在进入候选审计之前完成。实际候选的首次导入/执行修改仍受审计。
-
-验证：Python 3.12.12 / Torch 2.12.0 / Harbor 0.24.0 / mini-swe-agent 2.4.6 下 **404项CPU/模拟回归通过**，新增36项。覆盖六种顺序平衡、输入准备排除、数值错误拒绝、噪声控制、重复进程bootstrap、3个真实参考改写、扩展任务/Graph编排、冻结来源与种子、仅变更样本恢复、最终失败门、附加收据和旧资格篡改拒绝、Harbor预算与reward。Ruff、来源/文档检查及离线wheel独立轻量导入通过。Slurm作业50703（taurus）和50704（aries）在即时申请窗口返回`Requested nodes are busy`，未运行GPU；不能据此声明CUDA Graph、真实计时或GPU隔离已验证。之前stash保持原样。
-
-## 第十一版：设备模型与Headroom评分
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add device calibration and certificate-gated headroom scoring |
-| 日期 | 2026-10-21 |
-| 基础提交 | `b0d4b09` |
-| 状态 | 已提交；只进行CPU/模拟回归，按用户要求不运行任何实验 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V11-01 | 设备校准接口与原始收据 | 提供显式设备探针与cache flush/time接口，绑定物理UUID、驱动、软件和评测器，重算原始样本速率；本轮只实现不运行校准 | `kb_workflows/analysis/calibration.py` | [M3](MOTIVATION.md#m3) |
-| V11-02 | 工作量证书与独立可达性见证 | 核对参考源码、输入、精度和校准；D标签要求算法说明与至少两次独立标准/隐藏记录，历史暂定标签不能代替证书 | `kb_workflows/analysis/headroom.py` | [M3](MOTIVATION.md#m3) |
-| V11-03 | Headroom评分与证据失效 | 按SOL_target归一稳态收益，缺证书置零并保留固定分母；另报摊销bounded gain，外部规格/校准修改使旧资格失效 | `kb_workflows/analysis/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
-| V11-04 | 设备时间并集与性能解释 | 计算重叠活动并集与kernel数，来源未知不猜测；缺工作计数器时A/E为null，启动收益须有测量解释，暂为诊断 | `kb_workflows/analysis/performance.py` | [M3](MOTIVATION.md#m3) |
-| V11-05 | Verifier配置与精度设置恢复 | 可信规格和校准只进入Harbor verifier；开发子任务保留原评分模式；补齐半精度归约开关恢复与修改审计 | `kb_workflows/runtime/harbor.py` | [M5](MOTIVATION.md#m5) |
-
-默认评分保持不变；显式选择 `score_mode = "headroom"` 并提供可信规格和校准收据后，使用论文分母计算稳态分数。原K摊销bounded gain另报。达到的微基准速率是设备模型依据，不包装成物理上限证明。缺证书、输入/设备/精度不匹配及独立见证失败不能计分；低于模型估计只提示核查。完整格式与边界见[Headroom评分说明](HEADROOM_SCORING.md)。
-
-验证：Python 3.12.12 / Torch 2.12.0 下446项CPU/模拟回归通过，其中42项为本版新增。覆盖校准调度和CUDA events调用顺序的模拟、原始数据/驱动/UUID/版本绑定、SOL资源最大值、证书与D独立见证、持久化评分与外部证据失效、Harbor可信文件分离、区间并集与未知计数器。Ruff、动机表、本地文档链接与离线wheel轻量导入检查通过。
-
-本版未运行GPU/Trainium校准、模型生成、训练或科研实验。设备收据与实验结果维持未采集；后续实现按同一范围推进。来源归因和实际硬件计数器采集仍未完成；A/E不会填造数值。之前stash保持不变。
-
-## 第十二版：生产题族、逐角色精度与反向轨道
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add production task families with role-aware inputs and backward tracks |
-| 日期 | 2026-10-21 |
-| 基础提交 | `d2594bd` |
-| 状态 | 已提交；CPU/模拟回归，不运行科研实验 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V12-01 | Production-41参数化题集 | 独立Level 5增加12设计、6数值设计、12固定格式与11反向任务，保留旧250题及旧Level 4模型 | `kb_workflows/benchmarks/production_specs.py` | [M1](MOTIVATION.md#m1) |
-| V12-02 | 独立反向轨道与梯度参考 | 11个VJP参考支持外层no_grad下执行；FP64 gradcheck和方向有限差分核对梯度，轨道分别选题与评分 | `kb_workflows/benchmarks/production_ops.py` | [M1](MOTIVATION.md#m1) |
-| V12-03 | 逐输入角色的dtype契约 | 保留FP32缩放、bool mask与离散索引，支持FP8存储/packed INT4及E2M1软件量化；有效精度写入任务而非统一强转 | `kb_workflows/production.py` | [M1](MOTIVATION.md#m1) |
-| V12-04 | 显存计划与合法隐藏实例 | 按声明包络及设备容量确定性缩放并保存计划，私有尺寸/stride/动态范围/分页/mask及归一化近常量遵守输入域 | `kb_workflows/production.py` | [M2](MOTIVATION.md#m2) |
-| V12-05 | 生产题数值预算与零答案门 | 所有41题使用相对RMS及逐元素比较，六个数值设计预算独立；逐题验证全零反例，参考比较与独立FP64自资格明确区分 | `src/validation.py` | [M2](MOTIVATION.md#m2) |
-| V12-06 | 生产题全流程与来源恢复 | 选题/轨道贯穿原生与Harbor，prompt保留数学语义并移除生成器；生成参考与manifest可重建核对，协议参与恢复指纹 | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
-
-使用 `--suite production41 --level 5`，按 `--task-track design|numerical|implementation|backward` 选择独立轨道。`all`用于收集，混合分数只作诊断。small/standard/large与显存包络显式配置；角色格式、FP8及FP4的实现边界、隐藏实例和数值预算见[生产题说明](PRODUCTION_TASKS.md)。
-
-验证：Python 3.12.12 / Torch 2.12.0 下614项CPU/模拟回归通过，本版新增168项。覆盖全部41题的合法角色、支持dtype、隐藏奇数/stride/范围、全零反例、11个FP64 gradcheck与有限差分、10个独立Torch公式对照、pack/tie规则、显存缩放、原生失败分母及Harbor/轨道配置。生成文件一致性、Ruff、动机表、本地文档链接与离线wheel轻量导入检查通过。
-
-参考和原生/Harbor流程均已实现；GPU编译、计时、厂商最强baseline、原生FP4吞吐和可达性实验未运行，不能据此声称实机性能或完整L0资格。之前stash保持不变。
-
-## 第十三版：选集分析与预算研究工作流
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add evidence-bound selection studies and budget curves |
-| 日期 | 2026-10-21 |
-| 基础提交 | `caa7796` |
-| 状态 | 已提交；只运行CPU/模拟回归，不启动实验 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V13-01 | 研究结果的当前证据导出 | 重新核对当前源码与计分资格后导出固定槽位，合并互不重叠层级并拒绝复制运行冒充独立会话；不调用生成或评测 | `kb_workflows/analysis/study_data.py` | [M1](MOTIVATION.md#m1) |
-| V13-02 | 选集区分度与统计不确定性 | 支持并列秩Spearman、Kendall tau-b、差值/排名反转、任务/会话/样本bootstrap与显式二元power假设；常量相关为null，不假称旧排名已复现 | `kb_workflows/analysis/study_statistics.py` | [M1](MOTIVATION.md#m1) |
-| V13-03 | 多预算多会话与通用agent计划 | 生成原生one-shot/反馈及Harbor coding-agent网格，保留真实候选限制；默认不执行，显式执行时经过原生配置校验与resume | `kb_workflows/analysis/study_plan.py` | [M4](MOTIVATION.md#m4) |
-| V13-04 | 得分预算曲线与共同区间AUC | 独立预算点保留失败分母与非单调结果，区间覆盖任务/会话/样本；未知成本不免费，AUC不外推或取最好历史 | `kb_workflows/analysis/budget_curves.py` | [M4](MOTIVATION.md#m4) |
-| V13-05 | 缓存与外部agent用量核算 | 补总token和样本执行时间，区分Claude与Harbor cache口径；多步缺项保持未知，外部agent收据绑定结果文件，不冒充GPU账单 | `kb_workflows/agents/agent_models.py` | [M4](MOTIVATION.md#m4) |
-| V13-06 | 研究CLI与静态图导出 | 提供计划/选集/预算分析入口、可选Matplotlib静态图；分析实现单独指纹，残缺选集必须显式标记，文档与功能清单同步 | `scripts/analyze_budget_curves.py` | [M5](MOTIVATION.md#m5) |
-
-新增 `scripts.plan_study`、`scripts.analyze_selection` 和 `scripts.analyze_budget_curves`。计划默认不执行，分析只重算当前文件证据；研究用的任务/样本分母、方法/预算差异、遗漏选集与未知资源均显式保存。完整格式、假设和使用范围见[研究工作流](STUDIES.md)。
-
-验证：Python 3.12.12 / Torch 2.12.0 下644项CPU/模拟回归通过，本版新增30项；覆盖实际计分重算、来源失效、并列与全失败排名、分母/重复会话拒绝、曲线回落与AUC区间、真实CLI解析24个模拟job、Harbor/cache用量及Matplotlib静态导出。Ruff、动机表、文档链接和离线wheel轻量导入检查通过。
-
-本版没有运行模型/GPU/Trainium或训练实验，也没有补造原7模型数据或声称精确排名重现。token/设备时间硬上限仍未实现，估算费用和agent墙钟不等于GPU账单；之前stash保持不变。
-
-## 第十四版：资源预留、本地模型与预算证据
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Enforce auditable agent token reservations and development leases |
-| 日期 | 2026-10-21 |
-| 基础提交 | `511b1ab` |
-| 状态 | 软件实现与CPU/模拟回归；没有运行实验 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V14-01 | 调用前token预留与用量结算 | 本地总token与支持的API输出上限；请求前预留、已知用量返还、缺失或超额停机；不支持的后端拒绝配置 | `kb_workflows/agents/agent_models.py` | [M4](MOTIVATION.md#m4) |
-| V14-02 | 离线本地模型适配 | 精确chat template输入ID、单序列生成、禁止下载与远端代码、safetensors加载、模型及tokenizer内容绑定 | `kb_workflows/agents/local_model.py` | [M4](MOTIVATION.md#m4) |
-| V14-03 | 开发worker占用预留 | local/Docker父进程计时覆盖编译/验证/profiling与清理，预留清理时间；超额可见，不宣称纯GPU时间物理抢占 | `kb_workflows/agents/resource_budgets.py` | [M4](MOTIVATION.md#m4) |
-| V14-04 | 预算恢复与计分资格 | 限额样本只许一个可审计尝试；重算账本并绑定历史/汇总/源码/配置，改收据使新旧评分门失效 | `kb_workflows/analysis/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
-| V14-05 | token与设备占用预算网格 | 增加三种预留额度的研究计划与曲线横轴，按后端能力预检，其他预算继续分组；默认不执行 | `kb_workflows/analysis/study_plan.py` | [M4](MOTIVATION.md#m4) |
-
-配置、作用范围、未知用量处理与恢复规则见[资源预算](RESOURCE_BUDGETS.md)。R-18推进为部分实现；纯GPU busy时间硬限与远端可信取消仍待实现。不会把worker墙钟、模型token计数或客户端估算费用写成GPU账单。
-
-验证：Python 3.12.12 / Torch 2.12.0下681项CPU/模拟回归通过，本版新增37项；覆盖预留/返还/未知扣款、超额与不支持后端、最佳候选保留、模型资产变更、评分证据失效与预算网格。真实模型与设备实验均未运行，Ruff、动机表与文档链接检查通过。此前stash保持原样。
-
-## 第十五版：GRPO训练入口与奖励验证
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Integrate local GRPO with native terminal rewards and audit workflows |
-| 日期 | 2026-10-21 |
-| 基础提交 | `2ba12d6` |
-| 状态 | 软件实现与CPU/模拟回归；真实模型和训练实验未运行 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V15-01 | 冻结训练计划与持出划分 | 显式任务/源码/family划分、模型资产及实现指纹，公开参考沿用input-blind策略，默认不执行 | `kb_workflows/agents/rl_plan.py` | [M4](MOTIVATION.md#m4) |
-| V15-02 | 原生GRPO与标准开发工具 | 固定TRL 1.8.0，one-shot/反馈环境及候选选择，离线加载；持出题不进入训练callback | `kb_workflows/agents/rl_training.py` | [M4](MOTIVATION.md#m4) |
-| V15-03 | 分阶段小实例资格任务 | 新增qualify_small worker，在原尺寸分配与计时前运行审查契约；基线不合格时先停止模型加载 | `kb_workflows/evaluation/evaluate_task.py` | [M2](MOTIVATION.md#m2) |
-| V15-04 | 同题交替终局奖励 | 共享repeat种子、同设备UUID、独立进程交替重测；严格资格分与弱raw-speedup消融分开，失败保留零分 | `kb_workflows/agents/rl_rewards.py` | [M3](MOTIVATION.md#m3) |
-| V15-05 | 训练预算与checkpoint恢复 | 生成前预留group、中断仍扣额、checkpoint绑定文件/step/奖励历史，父进程墙钟监督包含清理 | `kb_workflows/agents/rl_training.py` | [M5](MOTIVATION.md#m5) |
-| V15-06 | 奖励重评分与可靠性审计 | 预声明案例、重复重评、ICC/排序/攻击接受率及公共最终差；缺检查与基础设施故障不冒充防攻击通过 | `kb_workflows/agents/rl_audit.py` | [M4](MOTIVATION.md#m4) |
-| V15-07 | 持出评测计划与CLI | 生成冻结checkpoint的原生持出任务/会话计划，提供计划、基线预检、训练、重评和离线审计命令 | `scripts/rl_workflow.py` | [M4](MOTIVATION.md#m4) |
-
-完整配置与限制见[RL工作流](RL_WORKFLOW.md)。默认只规划/预览；真实执行需要显式开关。本版不把TRL含工具观察的completion序列算成精确计费token，也不宣称纯GPU时间硬限、完整OS隔离或训练收益已经验证。
-
-验证：Python 3.12.12 / Torch 2.12.0下724项CPU/模拟回归通过，本版新增43项；实际原生评分处理模拟worker证据，覆盖坏候选分母、早停、交替种子、同设备检查、文件篡改、丢失账本、checkpoint恢复、TRL真实配置API、重评样本重排及持出权重冻结。未加载真实模型或运行训练；Ruff、动机表、文档链接和依赖检查通过。
-
-R-20推进为部分实现；候选算法证书加分和绑定训练来源的完整效果对照报告仍需完成。其余研究设计继续保留原状态，不以新增训练入口替代全部23项的验收。此前stash保持原样。
-
-## 第十六版：算法证书奖励与训练效果证据
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Bind RL policies to training lineage and reviewed scaling rewards |
-| 日期 | 2026-10-22 |
-| 基础提交 | `9ebca56` |
-| 状态 | 软件实现与CPU/模拟回归；真实模型、设备和训练实验未运行 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V16-01 | 显式尺寸实例与证据绑定 | Production-41维度覆盖、整除/显存检查；内容参与基线/冻结/评分/比较，私有隐藏实例保持独立 | `kb_workflows/production.py` | [M1](MOTIVATION.md#m1) |
-| V16-02 | 多尺寸算法证书 | 当前D/SOL审查绑定，至少5尺寸跨度16倍，固定源码/设备/变体，完整原生验证与配对斜率区间 | `kb_workflows/analysis/scaling_certificate.py` | [M3](MOTIVATION.md#m3) |
-| V16-03 | 有界证书奖励 | 默认关闭；仅资格通过且达到阈值的候选可请求，加分封顶1；失败和恒定倍率优化无算法加分 | `kb_workflows/agents/rl_rewards.py` | [M4](MOTIVATION.md#m4) |
-| V16-04 | 训练来源与父进程凭据 | 最终权重绑定计划、奖励文件、证书和实际优化路径；中断成本保留，nonce/锁拒绝旧完成记录及并发监督 | `kb_workflows/agents/rl_lineage.py` | [M5](MOTIVATION.md#m5) |
-| V16-05 | 预注册奖励对照与持出评测 | 固定两奖励组×全部种子、优化器/数据/预算与持出会话；当前lineage和权重匹配，缺少作业不缩小研究 | `kb_workflows/agents/rl_effectiveness.py` | [M4](MOTIVATION.md#m4) |
-| V16-06 | 按训练种子的效果分析 | 重算持出资格分，配对种子/分层任务区间与双侧检验；失败检查比例保留未知上下界，模拟数据不能支持正式效果 | `kb_workflows/agents/rl_effectiveness.py` | [M3](MOTIVATION.md#m3) |
-
-配置与运行规则见[RL工作流](RL_WORKFLOW.md)和[算法证书](SCALING_CERTIFICATES.md)。证书只支持有限审查区间；恒定倍数提速不等于斜率改进。各组相同声明额度不等于实际GPU busy时间相同，训练收益仍未测量。
-
-验证：Python 3.12.12 / Torch 2.12.0下743项CPU/模拟回归通过，本版新增19项。覆盖完整模拟尺寸扫描、恒定倍率反例、基线互不覆盖、证据变更失效、旧完成文件、恢复后优化路径、全部种子/会话/槽位保留及持出权重来源；模拟训练只生成模拟权重，不加载真实模型。Ruff、动机表、19份Markdown本地链接、177包依赖兼容性及离线wheel轻量导入检查通过。
-
-R-20的软件范围已补全，23项合计11项代码已实现、8项部分实现、4项待实现；其余设计继续推进。没有运行真实模型、GPU、Trainium、校准或训练实验，此前stash保持原样。
-
-## 第十七版：原生Neuron/NKI与设备适配接口
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add native Neuron evaluation through shared device adapters |
-| 日期 | 2026-10-22 |
-| 基础提交 | `e743d71` |
-| 状态 | 软件实现与CPU/模拟回归；未运行设备、校准、模型或训练实验 |
-
-| 编号 | 功能 | 具体变化 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V17-01 | 通用设备适配协议 | 同一caps/calibrate/flush/time/attribute接口，CUDA与Neuron两种实现，导入与预览不加载SDK | `kb_workflows/hardware/devices.py` | [M5](MOTIVATION.md#m5) |
-| V17-02 | Neuron配置与任务执行 | device节、独立worker解释器、core分配与LNC=1，接入原生标准/隐藏/最终及开发任务，拒绝CUDA环境混用 | `kb_workflows/hardware/neuron_worker.py` | [M5](MOTIVATION.md#m5) |
-| V17-03 | Neuron基线与配对重测 | eager/compile与4题源码绑定的框架库变体，复用最快正确基线、平衡配对与冻结重测；平台独立分组 | `kb_workflows/evaluation/baseline_variants.py` | [M3](MOTIVATION.md#m3) |
-| V17-04 | CPU FP64与输入角色保护 | 独立oracle留在CPU，逐次验证与双向调用保持模型状态/RNG；冻结NKI源码与环境，禁止FP8存储降级和CPU代理计分 | `kb_workflows/hardware/neuron_worker.py` | [M2](MOTIVATION.md#m2) |
-| V17-05 | Neuron校准与物理身份 | 序列号/core/驱动/SDK身份，原始copy与分dtype GEMM及启动代理；同步墙钟口径和未知cache明确保留 | `kb_workflows/hardware/neuron_device.py` | [M3](MOTIVATION.md#m3) |
-| V17-06 | 设备轨迹与每引擎诊断 | 收集框架trace/NEFF/NTFF及哈希，显式单位/窗口分析tensor/vector/scalar/DMA活动并集；不冒充工作计数器或host墙钟 | `kb_workflows/hardware/neuron_tables.py` | [M3](MOTIVATION.md#m3) |
-| V17-07 | NKI提示与coding skill | 保留ModelNew接口，提示现代NKI及native注册；skill复用设备配置和vendor解释器，客户端/验证器环境分开 | `kb_workflows/agents/generation.py` | [M4](MOTIVATION.md#m4) |
-
-使用方法见[Neuron/NKI说明](NEURON.md)。Production-41中40个可传输存储接口通过CPU前端回归，FP8存储题21显式拒绝；这不等于40题已在Neuron上运行或支持全部算子。原生后端是TorchNeuron 2.14的Beta接口，旧XLA产品、LNC=2和CUDA容器不是这一实现的运行环境。
-
-验证：Python 3.12.12 / Torch 2.12.0下823项CPU/模拟回归通过，本版新增80项。覆盖设备配置/分配、40题前端、4题库等价改写、CPU FP64、小实例资格、状态/RNG进度、模拟校准与profile、首次执行篡改、源码检查及Harbor完整摘要；原生SDK调用用模拟对象替代。Ruff、动机表、20份Markdown本地链接、skill校验、177包依赖兼容性及离线wheel轻量导入检查通过。没有安装或运行Neuron SDK及实机实验。
-
-R-21的软件范围已接入；23项当前为12项代码已实现、8项部分实现、3项待实现。来源归因、硬件计数器和正式归因门继续归R-16，隔离容器仍归R-23。此前stash没有恢复。
-
-## 第十八版：内存工具与题目级重复验证
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add optional memory tools and reviewed repeat consistency checks |
-| 日期 | 2026-10-22 |
-| 基础提交 | `ed4be46` |
-| 状态 | 软件实现与CPU/模拟回归；未运行工具、设备或模型实验 |
-
-本版交付R-10的软件实现，显式启用Compute Sanitizer和重复一致性检查。默认流程保持原配置；没有运行工具、GPU、Trainium、真实模型、校准或训练实验。详见[配置、证据和工具限制](TOOL_CHECKS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V18-01 | 四工具独立诊断流程 | 分别运行memcheck/racecheck/synccheck/initcheck，要求完成摘要与正调用覆盖，缺工具/日志或超时保持未知，工具范围含参考及框架 | `kb_workflows/evaluation/tool_runner.py` | [M2](MOTIVATION.md#m2) |
-| V18-02 | 模型快照与逐位重复验证 | 逐实例复制模型和输入并重放RNG，不推进原模型；每次保留原生精度门，记录输出位摘要，缺实例或快照不给通过 | `kb_workflows/evaluation/determinism.py` | [M2](MOTIVATION.md#m2) |
-| V18-03 | 审核绑定的原子操作策略 | 默认逐位一致，有限波动须有参考源码摘要、审核理由及非零界限；不放宽离散值、非有限值或原生精度 | `kb_workflows/evaluation/determinism.py` | [M2](MOTIVATION.md#m2) |
-| V18-04 | 原始工具证据与负结果恢复 | 绑定工具版本/二进制、逐进程日志、阶段nonce/源码/物理设备；重算派生结果，已记录失败可恢复，篡改收据失效 | `kb_workflows/evaluation/tool_checks.py` | [M5](MOTIVATION.md#m5) |
-| V18-05 | 诊断与性能采样分离 | 保留首次无插桩原生/配对样本与冷启动，诊断共用原请求预算；四工具全通过才给内存工具证据，L2另需重复一致性 | `kb_workflows/evaluation/tool_runner.py` | [M3](MOTIVATION.md#m3) |
-| V18-06 | 统一配置与跨流程指纹 | 配置可选工具/重复预算和题目策略；所有transport复用CLI，策略内容进入生成、最终冻结、比较、RL和旧评分指纹，Neuron拒绝CUDA工具 | `kb_workflows/config.py` | [M5](MOTIVATION.md#m5) |
-
-memcheck启用分配padding并禁用框架CUDA缓存；racecheck保留warning，不强制串行launch。四工具运行和最后的无插桩复核均不产生计分时间。重复检查使用独立模型/输入快照，默认逐位一致；审核的原子规约波动只影响重复策略，每次参考精度门继续执行。日志缺失、超时、无调用覆盖、模型无法快照、设备不匹配或收据被改均不能通过。该流程不证明所有竞态不存在，也不提供OS隔离或自写kernel来源认证。
-
-验证：Python 3.12.12 / Torch 2.12.0下875项CPU/模拟回归通过，本版新增52项。Ruff、动机覆盖、21份Markdown本地链接、skill校验、177包兼容性和离线wheel的15个轻量模块导入均通过。新增测试覆盖错误/警告、缺工具和日志、超时、设备/源码错绑、重封装后的缺项、逐位与有界原子策略、状态/RNG恢复、配对样本保留、CLI路由、策略指纹和Harbor导出。工具执行以模拟进程替代；真实子进程测试只运行CPU打印和受控超时。
-
-R-10的软件范围已接入；23项当前为13项代码已实现、8项部分实现、2项待实现。R-08来源归因与R-23隔离/重评分继续保留，其他部分实现项仍按动机表推进。此前stash没有恢复。
-
-## 第十九版：受限验证器与已有产物重评分
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add restricted verifier policies and frozen artifact regrading |
-| 日期 | 2026-10-22 |
-| 基础提交 | `2cbafd5` |
-| 状态 | 软件与CPU/模拟回归；未构建或运行真实容器、设备或模型实验 |
-
-本版交付R-23的软件范围，使用可选受限策略和默认只预览的产物重评分。配置、职责及实际SDK限制见[隔离与重评分](ISOLATION_REGRADE.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V19-01 | 受限验证器配置与镜像固定 | 显式CUDA/Docker受限策略，每请求把标签解析为不可变image ID；清空worker环境，使用非root、只读根和私有编译缓存，不把不支持的transport降格当作满足策略 | `kb_workflows/runtime/isolation.py` | [M5](MOTIVATION.md#m5) |
-| V19-02 | 实际权限与资源观察 | 核对前后Docker配置与Linux capability/no-new-privileges/seccomp、namespace和cgroup；单设备/主机资源有明确上限，缺观察不通过，不认证GPU独占或驱动逃逸安全 | `kb_workflows/runtime/isolation.py` | [M5](MOTIVATION.md#m5) |
-| V19-03 | 结果交接与容器清理 | 只读请求和独立结果目录，退出后只读有大小界限的普通JSON；拒绝symlink/FIFO/非有限值，确认删除自己创建的容器并处理create客户端超时 | `kb_workflows/runtime/restricted_transport.py` | [M5](MOTIVATION.md#m5) |
-| V19-04 | 隔离凭据进入评分与恢复 | 重算配置/结果摘要和原生观察，基线变体与标准/隐藏/最终/配对数据不能混用image；模拟凭据拒绝正式资格，保留诊断与原始计时分离 | `kb_workflows/analysis/paper_analysis.py` | [M2](MOTIVATION.md#m2) |
-| V19-05 | Harbor网络与只读验证器 | 独立verifier禁止联网，受限Compose隔离可写路径并复用bundled tests；agent执行使用显式host allowlist，实际SDK schema已校验，容器部署未运行 | `kb_workflows/runtime/harbor.py` | [M5](MOTIVATION.md#m5) |
-| V19-06 | 冻结候选的原生重评分 | 固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动 | `kb_workflows/runtime/regrade.py` | [M5](MOTIVATION.md#m5) |
-| V19-07 | 重评分来源与测量凭据 | 单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格 | `kb_workflows/runtime/regrade.py` | [M3](MOTIVATION.md#m3) |
-| V19-08 | Harbor产物重评分与默认预览 | 固定SDK/CLI/当前verifier及原trial/产物，用上游NopAgent重评分；核对隐式artifact覆盖、完整cohort和源码哈希，默认只生成计划/预览 | `kb_workflows/runtime/harbor_regrade.py` | [M5](MOTIVATION.md#m5) |
-
-原生受限策略只支持CUDA/Docker，明确拒绝其他transport的静默降格；Harbor采用独立外层限制及容器内观察，不把它等同原生host inspect收据。Linux策略与配置观察不提供完整安全认证；GPU独占、busy时间物理硬限和供应商计数器继续按对应设计追踪。已有结果不能因增加字段或改label变成新runtime测量。
-
-原生regrade冻结当前参考/隐藏源码、候选、历史记录与轨迹、新审核输入和完整槽位；新基线独立保存，缺失候选计入分母。Harbor使用实际0.24 regrade接口，验证SDK隐式artifact目录与逐trial源码派生。两个入口默认不启动实验，真实执行需要显式选项。模拟执行只能供审计，历史生成费用不被重新认证。
-
-验证：Python 3.12.12 / Torch 2.12.0下935项CPU/模拟回归通过，本版新增60项。Ruff、动机覆盖、22份Markdown本地链接、skill校验、177包兼容性和离线wheel的24个轻量模块导入均通过；安装的Harbor恢复源码与官方v0.24.0字节一致。回归覆盖权限/网络/cgroup、设备及挂载错绑、FIFO/symlink/报告界限、超时/清理、候选/历史/SDK/结果篡改、缺失槽位、零生成预览与实际Harbor Task/CLI/artifact覆盖契约。没有运行Docker、GPU、Trainium、模型或训练实验。
-
-23项当前为14项代码已实现、8项部分实现、1项待实现；来源归因R-08与其余部分实现项继续推进。此前stash保持原样，没有恢复。
-
-## 第二十版：CUDA执行来源诊断
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound CUDA execution origin diagnostics |
-| 日期 | 2026-10-22 |
-| 基础提交 | `d065a17` |
-| 状态 | 软件与CPU/模拟回归；未加载CUPTI或运行设备、模型实验 |
-
-本版开始实现R-08，交付CUDA/Triton直接launch的来源采集与独立诊断，支持范围及尚未完成的资格门槛见[设备来源诊断](KERNEL_ORIGIN.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V20-01 | 冻结候选源码与JIT身份 | 用实际内容哈希文件和保留代码对象加载候选，支持Triton源码检查与future导入；相同文件名或重新编译的相等对象不继承身份 | `kb_workflows/provenance/submission_source.py` | [M5](MOTIVATION.md#m5) |
-| V20-02 | CUDA编译产物与实际launch关联 | 可选CUPTI/Triton适配器关联实际cubin、模块/函数代次和成功launch；复制完整二进制摘要，卸载及句柄复用不继承来源 | `kb_workflows/provenance/cuda_origin.py` | [M2](MOTIVATION.md#m2) |
-| V20-03 | 来源时间并集与未知重放 | 逐调用重算保守自写时间占比，重叠活动只计一次，未知/Graph/内存活动不获自写信用；丢记录、错绑和模式变化不通过 | `kb_workflows/provenance/kernel_origin.py` | [M3](MOTIVATION.md#m3) |
-| V20-04 | 独立来源诊断与默认预览 | 独立公开输入worker保留请求/源码/设备/模式和逐次输出验证，CLI默认零设备预览；结果与日志不覆盖原实验 | `kb_workflows/provenance/origin_task.py` | [M5](MOTIVATION.md#m5) |
-| V20-05 | 来源诊断与正式资格边界 | R-08转为部分实现；库/Graph/Neuron和正式轨道门槛未完成，95%仅可配置诊断，不授予L1，不替换原生计时或声称算法/安全证明 | `docs/KERNEL_ORIGIN.md` | [M2](MOTIVATION.md#m2) |
-
-本版不向正式evidence写入kernel_origin通过凭据。CUDA Graph、可信库/框架二进制清单、Neuron来源关联和完整轨道资格继续实现；公开输入诊断不等于原生/隐藏完整覆盖。编译器源码身份与实际产物关联不能证明输出因果依赖、完整依赖闭包或未插桩执行相同路径。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,014项CPU/模拟回归通过，本版新增79项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性、离线wheel的23个轻量模块导入及本机供应商头文件C ABI核对均通过；ABI探针仅执行CPU代码，没有调用CUDA API。没有安装或加载CUPTI，没有运行GPU、Trainium、模型、容器或训练实验。
-
-23项当前为14项代码已实现、9项部分实现、0项尚未开始；R-08及其余部分实现项仍需继续完成，不代表23项全部完成。此前stash保持原样。
-
-## 第二十一版：可信库产物与CUDA Graph来源
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add wheel binary provenance and CUDA Graph origin diagnostics |
-| 日期 | 2026-10-22 |
-| 基础提交 | `143f158` |
-| 状态 | 软件与CPU/模拟回归；未运行CUPTI、cuobjdump、设备或模型实验 |
-
-本版继续R-08，补齐部分库/框架二进制、不可变Graph replay和原生内存操作关联。完整边界与命令见[设备来源诊断](KERNEL_ORIGIN.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V21-01 | 受信安装包与实际库二进制 | 候选导入前固定RECORD与逐文件哈希，只提取实际加载且前后身份一致的DSO；CUDA ELF字节匹配实际模块，缺工具/篡改/冲突/模拟不能建立库来源 | `kb_workflows/provenance/origin_binaries.py` | [M2](MOTIVATION.md#m2) |
-| V21-02 | CUDA Graph节点与执行快照 | 关联实际创建/克隆/instantiate的节点与函数代次，每次replay保存快照；源模板销毁不抹除既有执行，未知更新或可执行对象销毁不沿用旧来源 | `kb_workflows/provenance/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
-| V21-03 | 原生内存操作与双轨道诊断 | 成功原生copy/set及Graph节点记为runtime而非custom，逐调用分别给出自写和库轨道诊断；重叠并集与未知保留，正式资格仍未开放 | `kb_workflows/provenance/kernel_origin.py` | [M3](MOTIVATION.md#m3) |
-| V21-04 | CUPTI活动关联与原始提取记录 | 补齐DRIVER/RUNTIME activity生成correlation，运行时父关联唯一时才使用；二进制工具/日志按原字节绑定，兼容非UTF-8记录 | `kb_workflows/provenance/cuda_origin.py` | [M5](MOTIVATION.md#m5) |
-| V21-05 | 诊断容差与实际模式后置检查 | 导入前冻结配置容差，核对执行前后training/grad并记录恢复进程设置；协议v2要求后置观察，模式或环境改变保持未知 | `kb_workflows/provenance/origin_task.py` | [M2](MOTIVATION.md#m2) |
-| V21-06 | 来源任务进入队列验证入口 | 队列接收origin_audit并强制候选源码，验证器摘要包含新增入口；CPU请求校验覆盖预览生成的实际payload，不运行设备 | `kb_workflows/runtime/queue_worker.py` | [M5](MOTIVATION.md#m5) |
-
-库来源不是包名/路径推断：实际模块字节还必须匹配已验证DSO的CUDA ELF。库/框架同时有冲突身份时保留未知，不回退为自写。普通copy/set只有匹配成功原生API或Graph节点才记为runtime。custom门失败不修改数学正确性，库轨道允许已归因的非自写工作；两个结论目前都只是诊断，仍不授予L1或正式评分资格。
-
-CPP/其他loader、Graph更新后重新绑定、完整依赖闭包、Neuron和正式轨道资格继续实现；23项仍为14项代码已实现、9项部分实现。以前搁置的stash没有恢复。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,077项CPU/模拟回归通过，本版新增63项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性和离线wheel的26个轻量模块导入均通过。已静态读取当前环境32个受信库的RECORD条目，未导入Torch/CUPTI；Graph参数与本机供应商头文件的C ABI核对仅执行CPU代码，没有调用CUDA API。没有运行GPU、Trainium、模型、容器或训练实验。
-
-## 第二十二版：编译输入、依赖与产物来源
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Bind kernel provenance to observed compiler inputs and outputs |
-| 日期 | 2026-10-22 |
-| 基础提交 | `5ee0468` |
-| 状态 | 软件与CPU/模拟回归；未运行GPU、nvcc、ptxas或cuobjdump实验 |
-
-本版继续R-08，把实际编译输入和产物对应起来，避免只核对外层函数或装载后的可变对象。支持范围与尚未完成的路径见[设备来源诊断](KERNEL_ORIGIN.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V22-01 | 执行前冻结JIT文本与源码字面量 | 在执行候选前固定函数文本和保留代码对象，不依赖运行时inspect/linecache；记录完整字符串字面量供CUDA编译输入核对 | `kb_workflows/provenance/submission_source.py` | [M2](MOTIVATION.md#m2) |
-| V22-02 | 实际前端依赖与审核语言primitive | 观察真实AST解析和CodeGenerator调用，逐callee核对候选/语言源码与字节码和callable闭包；外层wrapper或builtin标签不代表完整来源 | `kb_workflows/provenance/triton_origin.py` | [M2](MOTIVATION.md#m2) |
-| V22-03 | 编译器产物及初始依赖冻结 | 在CUDA后端输出与真实构造器边界固定cubin、source、metadata和原始依赖收据；替换产物或事后洗白依赖无效，缓存/IR override缺证据不通过 | `kb_workflows/provenance/triton_origin.py` | [M2](MOTIVATION.md#m2) |
-| V22-04 | CUDA C++真实构建观察 | 核对Torch适配器RECORD、实际loader调用点、CUDA字面量、Ninja/source/object和工具/环境；未知header、编译wrapper或未完成构建不赋予来源 | `kb_workflows/provenance/cpp_origin.py` | [M5](MOTIVATION.md#m5) |
-| V22-05 | CUDA object回溯实际模块函数 | 只提取已核对CUDA object的cubin，再匹配实际模块和函数/launch；不是整个.so都算自写，未关联Runtime注册及模拟构建不能建立实测来源 | `kb_workflows/provenance/cpp_origin.py` | [M2](MOTIVATION.md#m2) |
-| V22-06 | 来源协议v3与实际SDK结构兼容 | 新增前端/产物必需凭据及真实GPUTarget结构摘要；CPU检查实际AST到MLIR与构造器，不调用GPU或编译工具，仍不授予正式L1 | `kb_workflows/provenance/kernel_origin.py` | [M5](MOTIVATION.md#m5) |
-
-Triton使用私有新缓存，必须观察到实际AST和编译器产物；初始依赖随构造器冻结，之后重新生成干净AST不能替换原始来源。真实GPUTarget作为dataclass按字段取摘要，避免正常metadata序列化失败。C++观察器接受当前审核范围内的完整CUDA字面量与构建路径，只授予已匹配CUDA模块/函数的object来源；opaque Runtime注册、动态生成文本和其他未适配输入仍为未知。
-
-当前凭据依赖受信worker/SDK，不提供任意解释器、native-memory攻击或输出因果关系的认证；两个轨道仍为诊断，不授予正式L1，不替换计时。23项仍为14项代码已实现、9项部分实现，其他范围继续实现。此前stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,117项CPU/模拟回归通过，本版新增40项。Ruff、动机覆盖、23份Markdown本地链接、skill校验、177包兼容性和离线wheel的28个轻量模块导入均通过。实际Triton前端到MLIR、真实CompiledKernel构造器与GPUTarget结构均有CPU回归；工具/设备启动在这些检查中禁止。其他编译/提取分支使用显式模拟。没有运行GPU、Trainium、模型、容器、nvcc、ptxas、cuobjdump或训练实验。
-
-## 第二十三版：状态映射与逐实例复核
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Audit mapped module state across native correctness cases |
-| 日期 | 2026-10-23 |
-| 基础提交 | `95671f1` |
-| 状态 | 软件与CPU/模拟回归；未运行设备、模型或容器实验 |
-
-本版继续R-07，状态复核可独立开启并覆盖实际原生验证实例，不要求该题已有17题中的FP64附加契约。接口、映射和当前范围见[状态审计](STATE_VALIDATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V23-01 | 声明式注册状态映射 | 支持重命名、融合切片、转置与不复制存储的reshape，核对值/元数据/共享关系；映射不能豁免状态比较 | `kb_workflows/evaluation/state_contract.py` | [M2](MOTIVATION.md#m2) |
-| V23-02 | 连续模式与累计状态检查 | 同一模型连续train/train/eval/train/eval，检查累计buffer、输出及training/grad后置状态，不只检查首次调用 | `kb_workflows/evaluation/state_contract.py` | [M2](MOTIVATION.md#m2) |
-| V23-03 | 零值参数与缓存失效探针 | 分别在train/eval预热后两轮修改同一参数存储；非零偏移覆盖全零参数，共享参数只修改一次，记录参考敏感性 | `kb_workflows/evaluation/state_contract.py` | [M2](MOTIVATION.md#m2) |
-| V23-04 | 原生逐实例状态复核 | 可选state_validation经过统一后端与Harbor，独立复核覆盖实际标准/隐藏输入，共享原请求预算，诊断不替换性能样本 | `kb_workflows/evaluation/state_audit.py` | [M5](MOTIVATION.md#m5) |
-| V23-05 | 状态快照与证据重算 | 拒绝共享模型/状态存储和改变快照值，逐例重算绑定摘要与模式/参数步骤；改容差/漏实例/模拟执行不能获得设备资格 | `kb_workflows/evaluation/state_contract.py` | [M2](MOTIVATION.md#m2) |
-
-配置为`--state-validation`或`[run] state_validation = true`，默认关闭；严格附加契约复用新版状态实现。状态与重复检查可以共用一次独立复核，只有原生未插桩样本进入评分。评分/恢复核对源码、配置、设备、nonce及逐实例收据，不接受遗漏实例或只改汇总。
-
-当前支持注册稠密Tensor/Parameter及声明式存储视图；未注册参考Tensor、任意对象状态、非线性重参数化和任务特定模式语义仍需适配，缺适配明确失败。23项保持14项代码已实现、9项部分实现；没有把此入口等同于250题已获完整状态资格。旧stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,180项CPU/模拟回归通过，本版新增63项；覆盖声明式映射/融合视图/共享权重、BN连续状态、零参数缓存、存储与梯度元数据替换、快照隔离、真实L2/L3参考的小尺寸CPU输入、逐原生实例收据、独立复核及Harbor配置。Ruff（工作流、测试和共享验证模块）、动机覆盖、24份Markdown本地链接、skill校验与177包依赖兼容性检查通过。离线wheel包含新增模块，轻量入口不导入设备SDK。没有运行GPU、Trainium、真实模型推理、容器或训练实验。
-
-## 第二十四版：独立数值参考与原生输入复核
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add independent L1 FP64 oracles and native-input numerical audits |
-| 日期 | 2026-10-23 |
-| 基础提交 | `2be301b` |
-| 状态 | 软件与CPU/模拟回归；未运行设备、模型或容器实验 |
-
-本版继续R-04/05，将数值检查从限定附加实例推进到原L1的实际原生输入。完整接口和范围见[原生输入数值复核](NUMERICAL_VALIDATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V24-01 | L1独立FP64算式与源码绑定 | 为原L1全部100题提供冻结源码/域/初始误差预算的CPU公式，不调用参考forward；原题不被改写，L2/L3缺适配不冒充覆盖 | `kb_workflows/numerics/operator_specs.py` | [M2](MOTIVATION.md#m2) |
-| V24-02 | 卷积与池化窗口参考 | 显式逐组空间收缩与转置散射，保留stride/dilation/padding/output padding；窗口池化保留ceil边界、分母与并列索引，不调用原融合算子 | `kb_workflows/numerics/operator_oracles.py` | [M2](MOTIVATION.md#m2) |
-| V24-03 | 数值语义与低精度自资格反例 | 归一化/attention/loss采用显式FP64公式并保留状态、标签、epsilon和精确激活语义；固定BF16抵消反例不能因候选等于参考而通过 | `kb_workflows/numerics/operator_oracles.py` | [M2](MOTIVATION.md#m2) |
-| V24-04 | 实际输入复核与内存准入 | 可选numerical_validation覆盖实际原生标准/隐藏输入，分配前核对主机内存估计包络；不缩小原尺寸，独立复核不替换性能样本 | `kb_workflows/numerics/numerical_audit.py` | [M5](MOTIVATION.md#m5) |
-| V24-05 | 参考结构与离散自资格修正 | 参考资格独立计算，oracle shape/结构/离散dtype不符时不能因没有数值叶子而通过；92题exclusive scan参考缺陷明确保留失败 | `kb_workflows/numerics/numerical.py` | [M2](MOTIVATION.md#m2) |
-| V24-06 | 数值与信号证据重算 | 核对逐原生实例、冻结规格/误差/内存政策、RMS限值、元素计数和信号叶子；源码漂移/缺项/模拟不能获得设备资格，配置贯穿Harbor及评分恢复 | `kb_workflows/numerics/numerical_audit.py` | [M2](MOTIVATION.md#m2) |
-
-通过`--numerical-validation`/`numerical_validation = true`开启，`oracle_memory_mb`默认4096 MiB，是分配前的估计准入包络，不是OS内存硬限。公开初始误差政策、源码和内存额度进入请求及恢复指纹；参考也须通过独立FP64门。没有自动调大容差、缩小原尺寸、修改计时输入或用诊断时间替代分数。
-
-原第92题exclusive cumsum的轴裁剪问题在本版被独立公式检出，原题文件及历史选集快照保持原样，数值资格明确失败。低精度参考也可能因抵消不合格；完整原250题适配、校准、输入修复/新基线及参考问题的有版本修正继续实现。23项仍为14项代码已实现、9项部分实现；旧stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,363项CPU/模拟回归通过，本版新增183项。覆盖原L1全部100题的小尺寸源码对照、独立融合路径禁用检查、FP16/BF16存储、归一化状态/仿射、池化及arg索引并列、参考shape缺陷、BF16抵消反例、内存准入、逐原生实例收据重算和组合复核/Harbor导出。Ruff（工作流、测试和共享验证模块）、动机覆盖、25份Markdown本地链接、skill校验和177包兼容性检查通过。离线wheel包含新代码及100题清单，轻量入口不导入设备SDK。没有运行GPU、Trainium、真实模型、容器或训练实验。
-
-## 第二十五版：参考修订与扫描输入契约
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Version scan reference repairs and preserve diagnostic contracts |
-| 日期 | 2026-10-23 |
-| 基础提交 | `6f2758c` |
-| 状态 | 软件与CPU/模拟回归；未运行设备、模型或容器实验 |
-
-本版继续R-04/06，修正第92题参考并为五类扫描增加合法隐藏形状，同时让新旧版本和诊断设置可区分。完整数据、语义和迁移规则见[参考修订](REFERENCE_REVISIONS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V25-01 | Exclusive scan参考有版本修正 | 沿声明轴补零/累加/裁剪，保留负轴、singleton与空轴shape；独立移位公式和旧错误反例同时核对，不改变名义计时尺寸 | `KernelBench/level1/92_cumsum_exclusive.py` | [M2](MOTIVATION.md#m2) |
-| V25-02 | 扫描输入族与原分布保留 | 五题追加奇数/非连续/rank-3/单元素/空轴，保留原3或4分布；乘积保持信号、mask保持bool，生成器不丢新增入口 | `kb_workflows/scan_cases.py` | [M2](MOTIVATION.md#m2) |
-| V25-03 | 任务修订与共享依赖绑定 | 记录参考/隐藏前后哈希、连续版本链和共享生成器；worker/队列执行前核对，新结果记录修订，评分恢复拒绝无当前修订的正结果 | `kb_workflows/benchmarks/reference_revisions.py` | [M5](MOTIVATION.md#m5) |
-| V25-04 | 选集运行快照升级与历史档案 | KernelBench-105清单v2保留250题身份/105主选/5探针/140扩展及seed，显式基底加修订；原研究CSV不重写为新结果 | `kb_workflows/benchmarks/suites.py` | [M5](MOTIVATION.md#m5) |
-| V25-05 | 空输出数值契约 | 合法空Tensor按结构/dtype检查，RMS及误差保留null，不编造测得零误差；空输出不能单独提供参考信号 | `kb_workflows/numerics/numerical.py` | [M2](MOTIVATION.md#m2) |
-| V25-06 | 诊断设置贯穿冻结与比较 | 统一状态/数值/内存/工具/重复选项，补齐早期摘要遗漏；修改开关或额度改变生成/最终冻结/研究/RL契约并分组报告 | `kb_workflows/evaluation/tool_checks.py` | [M3](MOTIVATION.md#m3) |
-| V25-07 | 修订任务跨入口回归 | CPU核对轴/空边界/精度提升、实际隐藏入口、队列与全部dispatch阶段、Harbor私有文件及旧证据拒绝，不运行设备实验 | `tests/benchmarks/test_reference_revisions.py` | [M5](MOTIVATION.md#m5) |
-
-第92题参考已采用revision 2；89–93的隐藏契约均有版本与共享依赖哈希。名义计时尺寸不变，旧3/4种隐藏分布保留，新增5类扫描实例；空数值测量为null，仍要求非空参考信号。选集v2保留原角色和seed，历史研究档案保持原字节。旧通过结果不能直接变成新任务修订的通过。
-
-同时修正早期状态/数值选项未进入部分最终冻结和研究摘要的问题；不同检查开关或oracle内存额度不混排。23项保持14项代码已实现、9项部分实现；其余全题适配、输入校准与新基线继续实现，旧stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,530项CPU/模拟回归通过，本版新增167项。覆盖正/负轴与空轴、六类dtype/提升、五题隐藏入口与三种精度、FP64参考、旧轴裁剪反例、当前/历史10份源码哈希、修订链/共享依赖/类型绕过、全部dispatch阶段、Harbor与评分恢复；状态/数值/内存设置改变会修改冻结、研究、生成及真实非执行RL计划契约。Ruff（工作流、测试、共享验证、隐藏生成脚本及5个隐藏文件）、动机覆盖、27份Markdown本地链接、skill校验和177包兼容性检查通过。离线wheel包含修订表与共享生成器，轻量入口无设备SDK导入。没有运行GPU、Trainium、真实模型、容器或训练实验。
-
-## 第二十六版：参考输入校准与强数值新基线
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add reference-only input calibration and qualified timing cohorts |
-| 日期 | 2026-10-23 |
-| 基础提交 | `dd4ced8` |
-| 状态 | 软件与CPU/模拟回归；按用户要求未运行设备、模型或容器实验 |
-
-本版继续R-05，将参考信号诊断衔接到可选的名义值分布选择、新基线和逐输出强数值检查。完整范围及操作见[输入校准](INPUT_CALIBRATION.md)。没有生成真实校准文件。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V26-01 | 参考专用输入配方选择 | 按固定顺序与三个种子检查参考FP64资格、信号和探针变化，保留失败尝试，不加载候选或采集速度 | `kb_workflows/numerics/input_calibration_task.py` | [M2](MOTIVATION.md#m2) |
-| V26-02 | L1角色保持的值分布 | 100题适配保留shape/stride/离散角色；乘积随机有界前缀、概率与三角结构受约束，隐藏工厂不套用名义配方 | `kb_workflows/numerics/input_profiles.py` | [M2](MOTIVATION.md#m2) |
-| V26-03 | 冻结强数值政策与逐输出复核 | 绝对误差项收紧为零且不放宽原预算，参考和候选均须通过独立FP64；首基线、warmup及每个计时输出在计时外核对 | `kb_workflows/numerics/input_calibration.py` | [M2](MOTIVATION.md#m2) |
-| V26-04 | 新基线与恢复证据 | 输入记录进入基线指纹，缺当前配方、执行设备、工厂调用或逐输出检查数不能恢复/评分，旧分布基线须重测 | `kb_workflows/engine.py` | [M3](MOTIVATION.md#m3) |
-| V26-05 | 多设备分布复用与实测身份 | 分别记录校准设备和执行设备；复用配方须在本设备再次数值资格，不借用性能或可达性证据 | `kb_workflows/numerics/input_calibration.py` | [M5](MOTIVATION.md#m5) |
-| V26-06 | 校准文件贯穿冻结与任务桥接 | 文件内容进入最终冻结、研究/RL及重新评分；单题子任务和Harbor私有文件保持一致，公开提示词说明分布及政策 | `kb_workflows/agents/generation.py` | [M5](MOTIVATION.md#m5) |
-| V26-07 | 轻量校准预览与准入回归 | 默认预览无SDK/输入/目录副作用，执行显式开启；内存超限在变换/公式前拒绝，CPU反例覆盖证据删改及所有计时输出 | `scripts/calibrate_inputs.py` | [M5](MOTIVATION.md#m5) |
-
-只校准原L1名义输入值分布，不改变尺寸、stride、离散角色或模型超参数；固定误差预算不被放宽。配方可跨设备复用，但当前设备须独立数值资格。隐藏分布独立保留。旧基线不能沿用新分布的资格；文件内容及执行证据贯穿冻结、比较与恢复。
-
-这不是从设备误差分布拟合阈值，也没有完成L2/L3全部适配。23项仍为14项代码已实现、9项部分实现；R-05保持部分实现。旧stash未恢复或修改。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,660项CPU/模拟回归通过，本版新增130项。覆盖100题角色/结构保持、长乘积三类dtype与随机信号、固定顺序与失败尝试、候选隔离、收据删改/数值非有限字段、跨模拟设备分布复用、实际基线入口及所有计时输出复核、主机内存准入、旧基线拒绝、队列与Harbor私有文件。Ruff、185项动机映射、28份Markdown本地链接、skill和177包兼容性检查通过；离线wheel包含新增模块及CLI，34个轻量模块导入无设备SDK。没有运行GPU、Trainium、真实模型、容器或训练实验。
-
-## 第二十七版：原L1算子隐藏输入与布局契约
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound L1 hidden input families and coverage replay |
-| 日期 | 2026-10-23 |
-| 基础提交 | `f56beee` |
-| 状态 | 软件、CPU/模拟及meta元数据检查；未运行设备或真实模型实验 |
-
-本版继续R-06，为原L1全部100题增加正确性输入，保留真实初始化及旧隐藏分布，并核对实际转换后的布局。完整边界见[算子专用隐藏输入](OPERATOR_INPUTS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V27-01 | 原L1真实初始化的隐藏输入族 | 100题使用参考实际参数构造合法形状/布局，LN固定normalized_shape及卷积通道/分组不替换，计时输入不变 | `kb_workflows/numerics/operator_cases.py` | [M2](MOTIVATION.md#m2) |
-| V27-02 | 算子边界、抵消与并列极值 | 矩阵耦合/结构、卷积池化空间、扫描mask/乘积、概率标签及attention独立处理，每种子632例且保留旧隐藏分布 | `kb_workflows/numerics/operator_cases.py` | [M2](MOTIVATION.md#m2) |
-| V27-03 | 显式非有限域与空数值测量 | 五种激活追加NaN/Inf及全NaN，传播严格匹配；全非有限叶子的RMS/误差为null，不能贡献参考信号 | `kb_workflows/numerics/numerical.py` | [M2](MOTIVATION.md#m2) |
-| V27-04 | 转换后保留正stride布局 | 修正dtype/device转换可能压紧切片的问题，将真实正stride与离散dtype送入候选及隔离副本 | `src/eval.py` | [M2](MOTIVATION.md#m2) |
-| V27-05 | 原生隐藏执行与覆盖复核 | CUDA及Neuron共同追加案例，逐例记录有效输入/种子/双向调用；评分恢复拒绝漏例、改布局、重复标签或缺记录 | `kb_workflows/numerics/operator_input_policy.py` | [M5](MOTIVATION.md#m5) |
-| V27-06 | 输入内存准入与全流程冻结 | 默认256MiB输入估计在分配前检查，超限不缩尺寸；计划和额度贯穿队列、生成、Harbor、最终冻结及研究比较 | `kb_workflows/config.py` | [M5](MOTIVATION.md#m5) |
-| V27-07 | 参考近常量失格证据保留 | BN/IN固定CPU FP32反例超过既定FP64预算，保留已知问题与失败；来源变化的旧结果在分析时明确失效 | `kb_workflows/numerics/operator_oracles.json` | [M2](MOTIVATION.md#m2) |
-| V27-08 | 全L1元数据与原生入口回归 | 真实100题初始化meta检查及CPU算式、私有seed、NaN信号、Neuron模拟、评分/RL/恢复收据回归，不运行设备实验 | `tests/numerics/test_operator_inputs.py` | [M5](MOTIVATION.md#m5) |
-
-100题每种子632例，默认三个种子，覆盖奇数/另一形状/正stride/近常量/动态范围/边界及适用算子的抵消、并列和非有限值。校准名义配方不覆盖隐藏输入，计时尺寸不变。原隐藏源文件与修订档案保持原字节，新追加规则采用显式协议和评测器绑定；缺完整案例证据不能通过。
-
-BN/IN新增CPU FP32失格反例保留，不放宽预算。全非有限输出只能证明精确传播，误差为null且不提供参考信号。23项仍为14项代码已实现、9项部分实现；L2/L3等余项继续实现。旧stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下1,894项CPU/模拟及meta回归通过，本版新增234项。包含100题真实初始化的meta形状检查、全部新增族的小尺寸CPU独立公式对照、三精度非有限传播、固定参考失格、私有种子/RNG隔离、原生隐藏与Neuron模拟入口、逐例布局/调用/内存收据删改、冻结/评分/恢复/RL和旧来源拒绝。Ruff、193项动机映射、29份Markdown本地链接、skill及177包依赖检查通过；离线wheel包含新模块和域清单，36个轻量模块导入无设备SDK。没有运行GPU、Trainium、预训练模型、容器或训练实验。
-
-## 第二十八版：原L2复合算子的独立数值参考
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound L2 composite FP64 arithmetic and replay receipts |
-| 日期 | 2026-10-23 |
-| 基础提交 | `1d5ae34` |
-| 状态 | 软件、CPU小配置与meta回归；未运行设备或真实模型实验 |
-
-本版继续R-04，将独立数值控制从原L1扩至原L2全部100题，合计200题。完整随机语义、资源和未完成范围见[复合数值参考](COMPOSITE_NUMERICS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V28-01 | 全部L2来源绑定的复合程序 | 100题冻结参考SHA、图节点、构造属性、状态形状与随机节点；构造变化或未知算术不回退到参考forward | `kb_workflows/numerics/composite_oracles.py` | [M2](MOTIVATION.md#m2) |
-| V28-02 | 复合层独立FP64算式 | Linear/卷积/池化/归一化/激活显式CPU公式，保留GELU近似、inplace别名及原dtype常量舍入，不调用融合数值forward | `kb_workflows/numerics/composite_math.py` | [M2](MOTIVATION.md#m2) |
-| V28-03 | 原生随机掩码条件下的数值参考 | Dropout保持实际模式，以原dtype/shape/stride/device和seed重放掩码；FP64算式独立计算数值，外部RNG恢复 | `kb_workflows/numerics/composite_oracles.py` | [M2](MOTIVATION.md#m2) |
-| V28-04 | 复合收据与缺项拒绝 | 逐例复核冻结程序、节点、采样模式/概率/布局/计数/摘要，缺失随机证据或图身份不匹配不能取得数值资格 | `kb_workflows/numerics/composite_specs.py` | [M5](MOTIVATION.md#m5) |
-| V28-05 | meta状态副本与分配前准入 | 不先复制真实GPU权重，先汇总meta输入/状态/节点元素估算主机包络，超限不执行FP64或采样也不缩题 | `kb_workflows/numerics/composite_oracles.py` | [M5](MOTIVATION.md#m5) |
-| V28-06 | 独立数值入口扩至L1及L2 | numerical_validation支持原200题实际标准/隐藏输入，Source/程序/额度贯穿现有请求与部署；L3仍拒绝泛化fallback | `kb_workflows/config.py` | [M5](MOTIVATION.md#m5) |
-| V28-07 | 零信号复合参考问题保留 | 83题min后clamp在固定参数下恒零，数值相等不能恢复reference_signal；源文件与总体不变，不放宽误差 | `kb_workflows/numerics/operator_oracles.json` | [M2](MOTIVATION.md#m2) |
-| V28-08 | 全L2数学与名义形状回归 | 100题小配置CPU数值与原构造/名义shape的meta检查，禁用融合forward、两类低精度、随机收据及准入反例 | `tests/support/_composite_cases.py` | [M5](MOTIVATION.md#m5) |
-
-冻结程序绑定真实初始化构造和状态形状，FP64数值解释不调用原融合层forward；FX的Python符号执行与meta层forward明确单列。Dropout复用原生随机掩码，其真实设备重放未做实验验证，不声称独立于框架随机原语。原L2第83题恒零参考保持信号失格。正式任务不使用CPU单测的小配置。
-
-原性能样本、计时尺寸及旧题源文件不被替换。L3、L2/L3配方、逐设备阈值与更完整计时/来源资格继续实现，23项仍为14项代码已实现、9项部分实现；旧stash未恢复或修改。
-
-验证：Python 3.12.12 / Torch 2.12.0下2,149项CPU/模拟/meta回归通过，本版新增255项。覆盖全部100题小配置独立数值与真实初始化/名义shape元数据、20道代表题禁用原数值forward、FP16/BF16、随机收据删改、inplace别名、原dtype常量舍入、正式构造拒绝小配置、主机准入和SDK轻量预览。6条warning保留，包括原2/28非仿射IN的通道提示与环境driver提示。Ruff、201项动机映射、30份Markdown本地链接、skill与177包依赖检查通过；离线wheel包含新程序/数据，37个轻量入口无设备SDK导入。未运行GPU、Trainium、预训练模型、容器或训练实验。
-
-## 第二十九版：L2/L3隐藏输入族与旧输入角色修订
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound L2/L3 hidden input families and repair legacy roles |
-| 日期 | 2026-10-23 |
-| 基础提交 | `f88155d` |
-| 状态 | 软件、CPU小输入、meta及模拟回归；不运行设备或模型实验 |
-
-本版继续R-06，为剩余150题冻结合法输入角色与形状，原250题每种子共1,529例附加隐藏输入。完整范围及例外见[隐藏输入](OPERATOR_INPUTS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V29-01 | L2融合输入族与残差耦合 | 全100题追加600例每种子；固定学习特征，改变batch/合法空间，保留LayerNorm末轴及转置卷积残差耦合 | `kb_workflows/numerics/model_input_families.json` | [M2](MOTIVATION.md#m2) |
-| V29-02 | L3序列状态与固定形状规则 | 50题追加297例，RNN/LSTM/GRU同步输入与状态batch轴，attention/NetVLAD变序列；三题显式保留构造约束 | `kb_workflows/numerics/model_input_cases.py` | [M2](MOTIVATION.md#m2) |
-| V29-03 | 旧概率和浮点标签语义修订 | 98题改温度归一化，100题仅缩放预测且保留结构化标签，槽位/参考/计时尺寸不变；前后哈希与生成器同步 | `kb_workflows/benchmarks/reference_revisions.json` | [M2](MOTIVATION.md#m2) |
-| V29-04 | 全题逐例隐藏覆盖门 | 250题共用原生与Neuron入口；逐seed/双向调用/内存/布局缺项拒绝，正结果不能借摘要恢复 | `kb_workflows/numerics/operator_input_policy.py` | [M2](MOTIVATION.md#m2) |
-| V29-05 | 形状精度独立重放与来源预检 | L2/L3从冻结清单重建实际shape和dtype，CLI/生成/队列/Harbor绑定同计划，轻量入口无设备SDK | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
-| V29-06 | 全模型元数据与域迁移反例 | 原150工厂/初始化meta检查，CPU隐藏/独立数值与Neuron模拟，缺例/改尺寸/改dtype、超限分配和生成器域回归 | `tests/numerics/test_model_input_cases.py` | [M5](MOTIVATION.md#m5) |
-
-L3/33的普通hidden属性、48/49的A/B/C参数固定部分尺寸，不通过替换状态或broadcast缩题；仍测试值和布局。Mamba两题输入估计需2,048 MiB，默认256 MiB会明确拒绝，不会跳过后通过。meta证明本版Torch形状推导，不证明后端、数值或设备资格。
-
-复合/序列算法更专门的饱和、抵消、极值和存储别名实例仍需补齐，R-06保持部分实现；23项仍为14项代码已实现、9项部分实现。L3独立数值、L2/L3校准及其他余项继续，旧stash未恢复或修改。实验按用户要求不运行。
-
-验证：Python 3.12.12 / Torch 2.12.0下2,469项CPU/模拟/meta回归通过，本版新增320项；9条warning保留原IN通道、Transformer/meshgrid与driver提示。JSON编码格式整理后另有145项修订/冻结/RL/集成检查通过。150题原构造及全部族仅做meta检查；小输入原生隐藏、L2独立数值、Neuron模拟和旧角色生成器检查通过。Ruff、207项动机映射、34份Markdown的844个本地链接、skill及177包依赖检查通过；离线wheel包含新模块/清单，18个安装后轻量入口未导入设备SDK。没有运行GPU、Trainium、预训练模型、容器或训练实验。
-
-## 第三十版：独立候选分配预填充检查
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add isolated candidate allocation poisoning controls |
-| 日期 | 2026-10-23 |
-| 基础提交 | `f25a3eb` |
-| 状态 | 软件、CPU与模拟回归；不运行GPU/Trainium或模型实验 |
-
-本版继续R-09，增加显式`allocation_validation`选项。两个独立正确性进程覆盖观察到的候选分配，保持原性能数据与算法政策。完整边界见[分配检查](ALLOCATION_VALIDATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V30-01 | 双模式候选分配预填充 | 浮点/复数NaN配合另一确定值，整数与bool用两端值，防止未写入输出碰巧符合参考 | `kb_workflows/evaluation/allocation_audit.py` | [M2](MOTIVATION.md#m2) |
-| V30-02 | 导入构造与实际调用作用域 | 覆盖候选模块全局缓存、构造缓存及逐原生双向调用；参考/输入工厂不预填，不强制确定性算法 | `src/reliability.py` | [M2](MOTIVATION.md#m2) |
-| V30-03 | 连续扩容前缀保护与未知存储 | resize增长只填新逻辑尾部；非连续增长/量化/不支持填充保留未知，meta存储量为null | `kb_workflows/evaluation/allocation_audit.py` | [M2](MOTIVATION.md#m2) |
-| V30-04 | 独立进程关闭缓存并同步报错 | 父进程设native allocator、无缓存与launch blocking，两种模式各自创建候选，后续直接复核；不替换原计时 | `kb_workflows/evaluation/tool_runner.py` | [M5](MOTIVATION.md#m5) |
-| V30-05 | 来源调用收据与冻结部署 | 复核模式/设备/来源/环境/导入构造/逐例seed-order，开关进入最终/研究/RL/Harbor合同，缺项不沿用正结果 | `kb_workflows/evaluation/tool_checks.py` | [M5](MOTIVATION.md#m5) |
-| V30-06 | 预填充反例与覆盖范围声明 | 多dtype/五种分配前端、部分写入和缓存、首模式碰撞、进程超时/改seed/设备及不支持路径CPU回归 | `tests/evaluation/test_allocation_audit.py` | [M2](MOTIVATION.md#m2) |
-
-默认关闭，CUDA后端显式开启；不把CPU模拟、零分配或未观察到错误视作完整GPU执行证明。原始allocator、其他线程、Graph及部分编译/扩展路径、吞吐对照仍待完成，R-09保持部分实现。23项仍为14项代码已实现、9项部分实现；旧stash保持原样。按用户要求不运行设备、模型或训练实验。
-
-验证：Python 3.12.12 / Torch 2.12.0下2,619项CPU/模拟/meta回归通过，本版新增150项；9条既有warning保留。覆盖12种dtype、五种分配前端、连续扩容保护、首模式碰撞、全局/构造缓存与部分输出、meta未知、环境恢复、模拟进程缺项/超时/改seed/设备、冻结与Harbor。Ruff（工作流、测试与共享调用）、src/eval.py既有诊断等价核对、213项动机映射、35份Markdown的866个本地链接、skill及177包依赖兼容性检查通过。离线wheel包含新模块与调用钩子，19个安装后轻量入口未导入设备SDK。未运行GPU、Trainium、真实模型、容器或训练实验。
-
-## 第三十一版：逐次同步与连续提交的吞吐对照
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add fresh-worker throughput contrast and performance review gates |
-| 日期 | 2026-10-23 |
-| 基础提交 | `3b968a5` |
-| 状态 | CPU队列/Neuron前端模拟与静态回归；不运行设备或模型实验 |
-
-本版继续R-09，增加默认关闭的`throughput_validation`及调用数、重复数和存储额度。完整流水线语义与限制见[吞吐对照](THROUGHPUT_VALIDATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V31-01 | 独立同步与连续提交进程 | 两个新公开正确性worker对照逐次屏障与N次连续提交，参考/候选交替顺序；原生时间不替换 | `kb_workflows/evaluation/tool_runner.py` | [M2](MOTIVATION.md#m2) |
-| V31-02 | 完整输出快照与复用缓冲区 | 两模式相同的消费和预分配快照复制成本，最终逐次核对结构/shape/dtype/device与数值，复用工作区仍保留各次输出 | `kb_workflows/evaluation/throughput_audit.py` | [M2](MOTIVATION.md#m2) |
-| V31-03 | 连续状态随机与执行政策 | 同工厂/输入字节/序列seed，模型连续推进不逐次重置；记录根模式/no_grad/线程并恢复环境与确定性设置 | `src/reliability.py` | [M2](MOTIVATION.md#m2) |
-| V31-04 | 名义元数据和存储准入 | 原尺寸meta输出推导后估算三组输入/两组快照/哈希及消费暂存，超限或不支持保留未知、不降N或换实例 | `kb_workflows/evaluation/throughput_audit.py` | [M5](MOTIVATION.md#m5) |
-| V31-05 | 吞吐差异复核与性能资格 | 按每轮10%阈值重算标记，标记不等于作弊；保存原生答案，未消除差异不获论文性能分且槽位不移除 | `kb_workflows/analysis/paper_analysis.py` | [M3](MOTIVATION.md#m3) |
-| V31-06 | 请求冻结与多后端私有部署 | 逐模式来源/设备/覆盖/seed/时间收据重放，选项进入最终/研究/RL/队列/Harbor；隐藏阶段不运行此诊断 | `kb_workflows/evaluation/tool_checks.py` | [M5](MOTIVATION.md#m5) |
-| V31-07 | 排队模拟与状态输出反例 | CPU虚拟排队验证最终完成屏障、合法摊销、缓冲区复用、随机/状态/结构化输出、篡改/超时及Neuron入口 | `tests/evaluation/test_throughput_audit.py` | [M2](MOTIVATION.md#m2) |
-
-诊断测量含快照消费，不能冒充原始forward均值。当前流消费契约、meta未知、CUDA launch blocking、存储包络和第二次屏障的边界明确记录。完整线程/stream/allocator/Graph与GPU来源/执行证据仍需补齐，R-09保持部分实现；23项仍为14项代码已实现、9项部分实现。旧stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下2,662项CPU/模拟/meta回归通过，本版新增43项；9条既有warning保留。覆盖排队屏障与合法摊销、逐输出/复用缓冲区、随机与连续状态、结构化/scalar/整数/bool快照、后续调用失效、根模式/梯度/线程/环境、存储拒绝、收据改动、论文性能门、私有Harbor与显式Neuron模拟。Ruff、src/eval.py既有诊断等价、220项动机映射、36份Markdown的889个本地链接、skill和177包依赖兼容性检查通过；离线wheel包含新模块及两后端钩子，20个安装后轻量入口不导入设备SDK。未运行GPU、Trainium、真实模型、容器或训练实验。
-
-## 第三十二版：实际输入的同对象更新与缓存检查
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound same-object input cache validation |
-| 日期 | 2026-10-23 |
-| 基础提交 | `cf64bd7` |
-| 状态 | CPU小输入、显式设备模拟与静态验证；不运行实验 |
-
-本版新增默认关闭的`cache_validation`与`cache_memory_mb`，完整机制见[同对象输入](INPUT_CACHE.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V32-01 | 全实际实例的同对象更新 | 独立worker覆盖原生公开/隐藏实例，三次复用Tensor身份并逐次验证输出，原计时保持 | `kb_workflows/evaluation/cache_audit.py` | [M2](MOTIVATION.md#m2) |
-| V32-02 | 来源绑定的合法值配方 | L1/L2/L3和生产41题保持几何/耦合与离散角色；公开继续可信工厂，隐藏不借公开配方 | `kb_workflows/evaluation/cache_recipes.py` | [M2](MOTIVATION.md#m2) |
-| V32-03 | 输入存储别名与几何恢复 | 隔离重复对象/正stride/offset/广播别名、分离计算图并原地复制；几何恢复记录且未知表示不通过 | `kb_workflows/evaluation/input_reuse.py` | [M2](MOTIVATION.md#m2) |
-| V32-04 | 连续状态与稳定输出快照 | 参考候选相同调用数和随机重放，不重置状态；立即快照复用输出，常量参考不误判作弊 | `kb_workflows/evaluation/cache_audit.py` | [M2](MOTIVATION.md#m2) |
-| V32-05 | 运行设置拒绝与组合诊断修复 | 导入/构造/原生/更新调用记录并恢复设置；修复状态收据覆盖父文档而破坏后续诊断 | `kb_workflows/evaluation/tool_checks.py` | [M2](MOTIVATION.md#m2) |
-| V32-06 | 存储准入和私有部署冻结 | 全底层存储和暂存估计先准入；源码/设备/原生覆盖/更新收据进入队列、Harbor及最终/研究/RL合同 | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
-| V32-07 | 全族回归与原始范围验收 | 小输入验证L1/L2/生产族、缓存反例及私有流程；R09按最初四项验收，不增加万能GPU证明条件 | `tests/evaluation/test_cache_audit.py` | [M5](MOTIVATION.md#m5) |
-
-R-09按最初四项设计验收，现为代码已实现；任意线程/Graph/完整GPU证明保持明确限制，执行来源和正式归因继续由R-08/R-16跟踪，不作为无限扩大的R-09验收条件。23项现为15项代码已实现、8项部分实现。实验按用户要求不运行，旧stash未恢复或修改。
-
-验证：Python 3.12.12 / Torch 2.12.0下2,934项CPU/模拟/meta回归通过，本版新增272项；保留10条框架/环境warning。覆盖全部L1/L2和生产41题的小输入配方、原生隐藏入口、对象/地址缓存反例、别名/stride/offset/广播、梯度与几何恢复、状态随机/复用输出、来源/额度/缺项篡改、父进程/Neuron模拟、组合状态与吞吐收据和私有Harbor。Ruff、src/eval.py既有诊断等价、227项动机映射、37份Markdown的907个本地链接、skill及177包依赖兼容性检查通过；离线wheel包含新增模块和两后端钩子，23个安装后轻量入口不导入设备SDK。没有运行GPU、Trainium、预训练模型、容器或训练实验。
-
-## 第三十三版：普通Tensor持久状态与逐题模式契约
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound ordinary tensor state and module mode checks |
-| 日期 | 2026-10-23 |
-| 基础提交 | `b9bc320` |
-| 状态 | CPU小输入、原构造meta与静态验证；不运行实验 |
-
-本版补齐R-07的普通状态和实际循环任务语义；全部291题使用来源绑定政策。接口、严格边界与两项循环规则见[状态检查](STATE_VALIDATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V33-01 | 稳定普通Tensor状态路径 | 按真实字典键/类型、列表位置和普通对象属性绑定，跳过注册参数的框架别名，不执行property | `kb_workflows/evaluation/state_paths.py` | [M2](MOTIVATION.md#m2) |
-| V33-02 | 循环模型逐题状态语义 | 源绑定L3/33持久hidden替换和放置，以及L3/41未使用初始化h0；候选可省略无用属性而不省输入 | `kb_workflows/evaluation/state_policies.py` | [M2](MOTIVATION.md#m2) |
-| V33-03 | 普通状态快照隔离与保真 | 普通状态值/路径/元数据与对象/重叠存储别名保真，deepcopy修复断开共享或重连失效缓存均拒绝 | `kb_workflows/evaluation/state_contract.py` | [M2](MOTIVATION.md#m2) |
-| V33-04 | 持久状态替换与规范参数更新 | 按实际参考连续比较替换后的普通状态，支持映射注册buffer；注册参数仍要求同对象存储及非零更新 | `kb_workflows/evaluation/state_contract.py` | [M2](MOTIVATION.md#m2) |
-| V33-05 | 状态所有者模式与收据重放 | 每次调用记录并比较全部映射状态所有者的train/eval和no_grad，漏模式/改角色/缺持久状态拒绝资格 | `kb_workflows/evaluation/state_audit.py` | [M2](MOTIVATION.md#m2) |
-| V33-06 | 全题状态政策与私有工作流 | 291题source绑定政策贯穿CLI/生成/队列/Harbor/最终，普通状态白名单和未使用角色不借可执行回调 | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
-| V33-07 | 原构造元数据与循环状态回归 | 291题仅构造meta模型、不调用输入工厂；小循环状态/对象缓存、别名、快照和收据反例验证有限软件范围 | `tests/evaluation/test_ordinary_state.py` | [M5](MOTIVATION.md#m5) |
-
-R-07按原始逐题模式/BN/参数可变性与输入域范围验收，现为代码已实现；输入族和内容变化复核分别沿用R-06/R-09。规范参数映射不执行非线性解码，任意业务状态不属于通用证明。23项现为16项代码已实现、7项部分实现。没有运行硬件或模型实验，旧stash未恢复或修改。
-
-验证：Python 3.12.12 / Torch 2.12.0下3,251项CPU/模拟/meta回归通过，本版新增317项；保留11条框架/环境warning。291题只构造原尺寸meta模型，不调用名义输入工厂；小输入覆盖普通容器/对象、持续替换、RNN/GRU/LSTM参数缓存、规范参数更新、模式所有者、恶意deepcopy别名与缓存重连、逐题角色及收据删改。Ruff、234项动机映射、37份Markdown的925个本地链接、skill和177包依赖兼容性检查通过；离线wheel包含新增政策/路径和快照实现，25个安装后轻量入口不导入设备SDK。未运行GPU、Trainium、预训练模型、容器或训练实验。
-
-## 第三十四版：来源绑定的库改写与扩展后端基线
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Expand source-bound framework and backend baseline portfolio |
-| 日期 | 2026-10-23 |
-| 基础提交 | `f2bf161` |
-| 状态 | CPU小输入、后端/Graph模拟与静态验证；不运行实验 |
-
-本版补齐R-13论文中列明的库改写和后端类型，保留标准四变体；完整菜单、计时范围和资格边界见[扩展基线](BASELINE_PORTFOLIO.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V34-01 | 全题来源绑定的基线清单 | 291题冻结参考SHA、11个数学改写和491个适用后端策略；没有额外改写的题目保留基础组合 | `kb_workflows/evaluation/baseline_rewrites.json` | [M3](MOTIVATION.md#m3) |
-| V34-02 | 注意力与归一化库改写 | SDPA/GQA、LayerNorm/var_mean、残差RMS及行缩放/范数形式保持名义域、mask、eps、affine和输出格式 | `kb_workflows/evaluation/baseline_rewrites.py` | [M3](MOTIVATION.md#m3) |
-| V34-03 | 卷积布局与后端偏好作用域 | channels-last/3d、cuDNN benchmark、cuBLASLt偏好按调用设置恢复，转换与设置成本计时；不冒充GPU来源 | `kb_workflows/evaluation/baseline_policies.py` | [M3](MOTIVATION.md#m3) |
-| V34-04 | 每个扩展项的Graph对应 | 六基础组合加每项库/后端Graph版本，完整声明2750个分题变体；不支持捕获和错误输出保留失败 | `kb_workflows/evaluation/baseline_variants.py` | [M3](MOTIVATION.md#m3) |
-| V34-05 | 基线政策收据与复核门 | 新变体的配方/来源/策略/Graph收据进入恢复、配对与评分；缺项失格但保留原始时间和诊断 | `kb_workflows/engine.py` | [M5](MOTIVATION.md#m5) |
-| V34-06 | 原生预检与多后端边界 | SDK轻量预览列逐题变体和总数，原生/最终/私有Harbor共用清单；Neuron保留自己的非CUDA组合 | `kb_workflows/cli.py` | [M5](MOTIVATION.md#m5) |
-| V34-07 | 数学格式与后端模拟回归 | 三个dtype的合法值配方、291题清单、2D/3D布局、设置异常恢复、原生错误拒绝与收据删改；不运行设备实验 | `tests/evaluation/test_baseline_recipes.py` | [M5](MOTIVATION.md#m5) |
-
-2750是291题的完整声明数，不是执行次数或性能提升。后端偏好不证明GPU路径；输入转换、作用域设置和输出复制按所声明流水线计时，不移除开销来提高资格。R-13现为代码已实现；23项为17项代码已实现、6项部分实现。旧stash保持原样，所有设备/模型实验按用户要求不运行。
-
-验证：Python 3.12.12 / Torch 2.12.0下3,658项CPU/模拟/meta回归通过，本版新增407项；保留11条框架/环境warning。覆盖三种dtype的11个改写、全部291题来源/Graph配方、2D/3D布局与cuBLASLt模拟、设置恢复/异常、转换计时、原生错误输出拒绝、缺政策/改来源/变体与配对/评分恢复边界。Ruff、241项动机映射、38份Markdown的943个本地链接、skill及177包依赖兼容性检查通过；离线wheel包含完整清单与新策略模块，28个安装后轻量入口不导入设备SDK。没有运行GPU、Trainium、真实模型、容器、编译器调优或训练实验。
-
-## 第三十五版：模型压力输入与实际存储别名
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add source-bound stress inputs and alias-preserving validation |
-| 日期 | 2026-10-23 |
-| 基础提交 | `29beec1` |
-| 状态 | CPU小输入、Neuron模拟与原尺寸meta检查；不运行实验 |
-
-本版补齐R-06列明的输入族软件范围。原250题每种子追加2,551例，默认三个种子共7,653例，保留原隐藏实例；参考初始化、权重与名义计时尺寸不变。完整角色、额度和局限见[隐藏输入](OPERATOR_INPUTS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V35-01 | 复合与序列专用压力政策 | 150题冻结七类角色与特征轴，追加异号对、激活分支、孤立极值和坐标不对称输入 | `kb_workflows/numerics/model_input_families.json` | [M2](MOTIVATION.md#m2) |
-| V35-02 | 当前实际权重的成对抵消 | 100个直接线性/标准卷积/循环入口按权重比值构造有界输入，保留参数与偏置并记录实际系数摘要 | `kb_workflows/numerics/model_stress.py` | [M2](MOTIVATION.md#m2) |
-| V35-03 | GELU与有限极值判别输入 | 15个激活题覆盖±32/±32752，26/88加±2.699，池化/极值归约检查实际窗口内的单个边界极值 | `kb_workflows/numerics/operator_cases.py` | [M2](MOTIVATION.md#m2) |
-| V35-04 | 偏移与共享存储隐藏输入 | 250题追加非零offset，33个合法多输入题追加重叠存储，初始化守卫并在分配前核对更大包络 | `kb_workflows/numerics/input_layouts.py` | [M2](MOTIVATION.md#m2) |
-| V35-05 | 按存储组隔离与转移 | 原生/Neuron转换、双向比较、状态/重复/数值检查保留stride、offset、别名和重复对象；输出快照保持独立 | `src/input_groups.py` | [M2](MOTIVATION.md#m2) |
-| V35-06 | 实际副本交付收据 | 重算有效输入及双向四次隔离副本布局，缺API/压紧/拆存储/错dtype不能取得别名资格；实际权重收据拒绝meta替代 | `kb_workflows/numerics/operator_input_policy.py` | [M5](MOTIVATION.md#m5) |
-| V35-07 | 别名与低精度反例回归 | 全250题转移及隔离的meta布局、小输入权重抵消/参数不变、GELU近似与BF16反例、边界极值及收据删改 | `tests/evaluation/test_input_layouts.py` | [M5](MOTIVATION.md#m5) |
-
-R-06按原设计的有限软件范围记为代码已实现；复杂模型中目标值可能被后续运算遮蔽，不声称全部历史错误都可检出。L3独立数值、校准和执行来源继续由对应设计跟踪。23项现为18项代码已实现、5项部分实现。旧stash保持原样，所有设备/模型实验按用户要求不运行。
-
-验证：Python 3.12.12 / Torch 2.12.0下3,996项CPU/模拟/meta回归通过，本版新增338项；保留13条框架/环境warning。覆盖250题真实构造的meta转移/隔离布局、实际权重抵消与参数不变、三精度有限激活、精确/近似GELU、单个边界极值、共享写入和storage-base错误、缺存储API/压紧/收据删改及原生/Neuron入口、评分/恢复/RL。Ruff、src/eval.py既有诊断等价、248项动机映射、38份Markdown的965个本地链接、skill及177包依赖兼容性检查通过；离线wheel逐字节核对14个改动代码/清单文件，30个安装后轻量入口不导入设备SDK。没有运行GPU、Trainium、真实模型、容器、编译器调优或训练实验。
-
-## 第三十六版：完整L3模型的独立FP64算式
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Add independent source-bound FP64 model oracles for all L3 tasks |
-| 日期 | 2026-10-24 |
-| 基础提交 | `fa9240d` |
-| 状态 | CPU小构造、原生小输入与原尺寸meta检查；不运行实验 |
-
-本版补上R-04的L3适配，独立数值入口覆盖原L1/L2/L3全部250题。50题原构造/名义形状只在meta上检查，数值真值使用逐层解释器或专门模型算式。完整范围与边界见[模型数值参考](MODEL_NUMERICS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V36-01 | 全L3来源与构造冻结 | 50题绑定来源、完整module树、标量属性、状态几何与算式；保留精度/模式/物理参数布局变化，拒绝缩小正式构造 | `kb_workflows/numerics/model_programs.json` | [M2](MOTIVATION.md#m2) |
-| V36-02 | 独立attention与encoder算术 | 显式投影、分头、mask、softmax、残差、前馈及norm，保持源码batch-first方向；原内置随机概率为零 | `kb_workflows/numerics/model_layers.py` | [M2](MOTIVATION.md#m2) |
-| V36-03 | 循环网络与普通状态算术 | RNN逐步递推、LSTM/GRU门公式、多层双向和h/c返回，保持33的状态copy舍入；不调用融合RNN | `kb_workflows/numerics/model_math.py` | [M2](MOTIVATION.md#m2) |
-| V36-04 | Swin、GPT、VLAD与SSD算术 | 窗口/shift、两类patch合并、余弦/因果/ReLU注意力、ghost残差及块内外状态递推分别实现，保持未使用层语义 | `kb_workflows/numerics/model_math.py` | [M2](MOTIVATION.md#m2) |
-| V36-05 | meta准入与条件随机掩码 | meta仅给形状/布局；全尺寸输入/状态与attention workspace先准入，原生值无关mask保留dtype/stride/RNG；闭包指向隔离meta模块 | `kb_workflows/numerics/model_oracles.py` | [M2](MOTIVATION.md#m2) |
-| V36-06 | 模型证据与统一数值入口 | L3配置、SDK轻量预览、逐原生实例收据、内部FX图和mask复核贯通已有控制worker、评分/恢复与打包 | `kb_workflows/numerics/model_specs.py` | [M5](MOTIVATION.md#m5) |
-| V36-07 | 小构造对照与参考缺陷保留 | 36个小配置的两模式算式、融合forward禁用、50题双meta计划、随机/可选状态/收据反例；35省略状态的FP32默认不被暗改 | `tests/numerics/test_model_oracles.py` | [M5](MOTIVATION.md#m5) |
-
-初始误差政策没有放宽，参考与候选都须通过独立门；非FP32的35题参考、过内存或未知算式保留失败/未测量。全题输入配方、阈值校准代码和更完整计时数值资格继续实现，R-04/R-05保持部分实现。23项仍为18项代码已实现、5项部分实现。旧stash保持原样；按用户要求不运行设备、原尺寸模型或训练实验。
-
-验证：Python 3.12.12 / Torch 2.12.0下4,226项CPU/模拟/meta回归通过，本版新增230项；保留18条框架/环境warning。36个小构造的两种模式、独立算式与融合forward禁用、50题原尺寸/隐藏BF16的双meta计划、原生随机mask、可选状态、参考默认dtype缺陷、内存准入、逐例收据及原生隐藏入口均有回归。原200题规格和全部精度政策逐项保持原值。Ruff、255项动机映射、39份Markdown的996个本地链接、skill及177包依赖检查通过；wheel逐字节核对11个改动代码/清单文件，31个安装后轻量入口不导入设备SDK。L3导出通过实际Harbor 0.24 Task schema，验证包内6个新增模型代码/清单与源码一致。没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验。
-
-## 第三十七版：全250题名义输入配方与调用前数值校验
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 提交标题 | Extend reference input calibration to all original task levels |
-| 日期 | 2026-10-24 |
-| 基础提交 | `a14d5eb` |
-| 状态 | CPU小输入、Neuron模拟和原尺寸meta；不运行实验 |
-
-本版继续R-05，配方选择扩到原250题，并修复状态/随机模型的计时真值时序。完整菜单、选择条件、固定前向RNG和剩余范围见[输入校准](INPUT_CALIBRATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V37-01 | L2/L3来源绑定的名义菜单 | 七类模型角色共731个配方声明，保留实际特征/显式初始状态、尺寸、参数和隐藏分布 | `kb_workflows/numerics/model_input_profiles.py` | [M2](MOTIVATION.md#m2) |
-| V37-02 | 按存储组生成值与极值修复 | 共享backing仅采样一次并保持视图/精度；七个L1极值题增加正态配方，修复FP16 uniform max恒值 | `kb_workflows/numerics/input_profiles.py` | [M2](MOTIVATION.md#m2) |
-| V37-03 | 固定前向RNG与输出变化审计 | 三个输入种子共享前向seed 42，同时要求输入探针变化和输出至少两次不同；恒零/非零常量不合格 | `kb_workflows/numerics/input_calibration.py` | [M2](MOTIVATION.md#m2) |
-| V37-04 | 全题参考专用校准器 | L1公式/L2复合/L3模型算式统一准入，保留程序与mask收据；候选、时间样本和误差放宽不参与选择 | `kb_workflows/numerics/input_calibration_task.py` | [M2](MOTIVATION.md#m2) |
-| V37-05 | 当前状态的调用前真值票据 | 计时参考调用前计算独立真值并恢复RNG，绑定参考/输入计划；模型路径拒绝缺票据的事后计算 | `kb_workflows/numerics/reference_oracles.py` | [M2](MOTIVATION.md#m2) |
-| V37-06 | 原生与Neuron计时顺序统一 | 基线/候选/配对/Neuron逐对票据，回调重放trial RNG，转移/快照/Graph输入保持别名；诊断不替换原始时间 | `kb_workflows/evaluation/paired_task.py` | [M5](MOTIVATION.md#m5) |
-| V37-07 | 角色、退化与连续状态回归 | 150原构造的所有配方仅做meta；小CPU输入验证三精度别名、常量/全零、固定mask、连续状态/RNG和模拟Neuron三阶段 | `tests/numerics/test_model_input_profiles.py` | [M5](MOTIVATION.md#m5) |
-
-菜单总计1039个分题声明：L1为308，L2为500，L3为231；它不是实验次数或校准成功数。预先冻结合格参考子集/排除清单的统一入口、阈值校准代码及未配置输入校准时的完整计时数值门仍需推进。23项保持18项代码已实现、5项部分实现。原尺寸设备/模型实验不运行，旧stash保持原样。
-
-验证：Python 3.12.12 / Torch 2.12.0下4,405项CPU/模拟/meta回归通过，本版新增179项；保留19条框架/环境warning。150个原始模型构造的全部配方只做meta；小输入覆盖三精度存储别名、L2/L3校准、恒零/非零常量、FP16极值修复、固定mask、连续状态/RNG、逐对票据与模拟Neuron的标准/基线/配对三阶段。Ruff、src/eval.py既有诊断等价、262项动机映射、39份Markdown的1023个本地链接、skill及177包依赖检查通过；wheel逐字节核对15个改动代码文件，33个安装后轻量入口不导入设备SDK。带L3校准格式夹具的导出通过实际Harbor 0.24 Task schema，oracle/选择政策与4个新配方文件完整传递。没有运行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验；CPU夹具不能建立实测校准资格。
-
-## 第三十八版：预注册参考资格集合与固定评分分母
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `d28005fb4cf618c03bd2050c400867c995365e8b` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Freeze reference eligibility before candidate workflows |
-| 定位方式 | `git log --all --grep="Freeze reference eligibility before candidate workflows"` |
-
-本版完成R-05剩余的集合冻结入口。清单从已有参考校准产生，不执行实验；完整校准后不合格的参考在生成候选前列入排除账本，资源/worker错误和未测完配方不能成为排除理由。配置与命令见[输入校准](INPUT_CALIBRATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V38-01 | 冻结参考资格与排除清单 | 按预定原题范围核对完整参考校准，固定第一个合格配方、每个失败配方的原因和case摘要；候选和时间不参与选择 | `kb_workflows/benchmarks/reference_population.py` | [M2](MOTIVATION.md#m2) |
-| V38-02 | 未解决失败不缩小题集 | 缺项、未测完菜单、资源/worker错误、模拟或来源漂移拒绝冻结；没有合格题目不能产生空集得分 | `kb_workflows/benchmarks/reference_population.py` | [M2](MOTIVATION.md#m2) |
-| V38-03 | 候选前冻结固定评分分母 | 在生成、导出和评测前保存集合及样本数，已有候选/结果不能补选集合；冻结后失败和缺失样本保留零分 | `kb_workflows/benchmarks/reference_population.py` | [M3](MOTIVATION.md#m3) |
-| V38-04 | 工作流与恢复共用题集 | 生成、基线、最终/配对验证、评分和研究分析统一选择器；全校准文件及清单绑定执行/评分/恢复指纹 | `kb_workflows/cli.py` | [M5](MOTIVATION.md#m5) |
-| V38-05 | 父集合与单题委托绑定 | 私有子任务保留父清单与当前题校准，运行收据校验父摘要；Harbor、RL、预算、研究和重新评分保留完整排除账本与实际子范围 | `kb_workflows/numerics/input_calibration.py` | [M5](MOTIVATION.md#m5) |
-| V38-06 | 无执行的集合冻结命令 | 读取已有校准预览，显式write只写新清单；TOML/CLI路径和任务委托可配置，不导入设备SDK或启动实验 | `scripts/freeze_reference_population.py` | [M5](MOTIVATION.md#m5) |
-| V38-07 | 资格集合的失败与传递回归 | 小CPU与不计分的序列化夹具覆盖缺项/篡改/未解决、固定分母、零分保留、私有委托、运行收据和轻量命令；不建立实测资格 | `tests/benchmarks/test_reference_population.py` | [M5](MOTIVATION.md#m5) |
-| V38-08 | 内层模型超时清理嵌套进程 | 模型CLI先超时时，先清理独立session后代再结束父进程，避免外层漏掉孤儿；CPU进程回归不调用真实模型 | `kb_workflows/agents/agent_models.py` | [M4](MOTIVATION.md#m4) |
-
-冻结的原范围、合格/排除题目、失败配方、参考/评测器/校准摘要和样本数共同绑定运行。子任务明确保留父集合与实际单题范围，不能把失败候选删除来提高宏平均。23项现为19项代码已实现、4项部分实现；R-04阈值及完整计时门、R-08/R-16来源与计数、R-18剩余硬预算继续推进。原stash未恢复，没有运行GPU、Trainium、模型、容器、校准或训练实验。
-
-验证：Python 3.12.12 / Torch 2.12.0下4,446项CPU/模拟/meta软件回归通过，保留19条框架/环境warning。本版新增40项资格集合回归与1项模型CLI内层超时进程回归，修复后的评分/RL/Agent/集合专项167项通过。Ruff、270项motivation映射、39份Markdown的1056个本地链接、skill和177包依赖检查通过；最终wheel为648634字节，23个改动代码文件逐字节一致，31个安装后轻量入口不导入Torch/Triton/NKI/Neuron SDK。最终私有导出通过实际Harbor 0.24 Task schema，父集合、当前评测器摘要和代码完整传递。校准/集合数据仅为不计分CPU序列化夹具，没有运行GPU、Trainium、真实模型、容器、校准或训练实验。
-
-## 第三十九版：原生计时逐次独立数值验证
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `78d222ab0ac0fb760c7aa80d115130b9a95b1f2d` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Verify every numerical timing output independently of input profiles |
-| 定位方式 | `git log --all --grep="Verify every numerical timing output independently of input profiles"` |
-
-本版推进R-04：配置`numerical_validation`即在原生计时路径启用实际输入独立FP64门，无须先校准输入分布。原始性能样本保留，诊断均在区间之外；实现、逐次覆盖与证据边界见[计时数值验证](TIMED_NUMERICS.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V39-01 | 不依赖值校准的逐次FP64门 | 启用数值验证后，原250题的原生计时自动采用独立实际输入真值，不再要求输入配方；实际冷调用/双向正确性输出、预热与每次正式输出均核对参考和候选 | `kb_workflows/evaluation/timed_numerics.py` | [M2](MOTIVATION.md#m2) |
-| V39-02 | 逐输出持久化数值证据 | 记录每次输出的类别、序号、RMS/全元素门、参考信号、内存与模型/随机mask收据；独立核对覆盖数、固定政策和源身份，不虚构前向seed | `kb_workflows/evaluation/timed_numerics.py` | [M2](MOTIVATION.md#m2) |
-| V39-03 | 配对共用调用前状态真值 | 每轮先计算一次参考调用前真值，再逐一验证三方输出；验证不额外推进普通Tensor/注册状态或随机流，保持原同步墙钟样本 | `kb_workflows/evaluation/paired_task.py` | [M2](MOTIVATION.md#m2) |
-| V39-04 | 原生与Neuron数值路径一致 | 未配置输入配方也启用Neuron双向/首次/预热/正式/配对强门；数值模式的FP32非组合基线关闭TF32，不改原尺寸和误差政策 | `kb_workflows/hardware/neuron_worker.py` | [M5](MOTIVATION.md#m5) |
-| V39-05 | 评分恢复要求计时数值证据 | 基线记录/缓存、候选恢复、配对、最终重测和普通评分核对完整逐次收据；缺检查、改预算或篡改误差计数不能取得正分 | `kb_workflows/evaluation/tool_checks.py` | [M3](MOTIVATION.md#m3) |
-| V39-06 | 验证失败时恢复真实调用后RNG | 数值或其他验证回调抛错时，finally仍恢复候选实际调用后的CPU/CUDA/Neuron随机状态，不把参考诊断的消耗带出计时器 | `kb_workflows/evaluation/measurement.py` | [M5](MOTIVATION.md#m5) |
-| V39-07 | 无配方的模型与状态计时回归 | 小CPU原构造验证L1/L2/L3票据、旧容差漏错、首/预热/正式覆盖、收据重封篡改和连续随机状态；模拟Neuron验证三阶段，不建立设备测量资格 | `tests/evaluation/test_timed_numerics.py` | [M5](MOTIVATION.md#m5) |
-
-R-04现剩阈值校准代码；23项维持19项代码已实现、4项部分实现。没有运行GPU、Trainium、模型、容器、校准或训练实验，旧stash未恢复。
-
-验证：Python 3.12.12 / Torch 2.12.0下4,477项CPU/模拟/meta回归通过，保留19条框架/环境warning；本版新增31项。小输入保留实际原构造参数，覆盖L1/L2/L3、实际原生双向入口、首次冷调用漏错、配对连续状态/RNG、基线变体绑定、收据重封篡改、缺失验证和模拟Neuron三阶段。Ruff、src/eval.py既有10项诊断等价、277项motivation映射、40份Markdown的1089个本地链接、skill及177包依赖检查通过。最终wheel为652073字节，11个改动代码文件逐字节一致，32个安装后轻量入口不导入设备SDK；无输入配方的导出通过实际Harbor 0.24 Task schema并传递当前逐次门与原生钩子。没有执行GPU、Trainium、原尺寸模型、预训练模型、容器、校准或训练实验；阈值仍为公布的初始政策。
-
-## 第四十版：参考专用阈值校准与冻结预算
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `f4e3a549d2f3a0182a4f3e41038caa9bd7ededbf` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Calibrate reference precision budgets within frozen published caps |
-| 定位方式 | `git log --all --grep="Calibrate reference precision budgets within frozen published caps"` |
-
-本版补齐R-04的阈值校准代码：仅从参考误差拟合，不超过已有上限，再用分离种子验证；不因验证失败反向改政策。预览、设备范围、冻结与证据边界见[精度校准](PRECISION_CALIBRATION.md)。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V40-01 | 固定预算内的误差使用比例 | 从实际存储值与未舍入FP64真值计算逐叶RMS和逐元素最大预算使用比例；原上限失格不能通过拟合加宽 | `kb_workflows/numerics/numerical.py` | [M2](MOTIVATION.md#m2) |
-| V40-02 | 参考专用阈值拟合与验证 | 原L1/L2/L3按题目/dtype使用三个拟合种子和三个不重叠验证种子，固定构造/前向RNG、隔离状态，不加载候选、不采性能时间 | `kb_workflows/numerics/precision_calibration_task.py` | [M2](MOTIVATION.md#m2) |
-| V40-03 | 五项预算统一缩放与禁止重拟合 | 固定margin4/floor1e-6且factor最多1，五项预算一同收紧；独立种子验证失败保留原政策，离散输出精确且不虚构浮点拟合 | `kb_workflows/numerics/precision_calibration.py` | [M2](MOTIVATION.md#m2) |
-| V40-04 | 阈值预览与单次配方应用 | 预览不导入设备SDK或创建输出，显式execute才运行参考；TOML/CLI路径、有效政策和缺项拒绝接入，名义配方仅变换一次 | `scripts/calibrate_precision.py` | [M5](MOTIVATION.md#m5) |
-| V40-05 | 校准与执行设备分离核对 | 校准设备保持来源身份，同硬件/软件类别可复用契约且逐次当前设备FP64自资格；异类拒绝，运行记录不能冒充新设备已校准 | `kb_workflows/numerics/precision_calibration.py` | [M5](MOTIVATION.md#m5) |
-| V40-06 | 模型生成前冻结阈值政策 | 冻结校准文件、类别、范围与样本数，候选出现后不能补选/替换阈值；预算、最终冻结和研究计划识别文件变化 | `kb_workflows/numerics/precision_calibration.py` | [M3](MOTIVATION.md#m3) |
-| V40-07 | 私有阈值贯通Agent与重评分 | 子任务携带本题/dtype记录，公开提示只给有效政策；Harbor/RL/评分恢复、研究导出及重新评分绑定内容和实际执行收据 | `kb_workflows/agents/generation.py` | [M5](MOTIVATION.md#m5) |
-| V40-08 | 拟合反例与批量传递回归 | 小CPU/模拟与格式夹具覆盖三dtype、原复合/循环构造、验证失败不重拟合、原上限失败、篡改、设备类别/多GPU、冻结、Harbor/研究/重新评分和全250题SDK轻量预览 | `tests/numerics/test_precision_calibration.py` | [M5](MOTIVATION.md#m5) |
-
-原误差上限、任务源码、尺寸和隐藏分布保持不变。契约可在同类多GPU批量运行中复用，但每个实际输出仍强制独立验证，不声称新设备已做校准。23项现为20项代码已实现、3项部分实现，继续完成R-08/R-16/R-18。没有运行GPU、Trainium、真实模型、容器、校准或训练实验；原stash未恢复。
-
-验证：完整软件回归4526项通过（含49项新增校准回归），19条依赖/既有提示；修改的运行时代码与新增测试Ruff通过。wheel内27个改动的运行时源码逐字节核对，35个流程模块脱离设备/模型SDK导入通过；真实Harbor 0.24任务schema、motivation清单、skill和41份Markdown的1133个本地链接检查通过。仅CPU小配置、meta元数据、格式夹具和显式模拟，没有运行设备或模型实验。
-
-## 第四十一版：Graph核参数更新的执行来源重绑定
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `21252bf4b02093170536d10d03df7e64bcb92fb1` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Track CUDA Graph kernel parameter updates without losing launch provenance |
-| 定位方式 | `git log --all --grep="Track CUDA Graph kernel parameter updates without losing launch provenance"` |
-
-本版继续实现R-08：为模板和可执行Graph的核参数更新建立新函数代次，同时保存历史调用。它仍是来源诊断；正式轨道、其余loader/编译器、整体Graph更新和Neuron来源继续实现，23项状态仍为20项代码已实现、3项部分实现。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V41-01 | Graph模板核函数参数更新 | 观察cuGraphKernelNodeSetParams的v1/v2参数前缀及匹配CUPTI事件，更新模板代次，保留已实例化可执行Graph | `kb_workflows/provenance/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
-| V41-02 | 可执行Graph更新与克隆别名 | 可执行Graph核参数更新只修改目标实例的后续提交；原模板、其他实例和旧调用快照保留，克隆节点沿原节点身份更新 | `kb_workflows/provenance/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
-| V41-03 | Graph更新事件与代次复核 | v4来源收据重放API、函数与context、节点/实例事件、前后代次和调用边界，拒绝回滚节点或借用其他实例的更新 | `kb_workflows/provenance/kernel_origin.py` | [M2](MOTIVATION.md#m2) |
-| V41-04 | 含糊更新失效与有界重放 | 成功却缺事件、错绑事件或失败伴更新事件使后续关联未知；原始代次及失效边界保留，有界重放超额拒绝而不省略证据 | `kb_workflows/provenance/origin_graphs.py` | [M2](MOTIVATION.md#m2) |
-| V41-05 | Graph更新反例与主机ABI核对 | CPU夹具覆盖两类API的v1/v2、克隆、相邻实例、失败/缺事件、重复更新和篡改；主机C编译核对供应商头文件布局，不调用CUDA | `tests/provenance/test_graph_updates.py` | [M5](MOTIVATION.md#m5) |
-
-支持范围和失效规则见[执行来源诊断](KERNEL_ORIGIN.md)。未知来源不转为custom/library通过，不授予L1，不替换原生性能时间。未运行CUPTI、nvcc、cuobjdump、GPU、Trainium、模型或容器实验；原搁置stash未恢复。
-
-验证：完整软件回归4564项通过（新增38项Graph更新回归），19条依赖/既有提示；当前工作流和新增测试Ruff通过。仅主机C程序核对供应商头文件的11个大小/offset，wheel内3个改动运行时源码逐字节一致，41个流程模块脱离设备/模型SDK导入；Harbor 0.24真实Task schema和私有副本、motivation、skill及41份Markdown的1149个本地链接检查通过。没有运行设备或模型实验。
-
-## 第四十二版：可重放工作计数器与审核后的 A/E 模型
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `4e6c8bf3c835619d7fc7e3857410b3f0d92e34a2` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Collect replayable CUDA work counters for reviewed A/E decomposition |
-| 定位方式 | `git log --all --grep="Collect replayable CUDA work counters for reviewed A/E decomposition"` |
-
-本版继续R-16：从供应商原始计数构建审核工作模型，替换此前可凭measured字符串启用A/E的弱接口。默认只预览，显式采集才调用ncu；本轮只实现与软件测试，未运行采集。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V42-01 | 原始工作计数器逐核重放 | 逐launch解析Nsight原始CSV的PID/context/stream/device、精确uint64计数与单位，缺指标、重复、错绑、截断和缩放值不转为零 | `kb_workflows/provenance/work_counters.py` | [M3](MOTIVATION.md#m3) |
-| V42-02 | 审核资源映射与完整实例契约 | 仅完整审核规则可建执行模型，绑定来源/参考、输入几何、精度政策、dtype与设备类别；部分资源计数保留诊断范围 | `kb_workflows/provenance/work_counters.py` | [M3](MOTIVATION.md#m3) |
-| V42-03 | 计数器驱动的A/E分解 | 从原始计数与同物理设备校准率重算资源最大值SOL并自动填A/E；拒绝measured字符串、手填SOL或篡改分量，缺证据只给AE/O | `kb_workflows/analysis/performance.py` | [M3](MOTIVATION.md#m3) |
-| V42-04 | 独立Nsight参考与候选采集 | 初始公开实例的一次前向由profilerAPI围住，保留实际尺寸/存储dtype、固定初始化/前向seed和输出门，可选FP64；异常关闭profiler且拒绝模式或环境修改 | `kb_workflows/provenance/counter_task.py`（单次worker已由第50版整合） | [M3](MOTIVATION.md#m3) |
-| V42-05 | 计数器父校验与失败工件保存 | 固定ncu参数和工具身份，重查源码/配置/输入/政策/实际设备及报告PID，超时或失格保留有界原始失败前缀，不产生部分通过 | `kb_workflows/provenance/counter_task.py` | [M2](MOTIVATION.md#m2) |
-| V42-06 | 计数器路由与精度校准队列修复 | 默认SDK轻量预览、显式execute及独立输出，local/Docker/Modal/队列路由；修复队列遗漏calibrate_precision并禁止参考校准带候选 | `scripts/audit_work_counters.py` | [M5](MOTIVATION.md#m5) |
-| V42-07 | 计数器反例与软件集成回归 | CPU小矩阵、vendor格式与模拟runner覆盖三dtype/两目标、严格容差、异常/模式/环境、原始计数/审核/校准篡改、工具替换与失败持久化；无设备实验 | `tests/provenance/test_work_counters.py` | [M5](MOTIVATION.md#m5) |
-
-用法与证据边界见[工作计数器](WORK_COUNTERS.md)。部分计数不能冒充完整工作量，初始公开实例不能冒充全部原生/隐藏或连续状态覆盖。Neuron计数器、跨捕获来源与正式归因门仍待完成；23项仍为20项代码已实现、3项部分实现。未运行GPU、Trainium、模型、容器、ncu或校准实验，原stash未恢复。
-
-验证：完整软件回归4627项通过（新增63项计数器回归），19条依赖/既有提示；220项跨流程定向集成通过。修改的工作流/命令与新增测试Ruff通过，wheel内9个改动运行时源码逐字节核对，45个模块脱离设备/模型SDK导入；Harbor 0.24真实Task schema及9个私有源码副本、motivation、skill和42份Markdown的1180个本地链接检查通过。仅CPU小矩阵、格式夹具和模拟runner，没有执行ncu或设备/模型实验。
-
-## 第四十三版：Neuron逐指令工作与采集输出校验
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `da0bceb841d0c983c5428659f9592237f7c08003` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Read Neuron executed-work tables and verify profiled forwards |
-| 定位方式 | `git log --all --grep="Read Neuron executed-work tables and verify profiled forwards"` |
-
-本版继续R-16的Neuron工作证据基础：读取供应商完整Parquet表并重放逐指令工作注释，修复采集导出和该次输出验证。只实现和软件测试，未运行设备采集。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V43-01 | Schema12分片完整读取与资源准入 | 完整读取12.0.1必需表和可选质量表，分片连续且不混用；全部文件先准入再解码，保留SHA、字段投影与读取后复查，不用UI采样或Summary替代 | `kb_workflows/hardware/neuron_tables.py` | [M5](MOTIVATION.md#m5) |
-| V43-02 | Neuron逐指令工作与DMA分账 | 精确整数保留raw/adjusted FLOPs、HBM缺失行和引擎busy并集；DMA包独立计账，不与HBM注释或聚合表重复相加 | `kb_workflows/hardware/neuron_tables.py` | [M3](MOTIVATION.md#m3) |
-| V43-03 | Execution与NKI调用点联结 | 唯一包含区间联结execution，NKI同时匹配execution/site/NEFF；含糊保留未知，标签不授予源码或硬件计数资格 | `kb_workflows/hardware/neuron_tables.py` | [M2](MOTIVATION.md#m2) |
-| V43-04 | Neuron采集导出与源码缓存 | 接当前SDK的NeuronProfiler.export_trace回调，在编译前设置私有NEFF缓存并恢复环境，流式保留NEFF/NTFF与框架trace摘要 | `kb_workflows/hardware/neuron_device.py` | [M5](MOTIVATION.md#m5) |
-| V43-05 | Profile输出与调用前票据验证 | 相同seed与连续状态下先冻结参考输出及可选oracle票据，关闭profiler后验证采集的候选输出，拒绝模式或环境变化 | `kb_workflows/hardware/neuron_worker.py` | [M2](MOTIVATION.md#m2) |
-| V43-06 | 推理模式统一与梯度设置恢复 | Neuron统一no_grad；环境守卫检测并恢复候选泄漏的梯度模式，包括异常退出，合法局部梯度上下文仍保留 | `kb_workflows/evaluation/strict_validation.py` | [M2](MOTIVATION.md#m2) |
-| V43-07 | Parquet与Neuron模拟回归 | 实际Parquet读写覆盖分片、大整数、缺失、重叠、准入与重封篡改；CPU状态随机模型和SDK模拟验证输出门，不运行设备实验 | `tests/hardware/test_neuron_tables.py` | [M5](MOTIVATION.md#m5) |
-
-格式、用法与证据边界见[Neuron工作分析](NEURON_WORK.md)。逐指令注释不是已采集硬件计数，execution/NKI标签联结不是执行来源。Neuron审核工作模型、跨捕获来源与正式归因门仍待完成；23项仍为20项代码已实现、3项部分实现。没有运行GPU、Trainium、真实模型、容器或采集实验，旧stash未恢复。
-
-验证：完整软件回归4675项通过（新增48项Parquet/profile/梯度模式回归），19条依赖/既有提示；此前305项跨流程定向回归通过。修改的工作流、命令与测试Ruff通过。wheel内6个改动运行时源码逐字节一致，47个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema及6个私有源码副本、motivation、skill和43份Markdown的1214个本地链接检查通过。仅CPU小模型、真实本地Parquet读写和SDK模拟，没有启动Explorer或设备实验。
-
-## 第四十四版：审核后的Neuron资源需求与A/E模型
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `75f617b9f17d42e4fc9d524c4755922371b562bc` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Model reviewed Neuron instruction demand with verified capture receipts |
-| 定位方式 | `git log --all --grep="Model reviewed Neuron instruction demand with verified capture receipts"` |
-
-本版把Neuron逐指令事实接入审核资源模型与同设备校准。report/capture配对属于可信维护者人工审核，尚非自动处理链或正式执行来源证明；本轮只实现和软件测试。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V44-01 | Neuron采集来源与调用收据 | 编译文件复核后封装源码/参考、配置、输入与注册状态探针、此前用例、政策、设备/软件、模式和工件；模拟收据不能建真实设备模型 | `kb_workflows/hardware/neuron_work.py` | [M2](MOTIVATION.md#m2) |
-| V44-02 | 逐指令审核与完整资源工作模型 | 可信维护者配对审核report/capture并逐行精确匹配engine/opcode/dtype，缺raw FLOPs/HBM拒绝建模；DMA不叠加，来源仍未知 | `kb_workflows/hardware/neuron_work.py` | [M3](MOTIVATION.md#m3) |
-| V44-03 | Neuron同设备校准与A/E | 原始资源需求除以同物理core及软件校准率取最大值，重放全部分量再拆A/E；明确为指令注释模型且hardware_counters_collected为false | `kb_workflows/analysis/performance.py` | [M3](MOTIVATION.md#m3) |
-| V44-04 | 显式execution身份核对 | 优先验证Instruction.execution_index存在且时间包含；缺字段才用唯一包含区间，不能借其他execution修复矛盾 | `kb_workflows/hardware/neuron_tables.py` | [M2](MOTIVATION.md#m2) |
-| V44-05 | 采集前输入隔离 | 候选输入隔离复制在profile区间前完成，采集中保留候选前向与完成屏障，不把验证器复制计入执行工作 | `kb_workflows/hardware/neuron_worker.py` | [M3](MOTIVATION.md#m3) |
-| V44-06 | 离线模型命令与失败门 | 已有Parquet可选联合capture/review/calibration构建模型，全程不启动工具或设备；模型失格仍保存完整原始报告与原因 | `scripts/analyze_device_trace.py` | [M5](MOTIVATION.md#m5) |
-| V44-07 | 注释模型与篡改回归 | CPU与实际Parquet回归覆盖审核缺项、精确关联、非空质量表、设备/校准/源码/汇总重封篡改、模拟收据和失败持久化，不运行设备实验 | `tests/hardware/test_neuron_work.py` | [M5](MOTIVATION.md#m5) |
-
-用法和审核字段见[Neuron工作分析](NEURON_WORK.md)。模型不将注释改称硬件计数，不提升L1/正式轨道资格或替换原生计时；自动跨捕获关联与正式归因门仍继续实现。23项仍为20项代码已实现、3项部分实现。没有运行GPU、Trainium、真实模型、容器或Explorer实验，原stash未恢复。
-
-验证：完整软件回归4726项通过（新增51项模型/采集边界回归），19条依赖/既有提示；296项跨流程定向测试通过。修改的工作流、命令与测试Ruff通过。wheel内6个改动运行时源码逐字节一致，48个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema和6个私有源码副本、motivation、skill及43份Markdown的1241个本地链接检查通过。仅实际本地Parquet读写、CPU小模型与序列化/SDK模拟，没有启动Explorer或设备实验。
-
-## 第四十五版：Neuron原始工件与Parquet的自动处理关联
-
-| 项目 | 版本信息 |
-| --- | --- |
-| 基础提交 | `4ac18c50a41f9a19f12390e0f5b3858108c53801` |
-| 提交日期 | 2026-10-24（UTC） |
-| 提交标题 | Bind Neuron Parquet to verified native artifacts through offline Explorer processing |
-| 定位方式 | `git log --all --grep="Bind Neuron Parquet to verified native artifacts through offline Explorer processing"` |
-
-本版补齐受信控制进程的原始文件到Parquet自动处理收据，可替代V44模型的人工文件配对；资源规则仍须审核。仅实现和软件测试，没有调用Explorer或设备。
-
-| 编号 | 功能 | 当前行为 | 实现入口 | Motivation |
-| --- | --- | --- | --- | --- |
-| V45-01 | 采集字节与可见core清单 | 原生profile除摘要外保存每工件字节数，worker记录可见core；自动处理仅接受完整字节清单和唯一已核对物理core，不猜编号映射 | `kb_workflows/hardware/neuron_device.py` | [M2](MOTIVATION.md#m2) |
-| V45-02 | 原始工件完整快照与资源准入 | 完整树先准入再核对捕获SHA/大小，拒绝缺项/额外/特殊文件/软链接；在独立新目录逐块校验复制为只读文件，原始目录与工作目录不得重叠 | `kb_workflows/hardware/neuron_processing.py` | [M5](MOTIVATION.md#m5) |
-| V45-03 | 固定Explorer处理工具与命令 | 版本查询前固定可执行文件路径与SHA，查询后及处理/解码后复核；仅固定view/完整Parquet命令，无capture、inspect或过滤附加参数 | `kb_workflows/hardware/neuron_processing.py` | [M2](MOTIVATION.md#m2) |
-| V45-04 | 输入输出复查与失败工件保留 | 处理和表解码后复查原始文件、快照、工具及全部输出；超时/更改/超限不产生收据，保留完整工作目录及有界日志前缀 | `kb_workflows/hardware/neuron_processing.py` | [M2](MOTIVATION.md#m2) |
-| V45-05 | 处理收据驱动Neuron模型 | 重放工具/命令/工件、capture/report和表包络后自动配对审核模型；指定无效处理证据不得退回人工模式，仍不授予执行所有权或正式资格 | `kb_workflows/hardware/neuron_work.py` | [M3](MOTIVATION.md#m3) |
-| V45-06 | 默认预览与离线处理入口 | 默认不查工具、不创建路径；显式execute只处理已有采集，超时及工件/表行数/解码估计可配，拒绝覆写，工具调用与设备工作标记分开记录 | `scripts/analyze_device_trace.py` | [M5](MOTIVATION.md#m5) |
-| V45-07 | 自动处理关联与失败反例 | 真实文件/Parquet及注入runner覆盖字节/core、完整快照、工具/输入/输出/目录替换、晚到修改、超时/资源门、收据重封和模型/CLI拒绝降级；不运行Explorer或设备 | `tests/hardware/test_neuron_processing.py` | [M5](MOTIVATION.md#m5) |
-
-用法与范围见[Neuron工作分析](NEURON_WORK.md)。自动绑定仅证明控制端观察到的文件处理，不隔离工具全部外部依赖，不授予kernel所有权、L1或原生时间等价资格。与原生计时/执行来源的完整关联、正式归因门与设备硬预算仍继续实现；23项仍为20项代码已实现、3项部分实现。未运行Explorer、GPU、Trainium、真实模型、容器或采集实验，旧stash未恢复。
-
-验证：最终完整软件回归4780项通过（新增54项自动处理链回归），19条依赖/既有提示；348项跨流程定向及最终54项处理链测试通过。修改的工作流、命令和测试Ruff通过。最终wheel内7个改动运行时源码逐字节一致，50个模块脱离设备/模型SDK及PyArrow导入；Harbor 0.24真实Task schema和7个私有源码副本、motivation、skill及43份Markdown的1267个本地链接检查通过。仅实际本地文件/Parquet、CPU小模型和SDK/runner模拟，没有调用Explorer或设备实验。
-
-## 维护方式
-
-1. 本文作为功能清单入口；后续新增版本节，写明提交、日期和功能状态。
-2. 功能编号保持稳定。后续改变默认值、替换实现或删除功能时，引用原编号说明变化。
-3. “已提交”“CPU/模拟验证”“真实 GPU/云端验证”分别记录；仅代码接入不等于完成实机验证。
-4. 未提交工作单独标记，提交后再固定版本，保留旧版行为，避免混淆历史能力。
-5. 实现证据使用固定提交链接。即使当前工作区继续变化，仍可核查本版内容。
-6. 每次提交功能变化时，同步更新对应清单条目与验证结果，并将文档纳入同一提交。记录本提交时可用唯一提交标题与定位命令，避免文档引用自身哈希的问题。
-
-上游基准来自该提交的 provenance 记录；本地没有 `3fdf6fec` 对象，本清单依据 `git show 2bce940:<path>` 核对整合内容，不是对上游源码逐文件 diff 的证明。第一版完整操作说明见 [本版工作流文档][v1-doc]。
-
-[v1-cli]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/cli.py
-[v1-config]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/config.py
-[v1-engine]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/engine.py
-[v1-transports]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/transports.py
-[v1-modal]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/modal_backend.py
-[v1-generation]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/generation.py
-[v1-docker]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/Dockerfile
-[v1-slurm]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/batch_run.sbatch
-[v1-modal-sh]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/batch_run_modal.sh
-[v1-queue]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/queue_worker.py
-[v1-common]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/common.py
-[v1-task]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/evaluate_task.py
-[v1-analysis]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/scripts/benchmark_eval_analysis.py
-[v1-legacy]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/kb_workflows/legacy.py
-[v1-shell]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/batch_run.sh
-[v1-doc]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/docs/BATCH_WORKFLOWS.md
-[v1-tests]: https://github.com/shadowfall09/KernelBench/blob/2bce940c631c01086c262eef9c9efc9d3693e1de/tests/test_workflows.py
-
-## 第46版：目录归类与实现精简
-
-基础提交为 `1860414de0087aeb6986c1e741075a0952b68df6`。本版回应维护成本，归入 M5；不新增原23项设计，不改变其完成状态。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
+| V1-11 | 将 Verified 隐藏门接入全部验证后端 | [evaluate_task.py](../kb_workflows/evaluation/evaluate_task.py) | [M2](MOTIVATION.md#m2) |
+| V2-01 | 严格比较输出结构、shape 和 dtype | [validation.py](../src/validation.py) | [M2](MOTIVATION.md#m2) |
+| V2-02 | 整数与 bool 精确比较 | [validation.py](../src/validation.py) | [M2](MOTIVATION.md#m2) |
+| V2-03 | 核对 NaN、Inf 的位置与符号 | [validation.py](../src/validation.py) | [M2](MOTIVATION.md#m2) |
+| V2-04 | 隔离参考与候选输入 | [validation.py](../src/validation.py) | [M2](MOTIVATION.md#m2) |
+| V2-05 | 保存参考输出快照 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V2-06 | 对齐 forward 随机种子 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V3-02 | 同步墙钟计时 | [measurement.py](../kb_workflows/evaluation/measurement.py) | [M2](MOTIVATION.md#m2) |
+| V3-03 | 变化输入与逐次输出验证 | [measurement.py](../kb_workflows/evaluation/measurement.py) | [M2](MOTIVATION.md#m2) |
+| V5-01 | 参考前后配对检查 | [reliability.py](../src/reliability.py) | [M2](MOTIVATION.md#m2) |
+| V5-02 | 隔离源码全局字典与后端设置 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V5-03 | 三个种子重新生成隐藏输入 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V5-04 | 按输入域限定的数值压力测试 | [reliability.py](../src/reliability.py) | [M2](MOTIVATION.md#m2) |
+| V5-05 | 无效验证不能算通过 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V6-11 | 验证与 reward | [harbor_verifier.py](../kb_workflows/runtime/harbor_verifier.py) | [M2](MOTIVATION.md#m2) |
+| V8-03 | 研究证据归档与重建 | [headroom_evidence.py](../scripts/headroom_evidence.py) | [M2](MOTIVATION.md#m2) |
+| V12-04 | 显存计划与合法隐藏实例 | [production.py](../kb_workflows/production.py) | [M2](MOTIVATION.md#m2) |
+| V12-05 | 生产题数值预算与零答案门 | [validation.py](../src/validation.py) | [M2](MOTIVATION.md#m2) |
+| V9-01 | FP64数值契约 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
+| V9-02 | 参考信号诊断 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
+| V9-03 | 合法输入族与隐藏形状 | [strict_validation.py](../kb_workflows/evaluation/strict_validation.py) | [M2](MOTIVATION.md#m2) |
+| V9-04 | 模式状态与同对象缓存检查 | [strict_validation.py](../kb_workflows/evaluation/strict_validation.py) | [M2](MOTIVATION.md#m2) |
+| V9-05 | 进程设置审计 | [strict_validation.py](../kb_workflows/evaluation/strict_validation.py) | [M2](MOTIVATION.md#m2) |
+| V15-03 | 分阶段小实例资格任务 | [evaluate_task.py](../kb_workflows/evaluation/evaluate_task.py) | [M2](MOTIVATION.md#m2) |
+| V17-04 | CPU FP64与输入角色保护 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M2](MOTIVATION.md#m2) |
+| V18-01 | 四工具独立诊断流程 | [tool_runner.py](../kb_workflows/evaluation/tool_runner.py) | [M2](MOTIVATION.md#m2) |
+| V18-02 | 模型快照与逐位重复验证 | [determinism.py](../kb_workflows/evaluation/determinism.py) | [M2](MOTIVATION.md#m2) |
+| V18-03 | 审核绑定的原子操作策略 | [determinism.py](../kb_workflows/evaluation/determinism.py) | [M2](MOTIVATION.md#m2) |
+| V19-04 | 隔离凭据进入评分与恢复 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M2](MOTIVATION.md#m2) |
+| V20-02 | CUDA编译产物与实际launch关联 | [cuda_origin.py](../kb_workflows/provenance/cuda_origin.py) | [M2](MOTIVATION.md#m2) |
+| V20-05 | 来源诊断与正式资格边界 | [KERNEL_ORIGIN.md](../docs/KERNEL_ORIGIN.md) | [M2](MOTIVATION.md#m2) |
+| V21-01 | 受信安装包与实际库二进制 | [origin_binaries.py](../kb_workflows/provenance/origin_binaries.py) | [M2](MOTIVATION.md#m2) |
+| V21-02 | CUDA Graph节点与执行快照 | [origin_graphs.py](../kb_workflows/provenance/origin_graphs.py) | [M2](MOTIVATION.md#m2) |
+| V21-05 | 诊断容差与实际模式后置检查 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M2](MOTIVATION.md#m2) |
+| V22-01 | 执行前冻结JIT文本与源码字面量 | [submission_source.py](../kb_workflows/provenance/submission_source.py) | [M2](MOTIVATION.md#m2) |
+| V22-02 | 实际前端依赖与审核语言primitive | [triton_origin.py](../kb_workflows/provenance/triton_origin.py) | [M2](MOTIVATION.md#m2) |
+| V22-03 | 编译器产物及初始依赖冻结 | [triton_origin.py](../kb_workflows/provenance/triton_origin.py) | [M2](MOTIVATION.md#m2) |
+| V22-05 | CUDA object回溯实际模块函数 | [cpp_origin.py](../kb_workflows/provenance/cpp_origin.py) | [M2](MOTIVATION.md#m2) |
+| V23-01 | 声明式注册状态映射 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
+| V23-02 | 连续模式与累计状态检查 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
+| V23-03 | 零值参数与缓存失效探针 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
+| V23-05 | 状态快照与证据重算 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
+| V24-01 | L1独立FP64算式与源码绑定 | [operator_specs.py](../kb_workflows/numerics/operator_specs.py) | [M2](MOTIVATION.md#m2) |
+| V24-02 | 卷积与池化窗口参考 | [operator_oracles.py](../kb_workflows/numerics/operator_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V24-03 | 数值语义与低精度自资格反例 | [operator_oracles.py](../kb_workflows/numerics/operator_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V24-05 | 参考结构与离散自资格修正 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
+| V24-06 | 数值与信号证据重算 | [numerical_audit.py](../kb_workflows/numerics/numerical_audit.py) | [M2](MOTIVATION.md#m2) |
+| V25-01 | Exclusive scan参考有版本修正 | [92_cumsum_exclusive.py](../KernelBench/level1/92_cumsum_exclusive.py) | [M2](MOTIVATION.md#m2) |
+| V25-02 | 扫描输入族与原分布保留 | [scan_cases.py](../kb_workflows/scan_cases.py) | [M2](MOTIVATION.md#m2) |
+| V25-05 | 空输出数值契约 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
+| V26-01 | 参考专用输入配方选择 | [input_calibration_task.py](../kb_workflows/numerics/input_calibration_task.py) | [M2](MOTIVATION.md#m2) |
+| V26-02 | L1角色保持的值分布 | [input_profiles.py](../kb_workflows/numerics/input_profiles.py) | [M2](MOTIVATION.md#m2) |
+| V26-03 | 冻结强数值政策与逐输出复核 | [input_calibration.py](../kb_workflows/numerics/input_calibration.py) | [M2](MOTIVATION.md#m2) |
+| V27-01 | 原L1真实初始化的隐藏输入族 | [operator_cases.py](../kb_workflows/numerics/operator_cases.py) | [M2](MOTIVATION.md#m2) |
+| V27-02 | 算子边界、抵消与并列极值 | [operator_cases.py](../kb_workflows/numerics/operator_cases.py) | [M2](MOTIVATION.md#m2) |
+| V27-03 | 显式非有限域与空数值测量 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
+| V27-04 | 转换后保留正stride布局 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V27-07 | 参考近常量失格证据保留 | [operator_oracles.json](../kb_workflows/numerics/operator_oracles.json) | [M2](MOTIVATION.md#m2) |
+| V28-01 | 全部L2来源绑定的复合程序 | [composite_oracles.py](../kb_workflows/numerics/composite_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V28-02 | 复合层独立FP64算式 | [composite_math.py](../kb_workflows/numerics/composite_math.py) | [M2](MOTIVATION.md#m2) |
+| V28-03 | 原生随机掩码条件下的数值参考 | [composite_oracles.py](../kb_workflows/numerics/composite_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V28-07 | 零信号复合参考问题保留 | [operator_oracles.json](../kb_workflows/numerics/operator_oracles.json) | [M2](MOTIVATION.md#m2) |
+| V29-01 | L2融合输入族与残差耦合 | [model_input_families.json](../kb_workflows/numerics/model_input_families.json) | [M2](MOTIVATION.md#m2) |
+| V29-02 | L3序列状态与固定形状规则 | [model_input_cases.py](../kb_workflows/numerics/model_input_cases.py) | [M2](MOTIVATION.md#m2) |
+| V29-03 | 旧概率和浮点标签语义修订 | [reference_revisions.json](../kb_workflows/benchmarks/reference_revisions.json) | [M2](MOTIVATION.md#m2) |
+| V29-04 | 全题逐例隐藏覆盖门 | [operator_input_policy.py](../kb_workflows/numerics/operator_input_policy.py) | [M2](MOTIVATION.md#m2) |
+| V30-01 | 双模式候选分配预填充 | [allocation_audit.py](../kb_workflows/evaluation/allocation_audit.py) | [M2](MOTIVATION.md#m2) |
+| V30-02 | 导入构造与实际调用作用域 | [reliability.py](../src/reliability.py) | [M2](MOTIVATION.md#m2) |
+| V30-03 | 连续扩容前缀保护与未知存储 | [allocation_audit.py](../kb_workflows/evaluation/allocation_audit.py) | [M2](MOTIVATION.md#m2) |
+| V30-06 | 预填充反例与覆盖范围声明 | [test_allocation_audit.py](../tests/evaluation/test_allocation_audit.py) | [M2](MOTIVATION.md#m2) |
+| V31-01 | 独立同步与连续提交进程 | [tool_runner.py](../kb_workflows/evaluation/tool_runner.py) | [M2](MOTIVATION.md#m2) |
+| V31-02 | 完整输出快照与复用缓冲区 | [throughput_audit.py](../kb_workflows/evaluation/throughput_audit.py) | [M2](MOTIVATION.md#m2) |
+| V31-03 | 连续状态随机与执行政策 | [reliability.py](../src/reliability.py) | [M2](MOTIVATION.md#m2) |
+| V31-07 | 排队模拟与状态输出反例 | [test_throughput_audit.py](../tests/evaluation/test_throughput_audit.py) | [M2](MOTIVATION.md#m2) |
+| V32-01 | 全实际实例的同对象更新 | [cache_audit.py](../kb_workflows/evaluation/cache_audit.py) | [M2](MOTIVATION.md#m2) |
+| V32-02 | 来源绑定的合法值配方 | [cache_recipes.py](../kb_workflows/evaluation/cache_recipes.py) | [M2](MOTIVATION.md#m2) |
+| V32-03 | 输入存储别名与几何恢复 | [input_reuse.py](../kb_workflows/evaluation/input_reuse.py) | [M2](MOTIVATION.md#m2) |
+| V32-04 | 连续状态与稳定输出快照 | [cache_audit.py](../kb_workflows/evaluation/cache_audit.py) | [M2](MOTIVATION.md#m2) |
+| V32-05 | 运行设置拒绝与组合诊断修复 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M2](MOTIVATION.md#m2) |
+| V33-01 | 稳定普通Tensor状态路径 | [state_paths.py](../kb_workflows/evaluation/state_paths.py) | [M2](MOTIVATION.md#m2) |
+| V33-02 | 循环模型逐题状态语义 | [state_policies.py](../kb_workflows/evaluation/state_policies.py) | [M2](MOTIVATION.md#m2) |
+| V33-03 | 普通状态快照隔离与保真 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
+| V33-04 | 持久状态替换与规范参数更新 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
+| V33-05 | 状态所有者模式与收据重放 | [state_audit.py](../kb_workflows/evaluation/state_audit.py) | [M2](MOTIVATION.md#m2) |
+| V35-01 | 复合与序列专用压力政策 | [model_input_families.json](../kb_workflows/numerics/model_input_families.json) | [M2](MOTIVATION.md#m2) |
+| V35-02 | 当前实际权重的成对抵消 | [model_stress.py](../kb_workflows/numerics/model_stress.py) | [M2](MOTIVATION.md#m2) |
+| V35-03 | GELU与有限极值判别输入 | [operator_cases.py](../kb_workflows/numerics/operator_cases.py) | [M2](MOTIVATION.md#m2) |
+| V35-04 | 偏移与共享存储隐藏输入 | [input_layouts.py](../kb_workflows/numerics/input_layouts.py) | [M2](MOTIVATION.md#m2) |
+| V35-05 | 按存储组隔离与转移 | [input_groups.py](../src/input_groups.py) | [M2](MOTIVATION.md#m2) |
+| V36-01 | 全L3来源与构造冻结 | [model_programs.json](../kb_workflows/numerics/model_programs.json) | [M2](MOTIVATION.md#m2) |
+| V36-02 | 独立attention与encoder算术 | [model_layers.py](../kb_workflows/numerics/model_layers.py) | [M2](MOTIVATION.md#m2) |
+| V36-03 | 循环网络与普通状态算术 | [model_math.py](../kb_workflows/numerics/model_math.py) | [M2](MOTIVATION.md#m2) |
+| V36-04 | Swin、GPT、VLAD与SSD算术 | [model_math.py](../kb_workflows/numerics/model_math.py) | [M2](MOTIVATION.md#m2) |
+| V36-05 | meta准入与条件随机掩码 | [model_oracles.py](../kb_workflows/numerics/model_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V37-01 | L2/L3来源绑定的名义菜单 | [model_input_profiles.py](../kb_workflows/numerics/model_input_profiles.py) | [M2](MOTIVATION.md#m2) |
+| V37-02 | 按存储组生成值与极值修复 | [input_profiles.py](../kb_workflows/numerics/input_profiles.py) | [M2](MOTIVATION.md#m2) |
+| V37-03 | 固定前向RNG与输出变化审计 | [input_calibration.py](../kb_workflows/numerics/input_calibration.py) | [M2](MOTIVATION.md#m2) |
+| V37-04 | 全题参考专用校准器 | [input_calibration_task.py](../kb_workflows/numerics/input_calibration_task.py) | [M2](MOTIVATION.md#m2) |
+| V37-05 | 当前状态的调用前真值票据 | [reference_oracles.py](../kb_workflows/numerics/reference_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V38-01 | 冻结参考资格与排除清单 | [reference_population.py](../kb_workflows/benchmarks/reference_population.py) | [M2](MOTIVATION.md#m2) |
+| V38-02 | 未解决失败不缩小题集 | [reference_population.py](../kb_workflows/benchmarks/reference_population.py) | [M2](MOTIVATION.md#m2) |
+| V39-01 | 不依赖值校准的逐次FP64门 | [timed_numerics.py](../kb_workflows/evaluation/timed_numerics.py) | [M2](MOTIVATION.md#m2) |
+| V39-02 | 逐输出持久化数值证据 | [timed_numerics.py](../kb_workflows/evaluation/timed_numerics.py) | [M2](MOTIVATION.md#m2) |
+| V39-03 | 配对共用调用前状态真值 | [paired_task.py](../kb_workflows/evaluation/paired_task.py) | [M2](MOTIVATION.md#m2) |
+| V40-01 | 固定预算内的误差使用比例 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
+| V40-02 | 参考专用阈值拟合与验证 | [precision_calibration_task.py](../kb_workflows/numerics/precision_calibration_task.py) | [M2](MOTIVATION.md#m2) |
+| V40-03 | 五项预算统一缩放与禁止重拟合 | [precision_calibration.py](../kb_workflows/numerics/precision_calibration.py) | [M2](MOTIVATION.md#m2) |
+| V41-01 | Graph模板核函数参数更新 | [origin_graphs.py](../kb_workflows/provenance/origin_graphs.py) | [M2](MOTIVATION.md#m2) |
+| V41-02 | 可执行Graph更新与克隆别名 | [origin_graphs.py](../kb_workflows/provenance/origin_graphs.py) | [M2](MOTIVATION.md#m2) |
+| V41-03 | Graph更新事件与代次复核 | [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py) | [M2](MOTIVATION.md#m2) |
+| V41-04 | 含糊更新失效与有界重放 | [origin_graphs.py](../kb_workflows/provenance/origin_graphs.py) | [M2](MOTIVATION.md#m2) |
+| V42-05 | 计数器父校验与失败工件保存 | [counter_task.py](../kb_workflows/provenance/counter_task.py) | [M2](MOTIVATION.md#m2) |
+| V43-03 | Execution与NKI调用点联结 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M2](MOTIVATION.md#m2) |
+| V43-05 | Profile输出与调用前票据验证 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M2](MOTIVATION.md#m2) |
+| V43-06 | 推理模式统一与梯度设置恢复 | [strict_validation.py](../kb_workflows/evaluation/strict_validation.py) | [M2](MOTIVATION.md#m2) |
+| V44-01 | Neuron采集来源与调用收据 | [neuron_work.py](../kb_workflows/hardware/neuron_work.py) | [M2](MOTIVATION.md#m2) |
+| V44-04 | 显式execution身份核对 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M2](MOTIVATION.md#m2) |
+| V45-01 | 采集字节与可见core清单 | [neuron_device.py](../kb_workflows/hardware/neuron_device.py) | [M2](MOTIVATION.md#m2) |
+| V45-03 | 固定Explorer处理工具与命令 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py) | [M2](MOTIVATION.md#m2) |
+| V45-04 | 输入输出复查与失败工件保留 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py) | [M2](MOTIVATION.md#m2) |
+| V48-01 | 原生调用覆盖与独立来源对照 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M2](MOTIVATION.md#m2) |
+| V51-01 | 显存前向输出、峰值与来源关联 | [eval.py](../src/eval.py) | [M2](MOTIVATION.md#m2) |
+| V54-01 | 原始计时可调用对象与实际调用收据 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M2](MOTIVATION.md#m2) |
+| V55-01 | 逐调用模型数据、入口与别名绑定 | [state_paths.py](../kb_workflows/evaluation/state_paths.py) | [M2](MOTIVATION.md#m2) |
+| V56-01 | Neuron完整候选状态与内容绑定 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M2](MOTIVATION.md#m2) |
+| V57-01 | 实际计分持续采集与自写/库轨道门 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M2](MOTIVATION.md#m2) |
+| V59-01 | L1测量证据汇总与评分重放 | [evidence.py](../kb_workflows/evaluation/evidence.py) | [M2](MOTIVATION.md#m2) |
+
+### M3：可解释且可比较的性能指标
+
+| 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
-| V46-01 | 按职责归类并合并重复实现 | 运行模块和测试分成8类，数据随模块；合并Neuron读取器与设备分析命令、公共测试设置；全题目录检查复用meta构造；精简结果页并重新核对评分证据。见[目录说明](../README.md#代码布局)、[维护规则](../CONTRIBUTING.md)、[清单检查](../tests/benchmarks/test_catalogs.py)。 | [M5](MOTIVATION.md#m5) |
+| V1-12 | 基线记录接入批量流程 | [engine.py](../kb_workflows/engine.py) | [M3](MOTIVATION.md#m3) |
+| V1-13 | 子集分析、pass@k 与统一结果归档 | [engine.py](../kb_workflows/engine.py) | [M3](MOTIVATION.md#m3) |
+| V3-01 | 默认四变体基线 | [baseline_variants.py](../kb_workflows/evaluation/baseline_variants.py) | [M3](MOTIVATION.md#m3) |
+| V3-04 | 冷成本与 K 次摊销 | [measurement.py](../kb_workflows/evaluation/measurement.py) | [M3](MOTIVATION.md#m3) |
+| V3-05 | 原始样本和测量信息 | [measurement.py](../kb_workflows/evaluation/measurement.py) | [M3](MOTIVATION.md#m3) |
+| V3-06 | 区分旧计时与新结果 | [config.py](../kb_workflows/config.py) | [M3](MOTIVATION.md#m3) |
+| V4-01 | 失败和缺失样本计入分母 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V4-02 | 按 K 摊销成本评分 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V4-03 | 兼容性和测量证据检查 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V4-04 | 分层统计与区间 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V4-06 | 旧分析与榜单不能绕过证据检查 | [common.py](../kb_workflows/common.py) | [M3](MOTIVATION.md#m3) |
+| V5-06 | 分阶段诊断与逐项收据 | [engine.py](../kb_workflows/engine.py) | [M3](MOTIVATION.md#m3) |
+| V6-06 | 结果页面 | [generate_leaderboard.py](../scripts/generate_leaderboard.py) | [M3](MOTIVATION.md#m3) |
+| V7-04 | 明确选择硬件 | [config.py](../kb_workflows/config.py) | [M3](MOTIVATION.md#m3) |
+| V8-06 | 分层来源与探针隔离 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V11-01 | 设备校准接口与原始收据 | [calibration.py](../kb_workflows/analysis/calibration.py) | [M3](MOTIVATION.md#m3) |
+| V11-02 | 工作量证书与独立可达性见证 | [headroom.py](../kb_workflows/analysis/headroom.py) | [M3](MOTIVATION.md#m3) |
+| V11-03 | Headroom评分与证据失效 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V11-04 | 设备时间并集与性能解释 | [performance.py](../kb_workflows/analysis/performance.py) | [M3](MOTIVATION.md#m3) |
+| V9-07 | 严格评分门与协议隔离 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V9-08 | 样本聚合消融 | [aggregation.py](../kb_workflows/evaluation/aggregation.py) | [M3](MOTIVATION.md#m3) |
+| V10-01 | 交替计时与噪声对照 | [paired_task.py](../kb_workflows/evaluation/paired_task.py) | [M3](MOTIVATION.md#m3) |
+| V10-02 | 冻结后独立最终重测 | [final_verification.py](../kb_workflows/evaluation/final_verification.py) | [M3](MOTIVATION.md#m3) |
+| V10-03 | 扩展基线组合与可信改写 | [baseline_variants.py](../kb_workflows/evaluation/baseline_variants.py) | [M3](MOTIVATION.md#m3) |
+| V10-04 | 附加证据与旧评分门 | [common.py](../kb_workflows/common.py) | [M3](MOTIVATION.md#m3) |
+| V14-04 | 预算恢复与计分资格 | [generation.py](../kb_workflows/agents/generation.py) | [M3](MOTIVATION.md#m3) |
+| V15-04 | 同题交替终局奖励 | [rl_rewards.py](../kb_workflows/agents/rl_rewards.py) | [M3](MOTIVATION.md#m3) |
+| V16-02 | 多尺寸算法证书 | [scaling_certificate.py](../kb_workflows/analysis/scaling_certificate.py) | [M3](MOTIVATION.md#m3) |
+| V16-06 | 按训练种子的效果分析 | [rl_effectiveness.py](../kb_workflows/agents/rl_effectiveness.py) | [M3](MOTIVATION.md#m3) |
+| V17-03 | Neuron基线与配对重测 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M3](MOTIVATION.md#m3) |
+| V17-05 | Neuron校准与物理身份 | [neuron_device.py](../kb_workflows/hardware/neuron_device.py) | [M3](MOTIVATION.md#m3) |
+| V17-06 | 设备轨迹与每引擎诊断 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M3](MOTIVATION.md#m3) |
+| V18-05 | 诊断与性能采样分离 | [tool_runner.py](../kb_workflows/evaluation/tool_runner.py) | [M3](MOTIVATION.md#m3) |
+| V19-07 | 重评分来源与测量凭据 | [regrade.py](../kb_workflows/runtime/regrade.py) | [M3](MOTIVATION.md#m3) |
+| V20-03 | 来源时间并集与未知重放 | [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py) | [M3](MOTIVATION.md#m3) |
+| V21-03 | 原生内存操作与双轨道诊断 | [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py) | [M3](MOTIVATION.md#m3) |
+| V25-06 | 诊断设置贯穿冻结与比较 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M3](MOTIVATION.md#m3) |
+| V26-04 | 新基线与恢复证据 | [engine.py](../kb_workflows/engine.py) | [M3](MOTIVATION.md#m3) |
+| V31-05 | 吞吐差异复核与性能资格 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M3](MOTIVATION.md#m3) |
+| V34-01 | 全题来源绑定的基线清单 | [baseline_rewrites.json](../kb_workflows/evaluation/baseline_rewrites.json) | [M3](MOTIVATION.md#m3) |
+| V34-02 | 注意力与归一化库改写 | [baseline_rewrites.py](../kb_workflows/evaluation/baseline_rewrites.py) | [M3](MOTIVATION.md#m3) |
+| V34-03 | 卷积布局与后端偏好作用域 | [baseline_policies.py](../kb_workflows/evaluation/baseline_policies.py) | [M3](MOTIVATION.md#m3) |
+| V34-04 | 每个扩展项的Graph对应 | [baseline_variants.py](../kb_workflows/evaluation/baseline_variants.py) | [M3](MOTIVATION.md#m3) |
+| V38-03 | 候选前冻结固定评分分母 | [reference_population.py](../kb_workflows/benchmarks/reference_population.py) | [M3](MOTIVATION.md#m3) |
+| V39-05 | 评分恢复要求计时数值证据 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M3](MOTIVATION.md#m3) |
+| V40-06 | 模型生成前冻结阈值政策 | [precision_calibration.py](../kb_workflows/numerics/precision_calibration.py) | [M3](MOTIVATION.md#m3) |
+| V42-01 | 原始工作计数器逐核重放 | [work_counters.py](../kb_workflows/provenance/work_counters.py) | [M3](MOTIVATION.md#m3) |
+| V42-02 | 审核资源映射与完整实例契约 | [work_counters.py](../kb_workflows/provenance/work_counters.py) | [M3](MOTIVATION.md#m3) |
+| V42-03 | 计数器驱动的A/E分解 | [performance.py](../kb_workflows/analysis/performance.py) | [M3](MOTIVATION.md#m3) |
+| V42-04 | 独立Nsight参考与候选采集 | [counter_task.py](../kb_workflows/provenance/counter_task.py) | [M3](MOTIVATION.md#m3) |
+| V43-02 | Neuron逐指令工作与DMA分账 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M3](MOTIVATION.md#m3) |
+| V44-02 | 逐指令审核与完整资源工作模型 | [neuron_work.py](../kb_workflows/hardware/neuron_work.py) | [M3](MOTIVATION.md#m3) |
+| V44-03 | Neuron同设备校准与A/E | [performance.py](../kb_workflows/analysis/performance.py) | [M3](MOTIVATION.md#m3) |
+| V44-05 | 采集前输入隔离 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M3](MOTIVATION.md#m3) |
+| V45-05 | 处理收据驱动Neuron模型 | [neuron_work.py](../kb_workflows/hardware/neuron_work.py) | [M3](MOTIVATION.md#m3) |
+| V49-01 | 保存报告重放与原生时间/设备活动关联 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M3](MOTIVATION.md#m3) |
+| V50-01 | 原生序列计数器与逐调用A/E关联 | [counter_task.py](../kb_workflows/provenance/counter_task.py) | [M3](MOTIVATION.md#m3) |
+| V60-01 | 实际配对设备时间与启动收益评分门 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M3](MOTIVATION.md#m3) |
+| V61-01 | 实际计分工作量指纹与计数模型关联 | [cuda_origin.py](../kb_workflows/provenance/cuda_origin.py) | [M3](MOTIVATION.md#m3) |
 
-当前仍为20项设计代码已实现、3项部分实现；执行来源、完整归因和设备硬预算继续推进。按要求只实现与软件验证，不运行实验；原stash保持原样。
+### M4：现实的Agent回路与预算
 
-## 第47版：队列取消与服务端设备租约
-
-基础提交为 `d5ca21d9816deb78be1ce1e7766dcabe9c2ea82c`。在现有模块内补齐HTTP队列的开发预算，不新增模块或脚本。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
+| 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
-| V47-01 | 远端队列租约、取消与未知用量拒绝 | 新版队列握手、请求/nonce绑定、排队与执行到期、丢失回复后的取消、父进程及子进程清理、重启不重花租约、异常清理停止接单；沿用现有设备预算账本。见[预算契约](RESOURCE_BUDGETS.md)、[队列](../kb_workflows/runtime/queue_worker.py)、[传输](../kb_workflows/runtime/transports.py)。 | [M4](MOTIVATION.md#m4) |
+| V7-07 | 真实 agent loop | [agent_loop.py](../kb_workflows/agents/agent_loop.py) | [M4](MOTIVATION.md#m4) |
+| V7-08 | One-shot | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |
+| V7-09 | 有界反馈 | [agent_loop.py](../kb_workflows/agents/agent_loop.py) | [M4](MOTIVATION.md#m4) |
+| V7-10 | 开发与最终评测分离 | [profile_task.py](../kb_workflows/runtime/profile_task.py) | [M4](MOTIVATION.md#m4) |
+| V7-11 | 资源与来源记录 | [experiment.py](../kb_workflows/analysis/experiment.py) | [M4](MOTIVATION.md#m4) |
+| V7-12 | 模式比较 | [experiment.py](../kb_workflows/analysis/experiment.py) | [M4](MOTIVATION.md#m4) |
+| V7-13 | 模型与后端 | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |
+| V7-14 | Coding-agent skill | [SKILL.md](../.claude/skills/kernelbench-pro/SKILL.md) | [M4](MOTIVATION.md#m4) |
+| V13-03 | 多预算多会话与通用agent计划 | [study_plan.py](../kb_workflows/analysis/study_plan.py) | [M4](MOTIVATION.md#m4) |
+| V13-04 | 得分预算曲线与共同区间AUC | [budget_curves.py](../kb_workflows/analysis/budget_curves.py) | [M4](MOTIVATION.md#m4) |
+| V13-05 | 缓存与外部agent用量核算 | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |
+| V14-01 | 调用前token预留与用量结算 | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |
+| V14-02 | 离线本地模型适配 | [local_model.py](../kb_workflows/agents/local_model.py) | [M4](MOTIVATION.md#m4) |
+| V14-03 | 开发worker占用预留 | [resource_budgets.py](../kb_workflows/agents/resource_budgets.py) | [M4](MOTIVATION.md#m4) |
+| V14-05 | token与设备占用预算网格 | [study_plan.py](../kb_workflows/analysis/study_plan.py) | [M4](MOTIVATION.md#m4) |
+| V15-01 | 冻结训练计划与持出划分 | [rl_plan.py](../kb_workflows/agents/rl_plan.py) | [M4](MOTIVATION.md#m4) |
+| V15-02 | 原生GRPO与标准开发工具 | [rl_training.py](../kb_workflows/agents/rl_training.py) | [M4](MOTIVATION.md#m4) |
+| V15-06 | 奖励重评分与可靠性审计 | [rl_evaluation.py](../kb_workflows/agents/rl_evaluation.py) | [M4](MOTIVATION.md#m4) |
+| V15-07 | 持出评测计划与CLI | [rl_evaluation.py](../kb_workflows/agents/rl_evaluation.py) | [M4](MOTIVATION.md#m4) |
+| V16-03 | 有界证书奖励 | [rl_rewards.py](../kb_workflows/agents/rl_rewards.py) | [M4](MOTIVATION.md#m4) |
+| V16-05 | 预注册奖励对照与持出评测 | [rl_effectiveness.py](../kb_workflows/agents/rl_effectiveness.py) | [M4](MOTIVATION.md#m4) |
+| V17-07 | NKI提示与coding skill | [generation.py](../kb_workflows/agents/generation.py) | [M4](MOTIVATION.md#m4) |
+| V38-08 | 内层模型超时清理嵌套进程 | [agent_models.py](../kb_workflows/agents/agent_models.py) | [M4](MOTIVATION.md#m4) |
+| V47-01 | 远端队列租约、取消与未知用量拒绝 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py) | [M4](MOTIVATION.md#m4) |
+| V53-01 | Modal开发预算与单次租约执行 | [modal_backend.py](../kb_workflows/runtime/modal_backend.py) | [M4](MOTIVATION.md#m4) |
+| V58-01 | Modal原生生成预算与工件核对 | [modal_backend.py](../kb_workflows/runtime/modal_backend.py) | [M4](MOTIVATION.md#m4) |
 
-软件验证使用普通CPU子进程、HTTP与SQLite，不运行设备、模型或容器实验。纯GPU busy时间硬限及其他远端后端继续跟踪，原23项仍为20项代码已实现、3项部分实现；暂缓stash保持原样。
+### M5：可复现且可部署的基础设施
 
-## 第48版：复用原生验证的来源对照与调用覆盖
-
-基础提交为 `b98687491d87c6b50f47b06fbc34752d775f70eb`。移除三个公开seed的简化采集循环，在现有来源模块中复用真实原生入口，没有新增模块或脚本。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
+| 编号 | 功能 | 当前证据入口 | Motivation |
 | --- | --- | --- | --- |
-| V48-01 | 原生调用覆盖与独立来源对照 | 两个新进程共用冻结输入计划，逐次核对正确性双顺序、预热、计时、隐藏及配对调用；流式内容摘要、别名/模式绑定及完整CUPTI窗口联结；按时间索引保留重叠未知活动并核对所有流。见[来源契约](KERNEL_ORIGIN.md)、[原生来源任务](../kb_workflows/provenance/origin_task.py)、[原生计时](../kb_workflows/evaluation/measurement.py)。 | [M2](MOTIVATION.md#m2) |
+| V1-01 | 统一批量入口 | [cli.py](../kb_workflows/cli.py) | [M5](MOTIVATION.md#m5) |
+| V1-02 | 生成与最终验证独立选择后端 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V1-04 | 多 GPU 调度与并发限制 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V1-05 | Docker 生成与验证 | [Dockerfile](../Dockerfile) | [M5](MOTIVATION.md#m5) |
+| V1-06 | Slurm 集群提交 | [batch_run.sbatch](../batch_run.sbatch) | [M5](MOTIVATION.md#m5) |
+| V1-07 | Modal 云端执行 | [modal_backend.py](../kb_workflows/runtime/modal_backend.py) | [M5](MOTIVATION.md#m5) |
+| V1-08 | 持久化 HTTP 验证队列 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py) | [M5](MOTIVATION.md#m5) |
+| V1-09 | 带内容指纹的断点恢复 | [common.py](../kb_workflows/common.py) | [M5](MOTIVATION.md#m5) |
+| V1-10 | 批量任务的超时与失败处理 | [transports.py](../kb_workflows/runtime/transports.py) | [M5](MOTIVATION.md#m5) |
+| V1-14 | 旧入口兼容与配置预览 | [legacy.py](../kb_workflows/legacy.py) | [M5](MOTIVATION.md#m5) |
+| V4-05 | 扩大恢复指纹覆盖 | [common.py](../kb_workflows/common.py) | [M5](MOTIVATION.md#m5) |
+| V5-07 | 新协议参与恢复指纹 | [common.py](../kb_workflows/common.py) | [M5](MOTIVATION.md#m5) |
+| V6-01 | 论文与旧实验材料 | [NOTICE.md](../NOTICE.md) | [M5](MOTIVATION.md#m5) |
+| V6-02 | 重复生成材料 | [INPUT_BLIND_GENERATION.md](../docs/INPUT_BLIND_GENERATION.md) | [M5](MOTIVATION.md#m5) |
+| V6-03 | 仓库入口 | [README.md](../README.md) | [M5](MOTIVATION.md#m5) |
+| V6-04 | 维护方式 | [CONTRIBUTING.md](../CONTRIBUTING.md) | [M5](MOTIVATION.md#m5) |
+| V6-05 | 项目名称 | [pyproject.toml](../pyproject.toml) | [M5](MOTIVATION.md#m5) |
+| V6-07 | 忽略规则 | [.gitignore](../.gitignore) | [M5](MOTIVATION.md#m5) |
+| V6-08 | 使用中的文件 | [paper_analysis.py](../kb_workflows/analysis/paper_analysis.py) | [M5](MOTIVATION.md#m5) |
+| V6-09 | 统一生成后端 | [harbor.py](../kb_workflows/runtime/harbor.py) | [M5](MOTIVATION.md#m5) |
+| V6-10 | 统一任务导出 | [harbor.py](../kb_workflows/runtime/harbor.py) | [M5](MOTIVATION.md#m5) |
+| V6-12 | GPU 与恢复 | [harbor.py](../kb_workflows/runtime/harbor.py) | [M5](MOTIVATION.md#m5) |
+| V6-13 | Python 升级 | [pyproject.toml](../pyproject.toml) | [M5](MOTIVATION.md#m5) |
+| V6-14 | 文档 | [HARBOR.md](../docs/HARBOR.md) | [M5](MOTIVATION.md#m5) |
+| V7-01 | 文件配置 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
+| V7-02 | GPU 预设 | [gpu_profiles.toml](../kb_workflows/hardware/gpu_profiles.toml) | [M5](MOTIVATION.md#m5) |
+| V7-03 | 自定义目标 | [gpu.py](../kb_workflows/hardware/gpu.py) | [M5](MOTIVATION.md#m5) |
+| V7-05 | 后端与子任务 | [generation.py](../kb_workflows/agents/generation.py) | [M5](MOTIVATION.md#m5) |
+| V7-06 | 集群与恢复 | [batch_run.sbatch](../batch_run.sbatch) | [M5](MOTIVATION.md#m5) |
+| V8-01 | 五条动机与逐项追踪 | [MOTIVATION.md](../docs/MOTIVATION.md) | [M5](MOTIVATION.md#m5) |
+| V8-02 | 统一论文与能力状态 | [PAPER.md](../research/headroom/PAPER.md) | [M5](MOTIVATION.md#m5) |
+| V8-07 | 选集与参考版本证据 | [suites.py](../kb_workflows/benchmarks/suites.py) | [M5](MOTIVATION.md#m5) |
+| V11-05 | Verifier配置与精度设置恢复 | [harbor.py](../kb_workflows/runtime/harbor.py) | [M5](MOTIVATION.md#m5) |
+| V12-06 | 生产题全流程与来源恢复 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V13-06 | 研究CLI与静态图导出 | [analyze_budget_curves.py](../scripts/analyze_budget_curves.py) | [M5](MOTIVATION.md#m5) |
+| V9-06 | 逐项证据等级 | [evidence.py](../kb_workflows/evaluation/evidence.py) | [M5](MOTIVATION.md#m5) |
+| V10-05 | 重测恢复与失败分母 | [final_verification.py](../kb_workflows/evaluation/final_verification.py) | [M5](MOTIVATION.md#m5) |
+| V15-05 | 训练预算与checkpoint恢复 | [rl_training.py](../kb_workflows/agents/rl_training.py) | [M5](MOTIVATION.md#m5) |
+| V16-04 | 训练来源与父进程凭据 | [rl_lineage.py](../kb_workflows/agents/rl_lineage.py) | [M5](MOTIVATION.md#m5) |
+| V17-01 | 通用设备适配协议 | [devices.py](../kb_workflows/hardware/devices.py) | [M5](MOTIVATION.md#m5) |
+| V17-02 | Neuron配置与任务执行 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
+| V18-04 | 原始工具证据与负结果恢复 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M5](MOTIVATION.md#m5) |
+| V18-06 | 统一配置与跨流程指纹 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
+| V19-01 | 受限验证器配置与镜像固定 | [isolation.py](../kb_workflows/runtime/isolation.py) | [M5](MOTIVATION.md#m5) |
+| V19-02 | 实际权限与资源观察 | [isolation.py](../kb_workflows/runtime/isolation.py) | [M5](MOTIVATION.md#m5) |
+| V19-03 | 结果交接与容器清理 | [restricted_transport.py](../kb_workflows/runtime/restricted_transport.py) | [M5](MOTIVATION.md#m5) |
+| V19-05 | Harbor网络与只读验证器 | [harbor.py](../kb_workflows/runtime/harbor.py) | [M5](MOTIVATION.md#m5) |
+| V19-06 | 冻结候选的原生重评分 | [regrade.py](../kb_workflows/runtime/regrade.py) | [M5](MOTIVATION.md#m5) |
+| V19-08 | Harbor产物重评分与默认预览 | [harbor_regrade.py](../kb_workflows/runtime/harbor_regrade.py) | [M5](MOTIVATION.md#m5) |
+| V20-01 | 冻结候选源码与JIT身份 | [submission_source.py](../kb_workflows/provenance/submission_source.py) | [M5](MOTIVATION.md#m5) |
+| V20-04 | 独立来源诊断与默认预览 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M5](MOTIVATION.md#m5) |
+| V21-04 | CUPTI活动关联与原始提取记录 | [cuda_origin.py](../kb_workflows/provenance/cuda_origin.py) | [M5](MOTIVATION.md#m5) |
+| V21-06 | 来源任务进入队列验证入口 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py) | [M5](MOTIVATION.md#m5) |
+| V22-04 | CUDA C++真实构建观察 | [cpp_origin.py](../kb_workflows/provenance/cpp_origin.py) | [M5](MOTIVATION.md#m5) |
+| V22-06 | 来源协议v3与实际SDK结构兼容 | [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py) | [M5](MOTIVATION.md#m5) |
+| V23-04 | 原生逐实例状态复核 | [state_audit.py](../kb_workflows/evaluation/state_audit.py) | [M5](MOTIVATION.md#m5) |
+| V24-04 | 实际输入复核与内存准入 | [numerical_audit.py](../kb_workflows/numerics/numerical_audit.py) | [M5](MOTIVATION.md#m5) |
+| V25-03 | 任务修订与共享依赖绑定 | [reference_revisions.py](../kb_workflows/benchmarks/reference_revisions.py) | [M5](MOTIVATION.md#m5) |
+| V25-04 | 选集运行快照升级与历史档案 | [suites.py](../kb_workflows/benchmarks/suites.py) | [M5](MOTIVATION.md#m5) |
+| V25-07 | 修订任务跨入口回归 | [test_reference_revisions.py](../tests/benchmarks/test_reference_revisions.py) | [M5](MOTIVATION.md#m5) |
+| V26-05 | 多设备分布复用与实测身份 | [input_calibration.py](../kb_workflows/numerics/input_calibration.py) | [M5](MOTIVATION.md#m5) |
+| V26-06 | 校准文件贯穿冻结与任务桥接 | [generation.py](../kb_workflows/agents/generation.py) | [M5](MOTIVATION.md#m5) |
+| V26-07 | 轻量校准预览与准入回归 | [calibrate_inputs.py](../scripts/calibrate_inputs.py) | [M5](MOTIVATION.md#m5) |
+| V27-05 | 原生隐藏执行与覆盖复核 | [operator_input_policy.py](../kb_workflows/numerics/operator_input_policy.py) | [M5](MOTIVATION.md#m5) |
+| V27-06 | 输入内存准入与全流程冻结 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
+| V27-08 | 全L1元数据与原生入口回归 | [test_operator_inputs.py](../tests/numerics/test_operator_inputs.py) | [M5](MOTIVATION.md#m5) |
+| V28-04 | 复合收据与缺项拒绝 | [composite_specs.py](../kb_workflows/numerics/composite_specs.py) | [M5](MOTIVATION.md#m5) |
+| V28-05 | meta状态副本与分配前准入 | [composite_oracles.py](../kb_workflows/numerics/composite_oracles.py) | [M5](MOTIVATION.md#m5) |
+| V28-06 | 独立数值入口扩至L1及L2 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
+| V28-08 | 全L2数学与名义形状回归 | [_composite_cases.py](../tests/support/_composite_cases.py) | [M5](MOTIVATION.md#m5) |
+| V29-05 | 形状精度独立重放与来源预检 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V29-06 | 全模型元数据与域迁移反例 | [test_model_input_cases.py](../tests/numerics/test_model_input_cases.py) | [M5](MOTIVATION.md#m5) |
+| V30-04 | 独立进程关闭缓存并同步报错 | [tool_runner.py](../kb_workflows/evaluation/tool_runner.py) | [M5](MOTIVATION.md#m5) |
+| V30-05 | 来源调用收据与冻结部署 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M5](MOTIVATION.md#m5) |
+| V31-04 | 名义元数据和存储准入 | [throughput_audit.py](../kb_workflows/evaluation/throughput_audit.py) | [M5](MOTIVATION.md#m5) |
+| V31-06 | 请求冻结与多后端私有部署 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M5](MOTIVATION.md#m5) |
+| V32-06 | 存储准入和私有部署冻结 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V32-07 | 全族回归与原始范围验收 | [test_cache_audit.py](../tests/evaluation/test_cache_audit.py) | [M5](MOTIVATION.md#m5) |
+| V33-06 | 全题状态政策与私有工作流 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V33-07 | 原构造元数据与循环状态回归 | [test_ordinary_state.py](../tests/evaluation/test_ordinary_state.py) | [M5](MOTIVATION.md#m5) |
+| V34-05 | 基线政策收据与复核门 | [engine.py](../kb_workflows/engine.py) | [M5](MOTIVATION.md#m5) |
+| V34-06 | 原生预检与多后端边界 | [cli.py](../kb_workflows/cli.py) | [M5](MOTIVATION.md#m5) |
+| V34-07 | 数学格式与后端模拟回归 | [test_baseline_recipes.py](../tests/evaluation/test_baseline_recipes.py) | [M5](MOTIVATION.md#m5) |
+| V35-06 | 实际副本交付收据 | [operator_input_policy.py](../kb_workflows/numerics/operator_input_policy.py) | [M5](MOTIVATION.md#m5) |
+| V35-07 | 别名与低精度反例回归 | [test_input_layouts.py](../tests/evaluation/test_input_layouts.py) | [M5](MOTIVATION.md#m5) |
+| V36-06 | 模型证据与统一数值入口 | [model_specs.py](../kb_workflows/numerics/model_specs.py) | [M5](MOTIVATION.md#m5) |
+| V36-07 | 小构造对照与参考缺陷保留 | [test_model_oracles.py](../tests/numerics/test_model_oracles.py) | [M5](MOTIVATION.md#m5) |
+| V37-06 | 原生与Neuron计时顺序统一 | [paired_task.py](../kb_workflows/evaluation/paired_task.py) | [M5](MOTIVATION.md#m5) |
+| V37-07 | 角色、退化与连续状态回归 | [test_model_input_profiles.py](../tests/numerics/test_model_input_profiles.py) | [M5](MOTIVATION.md#m5) |
+| V38-04 | 工作流与恢复共用题集 | [cli.py](../kb_workflows/cli.py) | [M5](MOTIVATION.md#m5) |
+| V38-05 | 父集合与单题委托绑定 | [input_calibration.py](../kb_workflows/numerics/input_calibration.py) | [M5](MOTIVATION.md#m5) |
+| V38-06 | 无执行的集合冻结命令 | [freeze_reference_population.py](../scripts/freeze_reference_population.py) | [M5](MOTIVATION.md#m5) |
+| V38-07 | 资格集合的失败与传递回归 | [test_reference_population.py](../tests/benchmarks/test_reference_population.py) | [M5](MOTIVATION.md#m5) |
+| V39-04 | 原生与Neuron数值路径一致 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M5](MOTIVATION.md#m5) |
+| V39-06 | 验证失败时恢复真实调用后RNG | [measurement.py](../kb_workflows/evaluation/measurement.py) | [M5](MOTIVATION.md#m5) |
+| V39-07 | 无配方的模型与状态计时回归 | [test_timed_numerics.py](../tests/evaluation/test_timed_numerics.py) | [M5](MOTIVATION.md#m5) |
+| V40-04 | 阈值预览与单次配方应用 | [calibrate_precision.py](../scripts/calibrate_precision.py) | [M5](MOTIVATION.md#m5) |
+| V40-05 | 校准与执行设备分离核对 | [precision_calibration.py](../kb_workflows/numerics/precision_calibration.py) | [M5](MOTIVATION.md#m5) |
+| V40-07 | 私有阈值贯通Agent与重评分 | [generation.py](../kb_workflows/agents/generation.py) | [M5](MOTIVATION.md#m5) |
+| V40-08 | 拟合反例与批量传递回归 | [test_precision_calibration.py](../tests/numerics/test_precision_calibration.py) | [M5](MOTIVATION.md#m5) |
+| V41-05 | Graph更新反例与主机ABI核对 | [test_graph_updates.py](../tests/provenance/test_graph_updates.py) | [M5](MOTIVATION.md#m5) |
+| V42-06 | 计数器路由与精度校准队列修复 | [audit_work_counters.py](../scripts/audit_work_counters.py) | [M5](MOTIVATION.md#m5) |
+| V42-07 | 计数器反例与软件集成回归 | [test_work_counters.py](../tests/provenance/test_work_counters.py) | [M5](MOTIVATION.md#m5) |
+| V43-01 | Schema12分片完整读取与资源准入 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M5](MOTIVATION.md#m5) |
+| V43-04 | Neuron采集导出与源码缓存 | [neuron_device.py](../kb_workflows/hardware/neuron_device.py) | [M5](MOTIVATION.md#m5) |
+| V43-07 | Parquet与Neuron模拟回归 | [test_neuron_tables.py](../tests/hardware/test_neuron_tables.py) | [M5](MOTIVATION.md#m5) |
+| V44-06 | 离线模型命令与失败门 | [analyze_device_trace.py](../scripts/analyze_device_trace.py) | [M5](MOTIVATION.md#m5) |
+| V44-07 | 注释模型与篡改回归 | [test_neuron_work.py](../tests/hardware/test_neuron_work.py) | [M5](MOTIVATION.md#m5) |
+| V45-02 | 原始工件完整快照与资源准入 | [neuron_processing.py](../kb_workflows/hardware/neuron_processing.py) | [M5](MOTIVATION.md#m5) |
+| V45-06 | 默认预览与离线处理入口 | [analyze_device_trace.py](../scripts/analyze_device_trace.py) | [M5](MOTIVATION.md#m5) |
+| V45-07 | 自动处理关联与失败反例 | [test_neuron_processing.py](../tests/hardware/test_neuron_processing.py) | [M5](MOTIVATION.md#m5) |
+| V46-01 | 按职责归类并合并重复实现 | [README.md](../README.md) | [M5](MOTIVATION.md#m5) |
+| V52-01 | 设备配置驱动队列与后端预算握手 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py) | [M5](MOTIVATION.md#m5) |
+| V61-02 | 功能清单按动机归类与历史重复精简 | [FEATURE_INVENTORY.md](../docs/FEATURE_INVENTORY.md) | [M5](MOTIVATION.md#m5) |
 
-正式轨道门、完整归因及硬件预算继续推进。内存探针前向和其他独立诊断未纳入本次来源联结；对照一致不证明未观察的执行路径相同。本轮只实现并做CPU/模拟软件验证，不运行GPU、模型或容器实验；原23项仍为20项代码已实现、3项部分实现，暂缓stash未动。
+## 维护与验证
 
+最新一批补齐实际计分工作量指纹与计数模型关联，并将本清单从逐版历史改为动机索引。A/E/O的时间来自实际计分进程；ncu进程自身尚缺同等身份采集，不能由该关联授予L2资格。详见[计数器关联](WORK_COUNTERS.md#关联实际计分时间)。
 
-## 第49版：原生报告重放与逐调用时间关联
-
-基础提交为 `c41c45df087a946a4c12bc8b64ffb8a94a49e0c1`。沿用来源与设备分析模块，不新增文件；用两个集中回归覆盖报告重封反例、原生时间样本与区间并集。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V49-01 | 保存报告重放与原生时间/设备活动关联 | 保存请求与逐次原生时间，收集和离线分析共用来源/设备/覆盖/窗口复核；将对照和采集的原生时间分别关联至同一调用，以同一CUPTI窗口计算busy并集及O，按阶段保留全部调用，缺活动保持null。见[来源文档](KERNEL_ORIGIN.md)、[分析入口](../scripts/analyze_device_trace.py)、[实现](../kb_workflows/analysis/performance.py)。 | [M3](MOTIVATION.md#m3) |
-
-旧的简化诊断报告不能建立本版调用关联；重算失败、模拟采集或缺项不产生正式资格，A/E仍待原生计数器逐调用关联。23项保持20项代码已实现、3项部分实现；没有执行设备、模型、容器或训练实验，原stash未恢复。
-
-
-## 第50版：原生计数器与逐调用 A/E 关联
-
-基础提交为 `5e9149fc407327a2249311792f9ad4c561287dce`。删除独立前向worker，采集和分析继续放在现有模块；共享原生软件夹具，替换重复单次路径与测试。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V50-01 | 原生序列计数器与逐调用A/E关联 | 在同一总预算内对照/来源/计数三进程复用完整原生输入、连续调用、输出门和计时；唯一NVTX窗口与来源launch数逐次核对，支持真实配对参考角色；完整审核、同设备校准与算法证书驱动离线A/E/O，失败保留原始工件。见[计数文档](WORK_COUNTERS.md)、[采集](../kb_workflows/provenance/counter_task.py)、[分析](../kb_workflows/analysis/performance.py)。 | [M3](MOTIVATION.md#m3) |
-
-旧的单次seed采集路径已移除，历史CSV仅供原范围离线诊断。未知、非kernel工作未覆盖、错配或模拟记录不能建立完整模型/正式资格。原23项仍为20项代码已实现、3项部分实现；没有执行设备、工具、模型、容器或训练实验，原stash保持原样。
-
-
-## 第51版：验证显存探针并纳入原生覆盖
-
-基础提交为 `54c516a245366d4cb939d8e9a66516cdafb4c981`。修复原生候选性能路径最后一次显存前向缺少输出检查的问题，不新增模块；计时与显存验证共享RNG恢复逻辑。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V51-01 | 显存前向输出、峰值与来源关联 | 显存调用隔离输入并使用同一参考/FP64政策，验证保留实际调用后的RNG；原始allocator峰值扣除验证副本的活跃分配增量，保留完整读数。CUPTI/Nsight和离线重放增加独立memory调用，缺输出/数值/窗口/显存收据不通过。见[原生验证](../src/eval.py)、[共享逻辑](../kb_workflows/evaluation/measurement.py)、[数值覆盖](TIMED_NUMERICS.md)、[来源](KERNEL_ORIGIN.md)。 | [M2](MOTIVATION.md#m2) |
-
-仅增加一个集中的回归，复用原生状态夹具；未执行设备、模型、工具、容器或训练实验。原23项仍为20项代码已实现、3项部分实现；其他独立诊断、正式资格门及设备预算继续推进，原stash保持原样。
-
-## 第52版：设备配置驱动队列与后端预算握手
-
-基础提交为 `e5ab852be01b7d1931e3fd96e8f2068969d90ee7`。修复配置允许Neuron队列、服务端却只接受CUDA的断点；沿用现有设备、传输和队列模块，不增加模块或脚本。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V52-01 | 设备配置驱动队列与后端预算握手 | worker从统一TOML选择CUDA/Neuron、分配内设备和服务端Python；保留venv解释器路径，SDK加载前切换环境。SQLite绑定后端，拒绝错后端和客户端解释器；v3握手将后端纳入预算与Neuron请求验证，提供无SDK的dry-run。见[队列](BATCH_WORKFLOWS.md#persistent-local-verification-queue)、[Neuron配置](NEURON.md)、[预算](RESOURCE_BUDGETS.md)。 | [M5](MOTIVATION.md#m5) |
-
-增加两个集中的软件回归，复用现有HTTP、SQLite与设备夹具；未执行设备、模型、容器或训练实验。原23项仍为20项代码已实现、3项部分实现，真实设备验证与物理预算限制没有由软件回归替代；原stash保持原样。
-
-## 第53版：Modal验证的预留、防重放与有界取消
-
-基础提交为 `0872004184d39ed18af6676ece66c332415f41e7`。将已有开发worker预算接入Modal验证，继续复用传输、agent账本和评分恢复，不增加模块、脚本或预算配置。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V53-01 | Modal开发预算与单次租约执行 | 原生local/Docker生成可使用带预算的Modal验证；共享nonce准入防止重放，远端父进程结算，客户端绑定请求/nonce并限时提交、等待和取消。关闭函数重试，丢失回复、错绑和清理未知均扣整笔并停止后续调用。见[预算契约](RESOURCE_BUDGETS.md#modal验证的开发租约)、[实现](../kb_workflows/runtime/modal_backend.py)、[回归](../tests/agents/test_resource_budgets.py)。 | [M4](MOTIVATION.md#m4) |
-
-替换一项过时拒绝检查、增加两个集中回归，覆盖真实mini-swe-agent循环及模拟云端准入/失败，没有启动Modal或任何设备/模型实验。原23项仍为20项代码已实现、3项部分实现；这些软件预算不提供GPU busy时间物理硬限，Modal/Harbor生成资源契约仍未开放，原stash保持原样。
-
-## 第54版：实际计分调用与来源重放关联
-
-基础提交为 `2527b1f5b18d1ba9838cd2df3b8100be0263715b`。补上实际CUDA原生计时进程的观察层，复用现有调用钩子、覆盖验证与离线分析，不增加模块或脚本。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V54-01 | 原始计时可调用对象与实际调用收据 | L1/L2原生请求在区间外记录输入/输出、布局、模式、seed与时间，区间内保留原始model对象；来源CLI可读取已存结果并按实际seed重放，逐项匹配调用与设备，分析单列实际计时时间。评分入口要求该收据，观察一致仍不授予正式来源资格。见[调用关联](KERNEL_ORIGIN.md)、[实现](../kb_workflows/provenance/origin_task.py)、[评分门](../kb_workflows/evaluation/evidence.py)。 | [M2](MOTIVATION.md#m2) |
-
-扩展原生公共/隐藏/配对共享回归，只新增一个集中反例，核对原始对象身份、结果/模式/seed/时间错绑和默认零实验预览。未执行设备、工具、模型、容器或训练实验；原23项仍为20项代码已实现、3项部分实现。来源路径等价、Neuron归因及其他剩余范围继续保留，原stash保持原样。
-
-## 第55版：模型状态与实际入口进入调用关联
-
-基础提交为 `0c2f169ff6a72997ac8ba508f2d7b9b8c6837d09`。修复仅输入/输出一致仍可能借用另一组模型状态或入口的问题，复用现有source registry、状态路径与原生钩子，不增加运行文件。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V55-01 | 逐调用模型数据、入口与别名绑定 | 实际/对照/采集/计数进程在区间外取前后模型状态摘要，含参数/buffer、普通属性、类数据、入口代码/default/closure及输入/状态存储关系；合法状态更新可保留，但逐次必须匹配。原生协议升v2，未知对象不补空状态，分析显示前后状态变化。见[状态路径](../kb_workflows/evaluation/state_paths.py)、[源码身份](../kb_workflows/provenance/submission_source.py)、[调用关联](KERNEL_ORIGIN.md)。 | [M2](MOTIVATION.md#m2) |
-
-只新增一个集中回归，覆盖同输出异状态、参数更新、等值clone破坏别名、入口重绑定、属性不执行与旧收据拒绝；其他公共/隐藏/配对/计数回归继续共用。未执行设备、工具、模型、容器或训练实验。任意全局依赖与host控制流等价仍未由状态观察证明，原23项仍为20项代码已实现、3项部分实现；原stash保持原样。
-
-## 第56版：Neuron完整候选状态与内容绑定
-
-基础提交为 `09f2c927fab2e5e95daa2191b9698603649b277a`。修复旧采集记录只抽样参考模型注册状态的问题，复用现有状态遍历和分块内容摘要，不增加运行模块。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V56-01 | Neuron完整候选状态与内容绑定 | 采集协议升v2，以实际候选前后参数/buffer、普通属性、入口代码/default/closure及输入/状态别名摘要，替代参考模型256点探针；绑定完整输入/输出内容和布局。摘要在采集窗口外完成，合法状态更新保留，未知状态和旧收据不能通过需求模型验证。见[采集契约](NEURON_WORK.md)、[worker](../kb_workflows/hardware/neuron_worker.py)、[验证](../kb_workflows/hardware/neuron_work.py)。 | [M2](MOTIVATION.md#m2) |
-
-扩展现有状态、RNG及窗口隔离回归，只新增一个集中收据反例；删除skill中已过时的“只采集首次前向”重复段落。未执行设备、供应商工具、模型、容器或训练实验。原23项仍为20项代码已实现、3项部分实现；完整来源、原生计时关联与正式归因门仍按剩余范围追踪，原stash保持原样。
-
-## 第57版：实际计分持续采集与自写/库轨道门
-
-基础提交为 `66376f753097cb66e6b9081019977b1c5ffc8794`。把已有CUPTI和来源关联接到实际计分进程，消除只凭另跑的profiling重放推断实际执行路径的问题；抽出共用源码保护、产物收集和窗口验证，不增加运行模块。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V57-01 | 实际计分持续采集与自写/库轨道门 | CUDA L1/L2的候选、隐藏、配对及基线使用持续CUPTI；计时仍用原始model，窗口在模式/状态/输出观察前关闭。实际trace绑定请求/设备/时间/调用，轨道门按源码→产物→函数→launch事实推导并由评分重算。`kernel_track`与默认0.95阈值进入配置、提示、恢复及比较；缺采集保留数值答案但不给来源资格，拒绝混合模式与模拟/缺失/丢记录；组合基线在满足计时要求的变体中选最快者，全部失败记录保留。反馈/交互桥接只在数值与来源均合格的候选中保留最快实现，分别报告正确性与性能资格。见[实际来源门](KERNEL_ORIGIN.md#实际计分模式与来源门)、[评分证据](../kb_workflows/evaluation/evidence.py)、[回归](../tests/provenance/test_kernel_origin.py)。 | [M2](MOTIVATION.md#m2) |
-
-仅增加两个集中测试，扩展已有配置、完整序列与原始对象回归，覆盖自写/库/未知来源、篡改、基线模式和缺工具时不重跑。没有执行设备、工具、模型、容器或训练实验。CUDA实际来源门的软件路径已接入，完整L1/L2仍需其他证据；Neuron与未支持来源、完整性能归因及预算剩余范围继续追踪。原23项仍为20项代码已实现、3项部分实现，原stash保持原样。
-
-## 第58版：Modal原生生成预算与工件核对
-
-基础提交为 `86c6e083a4a820b0cc6cc8c81d6c86a2882553c9`。将已有mini-swe-agent账本用于Modal生成，替换旧SDK文件接口和无界等待路径；不新增运行模块或预算项。
-
-| 编号 | 功能 | 变化与实现入口 | Motivation |
-| --- | --- | --- | --- |
-| V58-01 | Modal原生生成预算与工件核对 | 允许原生Modal输出token/worker预留，修正父/子开发验证协议；单次启动标记、请求/nonce/源码绑定、统一SDK期限与有界终止防止重开预算。传输可选政策及逐轮/model_calls工件，返回结果与文件清单核对，评分复核全部内容。SDK改用filesystem，Sandbox内local租约不建立多余云端Dict。见[资源契约](RESOURCE_BUDGETS.md#modal原生生成)、[实现](../kb_workflows/runtime/modal_backend.py)、[受控入口](../scripts/run_agent.py)。 | [M4](MOTIVATION.md#m4) |
-
-仅新增两个集中软件测试，使用本地文件模拟SDK、真实CLI入口/mini-swe-agent控制器及模拟模型/worker，覆盖额度耗尽、重复准入、恢复、篡改、错绑、越界、回复丢失、到期与清理未知。未创建Modal资源或运行设备、工具、模型、容器或训练实验。原23项仍为20项代码已实现、3项部分实现；物理GPU预算与Harbor契约等剩余范围继续保留，原stash保持原样。
-
-## 第五十九版：L1测量证据汇总与评分重放
-
-基础提交为 `48f0e4e2b3efe06f9d97a5a96abd6f9d5bfa992d`。修复完整测量材料仍在汇总前被拒绝的流程，继续复用现有评测和分析模块。
-
-| 编号 | 改进 | 行为 | Motivation |
-| --- | --- | --- | --- |
-| V59-01 | L1测量证据汇总与评分重放 | 先重算配对样本、实际来源和同模式基线，再核对每次测量的设备校准及源码/输入/精度绑定证书；标准、隐藏和冻结复测共享核对后的测量证据。原始worker收据保留，分析判定另存；缓存标签不能代替材料。单基线使用实际变体名，组合基线排除缺计时资格的变体。见[等级说明](STRICT_VALIDATION.md#等级与评分)、[评分接入](HEADROOM_SCORING.md#评分接入)。 | [M2](MOTIVATION.md#m2) |
-
-新增两个集中的持久化评分回归，覆盖正向汇总、最终隐藏记录改变、配对缺失/篡改、输入几何与设备错配、证书未审查。未运行设备、供应商工具、模型、容器或训练实验；L2正式计数归因继续拒绝以通用标签替代。原23项保持20项代码已实现、3项部分实现，原stash保持原样。
-
-## 第六十版：实际配对设备时间与启动收益评分门
-
-基础提交为 `fe44ba4066888d76b5379e81852a2a07c4e29cb6`。补全同一实际配对进程中的设备观察，复用现有来源、计时和评分模块，不新增运行文件或配置。
-
-| 编号 | 改进 | 行为 | Motivation |
-| --- | --- | --- | --- |
-| V60-01 | 实际配对设备时间与启动收益评分门 | 参考、候选、控制的全部预热/正式窗口绑定顺序、种子、输入、输出及原始墙钟；离线按活动并集计算busy/O。逐个独立repeat判断噪声分离、核数减少、busy变化≤5%及校准启动节省±20%；`launch_only`收益置零，混合/未知不给L1资格。数值正确性与原始收据保留。见[评分归因](HEADROOM_SCORING.md#实际配对归因与启动收益)、[实际来源](KERNEL_ORIGIN.md#实际计分模式与来源门)。 | [M3](MOTIVATION.md#m3) |
-
-只新增两个集中回归，复用已有采集与持久化评分夹具，覆盖三种角色、重叠活动并集、缺失/错绑/模拟/丢记录、启动收益零分和复测分类不一致。没有执行设备、供应商工具、模型、容器或训练实验；完整计数器A/E/O与Neuron来源仍未由这项门替代。原23项保持20项代码已实现、3项部分实现，原stash未恢复。
+清单、motivation映射和实现证据由`python -m scripts.check_motivations`核对，所有历史功能ID继续保留。软件回归和离线打包验证不替代真实设备、隔离、安全或模型效果实验。

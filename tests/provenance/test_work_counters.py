@@ -451,3 +451,107 @@ def test_counter_cli_preview_and_queue_validation_are_sdk_light(tmp_path):
                                 "--problem", "2", "--output", str(output)], cwd=ROOT, text=True, capture_output=True)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert not output.exists()
+
+
+def test_scored_counter_join_uses_actual_clock_and_rejects_changed_kernel_workloads(native_counter_runner, tmp_path, monkeypatch):
+    from scripts import analyze_device_trace
+    from tests.provenance.test_kernel_origin import frontend_receipt, raw_capture
+
+    report, _ = native_counter_runner(scored=True)
+    payload = report["origin"]["native_request"]
+    actual = payload["_scored_result"]
+    source = payload["kernel_src"]
+    def install(raw):
+        pattern = raw_capture()
+        for key in ("modules", "functions", "proofs"):
+            raw[key] = copy.deepcopy(pattern[key])
+        proof = raw["proofs"][0]
+        proof.update(source_sha256=hashlib.sha256(source.encode()).hexdigest(),
+                     jit_source_sha256=hashlib.sha256(source.encode()).hexdigest(), frontend=frontend_receipt(source))
+        proof["emission"]["frontend_receipt_sha256"] = proof["frontend"]["receipt_sha256"]
+        raw["launches"], raw["activities"] = [], []
+        for window in raw["windows"]:
+            for index, (left, right) in enumerate(((100, 700), (400, 900))):
+                correlation = window["id"] * 10 + index
+                raw["launches"].append({**pattern["launches"][0], "call": window["id"], "correlation": correlation})
+                raw["activities"].append({**pattern["activities"][0], "start_ns": window["start_ns"] + left,
+                                          "end_ns": window["start_ns"] + right, "stream": index + 1, "correlation": correlation})
+    install(actual["metadata"]["origin_capture"]["raw"])
+    install(report["origin"]["raw"])
+    def seal_all(value):
+        origin = value["origin"]
+        result = origin["native_request"]["_scored_result"]
+        observer = result["metadata"]["origin_capture"]
+        observer["receipt_sha256"] = fingerprint({k: v for k, v in observer.items() if k != "receipt_sha256"})
+        calls = result["metadata"]["native_call_receipt"]
+        calls["origin_capture_sha256"] = observer["receipt_sha256"]
+        calls["receipt_sha256"] = fingerprint({k: v for k, v in calls.items() if k != "receipt_sha256"})
+        origin["summary"] = kernel_summary = origin_task.summarize(origin["raw"])
+        assert kernel_summary["calls"]
+        origin["receipt_sha256"] = fingerprint({k: v for k, v in origin.items() if k not in {"receipt_sha256", "metadata"}})
+        value["receipt_sha256"] = counter_task._receipt(value)
+    report["recipe"] = policy(source=hashlib.sha256(source.encode()).hexdigest())
+    report["recipe"]["review"]["native_contract_sha256"] = counter_task.native_contract(payload)
+    report["recipe"]["review"]["workload_contracts"] = [
+        {"source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+         "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
+         "input_signature_sha256": row["input_signature_sha256"], "precision": "fp32",
+         "policy_sha256": fingerprint({"native_tolerance": 1e-4})} for row in report["native_run"]["calls"]]
+    seal_all(report)
+    calibrated = calibration.seal(CAPS, {
+        "memory_bytes": calibration.probe_record(10**9, [1] * 5, unit="bytes/s", parameters={}),
+        "fp32_flops": calibration.probe_record(10**9, [1] * 5, unit="operations/s", parameters={})},
+        [0.01] * 5, settings={"basis": "unscored parser fixture"})
+    bound = {"protocol": "reviewed_headroom_certificate_v1", "layer": "I", "precision": "fp32",
+             "review": {"reviewer": "software fixture", "rationale": "No device evidence"},
+             "reference_sha256": hashlib.sha256(payload["ref_arch_src"].encode()).hexdigest(),
+             "input_signature": report["origin"]["raw"]["windows"][0]["input_signature"],
+             "calibration_sha256": calibrated["receipt_sha256"],
+             "reference_work": {"memory_bytes": 192}, "algorithm_work": {"memory_bytes": 96}}
+    joined = performance.scored_timeline(report, actual, calibrated, bound, allow_simulated=True)
+    assert joined["status"] == "simulated" and not joined["formal_qualification_implemented"]
+    assert not joined["counter_process_workload_identity_observed"]
+    assert all(row["model_consistent"] and row["workload"]["kernel_count"] == 2 for row in joined["calls"])
+    for row in joined["calls"]:
+        assert row["scored_device_busy_ms"] == pytest.approx(0.0008)
+        if row["wall_decomposition_available"]:
+            assert row["sol_algorithm_ms"] * row["A"] * row["E"] * row["O"] == pytest.approx(row["scored_wall_ms"])
+        else:
+            assert row["O"] is None and row["scored_wall_ms"] is None
+    with pytest.raises(ValueError):
+        performance.scored_timeline(report, actual, calibrated, bound)
+    for damage in ("binary", "symbol", "grid", "block", "shared", "missing_identity", "memory", "missing_call"):
+        changed = copy.deepcopy(report)
+        raw = changed["origin"]["raw"]
+        if damage == "binary":
+            raw["modules"][0]["binary_sha256"] = "f" * 64
+            raw["proofs"][0]["binary_sha256"] = "f" * 64
+            raw["proofs"][0]["emission"]["binary_sha256"] = "f" * 64
+        elif damage == "symbol":
+            raw["functions"][0]["symbol"] = "other_entrypoint"
+            for activity in raw["activities"]:
+                activity["name"] = "other_entrypoint"
+        elif damage in {"grid", "block"}:
+            raw["activities"][0]["configuration"][damage][0] += 1
+        elif damage == "shared":
+            raw["activities"][0]["configuration"]["dynamic_shared_bytes"] += 1
+        elif damage == "missing_identity":
+            raw["activities"][0].pop("configuration")
+        elif damage == "memory":
+            raw["activities"][0]["kind"] = "memcpy"
+        else:
+            changed["native_run"]["calls"].pop()
+        seal_all(changed)
+        with pytest.raises(ValueError):
+            performance.scored_timeline(changed, changed["origin"]["native_request"]["_scored_result"], calibrated, bound,
+                                        allow_simulated=True)
+    # Real CLI routing; the serialization fixture remains explicitly simulated.
+    report_path, scored_path, cal_path, bound_path = [tmp_path / name for name in ("counter.json", "scored.json", "cal.json", "bound.json")]
+    for path, value in ((report_path, report), (scored_path, actual), (cal_path, calibrated), (bound_path, bound)):
+        atomic_json(path, value)
+    invoke = performance.scored_timeline
+    monkeypatch.setattr(analyze_device_trace, "scored_timeline", lambda *a: invoke(*a, allow_simulated=True))
+    output = tmp_path / "joined.json"
+    assert analyze_device_trace.native_main([str(report_path), "--scored-result", str(scored_path), "--problem", "2",
+        "--calibration", str(cal_path), "--certificate", str(bound_path), "--output", str(output)]) == 2
+    assert json.loads(output.read_text())["simulated"]
