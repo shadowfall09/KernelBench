@@ -418,6 +418,9 @@ def cache_control(payload):
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     try:
+        from ..provenance.neuron_runtime import bootstrap
+
+        bootstrap(payload)
         from .tool_checks import enabled
 
         native_worker = sys.argv[3:] == ["--native-worker"]

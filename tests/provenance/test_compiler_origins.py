@@ -21,6 +21,112 @@ CUDA = '#include <cuda_runtime.h>\n__global__ void owned(float *x) { x[0] += 1; 
 CUBIN = b'\x7fELF\x02\x01' + b'\x00' * 12 + (190).to_bytes(2, 'little') + b'\x00' * 44 + b'synthetic-device-object'
 
 
+def test_neuron_preloaded_runtime_binds_model_generations_and_device_sequences(tmp_path, monkeypatch):
+    """Compile CPU-only ABI stubs; never link or execute the vendor runtime."""
+    from kb_workflows.provenance import neuron_runtime
+
+    include = tmp_path / "include" / "nrt"
+    include.mkdir(parents=True)
+    header = """#pragma once
+#include <stddef.h>
+#include <stdint.h>
+typedef enum {NRT_SUCCESS=0, NRT_FAILURE=1} NRT_STATUS;
+typedef struct model {int value;} nrt_model_t;
+typedef struct tensors {int value;} nrt_tensor_set_t;
+typedef uint64_t nrta_seq_t;
+extern "C" {
+NRT_STATUS nrt_load(const void*,size_t,int32_t,int32_t,nrt_model_t**);
+NRT_STATUS nrt_load_collectives(const void*,size_t,int32_t,int32_t,uint32_t,uint32_t,nrt_model_t**);
+NRT_STATUS nrt_unload(nrt_model_t*);
+NRT_STATUS nrta_execute_schedule(nrt_model_t*,const nrt_tensor_set_t*,nrt_tensor_set_t*,int,NRT_STATUS*,nrta_seq_t*);
+}
+"""
+    (include / "nrt.h").write_text(header)
+    for name in ("nrt_async.h", "nrt_experimental.h"):
+        (include / name).write_text('#pragma once\n#include "nrt.h"\n')
+    stub = tmp_path / "stub.cpp"
+    stub.write_text("""#include <nrt/nrt.h>
+static nrt_model_t model;
+static nrta_seq_t next=40;
+extern "C" NRT_STATUS nrt_load(const void*,size_t,int32_t,int32_t,nrt_model_t** out) {*out=&model;return NRT_SUCCESS;}
+extern "C" NRT_STATUS nrt_load_collectives(const void* b,size_t n,int32_t s,int32_t c,uint32_t,uint32_t,nrt_model_t** o) {return nrt_load(b,n,s,c,o);}
+extern "C" NRT_STATUS nrt_unload(nrt_model_t*) {return NRT_SUCCESS;}
+extern "C" NRT_STATUS nrta_execute_schedule(nrt_model_t*,const nrt_tensor_set_t*,nrt_tensor_set_t*,int,NRT_STATUS*,nrta_seq_t* seq) {*seq=++next;return NRT_SUCCESS;}
+extern "C" void exercise() {
+ nrt_model_t* ptr; NRT_STATUS completion; nrta_seq_t seq; char binary[]="SIMULATED NEFF";
+ nrt_load(binary,sizeof(binary),0,1,&ptr);
+ nrta_execute_schedule(ptr,nullptr,nullptr,0,&completion,&seq);
+ nrt_unload(ptr);
+ nrt_load_collectives(binary,sizeof(binary),0,1,0,1,&ptr);
+ nrta_execute_schedule(ptr,nullptr,nullptr,0,&completion,&seq);
+ nrt_unload(ptr);
+}
+""")
+    library = tmp_path / "libnrt.so"
+    subprocess.run(["c++", "-shared", "-fPIC", "-I", str(include.parent), str(stub), "-o", str(library)],
+                   check=True, capture_output=True, timeout=30)
+    request = {"task": "profile", "eval_config": {"device_backend": "neuron", "neuron_runtime_origin": True,
+               "neuron_runtime_include": str(include.parent), "neuron_runtime_compiler": "c++"}}
+    manifest = neuron_runtime.build(tmp_path / "runtime", include.parent, "c++", fingerprint(request), simulated=True)
+    build_info = json.loads(manifest.read_text())
+    capture = tmp_path / "profile"
+    capture.mkdir()
+    events = [{"ph": "X", "cat": "privateuse1_driver", "ts": 100 + i * 10, "dur": 5,
+               "args": {"nrt_sequence_id": seq}} for i, seq in enumerate((41, 42, 99))]
+    (capture / "framework_trace.json").write_text(json.dumps({"traceEvents": events}))
+    code = f"""
+import ctypes,json
+from kb_workflows.provenance.neuron_runtime import Observer
+observer=Observer({request!r},allow_simulated=True)
+ctypes.CDLL({str(library)!r},mode=ctypes.RTLD_LOCAL).exercise()
+result=observer.export({str(capture)!r})
+print(json.dumps(result))
+"""
+    child = subprocess.run([os.sys.executable, "-c", code], env={**os.environ,
+        "LD_PRELOAD": build_info["library"], neuron_runtime.ENV: str(manifest),
+        "KB_NEURON_RUNTIME_DIRECTORY": str(manifest.parent)}, capture_output=True, text=True, timeout=30)
+    assert child.returncode == 0, child.stderr
+    result = json.loads(child.stdout)
+    assert result["simulated"] and result["status"] == "partial"
+    assert [b["generation"] for b in result["bindings"]] == [1, 2]
+    assert result["bindings"][0]["neff_sha256"] == result["bindings"][1]["neff_sha256"]
+    assert result["unresolved_events"] == [2] and not result["loaded_binary_identity_proven"]
+    assert not result["formal_origin_qualified"]
+    from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
+
+    files = file_manifest(capture, DEFAULT_LIMITS)
+    hashes, sizes = {p: r["sha256"] for p, r in files.items()}, {p: r["bytes"] for p, r in files.items()}
+    neuron_runtime.validate(result, hashes, sizes, allow_simulated=True)
+    with pytest.raises(ValueError, match="receipt"):
+        neuron_runtime.validate(result, hashes, sizes)
+    changed = json.loads(json.dumps(result))
+    changed["journal"][3]["model"] += 1
+    from kb_workflows.provenance.neuron_origin import _seal
+
+    _seal(changed)
+    with pytest.raises(ValueError, match="journal bytes"):
+        neuron_runtime.validate(changed, hashes, sizes, allow_simulated=True)
+    with pytest.raises(ValueError, match="binary snapshot"):
+        neuron_runtime.validate(result, {p: h for p, h in hashes.items() if not p.endswith(".neff")}, sizes, allow_simulated=True)
+    journal = result["journal"]
+    with pytest.raises(ValueError, match="live model"):
+        neuron_runtime._journal([journal[0], journal[2], journal[-1]])
+    duplicate = [*journal[:-1], journal[1], journal[2], journal[-1]]
+    with pytest.raises(ValueError, match="generation"):
+        neuron_runtime._journal(duplicate)
+    monkeypatch.delenv(neuron_runtime.ENV, raising=False)
+    monkeypatch.setenv("LD_PRELOAD", "existing-observer.so")
+    monkeypatch.setattr(neuron_runtime, "build", lambda *args, **kwargs: manifest)
+    monkeypatch.setattr(os.sys, "argv", ["worker", "request.json", "result.json", "--native-worker"])
+    executions = []
+    monkeypatch.setattr(os, "execve", lambda *args: executions.append(args))
+    neuron_runtime.bootstrap(request)
+    assert executions[0][1][1:] == ["-m", "kb_workflows.evaluation.evaluate_task", "request.json", "result.json", "--native-worker"]
+    assert executions[0][2]["LD_PRELOAD"] == build_info["library"] + " existing-observer.so"
+    neuron_runtime.bootstrap({**request, "task": "evaluate"})
+    assert len(executions) == 1
+
+
 def frontend_ir(frontend, context, *, signature=None):
     from triton._C.libtriton import ir
     from triton.backends.compiler import GPUTarget

@@ -108,6 +108,11 @@ def evaluate(payload, *, adapter=None):
     from ..provenance.submission_source import SourceRegistry, record_sources
 
     registry = SourceRegistry()
+    runtime = None
+    if payload.get("task") == "profile" and payload["eval_config"].get("neuron_runtime_origin"):
+        from ..provenance.neuron_runtime import Observer
+
+        runtime = Observer(payload)
     observer = CompilationObserver(registry) if payload.get("task") == "profile" else nullcontext()
     with torch.no_grad(), profile_source_cache(payload), record_sources(registry), observer:
         result = _evaluate(payload, adapter=adapter, registry=registry)
@@ -117,6 +122,8 @@ def evaluate(payload, *, adapter=None):
         result["compiler_observations"] = observer.value
         if directory := result.get("vendor_artifact_directory"):
             observer.export(directory)
+            if runtime is not None:
+                result["native_runtime"] = runtime.export(directory)
             files = file_manifest(directory, DEFAULT_LIMITS)
             result["artifact_files"] = {name: row["sha256"] for name, row in files.items()}
             result["artifact_file_bytes"] = {name: row["bytes"] for name, row in files.items()}

@@ -31,7 +31,7 @@ where = ["."]
 include = ["src*", "kb_workflows*", "scripts*"]
 
 [tool.setuptools.package-data]
-kb_workflows = ["hardware/gpu_profiles.toml", "benchmarks/manifests/*.json", "numerics/verification_contracts.json", "numerics/operator_oracles.json", "numerics/composite_programs.json", "numerics/model_programs.json", "numerics/model_input_families.json", "benchmarks/reference_revisions.json", "evaluation/baseline_rewrites.json"]
+kb_workflows = ["provenance/*.cpp", "hardware/gpu_profiles.toml", "benchmarks/manifests/*.json", "numerics/verification_contracts.json", "numerics/operator_oracles.json", "numerics/composite_programs.json", "numerics/model_programs.json", "numerics/model_input_families.json", "benchmarks/reference_revisions.json", "evaluation/baseline_rewrites.json"]
 
 [tool.ruff]
 target-version = "py312"

@@ -86,7 +86,7 @@ def evaluator_digest():
     paths = [ROOT / "requirements.txt", ROOT / "requirements-neuron-worker.txt"]
     for folder in ("src", "kb_workflows", "scripts"):
         paths.extend(path for path in (ROOT / folder).rglob("*")
-                     if path.is_file() and path.suffix in {".py", ".json", ".toml"}
+                     if path.is_file() and path.suffix in {".py", ".json", ".toml", ".cpp"}
                      and not {"__pycache__", "unit_tests"} & set(path.parts))
     for path in sorted(paths, key=lambda item: item.relative_to(ROOT).as_posix()):
         digest.update(path.relative_to(ROOT).as_posix().encode())

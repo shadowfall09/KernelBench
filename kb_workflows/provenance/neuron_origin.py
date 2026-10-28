@@ -241,6 +241,20 @@ def validate_compilation(value, files, sizes, *, allow_simulated=False):
     return value
 
 
+def driver_events(events):
+    """One selection/interval policy for cache snapshots and native schedules."""
+    for index, event in enumerate(events):
+        if not isinstance(event, dict) or event.get("ph") != "X" or event.get("cat") != "privateuse1_driver":
+            continue
+        args = event.get("args")
+        if isinstance(args, dict) and type(args.get("host_worker_idx")) is int and args["host_worker_idx"] >= 0:
+            continue
+        valid = (isinstance(args, dict) and "host_worker_idx" not in args
+                 and type(event.get("ts")) in (int, float) and 0 <= event["ts"] < 2**64
+                 and type(event.get("dur")) in (int, float) and 0 < event["dur"] < 2**64)
+        yield index, args, valid
+
+
 def runtime_neff_bindings(trace_file, directory, get_neff_info):
     """Bind SDK execution keys to cache byte snapshots, without claiming ownership."""
     from ..hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
@@ -269,18 +283,11 @@ def runtime_neff_bindings(trace_file, directory, get_neff_info):
         if not isinstance(events, list) or len(events) > 200_000:
             raise ValueError("Framework trace lacks a bounded event list")
         groups, selected = {}, []
-        for index, event in enumerate(events):
-            if not isinstance(event, dict) or event.get("ph") != "X" or event.get("cat") != "privateuse1_driver":
-                continue
-            args = event.get("args")
-            if isinstance(args, dict) and type(args.get("host_worker_idx")) is int and args["host_worker_idx"] >= 0:
-                continue
+        for index, args, valid in driver_events(events):
             selected.append(index)
             keys = tuple(args.get(name) for name in ("neff_cache_key", "persistent_cache_key")) if isinstance(args, dict) else ()
             if (len(keys) != 2 or any(not isinstance(key, str) or not 0 < len(key) <= 4096 for key in keys)
-                    or "host_worker_idx" in args
-                    or type(event.get("ts")) not in (int, float) or not 0 <= event["ts"] < 2**64
-                    or type(event.get("dur")) not in (int, float) or not 0 < event["dur"] < 2**64):
+                    or not valid):
                 value["unresolved_events"].append(index)
                 continue
             groups.setdefault(keys, []).append(index)

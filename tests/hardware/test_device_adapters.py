@@ -31,11 +31,17 @@ def neuron_config(tmp_path, **options):
 def test_device_config_is_lightweight_and_preserves_existing_gpu_configs(tmp_path):
     path = tmp_path / "run.toml"
     path.write_text('[device]\nbackend="neuron"\nhardware="Trainium2"\ndevices=[0,2]\npython="vendor/bin/python"\n'
-                    '[run]\ngeneration="local"\nrun_name="native_neuron"\n')
+                    '[run]\ngeneration="local"\nrun_name="native_neuron"\nneuron_runtime_origin=true\nneuron_runtime_include="sdk/include"\n')
     config = parse_config(["--config", str(path), "--dry-run"])
     assert (config.device_backend, config.hardware, config.gpu_arch, config.gpus) == ("neuron", "Trainium2", "trn2", "0,2")
     assert config.device_python == str(tmp_path / "vendor/bin/python")
+    assert config.neuron_runtime_origin and config.neuron_runtime_include == str(tmp_path / "sdk/include")
+    with pytest.raises(ValueError, match="NRT origin"):
+        RunConfig(neuron_runtime_origin=True).validate()
     assert variants_for(config, 1) == ("neuron_eager", "neuron_compile")
+    script = ('import sys; from kb_workflows.hardware import devices, neuron_device, neuron_tables as neuron_profile; assert not {"torch", "torch_neuronx", "nki"} & sys.modules.keys(); from kb_workflows.analysis.calibration import CUDADevice; assert isinstance(CUDADevice.__new__(CUDADevice), devices.DeviceAdapter); assert isinstance(neuron_device.NeuronDevice.__new__(neuron_device.NeuronDevice), devices.DeviceAdapter)')
+    result = subprocess.run([sys.executable, "-c", script], cwd=ROOT, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
     old = parse_config(["--gpu-profile", "H100", "--dry-run"])
     assert old.device_backend == "cuda" and old.gpu_arch == "Hopper"
     path.write_text(path.read_text() + '\n[gpu]\nprofile="H100"\n')
@@ -91,12 +97,6 @@ def test_neuron_identity_uses_device_serial_core_loaded_driver_and_sdk(tmp_path)
     for versions in (("2.12.0", "2.14.3.0.1", "0.6.0"), ("2.14.0", "2.9.0.2.15", "0.6.0"), ("2.14.0", "2.14.3.0.1", "0.3.0")):
         with pytest.raises(ValueError, match="native torch"):
             neuron_device.native_versions(*versions)
-
-
-def test_two_adapters_expose_the_five_protocol_methods_without_sdk_imports():
-    script = ('import sys; from kb_workflows.hardware import devices, neuron_device, neuron_tables as neuron_profile; assert not {"torch", "torch_neuronx", "nki"} & sys.modules.keys(); from kb_workflows.analysis.calibration import CUDADevice; assert isinstance(CUDADevice.__new__(CUDADevice), devices.DeviceAdapter); assert isinstance(neuron_device.NeuronDevice.__new__(neuron_device.NeuronDevice), devices.DeviceAdapter)')
-    result = subprocess.run([sys.executable, "-c", script], cwd=ROOT, capture_output=True, text=True)
-    assert result.returncode == 0, result.stderr
 
 
 def test_neuron_instruction_union_does_not_sum_overlaps_or_count_instructions_as_kernels():

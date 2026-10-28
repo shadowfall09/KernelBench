@@ -56,7 +56,29 @@ Neuron worker与CUDA共用源码冻结、字节核对和编译注册，`source_r
 
 实现依据是 [NKI 0.7.0 官方 wheel](https://pip.repos.neuron.amazonaws.com/nki/nki-0.7.0%2B37713544100.gfede04bb-cp312-cp312-linux_x86_64.whl) 的编译驱动，以及固定提交的 [Torch Neuron NKI 降低](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/python_ops/neuron_nki_call_lowering.py)。这不是所有 SDK 版本的兼容保证：其他前端、线程、缓存或编译路径未观察到时保持未知。本次仅静态阅读 SDK，并用明确模拟的 CPU 流水线验证协议，没有导入或运行 Neuron SDK。
 
-这里仍只观察根函数与编译交接，不证明全部辅助函数/动态依赖的来源，也未核对实际 `nrt_load` 字节与设备执行序号。因此编译观察和运行时缓存快照都保持 `formal_origin_qualified=false`、`loaded_binary_identity_proven=false`，R-08/R-16 继续部分实现。来源观察统一放在 [neuron_origin.py](../kb_workflows/provenance/neuron_origin.py)；[neuron_work.py](../kb_workflows/hardware/neuron_work.py)只组合采集与资源需求模型。
+这里仍只观察根函数与编译交接，不证明全部辅助函数/动态依赖的来源。因此编译观察和运行时缓存快照都保持 `formal_origin_qualified=false`、`loaded_binary_identity_proven=false`；下一节的可选原生观察器单独核对加载字节与提交序号，R-08/R-16 继续部分实现。来源观察统一放在 [neuron_origin.py](../kb_workflows/provenance/neuron_origin.py)；[neuron_work.py](../kb_workflows/hardware/neuron_work.py)只组合采集与资源需求模型。
+
+## 可选原生加载与提交观察
+
+在 Neuron config 的 `[run]` 中启用：
+
+```toml
+neuron_runtime_origin = true
+neuron_runtime_include = "/opt/aws/neuron/include"
+neuron_runtime_compiler = "c++"
+```
+
+默认关闭，只用于公开开发 profile。SDK include 路径可配置；配置文件里的相对路径按配置目录解析。正式 evaluate、baseline 和 paired_timing 不启动观察器。启用时要求同一原生 worker 主机已安装 C++ 编译器及 NRT 头文件；缺失、编译失败或收集失败会明确失败，不退回一个声称已观察的结果。本轮没有安装或调用实际 NRT。
+
+轻量 worker 入口先编译仓库自己的 [C++ 观察器](../kb_workflows/provenance/neuron_runtime.cpp)，然后在导入 Torch/Neuron 和候选前，以 `LD_PRELOAD` 重启同一 worker。编译直接使用所配置 SDK 的 `nrt.h`、`nrt_async.h` 和 `nrt_experimental.h` 声明；不自行猜测 `nrta_seq_t` 布局。构建收据固定源码、编译器及这三个直接头文件的摘要，并在构建后复查，保留命令与 SO 摘要。它不认证工具链的全部传递依赖。
+
+观察外层 `nrt_load`、`nrt_load_collectives`、`nrt_unload` 和 `nrta_execute_schedule`。加载时保存字节副本，并把这个副本传给真实 NRT；成功加载的缓冲区持续保留到成功卸载。模型地址复用产生不同代次，库内部嵌套转发不会重复认领一次加载。全局符号不可见时只查找已经加载的唯一 `libnrt.so` 路径，兼容 Python 的局部加载；不会因此另行加载 SDK，多版本含糊时拒绝。复制最多128 MiB/次、总计512 MiB、4096代，日志最多200,000条收集操作；超限留下错误，不取得加载身份。
+
+profile 同步完成后封口原生日志。`native_runtime/` 保存 SO、构建清单、原始 JSONL 和每次加载的 NEFF；它们仍受整个采集树的4096文件、每文件128 MiB、总计512 MiB限制，原生快照不额外增加磁盘额度。worker 复查加载观察器的工件，再按日志重放成功加载/卸载的代次，用原生异步序号关联框架 `privateuse1_driver` 事件。两种观察器共用事件选择与区间有效性政策，显式 host worker 不在该范围。序号缺失、重复含糊、没有本次活模型或文件不一致时拒绝相应关联；没有用事件名称或当前缓存字节认领加载身份。
+
+`kernelbench_pro_neuron_native_runtime_v1` 的 `loaded_binary_identity_proven` 仅在真实收据覆盖全部选中 driver 事件时为true。这里证明的是观察到的加载与异步提交关联；调度返回成功本身不证明设备完成、输出有用性或全部硬件活动覆盖。模拟收据始终不能取得真实加载身份，默认验证也拒绝模拟标记。`formal_origin_qualified` 仍为false：辅助函数编译归属、实际评分连续调用和原生时间的完整关联尚未完成，不能凭这项开发采集通过自写内核门或授予 L1/L2。
+
+接口依据固定提交的 [NRT 调用封装](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/runtime/NRTUtils.cpp)及其正式头文件。当前验证只编译并运行仓库自写的 CPU 假 NRT，覆盖实际预加载、嵌套转发、卸载后同址复用、序号匹配/缺失、原始工件及启动参数；它不证明某一实际 SDK 安装的 ABI 或设备兼容性。其他加载/执行 API、不同进程、绕过预加载的路径不在支持范围。
 
 ## 审核后的资源需求模型
 

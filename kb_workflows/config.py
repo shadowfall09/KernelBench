@@ -32,6 +32,9 @@ class RunConfig:
     task_dimensions: str = ""
     device_backend: str = "cuda"
     device_python: str = ""
+    neuron_runtime_origin: bool = False
+    neuron_runtime_include: str = "/opt/aws/neuron/include"
+    neuron_runtime_compiler: str = "c++"
     start: int = 1
     end: int | None = None
     run_name: str = ""
@@ -348,6 +351,11 @@ class RunConfig:
             raise ValueError("--gpus must contain distinct numeric device IDs")
         if self.device_backend not in {"cuda", "neuron"}:
             raise ValueError("Unknown device backend")
+        if type(self.neuron_runtime_origin) is not bool or self.neuron_runtime_origin and self.device_backend != "neuron":
+            raise ValueError("Native NRT origin observation requires the Neuron backend")
+        if not self.neuron_runtime_include or not self.neuron_runtime_compiler:
+            raise ValueError("Native NRT observation requires compiler and SDK include paths")
+        self.neuron_runtime_include = str(Path(self.neuron_runtime_include).expanduser().resolve())
         if self.device_python:
             self.device_python = os.path.abspath(Path(self.device_python).expanduser())
         profiles = gpu_profiles()
@@ -497,6 +505,8 @@ def parser():
         "task_dimensions",
         "device_backend",
         "device_python",
+        "neuron_runtime_include",
+        "neuron_runtime_compiler",
         "sanitizer_tools",
         "sanitizer_command",
         "determinism_policy_file",
@@ -541,7 +551,7 @@ def parser():
             default=argparse.SUPPRESS,
             **({"choices": choices[name]} if name in choices else {}),
         )
-    for name in ("paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation", "allocation_validation", "throughput_validation", "cache_validation"):
+    for name in ("neuron_runtime_origin", "paired_timing", "resume", "enable_ncu", "hidden_tests", "strict_validation", "record_baseline", "bedrock", "build_image", "dry_run", "baseline_suite", "score_gate_required", "agent_profile", "determinism_checks", "state_validation", "numerical_validation", "allocation_validation", "throughput_validation", "cache_validation"):
         flag = name.replace("_", "-")
         p.add_argument(f"--{flag}", dest=name, type=boolean, nargs="?", const=True, default=argparse.SUPPRESS)
         p.add_argument(f"--no-{flag}", dest=name, action="store_false", default=argparse.SUPPRESS)
@@ -574,7 +584,7 @@ def file_options(path, argument_parser):
             raise ValueError(f"run.{key} must be {expected.__name__}, got {type(value).__name__}")
         if actions[key].choices and value not in actions[key].choices:
             raise ValueError(f"Invalid run.{key}: {value!r}; choose from {actions[key].choices}")
-        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest", "device_python"} and value:
+        if key in {"runs_dir", "problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file", "regrade_manifest", "device_python", "neuron_runtime_include"} and value:
             candidate = Path(value).expanduser()
             candidate = candidate if candidate.is_absolute() else path.parent / candidate
             value = os.path.abspath(candidate) if key == "device_python" else str(candidate.resolve())
