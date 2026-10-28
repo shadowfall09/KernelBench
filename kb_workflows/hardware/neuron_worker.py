@@ -104,11 +104,22 @@ def profile_source_cache(payload):
 def evaluate(payload, *, adapter=None):
     import torch
 
+    from ..provenance.neuron_origin import CompilationObserver
     from ..provenance.submission_source import SourceRegistry, record_sources
 
     registry = SourceRegistry()
-    with torch.no_grad(), profile_source_cache(payload), record_sources(registry):
+    observer = CompilationObserver(registry) if payload.get("task") == "profile" else nullcontext()
+    with torch.no_grad(), profile_source_cache(payload), record_sources(registry), observer:
         result = _evaluate(payload, adapter=adapter, registry=registry)
+    if payload.get("task") == "profile":
+        from .neuron_processing import DEFAULT_LIMITS, file_manifest
+
+        result["compiler_observations"] = observer.value
+        if directory := result.get("vendor_artifact_directory"):
+            observer.export(directory)
+            files = file_manifest(directory, DEFAULT_LIMITS)
+            result["artifact_files"] = {name: row["sha256"] for name, row in files.items()}
+            result["artifact_file_bytes"] = {name: row["bytes"] for name, row in files.items()}
     build = ROOT / "cache/workflow" / fingerprint(payload)
     hashes = {}
     for key, name in (("ref_arch_src", "reference.py"), ("kernel_src", "candidate.py")):

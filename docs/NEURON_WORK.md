@@ -46,6 +46,18 @@ Neuron worker与CUDA共用源码冻结、字节核对和编译注册，`source_r
 
 这里观测的是执行事件key与查询时的缓存字节快照；它没有捕获编译前端到NEFF的完整生成链，也没有读取实际加载到设备的二进制。因此`loaded_binary_identity_proven`与`formal_origin_qualified`保持false，不能据此通过Neuron自写内核门或授予L1/L2资格。
 
+## 编译前端与框架降低观察
+
+开发 profile 现在同时保留 `kernelbench_pro_neuron_compilation_observation_v1`。观察器在导入候选前固定 NKI 编译入口的代码对象，以当前 Python 线程的实际调用/返回事件关联 `compile_to_bir`、`NKIFrontend.compile`、`compile_mlir_to_bir`、`NirResult.build_config` 和框架 `_lower_custom_nki`。它不替换 SDK 函数，也不覆盖已有 Python profiler；已有 profiler、回调被替换或入口代码变化都会留下未完成原因。正式 evaluate、baseline、paired_timing 路径不启用这项开发插桩。
+
+只有实际前端返回的 MLIR 对象传给实际 BIR 降低、同一个 NirResult 返回框架配置、配置和 BIR 字节在框架降低时仍一致，才标记 `fresh_lowering_observed`。内存缓存、持久 trace 缓存跳过前端，或模块对象不对应时保留缺失阶段。源码身份来自本次冻结编译注册的代码对象；相同文件名和另行编译的相等代码对象不等于已注册对象。外部根函数单独记录为代码观察，不能据此认领自写内核。
+
+每次 BIR 快照最多16 MiB，总计64 MiB；流水线、配置对象和降低调用分别最多4096项。原始字节保存到既有 profile 工件树的 `compiler_ir/<sha256>.bir`，纳入统一哈希/字节清单。收据记录入口代码摘要、逐阶段观察、BIR 摘要及实际 StableHLO 摘要/cache key；验证器检查阶段依赖、原始工件和模拟标记。StableHLO 摘要不等于保留了完整 HLO 文件。
+
+实现依据是 [NKI 0.7.0 官方 wheel](https://pip.repos.neuron.amazonaws.com/nki/nki-0.7.0%2B37713544100.gfede04bb-cp312-cp312-linux_x86_64.whl) 的编译驱动，以及固定提交的 [Torch Neuron NKI 降低](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/python_ops/neuron_nki_call_lowering.py)。这不是所有 SDK 版本的兼容保证：其他前端、线程、缓存或编译路径未观察到时保持未知。本次仅静态阅读 SDK，并用明确模拟的 CPU 流水线验证协议，没有导入或运行 Neuron SDK。
+
+这里仍只观察根函数与编译交接，不证明全部辅助函数/动态依赖的来源，也未核对实际 `nrt_load` 字节与设备执行序号。因此编译观察和运行时缓存快照都保持 `formal_origin_qualified=false`、`loaded_binary_identity_proven=false`，R-08/R-16 继续部分实现。来源观察统一放在 [neuron_origin.py](../kb_workflows/provenance/neuron_origin.py)；[neuron_work.py](../kb_workflows/hardware/neuron_work.py)只组合采集与资源需求模型。
+
 ## 审核后的资源需求模型
 
 Neuron worker的profile返回`kernelbench_pro_neuron_verified_capture_v2`收据。它在冻结编译源码再次核对后生成，保留候选/参考源码、配置、完整输入/输出内容摘要、输入几何和布局、此前正确性用例、实际设备/软件、模式、seed、比较政策和原生工件哈希/字节数，并记录原生worker的可见core清单。实际候选模型在采集前后分别通过共享状态遍历记录参数/buffer、普通属性、类数据、入口代码/default/closure及输入/状态别名摘要；合法状态更新可使前后摘要不同。内容摘要分块复制到主机，不再用参考模型的256点注册状态探针替代候选状态。所有摘要及输入隔离复制都在采集区间外完成，采集中只有候选前向及完成屏障。

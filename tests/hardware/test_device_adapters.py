@@ -311,7 +311,7 @@ def test_neuron_library_baselines_preserve_production_semantics(pid, monkeypatch
     assert compare_outputs(expected, library(*args), 1e-5) is None
 
 
-def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(payload, monkeypatch):
+def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(payload, monkeypatch, tmp_path):
     import importlib.util
     import os
     import py_compile
@@ -347,6 +347,84 @@ def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(pay
     crlf = copy.deepcopy(request)
     crlf["kernel_src"] = request["kernel_src"].replace("\n", "\r\n")
     assert neuron_worker.evaluate(crlf, adapter=SimulatedNeuron())["correctness"]
+
+    from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
+    from kb_workflows.provenance.neuron_origin import CompilationObserver, validate_compilation
+
+    ir = tmp_path / "observed.bir"
+    ir.write_bytes(b"SIMULATED BIR; no NKI compiler or device executed")
+    module = object()
+
+    def frontend(kernel_fn):
+        kernel = SimpleNamespace(func=kernel_fn)
+        assert kernel.func is kernel_fn
+        return SimpleNamespace(module=module)
+
+    def bir(module):
+        return SimpleNamespace(descriptor=SimpleNamespace(kernel_json_path=ir))
+
+    def pipeline(kernel_func, *, cached=False, mismatch=False):
+        if cached:
+            return SimpleNamespace(descriptor=SimpleNamespace(kernel_json_path=ir))
+        result = frontend(kernel_func)
+        return bir(object() if mismatch else result.module)
+
+    def build_config(self):
+        return SimpleNamespace(backend_config_b64=b"SIMULATED backend config",
+                               backend_config={"klir_binary": {"binary": str(ir)}})
+
+    def lower(dconfig, *, corrupt=False):
+        backend_config = dconfig.backend_config_b64.decode("ascii")
+        if corrupt:
+            ir.write_bytes(b"CHANGED BIR")
+        assert backend_config
+        return SimpleNamespace(stablehlo_bytes=b"SIMULATED StableHLO", cache_key="simulated-key")
+
+    functions = {"pipeline": pipeline, "frontend": frontend, "bir": bir, "config": build_config, "lower": lower}
+    with CompilationObserver(registry, functions=functions) as observer:
+        lower(build_config(pipeline(namespace["ModelNew"].forward)))
+    directory = tmp_path / "compiler-capture"
+    directory.mkdir()
+    observation = observer.export(directory)
+    files = file_manifest(directory, DEFAULT_LIMITS)
+    hashes, sizes = {k: r["sha256"] for k, r in files.items()}, {k: r["bytes"] for k, r in files.items()}
+    assert observation["status"] == "observed" and observation["simulated"]
+    assert observation["pipelines"][0]["root"]["source_sha256"] == value["metadata"]["compiler_source_sha256"]["candidate.py"]
+    assert observation["pipelines"][0]["cache_keys"] == ["simulated-key"]
+    assert not observation["formal_origin_qualified"] and not observation["loaded_binary_identity_proven"]
+    validate_compilation(observation, hashes, sizes, allow_simulated=True)
+    with pytest.raises(ValueError, match="receipt"):
+        validate_compilation(observation, hashes, sizes)
+    with pytest.raises(ValueError, match="BIR snapshot"):
+        validate_compilation(observation, {}, {}, allow_simulated=True)
+    for options in ({"cached": True}, {"mismatch": True}):
+        with CompilationObserver(registry, functions=functions) as missing:
+            lower(build_config(pipeline(namespace["ModelNew"].forward, **options)))
+        assert missing.value["status"] == "partial"
+        assert not missing.value["pipelines"][0]["fresh_lowering_observed"]
+    with CompilationObserver(registry, functions=functions) as changed:
+        lower(build_config(pipeline(namespace["ModelNew"].forward)), corrupt=True)
+    assert changed.value["issues"] and not changed.value["pipelines"][0]["fresh_lowering_observed"]
+    with CompilationObserver(registry, functions=functions) as disrupted:
+        sys.setprofile(None)
+    assert disrupted.value["status"] == "partial" and disrupted.value["issues"]
+    assert sys.getprofile() is None
+    from types import FunctionType
+
+    recompiled = FunctionType(pipeline.__code__.replace(), pipeline.__globals__, closure=pipeline.__closure__)
+    with CompilationObserver(registry, functions=functions) as unregistered:
+        recompiled(namespace["ModelNew"].forward, cached=True, mismatch=False)
+    assert unregistered.value["pipelines"] == []
+    assert unregistered.value["status"] == "not_measured"
+    def previous(*args):
+        return None
+    sys.setprofile(previous)
+    try:
+        with CompilationObserver(registry, functions=functions) as occupied:
+            assert sys.getprofile() is previous
+        assert sys.getprofile() is previous and occupied.value["issues"]
+    finally:
+        sys.setprofile(None)
     path.write_text("# changed compiled source")
     with pytest.raises(ValueError, match="compiler source file"):
         neuron_worker.evaluate(engine.task_payload(config, 19), adapter=SimulatedNeuron())
@@ -382,7 +460,8 @@ def test_native_caps_bind_compiler_versions_and_physical_core_without_sdk_execut
 
 
 def test_neuron_profile_api_retains_native_artifact_hashes_with_a_simulated_sdk(tmp_path, monkeypatch):
-    from kb_workflows.hardware.neuron_work import runtime_neff_bindings, seal, validate_runtime_neff
+    from kb_workflows.hardware.neuron_work import seal
+    from kb_workflows.provenance.neuron_origin import runtime_neff_bindings, validate_runtime_neff
 
     directory, observed, events = tmp_path / "profile", [], []
     monkeypatch.setenv("TORCH_NEURONX_NEFF_CACHE_DIR", str(tmp_path / "source_cache"))
@@ -566,7 +645,12 @@ def get_inputs(): return [torch.randn(2,3)]
                     return function()
                 finally:
                     active = False
-            return super().profile(captured, directory=directory, verifier=verifier)
+            report = super().profile(captured, directory=directory, verifier=verifier)
+            directory.mkdir(parents=True)
+            (directory / "fixture.neff").write_bytes(b"SIMULATED NEFF")
+            (directory / "fixture.ntff").write_bytes(b"SIMULATED NTFF")
+            report["vendor_artifact_directory"] = str(directory)
+            return report
 
     monkeypatch.setattr(torch.Tensor, "clone", clone)
     monkeypatch.setattr(state_paths, "invocation_state", state)
@@ -577,6 +661,9 @@ def get_inputs(): return [torch.randn(2,3)]
     assert capture["binding"]["input_layout_sha256"] and capture["binding"]["output_content_sha256"]
     assert observed_states == [capture["call"]["model_state_before"], capture["call"]["model_state_after"]]
     assert capture["compiler_source_sha256"] == result["metadata"]["compiler_source_sha256"]
+    assert capture["artifact_file_bytes"] == {"fixture.neff": 14, "fixture.ntff": 14}
+    assert capture["compiler_observations"] == result["compiler_observations"]
+    assert not capture["compiler_observations"]["formal_origin_qualified"]
 
 
 @pytest.mark.parametrize("throws", [False, True])

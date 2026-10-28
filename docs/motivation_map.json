@@ -1428,9 +1428,10 @@
         "kb_workflows/evaluation/measurement.py",
         "kb_workflows/evaluation/paired_task.py",
         "kb_workflows/hardware/neuron_work.py",
-        "kb_workflows/hardware/neuron_worker.py"
+        "kb_workflows/hardware/neuron_worker.py",
+        "kb_workflows/provenance/neuron_origin.py"
       ],
-      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron已有本次编译代码对象注册及运行时key/当前NEFF缓存快照，编译归属与实际加载身份仍未建立；未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
+      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron已有本次编译代码对象注册、实际前端→MLIR/BIR→框架降低交接观察、BIR原始快照及运行时key/当前NEFF缓存快照；缓存跳过阶段保持未知，辅助依赖归属与实际加载身份仍未建立；未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
     },
     {
       "id": "R-09",
@@ -1571,7 +1572,8 @@
         "docs/KERNEL_ORIGIN.md",
         "kb_workflows/evaluation/evidence.py",
         "kb_workflows/evaluation/tool_runner.py",
-        "kb_workflows/common.py"
+        "kb_workflows/common.py",
+        "kb_workflows/provenance/neuron_origin.py"
       ],
       "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。CUDA L2软件已按标准/隐藏/冻结/配对重放计数器与逐内核资源模型、原始独占驱动观察及安全/重复收据，旧分数随工件变化失效；独立诊断不单独授予等级。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key关联当前NEFF缓存快照，未证明实际加载身份。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、跨平台完整归因。模拟资料不授予资格，未运行设备或工具实验"
     },
@@ -4768,18 +4770,21 @@
     },
     {
       "id": "V43-04",
-      "title": "Neuron采集导出与源码缓存",
+      "title": "Neuron采集、编译观察与缓存快照",
       "primary": "M5",
-      "secondary": [],
+      "secondary": [
+        "M2"
+      ],
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/hardware/neuron_device.py",
         "docs/NEURON_WORK.md",
         "tests/hardware/test_device_adapters.py",
-        "kb_workflows/hardware/neuron_work.py"
+        "kb_workflows/hardware/neuron_work.py",
+        "kb_workflows/provenance/neuron_origin.py"
       ],
-      "reason": "接NeuronProfiler.export_trace与编译前私有NEFF缓存；设备事件的运行时/持久化key按SDK当前缓存字节关联，每对key只查一次，保存原始事件索引、哈希和字节。复用已有NEFF，缺少才保存快照；缺失或不一致保留未知，不证明实际加载或源码编译归属"
+      "reason": "接NeuronProfiler.export_trace及编译前私有缓存。开发profile固定SDK代码对象，以实际前端/IR对象、BIR返回对象和框架配置交接记录根源码→BIR→StableHLO/key，保留限额BIR原始字节并重放阶段和清单。缓存跳过、对象/字节不一致、已有或被替换profiler保留未知；正式计时不启用。运行时key按SDK当前NEFF缓存字节关联并保留事件索引，复用现有NEFF。来源逻辑移归provenance，不证明全部辅助依赖或实际加载，不授予正式资格；仅扩展集中软件回归，不运行实验"
     },
     {
       "id": "V43-05",

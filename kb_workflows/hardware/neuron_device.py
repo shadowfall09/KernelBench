@@ -217,8 +217,8 @@ class NeuronDevice:
         path = directory / "framework_trace.json"
         capture.export_chrome_trace(str(path))
         del output
+        from ..provenance.neuron_origin import runtime_neff_bindings
         from .neuron_processing import DEFAULT_LIMITS, file_manifest
-        from .neuron_work import runtime_neff_bindings
 
         bindings = runtime_neff_bindings(path, directory, getattr(self, "_neff_info", None))
 
