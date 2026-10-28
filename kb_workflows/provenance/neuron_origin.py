@@ -28,6 +28,7 @@ RUNTIME_NEFF_SCOPE = "privateuse1_driver_events_to_current_cache_snapshots; expl
 COMPILATION = "kernelbench_pro_neuron_compilation_observation_v2"
 COMPILATION_SCOPE = "current_python_thread; frontend_to_bir_to_framework_lowering; gather_files_and_static_callable_references"
 DEPENDENCY_SCOPE = "returned_gather_files_and_static_call_references; not_native_ast_callee_attestation"
+BIR_SCOPE = "nki_0.7_original_emission_per_core_work_dir_npy_and_optional_debug_sidecar"
 
 
 def _seal(value):
@@ -41,7 +42,8 @@ def _compiler_functions():
 
     return {"pipeline": driver.compile_to_bir, "frontend": frontend.NKIFrontend.compile,
             "bir": ncc_driver.compile_mlir_to_bir, "config": ncc_driver.NirResult.build_config,
-            "lower": _lower_custom_nki, "parser": frontend.ParserFrontend._compile, "source": inspect.getsourcelines}
+            "lower": _lower_custom_nki, "parser": frontend.ParserFrontend._compile, "source": inspect.getsourcelines,
+            "emitter": ncc_driver._run_minimal_pipeline_and_report_allocation}
 
 
 class CompilationObserver:
@@ -56,6 +58,7 @@ class CompilationObserver:
         self.functions = functions
         self.language, self.kernel_types = language, ()
         self.source_binaries = {}
+        self.aux_binaries = {}
         self.ast_binaries, self.native_frames = {}, {}
         self.native_frontend, self.native_original, self.native_factory = native_frontend, None, None
         self.compiler_index, self.compiler_inputs = None, {}
@@ -94,7 +97,7 @@ class CompilationObserver:
                 self.native_frontend = frontend
             self.codes = {id(fn.__code__): (fn.__code__, name) for name, fn in self.functions.items()}
             names = {name for _, name in self.codes.values()}
-            if not {"pipeline", "frontend", "bir", "config", "lower"} <= names or names - {"pipeline", "frontend", "bir", "config", "lower", "parser", "source"}:
+            if not {"pipeline", "frontend", "bir", "config", "lower"} <= names or names - {"pipeline", "frontend", "bir", "config", "lower", "parser", "source", "emitter"}:
                 raise ValueError("Unsupported NKI compiler observation contract")
             self.original_codes = {name: fn.__code__ for name, fn in self.functions.items()}
             self.entrypoints = {name: self.registry.callable_identity(fn) for name, fn in self.functions.items()}
@@ -155,7 +158,7 @@ class CompilationObserver:
                     config = [frame.f_locals.get(key) for key in ("arch", "arch_sub_version", "lnc")]
                     packet = bind(raw, state["reads"], config, simulated=self.injected)
                     digest = packet["ast_sha256"]
-                    total = sum(len(v) for collection in (self.binaries, self.source_binaries, self.ast_binaries) for v in collection.values())
+                    total = sum(len(v) for collection in (self.binaries, self.source_binaries, self.ast_binaries, self.aux_binaries) for v in collection.values())
                     if digest not in self.ast_binaries and total + len(raw) > 64 * 1024**2:
                         raise ValueError("NKI compiler snapshots exceed the 64 MiB envelope")
                     self.ast_binaries[digest] = raw
@@ -169,7 +172,7 @@ class CompilationObserver:
         self.native_factory = factory
         self.native_frontend.Kernel = factory
 
-    def _snapshot(self, path, *, source=False):
+    def _snapshot(self, path, *, source=False, auxiliary=False):
         limit = (4 if source else 16) * 1024**2
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         with os.fdopen(fd, "rb") as stream:
@@ -179,11 +182,41 @@ class CompilationObserver:
         if not 0 < len(raw) <= limit:
             raise ValueError("NKI compiler input exceeds its observation envelope")
         digest = hashlib.sha256(raw).hexdigest()
-        target = self.source_binaries if source else self.binaries
-        if digest not in target and sum(map(len, self.binaries.values())) + sum(map(len, self.source_binaries.values())) + sum(map(len, self.ast_binaries.values())) + len(raw) > 64 * 1024**2:
+        target = self.source_binaries if source else self.aux_binaries if auxiliary else self.binaries
+        if digest not in target and sum(len(v) for collection in (self.binaries, self.source_binaries, self.ast_binaries, self.aux_binaries) for v in collection.values()) + len(raw) > 64 * 1024**2:
             raise ValueError("NKI compiler snapshots exceed the 64 MiB envelope")
         target[digest] = raw
         return digest
+
+    def _bir_files(self, descriptor, work_dir):
+        """Freeze the reviewed SDK's emitted bundle, before it can use the cache."""
+        main = Path(descriptor.kernel_json_path).absolute()
+        paths = [("bir", main)]
+        cores = tuple(getattr(descriptor, "per_core_json_paths", ()) or ())
+        if len(cores) > 64:
+            raise ValueError("NKI per-core BIR set exceeds its envelope")
+        paths.extend(("per_core:" + str(n), Path(path).absolute()) for n, path in enumerate(cores))
+        with os.scandir(work_dir) as entries:
+            for entry in entries:
+                if not entry.name.startswith(".") and entry.name.endswith(".npy"):
+                    paths.append(("constant:" + entry.name, Path(entry.path).absolute()))
+                    if len(paths) > 255:
+                        raise ValueError("NKI BIR bundle exceeds 256 files")
+        debug = Path(str(main) + ".debuginfo.json")
+        if debug.exists() or debug.is_symlink():
+            paths.append(("debug", debug))
+        rows = []
+        for role, path in sorted(paths):
+            auxiliary = role == "debug" or role.startswith("constant:")
+            digest = self._snapshot(path, auxiliary=auxiliary)
+            rows.append({"role": role, "path": str(path), "sha256": digest,
+                         "artifact": ("compiler_inputs/" + digest + ".bin") if auxiliary else ("compiler_ir/" + digest + ".bir")})
+        return rows
+
+    def _check_bir_files(self, descriptor, row):
+        packet = row.get("bir_emission")
+        if packet is not None and self._bir_files(descriptor, Path(descriptor.kernel_json_path).parent) != packet["effective_files"]:
+            raise ValueError("NKI emitted BIR bundle changed before compiler handoff")
 
     def references(self, function):
         """Resolve a conservative static view; dynamic/opaque calls stay unknown."""
@@ -302,6 +335,7 @@ class CompilationObserver:
             function = getattr(kernel, "func", kernel)
             row["source_dependencies"] = None
             row["native_ast"] = None
+            row["bir_emission"] = None
             self.rows.append(row)
             self.frames[frame] = {"row": row, "references": self.references(function)}
         if name == "parser" and event == "call":
@@ -341,8 +375,27 @@ class CompilationObserver:
                 if packet := active["row"]["native_ast"]:
                     packet["module_handoff_observed"] = result.module is active.get("native_module")
                     _seal(packet)
+        elif name == "emitter" and active is not None and result is not None:
+            caller = frame.f_back
+            if (caller is not None and caller.f_code is self.original_codes["bir"]
+                    and local["module"] is active.get("module") and active["row"]["frontend_observed"]):
+                if not isinstance(result, tuple) or len(result) != 4:
+                    raise ValueError("Unsupported NKI BIR emission result")
+                active["emission"] = result[1]
+                active["row"]["bir_emission"] = {"scope": BIR_SCOPE,
+                    "files": self._bir_files(result[1], caller.f_locals["work_dir"]),
+                    "effective_files": [], "cache_copy_matched": False}
         elif name == "bir" and active is not None and result is not None:
             if local["module"] is active.get("module") and active["row"]["frontend_observed"]:
+                if "emitter" in self.functions:
+                    packet = active["row"]["bir_emission"]
+                    if packet is None or local.get("bir_result") is not active.get("emission"):
+                        raise ValueError("NKI BIR lacks its original emission")
+                    packet["effective_files"] = self._bir_files(result.descriptor, Path(result.descriptor.kernel_json_path).parent)
+                    packet["cache_copy_matched"] = ({r["role"]: r["sha256"] for r in packet["files"]}
+                        == {r["role"]: r["sha256"] for r in packet["effective_files"]})
+                    if not packet["cache_copy_matched"]:
+                        raise ValueError("NKI cached BIR bundle differs from its original emission")
                 active["bir"] = result
                 active["row"]["bir_sha256"] = self._snapshot(result.descriptor.kernel_json_path)
                 active["row"]["bir_path"] = str(Path(result.descriptor.kernel_json_path).resolve())
@@ -355,13 +408,14 @@ class CompilationObserver:
             nir = self.nirs.get(id(local["self"]))
             if nir and nir[0] is local["self"] and nir[2]:
                 row = nir[1]
+                self._check_bir_files(nir[0].descriptor, row)
                 if self._snapshot(nir[0].descriptor.kernel_json_path) == row["bir_sha256"]:
                     config = result.backend_config_b64
                     if type(config) is not bytes or not 0 < len(config) <= 1024**2:
                         raise ValueError("Invalid NKI backend configuration")
                     if len(self.configs) >= 4096 and id(result) not in self.configs:
                         raise ValueError("NKI configuration observations exceed 4096 objects")
-                    self.configs[id(result)] = (result, row, config)
+                    self.configs[id(result)] = (result, row, config, nir[0])
                     row["config_observed"] = True
         elif name == "lower" and result is not None:
             self.lower_count += 1
@@ -374,6 +428,9 @@ class CompilationObserver:
                     raise ValueError("NKI backend configuration changed before lowering")
                 if self._snapshot(local["dconfig"].backend_config["klir_binary"]["binary"]) != row["bir_sha256"]:
                     raise ValueError("NKI BIR changed before framework lowering")
+                self._check_bir_files(config[3].descriptor, row)
+                if row.get("bir_emission") and str(Path(local["dconfig"].backend_config["klir_binary"]["binary"]).absolute()) != row["bir_path"]:
+                    raise ValueError("NKI framework lowering changed its BIR bundle path")
                 hlo, key = result.stablehlo_bytes, result.cache_key
                 if type(hlo) is not bytes or not 0 < len(hlo) <= 64 * 1024**2 or type(key) is not str or not 0 < len(key) <= 4096:
                     raise ValueError("Invalid NKI StableHLO/key observation")
@@ -382,7 +439,16 @@ class CompilationObserver:
                 if self.compiler_index is not None:
                     from ..common import atomic_json
 
-                    self.compiler_inputs[digest] = [{"path": row["bir_path"], "sha256": row["bir_sha256"]}]
+                    bundle = (row.get("bir_emission") or {}).get("effective_files") or [{"path": row["bir_path"], "sha256": row["bir_sha256"]}]
+                    inputs = {r["path"]: r for r in self.compiler_inputs.get(digest, [])}
+                    for item in bundle:
+                        if item["path"] in inputs and inputs[item["path"]]["sha256"] != item["sha256"]:
+                            raise ValueError("Conflicting compiler input bundles for the same StableHLO")
+                        role = "bir" if inputs.get(item["path"], {}).get("role") == "bir" else item.get("role")
+                        inputs[item["path"]] = {"path": item["path"], "sha256": item["sha256"], "role": role}
+                    if len(inputs) > 256:
+                        raise ValueError("Compiler input bundle exceeds 256 files")
+                    self.compiler_inputs[digest] = list(inputs.values())
                     if len(self.compiler_inputs) > 4096:
                         raise ValueError("Compiler input index exceeds its envelope")
                     atomic_json(self.compiler_index, self.compiler_inputs)
@@ -397,7 +463,7 @@ class CompilationObserver:
 
     def export(self, directory):
         """Preserve observed BIR bytes inside the existing profile artifact tree."""
-        for folder, binaries, extension in (("compiler_ir", self.binaries, ".bir"), ("compiler_sources", self.source_binaries, ".py"), ("compiler_ast", self.ast_binaries, ".msgpack")):
+        for folder, binaries, extension in (("compiler_ir", self.binaries, ".bir"), ("compiler_sources", self.source_binaries, ".py"), ("compiler_ast", self.ast_binaries, ".msgpack"), ("compiler_inputs", self.aux_binaries, ".bin")):
             if not binaries:
                 continue
             root = Path(directory) / folder
@@ -421,7 +487,7 @@ def validate_compilation(value, files, sizes, *, allow_simulated=False):
         raise ValueError("Invalid Neuron compiler observation envelope")
     entrypoints = value.get("compiler_entrypoints")
     required = {"pipeline", "frontend", "bir", "config", "lower"}
-    if (not isinstance(entrypoints, dict) or entrypoints and (not required <= set(entrypoints) or set(entrypoints) - required - {"parser", "source"})
+    if (not isinstance(entrypoints, dict) or entrypoints and (not required <= set(entrypoints) or set(entrypoints) - required - {"parser", "source", "emitter"})
             or any(not isinstance(item, dict) or not sha(item.get("code_sha256")) for item in entrypoints.values())
             or rows and not entrypoints):
         raise ValueError("Invalid Neuron compiler entrypoint observations")
@@ -436,6 +502,43 @@ def validate_compilation(value, files, sizes, *, allow_simulated=False):
                 or row["fresh_lowering_observed"] and not row["config_observed"]):
             raise ValueError("Inconsistent Neuron compiler stages")
         digest = row.get("bir_sha256")
+        emission = row.get("bir_emission")
+        if emission is not None:
+            if (not isinstance(emission, dict) or emission.get("scope") != BIR_SCOPE or "emitter" not in entrypoints
+                    or not row["frontend_observed"] or type(emission.get("cache_copy_matched")) is not bool):
+                raise ValueError("Invalid original NKI BIR emission observation")
+            signatures = []
+            for field in ("files", "effective_files"):
+                bundle = emission.get(field)
+                if not isinstance(bundle, list) or len(bundle) > 256 or field == "files" and not bundle:
+                    raise ValueError("Invalid NKI BIR bundle envelope")
+                roles = {}
+                for item in bundle:
+                    role = item.get("role") if isinstance(item, dict) else None
+                    auxiliary = isinstance(role, str) and (role == "debug" or role.startswith("constant:"))
+                    if (not isinstance(role, str) or role in roles
+                            or not (role in {"bir", "debug"} or role in {"per_core:" + str(n) for n in range(64)}
+                                    or role.startswith("constant:") and Path(role[9:]).name == role[9:]
+                                    and not role[9:].startswith(".") and role.endswith(".npy"))
+                            or not isinstance(item.get("path"), str) or not Path(item["path"]).is_absolute()
+                            or not 0 < len(item["path"]) <= 4096 or "\x00" in item["path"] or not sha(item.get("sha256"))):
+                        raise ValueError("Invalid NKI BIR bundle file")
+                    artifact = ("compiler_inputs/" + item["sha256"] + ".bin") if auxiliary else ("compiler_ir/" + item["sha256"] + ".bir")
+                    if (item.get("artifact") != artifact or files.get(artifact) != item["sha256"] or sizes is None
+                            or not 0 < sizes.get(artifact, 0) <= 16 * 1024**2):
+                        raise ValueError("NKI BIR bundle snapshot missing or changed")
+                    roles[role] = item["sha256"]
+                    artifacts.add(artifact)
+                if bundle and "bir" not in roles:
+                    raise ValueError("NKI BIR bundle lacks its main binary")
+                signatures.append(roles)
+            if (emission["cache_copy_matched"] != (signatures[0] == signatures[1])
+                    or row["bir_lowering_observed"] and (not emission["cache_copy_matched"]
+                        or not any(item["role"] == "bir" and item["path"] == row.get("bir_path") and item["sha256"] == digest
+                                   for item in emission["effective_files"]))):
+                raise ValueError("NKI BIR cache does not match its original emission")
+        elif "emitter" in entrypoints and row["bir_lowering_observed"]:
+            raise ValueError("NKI BIR lacks its original emission observation")
         if row.get("native_ast") is not None:
             from .neuron_ast import validate
 

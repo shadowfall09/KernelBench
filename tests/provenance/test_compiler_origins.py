@@ -84,13 +84,17 @@ extern "C" int exercise(const char* cwd) {
     (work / "module.mlir").write_bytes(b"SIMULATED StableHLO")
     bir_file = work / "input.bir"
     bir_file.write_bytes(b"SIMULATED BIR")
+    constant_file = work / "weight.npy"
+    constant_file.write_bytes(b"SIMULATED NPY")
     fake_compiler = tmp_path / "fake-neuronx-cc"
-    fake_compiler.write_text("#!" + os.sys.executable + "\nfrom pathlib import Path\nPath('module.neff').write_bytes(b'SIMULATED NEFF\\x00')\n")
+    fake_compiler.write_text("#!" + os.sys.executable + "\nfrom pathlib import Path\nPath('module.neff').write_bytes(b'SIMULATED NEFF\\x00')\n"
+                            "if Path('inject-constant').exists(): Path('late.npy').write_bytes(b'LATE CONSTANT')\n")
     fake_compiler.chmod(0o755)
     manifest = neuron_runtime.build(tmp_path / "runtime", include.parent, "c++", fingerprint(request), simulated=True,
                                    backend_compiler=str(fake_compiler))
     (manifest.parent / "compiler-inputs.json").write_text(json.dumps({sha256(b"SIMULATED StableHLO"): [
-        {"path": str(bir_file), "sha256": sha256(b"SIMULATED BIR")}]}))
+        {"path": str(bir_file), "sha256": sha256(b"SIMULATED BIR"), "role": "bir"},
+        {"path": str(constant_file), "sha256": sha256(b"SIMULATED NPY")}]}))
     build_info = json.loads(manifest.read_text())
     capture = tmp_path / "profile"
     capture.mkdir()
@@ -126,9 +130,13 @@ print(json.dumps(result))
     assert result["unresolved_events"] == [2] and not result["loaded_binary_identity_proven"]
     assert not result["formal_origin_qualified"]
     assert len(result["compiler_jobs"]) == 1 and not result["compiler_jobs"][0]["issues"]
+    assert result["compiler_jobs"][0]["constant_directories"] == {str(work): ["weight.npy"]}
     compilation = {"simulated": True, "pipelines": [{"fresh_lowering_observed": True,
         "native_ast": {"all_definition_sources_matched": True, "module_handoff_observed": True, "root_source_sha256": "a"*64},
-        "stablehlo_sha256": [sha256(b"SIMULATED StableHLO")], "bir_path": str(bir_file), "bir_sha256": sha256(b"SIMULATED BIR")} ]}
+        "stablehlo_sha256": [sha256(b"SIMULATED StableHLO")], "bir_path": str(bir_file), "bir_sha256": sha256(b"SIMULATED BIR"),
+        "bir_emission": {"cache_copy_matched": True, "effective_files": [
+            {"path": str(bir_file), "sha256": sha256(b"SIMULATED BIR")},
+            {"path": str(constant_file), "sha256": sha256(b"SIMULATED NPY")} ]}} ]}
     linked = neuron_runtime.compiler_links(compilation, result)
     assert linked["status"] == "partial" and len(linked["links"]) == 2 and linked["simulated"]
     assert linked["unresolved_events"] == [2]
@@ -137,6 +145,11 @@ print(json.dumps(result))
     wrong_hlo = json.loads(json.dumps(compilation))
     wrong_hlo["pipelines"][0]["stablehlo_sha256"] = ["b"*64]
     assert neuron_runtime.compiler_links(wrong_hlo, result)["status"] == "not_measured"
+    missing_bundle = json.loads(json.dumps(compilation))
+    missing_bundle["pipelines"][0]["bir_emission"]["effective_files"][1]["sha256"] = "c"*64
+    assert neuron_runtime.compiler_links(missing_bundle, result)["status"] == "not_measured"
+    missing_bundle["pipelines"][0]["bir_emission"] = None
+    assert neuron_runtime.compiler_links(missing_bundle, result)["status"] == "not_measured"
     from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
 
     files = file_manifest(capture, DEFAULT_LIMITS)
@@ -153,6 +166,24 @@ print(json.dumps(result))
         neuron_runtime.validate(changed, hashes, sizes, allow_simulated=True)
     with pytest.raises(ValueError, match="binary snapshot"):
         neuron_runtime.validate(result, {p: h for p, h in hashes.items() if not p.endswith(".neff")}, sizes, allow_simulated=True)
+    extra_constant = work / "unexpected.npy"
+    extra_constant.write_bytes(b"UNOBSERVED CONSTANT")
+    assert neuron_runtime._compile_job(build_info["backend_compiler"], [str(tmp_path / "extra-job"), str(work),
+        "neuronx-cc", "compile", "module.mlir", "--output", "module.neff"]) == 0
+    extra_receipt = json.loads((tmp_path / "extra-job/receipt.json").read_text())
+    assert any("directory changed before" in issue for issue in extra_receipt["issues"])
+    extra_constant.unlink()
+    constant_file.write_bytes(b"POISONED CONSTANT")
+    assert neuron_runtime._compile_job(build_info["backend_compiler"], [str(tmp_path / "changed-job"), str(work),
+        "neuronx-cc", "compile", "module.mlir", "--output", "module.neff"]) == 0
+    changed_receipt = json.loads((tmp_path / "changed-job/receipt.json").read_text())
+    assert any("BIR changed before" in issue for issue in changed_receipt["issues"])
+    constant_file.write_bytes(b"SIMULATED NPY")
+    (work / "inject-constant").touch()
+    assert neuron_runtime._compile_job(build_info["backend_compiler"], [str(tmp_path / "late-job"), str(work),
+        "neuronx-cc", "compile", "module.mlir", "--output", "module.neff"]) == 0
+    late_receipt = json.loads((tmp_path / "late-job/receipt.json").read_text())
+    assert any("directory changed during" in issue for issue in late_receipt["issues"])
     journal = result["journal"]
     with pytest.raises(ValueError, match="live model"):
         neuron_runtime._journal([journal[0], next(r for r in journal if r["type"] == "execute"), journal[-1]])
@@ -733,18 +764,46 @@ def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(pay
     from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
     from kb_workflows.provenance.neuron_origin import CompilationObserver, validate_compilation
 
-    ir = tmp_path / "observed.bir"
+    ir = tmp_path / "emission" / "observed.bir"
+    ir.parent.mkdir()
     ir.write_bytes(b"SIMULATED BIR; no NKI compiler or device executed")
+    constant = ir.with_name("weight.npy")
+    constant.write_bytes(b"SIMULATED NPY")
+    core = ir.with_name("core.bir")
+    core.write_bytes(b"SIMULATED PER-CORE BIR")
+    Path(str(ir) + ".debuginfo.json").write_bytes(b"SIMULATED DEBUG")
     module = object()
     extra_dependencies = []
+    cache_mode = None
 
     def frontend(kernel_fn):
         kernel = NS(func=kernel_fn)
         assert kernel.func is kernel_fn
         return NS(module=module, dep_files=[kernel_fn.__code__.co_filename, *extra_dependencies])
 
+    def emitter(module):
+        return None, NS(kernel_json_path=ir, per_core_json_paths=(str(core),)), "nki", "nki"
+
     def bir(module):
-        return NS(descriptor=NS(kernel_json_path=ir))
+        work_dir = ir.parent
+        assert work_dir.is_dir()
+        _, bir_result, _, _ = emitter(module)
+        path = ir
+        if cache_mode is not None:
+            path = tmp_path / ("cache-" + cache_mode) / "cached.bir"
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(ir.read_bytes())
+            (path.parent / constant.name).write_bytes(constant.read_bytes())
+            Path(str(path) + ".debuginfo.json").write_bytes(Path(str(ir) + ".debuginfo.json").read_bytes())
+            if cache_mode == "bir":
+                path.write_bytes(b"POISONED CACHE BIR")
+            elif cache_mode == "constant":
+                (path.parent / constant.name).write_bytes(b"POISONED CACHE NPY")
+            elif cache_mode == "extra":
+                (path.parent / "extra.npy").write_bytes(b"EXTRA")
+            elif cache_mode == "missing":
+                (path.parent / constant.name).unlink()
+        return NS(descriptor=NS(kernel_json_path=path, per_core_json_paths=bir_result.per_core_json_paths))
 
     def pipeline(kernel_func, *, cached=False, mismatch=False):
         if cached:
@@ -754,7 +813,7 @@ def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(pay
 
     def build_config(self):
         return NS(backend_config_b64=b"SIMULATED backend config",
-                               backend_config={"klir_binary": {"binary": str(ir)}})
+                               backend_config={"klir_binary": {"binary": str(self.descriptor.kernel_json_path)}})
 
     def lower(dconfig, *, corrupt=False):
         backend_config = dconfig.backend_config_b64.decode("ascii")
@@ -763,7 +822,7 @@ def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(pay
         assert backend_config
         return NS(stablehlo_bytes=b"SIMULATED StableHLO", cache_key="simulated-key")
 
-    functions = {"pipeline": pipeline, "frontend": frontend, "bir": bir, "config": build_config, "lower": lower}
+    functions = {"pipeline": pipeline, "frontend": frontend, "bir": bir, "config": build_config, "lower": lower, "emitter": emitter}
     with CompilationObserver(registry, functions=functions) as observer:
         lower(build_config(pipeline(namespace["ModelNew"].forward)))
     directory = tmp_path / "compiler-capture"
@@ -778,8 +837,41 @@ def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(pay
     validate_compilation(observation, hashes, sizes, allow_simulated=True)
     with pytest.raises(ValueError, match="receipt"):
         validate_compilation(observation, hashes, sizes)
-    with pytest.raises(ValueError, match="BIR snapshot"):
+    with pytest.raises(ValueError, match="snapshot"):
         validate_compilation(observation, {p: h for p, h in hashes.items() if not p.endswith(".bir")}, sizes, allow_simulated=True)
+    bundle = observation["pipelines"][0]["bir_emission"]
+    assert bundle["cache_copy_matched"] and {r["role"] for r in bundle["files"]} == {"bir", "per_core:0", "constant:weight.npy", "debug"}
+    with pytest.raises(ValueError, match="bundle snapshot"):
+        validate_compilation(observation, {p: h for p, h in hashes.items() if not p.startswith("compiler_inputs/")}, sizes, allow_simulated=True)
+    for cache_mode in ("valid", "bir", "constant", "extra", "missing"):
+        with CompilationObserver(registry, functions=functions) as cached_bundle:
+            lower(build_config(pipeline(namespace["ModelNew"].forward)))
+        row = cached_bundle.value["pipelines"][0]
+        assert row["fresh_lowering_observed"] is (cache_mode == "valid")
+        assert row["bir_emission"]["cache_copy_matched"] is (cache_mode == "valid")
+        assert bool(cached_bundle.value["issues"]) is (cache_mode != "valid")
+        cached_dir = tmp_path / ("capture-" + cache_mode)
+        cached_dir.mkdir()
+        cached_bundle.export(cached_dir)
+        inventory = file_manifest(cached_dir, DEFAULT_LIMITS)
+        validate_compilation(cached_bundle.value, {p: r["sha256"] for p, r in inventory.items()},
+                             {p: r["bytes"] for p, r in inventory.items()}, allow_simulated=True)
+    cache_mode = None
+    with CompilationObserver(registry, functions=functions) as shared_hlo:
+        shared_hlo.compiler_index = tmp_path / "shared-inputs.json"
+        lower(build_config(pipeline(namespace["ModelNew"].forward)))
+        cache_mode = "valid"
+        lower(build_config(pipeline(namespace["ModelNew"].forward)))
+    merged = json.loads(shared_hlo.compiler_index.read_text())[sha256(b"SIMULATED StableHLO")]
+    assert {item["path"] for item in merged if item["role"] == "bir"} == {str(ir), str(tmp_path / "cache-valid/cached.bir")}
+    assert {item["path"] for item in merged if item["path"].endswith(".npy")} == {str(constant), str(tmp_path / "cache-valid/weight.npy")}
+    cache_mode = None
+    with CompilationObserver(registry, functions=functions) as changed_constant:
+        config_value = build_config(pipeline(namespace["ModelNew"].forward))
+        constant.write_bytes(b"CHANGED AFTER CONFIG")
+        lower(config_value)
+    assert changed_constant.value["issues"] and not changed_constant.value["pipelines"][0]["fresh_lowering_observed"]
+    constant.write_bytes(b"SIMULATED NPY")
     for options in ({"cached": True}, {"mismatch": True}):
         with CompilationObserver(registry, functions=functions) as missing:
             lower(build_config(pipeline(namespace["ModelNew"].forward, **options)))

@@ -55,9 +55,18 @@ def _compile_job(plan, arguments):
             raise ValueError("Compiler file grew beyond its envelope")
         (directory / name).write_bytes(raw)
         return {"path": str(path.resolve()), "artifact": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+    def constants(parent):
+        names = []
+        with os.scandir(parent) as entries:
+            for entry in entries:
+                if not entry.name.startswith(".") and entry.name.endswith(".npy"):
+                    names.append(entry.name)
+                    if len(names) > 256:
+                        raise ValueError("NKI constant directory exceeds 256 files")
+        return sorted(names)
     value = {"protocol": plan["protocol"], "simulated": plan["simulated"], "pid": os.getpid(), "command": command,
              "cwd": str(cwd), "compiler": {"path": plan["path"], "sha256": plan["sha256"]},
-             "inputs": [], "output": None, "issues": [], "exit_code": None}
+             "inputs": [], "constant_directories": {}, "output": None, "issues": [], "exit_code": None}
     try:
         directory.mkdir(parents=True, exist_ok=False)
         if (len(original) < 4 or original[1] != "compile" or original[2] not in {"module.mlir", "sg00/bir.json"} or original.count("--output") != 1
@@ -68,13 +77,24 @@ def _compile_job(plan, arguments):
         if index_path.is_file() and not index_path.is_symlink() and index_path.stat().st_size <= 8 * 1024**2:
             index = json.loads(index_path.read_bytes())
             rows = index.get(value["inputs"][0]["sha256"], [])
-            if not isinstance(rows, list) or len(rows) > 16:
+            if not isinstance(rows, list) or len(rows) > 256:
                 raise ValueError("Invalid observed BIR input set")
+            for row in rows:
+                if row.get("role") == "bir":
+                    parent = str(Path(row["path"]).parent)
+                    value["constant_directories"][parent] = sorted({Path(item["path"]).name for item in rows
+                        if str(Path(item["path"]).parent) == parent and Path(item["path"]).name.endswith(".npy")
+                        and not Path(item["path"]).name.startswith(".")})
             for n, row in enumerate(rows):
                 item = snapshot(row["path"], "bir-" + str(n) + ".bin", 16 * 1024**2)
                 if item["sha256"] != row["sha256"]:
                     raise ValueError("Observed BIR changed before compiler invocation")
                 value["inputs"].append(item)
+                if sum(item["bytes"] for item in value["inputs"][1:]) > 64 * 1024**2:
+                    raise ValueError("Observed BIR bundle exceeds 64 MiB")
+            for parent, expected in value["constant_directories"].items():
+                if constants(parent) != expected:
+                    raise ValueError("NKI constant directory changed before compiler invocation")
     except Exception as exc:
         value["issues"].append(type(exc).__name__ + ": " + str(exc)[:240])
     if digest(plan["path"]) != plan["sha256"]:
@@ -89,6 +109,9 @@ def _compile_job(plan, arguments):
             value["output"] = snapshot(cwd / "module.neff", "compiler-" + directory.name + ".neff")
         if digest(plan["path"]) != plan["sha256"] or any(digest(row["path"]) != row["sha256"] for row in value["inputs"]):
             raise ValueError("Compiler tool or inputs changed during invocation")
+        for parent, expected in value["constant_directories"].items():
+            if constants(parent) != expected:
+                raise ValueError("NKI constant directory changed during compiler invocation")
     except Exception as exc:
         value["issues"].append(type(exc).__name__ + ": " + str(exc)[:240])
     value["receipt_sha256"] = hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
@@ -242,7 +265,7 @@ def validate_compiler_job(job, prefix, spawn, plan, files, sizes, *, allow_simul
     if (not isinstance(command, list) or not 4 <= len(command) <= 256
             or any(not isinstance(s, str) or len(s) > 4096 for s in command)
             or command[0] != plan["path"] or command[1] != "compile"
-            or not isinstance(inputs, list) or len(inputs) > 17
+            or not isinstance(inputs, list) or len(inputs) > 257
             or not isinstance(job.get("issues"), list) or len(job["issues"]) > 32):
         raise ValueError("Invalid Neuron compiler command/input envelope")
     for row in [*inputs, *([output] if output is not None else [])]:
@@ -252,6 +275,16 @@ def validate_compiler_job(job, prefix, spawn, plan, files, sizes, *, allow_simul
                 or files.get(prefix + "/" + row["artifact"]) != row["sha256"]
                 or sizes.get(prefix + "/" + row["artifact"]) != row["bytes"]):
             raise ValueError("Neuron compiler input/output snapshot missing or changed")
+    if sum(row["bytes"] for row in inputs[1:]) > 64 * 1024**2:
+        raise ValueError("Neuron compiler input bundle exceeds its byte envelope")
+    directories = job.get("constant_directories", {})
+    if not isinstance(directories, dict) or len(directories) > 256:
+        raise ValueError("Invalid Neuron constant directory envelope")
+    for parent, names in directories.items():
+        expected = sorted({Path(row["path"]).name for row in inputs[1:] if str(Path(row["path"]).parent) == parent
+                           and Path(row["path"]).name.endswith(".npy") and not Path(row["path"]).name.startswith(".")})
+        if not Path(parent).is_absolute() or names != expected:
+            raise ValueError("Neuron constant directory differs from its input snapshots")
     return job
 
 
@@ -271,10 +304,15 @@ def compiler_links(compilation, runtime):
                 continue
             for index, row in enumerate(rows):
                 native = row.get("native_ast") or {}
+                emission = row.get("bir_emission") or {}
+                observed = {(item["path"], item["sha256"]) for item in job["inputs"][1:]}
                 if (row.get("fresh_lowering_observed") and native.get("all_definition_sources_matched")
                         and (compilation.get("simulated") is True or native.get("native_definition_sources_bound") is True)
                         and native.get("module_handoff_observed") and job["inputs"][0]["sha256"] in row.get("stablehlo_sha256", [])
-                        and any(item["path"] == row.get("bir_path") and item["sha256"] == row.get("bir_sha256") for item in job["inputs"][1:])):
+                        and emission.get("cache_copy_matched") is True and emission.get("effective_files")
+                        and str(Path(row.get("bir_path", "")).parent) in job.get("constant_directories", {})
+                        and all((item["path"], item["sha256"]) in observed for item in emission["effective_files"])
+                        and (row.get("bir_path"), row.get("bir_sha256")) in observed):
                     matches.append({"pipeline": index, "job_receipt_sha256": job["receipt_sha256"],
                                     "root_source_sha256": native.get("root_source_sha256"), "bir_sha256": row["bir_sha256"],
                                     "hlo_sha256": job["inputs"][0]["sha256"], "neff_sha256": binding["neff_sha256"]})
@@ -285,7 +323,7 @@ def compiler_links(compilation, runtime):
     unresolved = sorted(set(unresolved))
     return _seal({"protocol": "kernelbench_pro_neuron_compiler_links_v1", "links": links, "unresolved_events": unresolved,
                   "simulated": bool(runtime.get("simulated")) or bool(compilation.get("simulated")),
-                  "scope": "observed BIR/HLO files, compiler command/output and loaded NEFF; auxiliary input closure not proven",
+                  "scope": "original-emission-matched NKI BIR/per-core/npy/debug bundle, HLO, compiler output and loaded NEFF; other external inputs not proven",
                   "formal_origin_qualified": False, "status": "observed" if links and not unresolved else "partial" if links else "not_measured"})
 
 
