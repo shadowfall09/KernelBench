@@ -10,7 +10,7 @@ from pathlib import Path
 
 from ..analysis.calibration import IDENTITY_FIELDS, identity
 from ..common import atomic_json, evaluator_digest, fingerprint, read_json
-from .operator_specs import spec_for
+from .specs import spec_for
 
 PROTOCOL = "kernelbench_pro_reference_precision_calibration_v1"
 BUNDLE = "kernelbench_pro_precision_calibration_bundle_v1"
@@ -172,8 +172,8 @@ def validate_record(record, source, precision, profile=None, *, allow_simulated=
                     or not 0 < row["estimated_host_bytes"] <= record["oracle_memory_mb"] * 1024**2):
                 raise ValueError("Precision calibration has unresolved original-size memory admission")
             if row.get("status") == "passed" and spec["family"] in {"composite", "model_block"}:
-                from .composite_specs import receipt_valid as composite_receipt
-                from .model_specs import receipt_valid as model_receipt
+                from .specs import validate_composite_receipt as composite_receipt
+                from .specs import validate_model_receipt as model_receipt
 
                 check = model_receipt if spec["family"] == "model_block" else composite_receipt
                 if not isinstance(row.get("source_device"), str) or not check(row.get("oracle_receipt"), spec,

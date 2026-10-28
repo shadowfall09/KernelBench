@@ -62,12 +62,12 @@ def main(argv=None):
                 "scope": "additional_hidden_correctness_only; original_initialization_preserved"}
         strict_coverage = None
         if config.strict_validation:
-            from .numerics.contract_specs import coverage
+            from .numerics.specs import coverage
 
             strict_coverage = coverage(config.level, selected)
         numerical_coverage = None
         if config.numerical_validation:
-            from .numerics.operator_specs import spec_for
+            from .numerics.specs import spec_for
 
             specs = {pid: spec_for(config.level, pid, path.read_text()) for pid, path in selected.items()}
             numerical_coverage = {"supported": list(specs), "scope": "independent_FP64_on_actual_native_inputs",

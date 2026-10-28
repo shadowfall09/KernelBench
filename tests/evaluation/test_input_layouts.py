@@ -100,7 +100,7 @@ def test_storage_base_shortcut_cannot_pass_the_actual_nonzero_offset_case():
 def test_gelu_discriminator_exposes_replacing_the_declared_formula(pid):
     from kb_workflows.numerics.numerical import PrecisionContract, precision_gate
     from kb_workflows.numerics.operator_oracles import execute
-    from kb_workflows.numerics.operator_specs import spec_for
+    from kb_workflows.numerics.specs import spec_for
     from tests.numerics.test_operator_oracles import small_case
 
     source, model, _ = small_case(pid)

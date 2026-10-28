@@ -202,7 +202,7 @@ assert not {{"torch","nki","triton","torch_neuronx"}} & sys.modules.keys()
 
 @pytest.mark.parametrize("pid", [33, 34])
 def test_near_constant_fp32_normalization_retains_reference_self_qualification_failure(pid):
-    from kb_workflows.numerics.operator_specs import spec_for
+    from kb_workflows.numerics.specs import spec_for
     from tests.numerics.test_operator_oracles import small_case
 
     source, model, _ = small_case(pid)

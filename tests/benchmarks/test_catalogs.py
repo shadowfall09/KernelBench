@@ -61,17 +61,19 @@ def test_source_frozen_catalogs_and_meta_geometry(level):
                     assert input_signature(values) == input_signature(nominal) and layout(values) == layout(nominal)
                 rows = list(model_input_cases.cases(spec, seed=42, memory_mb=8192, allocation_device="meta", reference=model))
                 assert [row["label"] for row in rows] == list(model_input_cases.labels(spec))
-                from kb_workflows.numerics import composite_oracles, composite_specs, model_oracles, model_specs
-                from kb_workflows.numerics.operator_specs import spec_for
+                from kb_workflows.numerics import composite_oracles, model_oracles
+                from kb_workflows.numerics import specs as composite_specs
+                from kb_workflows.numerics import specs as model_specs
+                from kb_workflows.numerics.specs import spec_for
 
                 oracle_spec = spec_for(level, pid, source)
                 if level == 2:
                     prepared = composite_oracles.Prepared(model, nominal, expected_program=oracle_spec["program_sha256"])
-                    assert prepared.description == composite_specs.program_for(oracle_spec)
+                    assert prepared.description == composite_specs.composite_program(oracle_spec)
                     assert len(prepared.description["nodes"]) == oracle_spec["program_nodes"]
                 else:
                     prepared = model_oracles.Prepared(model, nominal, problem_id=pid, expected_program=oracle_spec["program_sha256"])
-                    assert prepared.description == model_specs.program_for(oracle_spec)
+                    assert prepared.description == model_specs.model_program(oracle_spec)
                 assert prepared.estimated_host_bytes > 0
                 assert all(value.device.type == "meta" for value in model.parameters())
             before = {name: (value.shape, value.dtype) for name, value in model.state_dict().items()}

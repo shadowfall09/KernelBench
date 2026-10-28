@@ -188,15 +188,15 @@
     },
     {
       "id": "V1-14",
-      "title": "旧入口兼容与配置预览",
+      "title": "统一入口与配置预览",
       "primary": "M5",
       "secondary": [],
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/legacy.py"
+        "kb_workflows/config.py"
       ],
-      "reason": "保留入口兼容并允许无副作用预览"
+      "reason": "统一TOML/CLI与无副作用预览；已由run_batch替代的旧pydra生成/评测脚本及选项转换层删除"
     },
     {
       "id": "V2-01",
@@ -1008,7 +1008,7 @@
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/analysis/calibration.py",
-        "scripts/calibrate_device.py"
+        "scripts/calibrate.py"
       ],
       "reason": "提供显式设备探针与cache flush/time接口，绑定物理UUID、驱动、软件和评测器，重算原始样本速率；本轮只实现不运行校准"
     },
@@ -1316,19 +1316,18 @@
         "kb_workflows/numerics/model_oracles.py",
         "kb_workflows/numerics/model_math.py",
         "kb_workflows/numerics/model_layers.py",
-        "kb_workflows/numerics/model_specs.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/numerics/model_programs.json",
         "docs/MODEL_NUMERICS.md",
         "tests/numerics/test_model_oracles.py",
-        "kb_workflows/numerics/reference_oracles.py",
         "kb_workflows/numerics/input_calibration.py",
         "tests/numerics/test_model_input_profiles.py",
         "kb_workflows/evaluation/timed_numerics.py",
         "tests/evaluation/test_timed_numerics.py",
-        "docs/TIMED_NUMERICS.md",
+        "docs/RELIABILITY.md",
         "kb_workflows/numerics/precision_calibration.py",
         "kb_workflows/numerics/precision_calibration_task.py",
-        "scripts/calibrate_precision.py",
+        "scripts/calibrate.py",
         "tests/numerics/test_precision_calibration.py",
         "docs/PRECISION_CALIBRATION.md"
       ],
@@ -1348,10 +1347,10 @@
         "tests/numerics/test_numerical_audit.py",
         "kb_workflows/numerics/input_calibration.py",
         "kb_workflows/numerics/input_profiles.py",
-        "scripts/calibrate_inputs.py",
+        "scripts/calibrate.py",
         "docs/INPUT_CALIBRATION.md",
         "kb_workflows/numerics/model_input_profiles.py",
-        "kb_workflows/numerics/reference_oracles.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/numerics/input_calibration_task.py",
         "tests/numerics/test_model_input_profiles.py",
         "kb_workflows/benchmarks/reference_population.py",
@@ -1399,7 +1398,7 @@
         "kb_workflows/evaluation/strict_validation.py",
         "tests/evaluation/test_state_contract.py",
         "tests/evaluation/test_state_audit.py",
-        "docs/STATE_VALIDATION.md",
+        "docs/RELIABILITY.md",
         "kb_workflows/evaluation/state_paths.py",
         "kb_workflows/evaluation/state_policies.py",
         "tests/evaluation/test_ordinary_state.py"
@@ -1450,15 +1449,13 @@
         "kb_workflows/evaluation/allocation_audit.py",
         "kb_workflows/evaluation/tool_runner.py",
         "tests/evaluation/test_allocation_audit.py",
-        "docs/ALLOCATION_VALIDATION.md",
+        "docs/RELIABILITY.md",
         "kb_workflows/evaluation/throughput_audit.py",
         "tests/evaluation/test_throughput_audit.py",
-        "docs/THROUGHPUT_VALIDATION.md",
         "kb_workflows/evaluation/cache_audit.py",
         "kb_workflows/evaluation/cache_recipes.py",
         "kb_workflows/evaluation/input_reuse.py",
-        "tests/evaluation/test_cache_audit.py",
-        "docs/INPUT_CACHE.md"
+        "tests/evaluation/test_cache_audit.py"
       ],
       "reason": "原始四项已提供可选软件路径：候选分配双预填、全实际正确性实例同对象更新、公开同步/连续提交对照、候选导入/构造/调用运行设置拒绝与恢复。来源/设备/覆盖收据贯穿评分恢复；不支持路径不通过。完整GPU/线程/Graph证明不是原设计验收条件，来源与正式归因仍归R-08/R-16；按用户要求不运行实验"
     },
@@ -1528,7 +1525,7 @@
       "evidence": [
         "kb_workflows/analysis/calibration.py",
         "kb_workflows/analysis/headroom.py",
-        "scripts/calibrate_device.py"
+        "scripts/calibrate.py"
       ],
       "reason": "已实现显式CUDA校准、原始探针/驱动与物理设备绑定、资源工作量证书校验及独立见证导出；按用户要求不运行校准或实验，不把达到的速率当成物理定理"
     },
@@ -2838,7 +2835,7 @@
       "status": "implemented",
       "source": "current_integration",
       "evidence": [
-        "kb_workflows/numerics/operator_specs.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/numerics/operator_oracles.py",
         "kb_workflows/numerics/operator_oracles.json",
         "tests/numerics/test_operator_oracles.py"
@@ -3132,7 +3129,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "scripts/calibrate_inputs.py",
+        "scripts/calibrate.py",
         "tests/numerics/test_input_calibration.py",
         "docs/INPUT_CALIBRATION.md"
       ],
@@ -3260,7 +3257,7 @@
       "evidence": [
         "kb_workflows/numerics/composite_oracles.py",
         "kb_workflows/numerics/composite_programs.json",
-        "kb_workflows/numerics/composite_specs.py"
+        "kb_workflows/numerics/specs.py"
       ],
       "reason": "100题冻结参考SHA、图节点、构造属性、状态形状与随机节点；构造变化或未知算术不回退到参考forward"
     },
@@ -3299,7 +3296,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/numerics/composite_specs.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/numerics/numerical_audit.py",
         "tests/numerics/test_composite_oracles.py"
       ],
@@ -3327,7 +3324,7 @@
       "source": "committed_implementation",
       "evidence": [
         "kb_workflows/config.py",
-        "kb_workflows/numerics/operator_specs.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/common.py",
         "pyproject.toml"
       ],
@@ -4067,7 +4064,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/numerics/model_specs.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/numerics/numerical_audit.py",
         "kb_workflows/config.py",
         "pyproject.toml"
@@ -4156,7 +4153,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "kb_workflows/numerics/reference_oracles.py",
+        "kb_workflows/numerics/specs.py",
         "kb_workflows/numerics/input_calibration.py"
       ],
       "reason": "计时参考调用前计算独立真值并恢复RNG，绑定参考/输入计划；模型路径拒绝缺票据的事后计算"
@@ -4428,7 +4425,7 @@
       "source": "committed_implementation",
       "evidence": [
         "tests/evaluation/test_timed_numerics.py",
-        "docs/TIMED_NUMERICS.md"
+        "docs/RELIABILITY.md"
       ],
       "reason": "小CPU原构造验证L1/L2/L3票据、旧容差漏错、首/预热/正式覆盖、收据重封篡改和连续随机状态；模拟Neuron验证三阶段，不建立设备测量资格"
     },
@@ -4484,7 +4481,7 @@
       "status": "implemented",
       "source": "committed_implementation",
       "evidence": [
-        "scripts/calibrate_precision.py",
+        "scripts/calibrate.py",
         "kb_workflows/config.py",
         "kb_workflows/cli.py"
       ],
@@ -5072,7 +5069,7 @@
         "tests/benchmarks/test_catalogs.py",
         "tests/conftest.py"
       ],
-      "reason": "收拢目录与分析入口，合并重复清单和模型构造，减少维护成本同时保留评分证据门"
+      "reason": "按职责归类并继续做减法：删除重复旧生成/评测入口，数值规格/收据/真值准备集中到specs.py，可靠性说明合并，校准命令共享执行/收集逻辑；测试保留完整任务覆盖并削减独立维度的笛卡尔积"
     },
     {
       "id": "V47-01",
@@ -5183,7 +5180,7 @@
         "tests/evaluation/test_baseline_timing.py",
         "tests/provenance/test_kernel_origin.py",
         "tests/provenance/test_work_counters.py",
-        "docs/TIMED_NUMERICS.md"
+        "docs/RELIABILITY.md"
       ],
       "reason": "额外显存前向也必须输出正确，不能绕过最后一次验证；隔离副本和参考检查不应污染候选峰值或RNG，原始/调整读数及独立memory覆盖进入原生来源与计数器重放"
     },
@@ -5317,7 +5314,7 @@
         "tests/provenance/test_kernel_origin.py",
         "tests/hardware/test_gpu_config.py",
         "docs/KERNEL_ORIGIN.md",
-        "docs/STRICT_VALIDATION.md",
+        "docs/RELIABILITY.md",
         "kb_workflows/evaluation/baseline_variants.py",
         "README.md",
         "kb_workflows/agents/agent_loop.py",
@@ -5368,7 +5365,7 @@
         "kb_workflows/engine.py",
         "tests/evaluation/test_scoring_recovery.py",
         "tests/provenance/test_kernel_origin.py",
-        "docs/STRICT_VALIDATION.md",
+        "docs/RELIABILITY.md",
         "docs/HEADROOM_SCORING.md"
       ],
       "reason": "修复worker尚缺外部测量证据便提前拒绝L1的评分顺序：先重放配对原始样本、实际来源和同模式基线，再核对所有测量设备的校准及输入/精度/源码绑定的审查证书，合并资格用于标准、隐藏和冻结复测；保留原始收据并另存分析判定。缓存passed标签不能替代当前材料，单基线使用真实变体名，基线选择排除缺实际计时证据的变体。L2完整计数归因仍未实现，不由通用标签授予资格；复用原模块，仅增加两个集中回归，无设备或模型实验"
@@ -5394,7 +5391,7 @@
         "tests/analysis/test_device_headroom.py",
         "docs/HEADROOM_SCORING.md",
         "docs/KERNEL_ORIGIN.md",
-        "docs/STRICT_VALIDATION.md"
+        "docs/RELIABILITY.md"
       ],
       "reason": "复用实际持续CUPTI，补齐同进程参考/候选/控制的预热与正式设备窗口，不包装计时callable、不增加同步；离线核对完整顺序/种子/输入/输出、候选窗口和原始墙钟样本，按活动并集计算busy与O。所有独立复测分别要求噪声分离、核数减少、busy变化≤5%且节省与校准启动成本±20%相符，launch_only收益置零，混合或缺证据不给L1资格；保留原始正确性及收据，不用诊断重放替代实际证据，不将未标记解释为已证明算法收益。仅新增两个集中回归、复用既有模块与夹具，无设备或模型实验"
     },

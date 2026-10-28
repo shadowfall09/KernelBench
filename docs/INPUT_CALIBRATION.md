@@ -7,7 +7,7 @@
 先预览，不分配原题输入、不导入Torch，也不创建输出目录：
 
 ```bash
-python -m scripts.calibrate_inputs --config configs/a6000-feedback.toml \
+python -m scripts.calibrate inputs --config configs/a6000-feedback.toml \
   --output /path/to/new-input-calibration.json
 ```
 
@@ -91,6 +91,6 @@ Agent/Harbor私有子任务只携带本题校准，但保留完整父清单及�
 
 这是一份可信控制端的完整性与执行顺序契约，不是签名认证或对历史实验先后顺序的外部证明。参考入选只说明该校准文件的固定种子/配方达到政策；本次设备及未变换的隐藏输入仍须独立通过数值验证。实现见[资格集合](../kb_workflows/benchmarks/reference_population.py)、[冻结命令](../scripts/freeze_reference_population.py)和[软件回归](../tests/benchmarks/test_reference_population.py)。
 
-CPU/模拟测试不代表任何设备或模型实验结果；本任务按用户要求不运行这些实验。实现见[模型配方](../kb_workflows/numerics/model_input_profiles.py)、[校准器](../kb_workflows/numerics/input_calibration_task.py)、[共享oracle准备](../kb_workflows/numerics/reference_oracles.py)和[回归](../tests/numerics/test_model_input_profiles.py)。
+CPU/模拟测试不代表任何设备或模型实验结果；本任务按用户要求不运行这些实验。实现见[模型配方](../kb_workflows/numerics/model_input_profiles.py)、[校准器](../kb_workflows/numerics/input_calibration_task.py)、[共享oracle准备](../kb_workflows/numerics/specs.py)和[回归](../tests/numerics/test_model_input_profiles.py)。
 
-数值验证现在不依赖名义输入配方即可检查首次、预热与全部计时输出；逐次误差/信号/程序证据进入评分和恢复，见[计时数值验证](TIMED_NUMERICS.md)。配对每轮共用一次调用前真值，不额外推进状态或RNG。
+数值验证现在不依赖名义输入配方即可检查首次、预热与全部计时输出；逐次误差/信号/程序证据进入评分和恢复，见[计时数值验证](RELIABILITY.md#timed-numerics)。配对每轮共用一次调用前真值，不额外推进状态或RNG。

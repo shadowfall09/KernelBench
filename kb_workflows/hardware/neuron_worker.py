@@ -165,8 +165,8 @@ def _evaluate(payload, *, adapter=None, registry=None):
     from ..evaluation.evidence import LEVELS, accepted, check, from_result
     from ..evaluation.measurement import CLOCK, amortized, fresh_seed, input_signature, synchronized_times, timing_stats
     from ..evaluation.strict_validation import environment_guard, run_checks
-    from ..numerics.contract_specs import contract_for
     from ..numerics.numerical import PrecisionContract, precision_gate, signal_audit, to_oracle
+    from ..numerics.specs import contract_for
     from ..production import instance_plan, production_context
 
     source = validate_sources(payload)

@@ -11,10 +11,11 @@ import torch
 from kb_workflows import engine
 from kb_workflows.common import ROOT, kernel_name
 from kb_workflows.config import RunConfig
-from kb_workflows.numerics import composite_specs, numerical_audit
+from kb_workflows.numerics import numerical_audit
+from kb_workflows.numerics import specs as composite_specs
 from kb_workflows.numerics.composite_oracles import Prepared
 from kb_workflows.numerics.numerical import PrecisionContract, precision_gate
-from kb_workflows.numerics.operator_specs import spec_for
+from kb_workflows.numerics.specs import spec_for
 from src.eval import load_original_model_and_inputs
 from src.validation import clone_tensors
 from tests.support._composite_cases import small_composite_case
@@ -182,12 +183,12 @@ def test_native_dropout_receipt_schema_is_replayed_on_an_explicit_toy_plan(tmp_p
         torch.manual_seed(42)
         prepared.execute()
     descriptor = prepared.description
-    spec = {"program_sha256": prepared.program_sha256, "composite_protocol": composite_specs.PROTOCOL,
+    spec = {"program_sha256": prepared.program_sha256, "composite_protocol": composite_specs.COMPOSITE_PROTOCOL,
             "program_nodes": len(descriptor["nodes"]),
             "stochastic_nodes": [row["name"] for row in descriptor["nodes"] if row["op"] == "call_module" and row["target"].startswith("Dropout:")]}
     file = tmp_path / "toy-program-schema.json"
     file.write_text(json.dumps({"protocol": "kernelbench_pro_composite_programs_v1", "programs": {prepared.program_sha256: descriptor}}))
-    monkeypatch.setattr(composite_specs, "PROGRAMS", file)
+    monkeypatch.setattr(composite_specs, "COMPOSITE_PROGRAMS", file)
     receipt = copy.deepcopy(prepared.receipt())
     mask = receipt["masks"][0]
     if damage == "mask_missing":
@@ -208,7 +209,7 @@ def test_native_dropout_receipt_schema_is_replayed_on_an_explicit_toy_plan(tmp_p
         mask["node"] = "another_dropout"
     elif damage == "meta_forward":
         receipt["shape_propagation_device"] = "cpu"
-    assert composite_specs.receipt_valid(receipt, spec, precision="fp32", source_device="cpu") is (damage is None)
+    assert composite_specs.validate_composite_receipt(receipt, spec, precision="fp32", source_device="cpu") is (damage is None)
 
 
 def test_tensor_literals_preserve_native_storage_rounding_before_fp64_arithmetic():

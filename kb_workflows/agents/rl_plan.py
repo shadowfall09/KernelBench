@@ -10,7 +10,7 @@ from pathlib import Path
 from ..benchmarks.suites import suite_rows
 from ..common import ROOT, atomic_json, evaluator_digest, fingerprint, read_json, select_problems
 from ..config import RunConfig, file_options, parser
-from ..numerics.contract_specs import contract_for
+from ..numerics.specs import contract_for
 from .generation import build_prompt, prompt_source
 from .local_model import checkpoint_digest
 

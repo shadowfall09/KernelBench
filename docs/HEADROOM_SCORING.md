@@ -9,7 +9,7 @@
 `kb_workflows.hardware.devices.DeviceAdapter`定义`caps()`、`flush()`、`time()`、`calibrate()`和`attribute()`，提供CUDA与[原生Neuron适配器](NEURON.md)。校准只执行可信探针，不导入候选，不会由评测自动启动。CUDA使用events采集探针时间；Neuron标明同步墙钟口径，缺少真实FP64能力时不生成FP64速率。两者均未在本轮运行实机校准。
 
 ```bash
-python -m scripts.calibrate_device --device cuda:0 --output calibration.json
+python -m scripts.calibrate device --execute --device cuda:0 --output calibration.json
 ```
 
 探针包括超过两倍已知 L2 的设备内拷贝、多个矩阵尺寸的 FP32/FP16/FP64 GEMM、支持时的 BF16 GEMM，以及同步墙钟下单元素加法的启动代理成本。矩阵计时用当前流 CUDA events；拷贝计入读与写字节，FMA 按两次操作计算。保留每个原始时间样本、工作量、矩阵扫描结果和中位时间对应速率。FP32 禁用 TF32，半精度归约禁用 reduced precision；退出或报错后恢复后端设置。未知 L2、缺物理 UUID/驱动版本、显存不足或探针失败均拒绝生成有效收据。

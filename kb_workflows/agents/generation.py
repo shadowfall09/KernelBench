@@ -18,19 +18,15 @@ from ..benchmarks.reference_population import select_run_problems
 from ..common import ROOT, atomic_json, evaluator_digest, fingerprint, kernel_name, read_json, select_problems
 from ..runtime.transports import resolve_devices, terminate
 
+# Public test harnesses hidden from generation to prevent task-specific shortcuts.
+STRIP_TEST_CONFIG_PIDS = {(1, 90), (3, 35), (3, 47), (1, 100)}
+
 
 def input_blind_problems():
-    tree = ast.parse((ROOT / "src" / "prompt_constructor.py").read_text())
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(t, ast.Name) and t.id == "STRIP_TEST_CONFIG_PIDS" for t in node.targets
-        ):
-            return ast.literal_eval(node.value)
-    raise ValueError("Input-blind problem configuration is missing")
-
+    return set(STRIP_TEST_CONFIG_PIDS)
 
 def prompt_source(source, level, pid):
-    # Follow the configured input-blind policy without importing its API-client dependencies.
+    # Follow the shared input-blind task policy.
     if level == 5:
         lines = source.splitlines(keepends=True)
         return "\n".join("".join(lines[node.lineno - 1:node.end_lineno]) for node in ast.parse(source).body

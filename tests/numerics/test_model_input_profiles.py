@@ -135,8 +135,8 @@ def test_model_calibration_preview_is_sdk_light_and_never_starts_experiments(tmp
     output = tmp_path / "unrun.json"
     script = f'''import sys,json
 sys.path.insert(0,{str(ROOT)!r})
-from scripts.calibrate_inputs import main
-assert main(["--config",{str(config)!r},"--output",{str(output)!r}]) == 0
+from scripts.calibrate import main
+assert main(["inputs","--config",{str(config)!r},"--output",{str(output)!r}]) == 0
 assert not {{"torch","triton","nki","torch_neuronx"}} & sys.modules.keys()
 '''
     result = subprocess.run([sys.executable, "-I", "-c", script], capture_output=True, text=True, check=True)
@@ -206,7 +206,7 @@ class StatefulRandom(torch.nn.Module):
 
 def counter_oracle(monkeypatch):
     """An unscored CPU oracle fixture for exercising orchestration, not L2 math."""
-    from kb_workflows.numerics import reference_oracles
+    from kb_workflows.numerics import specs as reference_oracles
 
     def prepare(model, args, **kwargs):
         class Oracle:
@@ -217,7 +217,7 @@ def counter_oracle(monkeypatch):
 
         return Oracle()
 
-    monkeypatch.setattr(reference_oracles, "prepare", prepare)
+    monkeypatch.setattr(reference_oracles, "prepare_oracle", prepare)
 
 
 def test_timed_reference_ticket_tracks_continuous_state_and_restores_forward_rng(tmp_path, monkeypatch):

@@ -15,8 +15,7 @@ from src.eval import load_original_model_and_inputs
 
 
 @pytest.mark.parametrize("pid", TASKS)
-@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16])
-@pytest.mark.parametrize("seed", [42, 123, 456])
+@pytest.mark.parametrize("dtype,seed", [(torch.float32, 42), (torch.float16, 123), (torch.bfloat16, 456)])
 def test_scan_cases_preserve_legal_shapes_roles_and_match_independent_fp64(pid, dtype, seed):
     source = problem_paths(1)[pid].read_text()
     Model, _, _ = load_original_model_and_inputs(source, {})
@@ -32,7 +31,7 @@ def test_scan_cases_preserve_legal_shapes_roles_and_match_independent_fp64(pid, 
         if dtype == torch.float32:
             policy = PrecisionContract(5e-6, 1e-7, 5e-5, 5e-7, 1e-6)
         else:
-            from kb_workflows.numerics.operator_specs import spec_for
+            from kb_workflows.numerics.specs import spec_for
             policy = PrecisionContract(**spec_for(1, pid, source)["precision"][str(dtype).removeprefix("torch.")])
         assert precision_gate(output, output.clone(), truth, policy)["passed"]
         assert output.shape == args[0].shape

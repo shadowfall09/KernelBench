@@ -12,7 +12,7 @@ LICENSE file in the root directory of this source tree.
 
 ## 当前题目
 
-配置以 `src/prompt_constructor.py` 中的 `STRIP_TEST_CONFIG_PIDS` 为准：
+配置以 `kb_workflows/agents/generation.py` 中的 `STRIP_TEST_CONFIG_PIDS` 为准：
 
 | Level | 题号 | 操作 |
 | --- | --- | --- |

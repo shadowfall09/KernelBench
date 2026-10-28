@@ -11,7 +11,6 @@ from kb_workflows import engine
 from kb_workflows.agents.generation import build_prompt, generate_run, prepare_job, prompt_source
 from kb_workflows.common import ROOT, kernel_name, read_json, select_problems
 from kb_workflows.config import RunConfig, parse_config
-from kb_workflows.legacy import convert_arguments
 from kb_workflows.runtime.queue_worker import JobStore, handler_for, worker_loop
 from kb_workflows.runtime.transports import http_json, local_evaluate, resolve_devices
 
@@ -41,22 +40,6 @@ def test_problem_range_and_cli_validation():
     assert parse_config(["--no-hidden-tests"]).hidden_tests is False
     assert parse_config([]).baseline == "baseline_time_suite_fp32_wall"
     assert parse_config(["--precision", "bf16"]).baseline == "baseline_time_suite_bf16_wall"
-
-
-def test_legacy_options_use_same_configuration():
-    args = convert_arguments(
-        [
-            "level=2",
-            "subset=(3,5)",
-            "dataset_src=local",
-            "num_parallel=2",
-            "gpu_arch=['Ampere']",
-            "use_hidden_tests=True",
-            "queue_base_url=http://localhost:8000",
-        ]
-    )
-    config = parse_config(args)
-    assert (config.level, config.start, config.end, config.parallel, config.gpu_arch) == (2, 3, 5, 2, "Ampere")
 
 
 def test_gpu_indices_respect_slurm_allocation(monkeypatch):

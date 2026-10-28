@@ -14,7 +14,7 @@ from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.engine import task_payload
 from kb_workflows.evaluation import evaluate_task, tool_checks, tool_runner
 from kb_workflows.numerics import numerical_audit, operator_oracles
-from kb_workflows.numerics.operator_specs import spec_for
+from kb_workflows.numerics.specs import spec_for
 from src.eval import load_original_model_and_inputs
 from src.reliability import check_paired_calls
 

@@ -304,8 +304,8 @@ def test_preview_is_sdk_light_and_never_executes_calibration(tmp_path, level, co
     output = tmp_path / "absent" / "fit.json"
     script = f'''import sys
 sys.path.insert(0,{str(ROOT)!r})
-from scripts.calibrate_precision import main
-assert main(["--config",{str(config)!r},"--output",{str(output)!r}]) == 0
+from scripts.calibrate import main
+assert main(["precision","--config",{str(config)!r},"--output",{str(output)!r}]) == 0
 assert not {{"torch","triton","nki","torch_neuronx"}} & sys.modules.keys()
 '''
     result = subprocess.run([sys.executable, "-I", "-c", script], text=True, capture_output=True, check=True)

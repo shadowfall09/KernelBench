@@ -75,7 +75,7 @@ def task_payload(config, pid, sid=0, hidden=False, task="evaluate"):
 
         options["precision_profile"] = record_for(config.precision_calibration, config.level, pid, config.precision, path.read_text(), options.get("input_profile"))
     if config.numerical_validation:
-        from .numerics.operator_specs import spec_for
+        from .numerics.specs import spec_for
 
         options["oracle_spec_sha256"] = fingerprint(spec_for(config.level, pid, path.read_text()))
     if config.cache_validation:

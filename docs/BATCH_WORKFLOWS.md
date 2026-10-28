@@ -164,7 +164,7 @@ are evaluated again. Matching recorded failures are retained; use a new kernel,
 changed settings or omit `--resume` to retry them.
 
 Agent prompts use the canonical input-blind problem list in
-`src/prompt_constructor.py`. Those staged `model.py` files contain imports and
+`kb_workflows/agents/generation.py`. Those staged `model.py` files contain imports and
 model classes without test inputs. Hidden tests never appear in the prompt.
 The agent is instructed to use this staged source and `python verify.py`.
 This preserves prompt input blindness; local/Docker/Modal agents still have
@@ -253,12 +253,11 @@ use the same reference, evaluator and hidden-test sources.
 
 `--queue-wait-timeout` bounds submission/retries/polling, separate from each device task's `--timeout`. On timeout or lost communication the client requests cancellation, retaining the failed call and any confirmed server-parent usage. With `agent_device_seconds`, the worker also expires queued/running leases without requiring a live client. Budgeted requests and all Neuron requests require a healthy `kernelbench_pro_queue_v3` worker with a matching backend; older workers must be upgraded. Legacy unbudgeted CUDA services remain compatible. See [resource budgets](RESOURCE_BUDGETS.md) for accounting and cleanup limits.
 
-The compatibility Python entrypoint still accepts common pydra options:
+Use the shared entrypoint for existing generations as well:
 
 ```bash
-python scripts/eval_from_generations_queue.py \
-  run_name=queue_test dataset_src=local level=1 subset='(1,10)' \
-  gpu_arch="['Ampere']" queue_base_url=http://WORKER_HOST:8000
+python scripts/run_batch.py --config configs/a6000.toml --stage evaluate \
+  --evaluation queue --queue-url http://WORKER_HOST:8000 --run-name queue_test
 ```
 
 ## Modal
@@ -284,8 +283,7 @@ uses the selected evaluation backend. Kernels and logs are downloaded before
 sandbox termination. Credentials use a named Modal secret, or environment
 credentials; `--profile` resolves AWS credentials at runtime for SSO/Bedrock.
 
-`scripts/batch_run_modal.py` is a compatibility wrapper for the same workflow and
-accepts options such as `level=1 start=1 end=10 gpu=H100 run_name=sandbox_test`.
+The shared entrypoint accepts TOML configuration and ordinary `--option` arguments for every backend.
 
 ## Baselines, analysis and output files
 

@@ -13,8 +13,8 @@ import torch
 
 from src.validation import clone_tensors, compare_outputs, preserve_backend_settings, synchronize
 
-from ..numerics.contract_specs import contract_for
 from ..numerics.numerical import PrecisionContract, precision_gate, signal_audit, to_oracle
+from ..numerics.specs import contract_for
 from .evidence import check
 from .state_contract import state_checks
 

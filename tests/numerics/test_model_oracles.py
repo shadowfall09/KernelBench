@@ -63,7 +63,7 @@ def test_truth_does_not_call_source_or_fused_numerical_forward(pid, monkeypatch)
 @pytest.mark.parametrize("pid", range(1, 51))
 def test_frozen_model_arithmetic_accepts_reviewed_hidden_shapes_and_alternate_storage_precision(pid):
     from kb_workflows.numerics import model_input_cases
-    from kb_workflows.numerics.operator_specs import spec_for
+    from kb_workflows.numerics.specs import spec_for
     from tests.support._model_cases import original_meta
 
     source, model, _ = original_meta(3, pid)
@@ -120,7 +120,7 @@ def test_omitted_lstm_states_keep_the_source_default_fp32_failure_for_other_stor
 @pytest.mark.parametrize("damage", [None, "program", "source_forward", "mask", "dtype", "stride", "kept", "events", "mode", "boolean_probability"])
 @pytest.mark.parametrize("pid", [14, 44])
 def test_model_stochastic_receipts_are_replayed_against_frozen_toy_constructor_plans(tmp_path, monkeypatch, pid, damage):
-    from kb_workflows.numerics import model_specs
+    from kb_workflows.numerics import specs as model_specs
 
     _, model, args = small_model_case(pid, torch.float32)
     for layer in model.modules():
@@ -129,11 +129,11 @@ def test_model_stochastic_receipts_are_replayed_against_frozen_toy_constructor_p
     prepared = Prepared(model, args, problem_id=pid)
     with torch.no_grad():
         prepared.execute()
-    spec = {"program_sha256": prepared.program_sha256, "model_protocol": model_specs.PROTOCOL,
+    spec = {"program_sha256": prepared.program_sha256, "model_protocol": model_specs.MODEL_PROTOCOL,
             "problem_id": pid, "program_modules": len(prepared.description["architecture"]["modules"])}
     path = tmp_path / "unscored-toy-model-programs.json"
     path.write_text(json.dumps({"protocol": "kernelbench_pro_model_programs_v1", "programs": {prepared.program_sha256: prepared.description}}))
-    monkeypatch.setattr(model_specs, "PROGRAMS", path)
+    monkeypatch.setattr(model_specs, "MODEL_PROGRAMS", path)
     receipt = copy.deepcopy(prepared.receipt())
     if damage == "program":
         receipt["program_sha256"] = "0" * 64
@@ -150,7 +150,7 @@ def test_model_stochastic_receipts_are_replayed_against_frozen_toy_constructor_p
         receipt["dropout_states"][0]["training"] = False
     elif damage == "boolean_probability":
         receipt["dropout_states"][0]["probability"] = True
-    assert model_specs.receipt_valid(receipt, spec, precision="fp32", source_device="cpu") is (damage is None)
+    assert model_specs.validate_model_receipt(receipt, spec, precision="fp32", source_device="cpu") is (damage is None)
 
 
 def original_request(tmp_path, memory=256):

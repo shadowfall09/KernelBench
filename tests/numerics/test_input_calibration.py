@@ -16,8 +16,8 @@ from kb_workflows.config import RunConfig, parse_config
 from kb_workflows.evaluation import measurement
 from kb_workflows.numerics import input_calibration, input_calibration_task, input_profiles, numerical_audit
 from kb_workflows.numerics.numerical import signal_audit
-from kb_workflows.numerics.operator_specs import spec_for
-from scripts import calibrate_inputs
+from kb_workflows.numerics.specs import spec_for
+from scripts import calibrate
 from src import eval as native
 from src.validation import compare_outputs
 
@@ -224,15 +224,15 @@ def test_config_and_calibration_preview_are_sdk_light_and_do_not_allocate_inputs
     output = tmp_path / "not-created.json"
     script = f'''import sys
 sys.path.insert(0,{str(ROOT)!r})
-from scripts.calibrate_inputs import main
-assert main(["--config",{str(config)!r},"--output",{str(output)!r}]) == 0
+from scripts.calibrate import main
+assert main(["inputs","--config",{str(config)!r},"--output",{str(output)!r}]) == 0
 assert "torch" not in sys.modules
 '''
     result = subprocess.run([sys.executable, "-I", "-c", script], check=True, capture_output=True, text=True)
     assert json.loads(result.stdout)["candidate_executed"] is False
     assert not output.exists()
     cfg = parse_config(["--config", str(config)])
-    tasks = calibrate_inputs.prepare(cfg)
+    tasks = calibrate.prepare(cfg, "inputs")
     assert "kernel_src" not in tasks[0][1]
     assert tasks[0][1]["request_id"] == "kb-" + fingerprint(tasks[0][1])
 

@@ -7,7 +7,7 @@
 默认只预览任务范围、拟合/验证种子、拟合规则和内存额度；不导入Torch、不分配原题输入，也不创建输出目录：
 
 ```bash
-python -m scripts.calibrate_precision --config /path/to/device.toml \
+python -m scripts.calibrate precision --config /path/to/device.toml \
   --output /path/to/new-precision-calibration.json
 ```
 
@@ -57,4 +57,4 @@ fitted_budget_term = original_budget_term * factor
 
 记录包括原始/有效输入签名、输入/输出探针、逐叶误差使用比例、原/拟合数值门、参考信号、独立程序及原生mask收据。探针最多取每Tensor的256个确定位置，不是全内容哈希或随机独立性的证明。记录校验属于可信控制端的完整性契约，不是密码学或硬件认证；CPU/模拟标记不能建立设备校准资格。
 
-实现见[政策与校验](../kb_workflows/numerics/precision_calibration.py)、[参考拟合器](../kb_workflows/numerics/precision_calibration_task.py)、[命令](../scripts/calibrate_precision.py)、[误差比例](../kb_workflows/numerics/numerical.py)和[软件回归](../tests/numerics/test_precision_calibration.py)。
+实现见[政策与校验](../kb_workflows/numerics/precision_calibration.py)、[参考拟合器](../kb_workflows/numerics/precision_calibration_task.py)、[命令](../scripts/calibrate.py)、[误差比例](../kb_workflows/numerics/numerical.py)和[软件回归](../tests/numerics/test_precision_calibration.py)。

@@ -22,8 +22,8 @@ LICENSE file in the root directory of this source tree.
 - 严格检查输出结构、shape、dtype、整数、bool 和非有限值；隐藏测试使用三个种子，29 道 Level 1 题另有数值压力测试。
 - 原250题追加来源绑定的[隐藏输入族](docs/OPERATOR_INPUTS.md)，核对耦合形状、布局与逐例执行；固定状态/参数约束和内存不足均明确保留。
 - 可选四种Compute Sanitizer工具与题目级重复一致性检查，检查耗时与性能采样分开。
-- 可选[分配预填充检查](docs/ALLOCATION_VALIDATION.md)，以两个独立正确性进程检查候选未写满输出和未初始化缓存，不替换性能样本。
-- 可选[吞吐对照](docs/THROUGHPUT_VALIDATION.md)，逐次验证同步/连续提交下的输出，记录差异与复核标记，保留原始性能数据。
+- 可选[分配预填充检查](docs/RELIABILITY.md#allocation-validation)，以两个独立正确性进程检查候选未写满输出和未初始化缓存，不替换性能样本。
+- 可选[吞吐对照](docs/RELIABILITY.md#throughput-validation)，逐次验证同步/连续提交下的输出，记录差异与复核标记，保留原始性能数据。
 - 可选受限Docker验证器和Harbor网络策略；支持冻结已有候选后用当前验证器重评分，默认仅生成计划。
 - 评分包含失败和缺失样本，恢复时核对源码、配置和测量证据。
 
@@ -33,7 +33,7 @@ LICENSE file in the root directory of this source tree.
 [动机与逐项对照](docs/MOTIVATION.md)覆盖每版改动和未完成设计；
 [统一研究稿](research/headroom/PAPER.md)说明 Headroom 目标与当前实现的差额。
 当前提供 NVIDIA CUDA 和[原生Neuron/NKI设备工作流](docs/NEURON.md)；后者为软件接入及CPU/模拟验证，实机部署与性能未验证。可选Headroom评分要求真实设备校准和可信规格，缺证据不计分。
-显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/STRICT_VALIDATION.md)。CUDA L1/L2另有[实际计分来源门](docs/KERNEL_ORIGIN.md)，自写/库轨道使用同模式基线；来源门不替代其他等级证据。
+显式严格模式已为17道L1加入附加FP64契约与证据等级，见[严格验证](docs/RELIABILITY.md#strict-validation)。CUDA L1/L2另有[实际计分来源门](docs/KERNEL_ORIGIN.md)，自写/库轨道使用同模式基线；来源门不替代其他等级证据。
 
 ## 代码布局
 
@@ -137,7 +137,7 @@ python -m scripts.check_motivations
 | [研究工作流](docs/STUDIES.md) | 当前证据导出、选集区分度、多会话计划与得分—预算曲线 |
 | [资源预算](docs/RESOURCE_BUDGETS.md) | 精确本地token、API输出预留、开发worker占用与恢复证据 |
 | [RL工作流](docs/RL_WORKFLOW.md) | GRPO计划、算法证书奖励、训练来源、恢复、审计与持出效果对照 |
-| [严格验证](docs/STRICT_VALIDATION.md) | FP64附加契约、输入/状态检查、证据等级与聚合消融 |
+| [严格验证](docs/RELIABILITY.md#strict-validation) | FP64附加契约、输入/状态检查、证据等级与聚合消融 |
 | [正确性可靠性](docs/RELIABILITY.md) | 检查协议、适配范围与成本 |
 | [输入盲化](docs/INPUT_BLIND_GENERATION.md) | 生成材料如何去掉测试输入 |
 | [贡献指南](CONTRIBUTING.md) | 本仓库的开发与评审方式 |

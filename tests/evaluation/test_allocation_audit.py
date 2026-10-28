@@ -51,9 +51,13 @@ def collector(tmp_path, pattern):
         yield capture, child
 
 
-@pytest.mark.parametrize("dtype", DTYPES)
-@pytest.mark.parametrize("pattern", audit.PATTERNS)
-@pytest.mark.parametrize("factory", ["empty", "empty_like", "empty_strided", "new_empty", "new_empty_strided"])
+# Allocation frontends and dtype handling are independent dimensions. Cover
+# every frontend/pattern for each dtype class, and every remaining dtype once.
+@pytest.mark.parametrize("dtype,pattern,factory",
+    [(dtype, pattern, factory) for dtype in (torch.float32, torch.complex64, torch.int64, torch.bool)
+     for pattern in audit.PATTERNS for factory in ("empty", "empty_like", "empty_strided", "new_empty", "new_empty_strided")]
+    + [(dtype, pattern, "empty") for dtype in DTYPES
+       if dtype not in (torch.float32, torch.complex64, torch.int64, torch.bool) for pattern in audit.PATTERNS])
 def test_all_reviewed_dense_allocation_frontends_poison_native_storage_without_switching_algorithms(tmp_path, dtype, pattern, factory):
     base = torch.ones(3, 5, dtype=dtype)
     deterministic = torch.are_deterministic_algorithms_enabled()

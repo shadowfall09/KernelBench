@@ -9,7 +9,7 @@ import torch
 from kb_workflows.common import problem_paths
 from kb_workflows.numerics import operator_oracles
 from kb_workflows.numerics.numerical import PrecisionContract, precision_gate
-from kb_workflows.numerics.operator_specs import spec_for
+from kb_workflows.numerics.specs import spec_for
 from src.eval import load_original_model_and_inputs
 
 POLICY = PrecisionContract(5e-6, 1e-7, 5e-5, 5e-7, 1e-6)

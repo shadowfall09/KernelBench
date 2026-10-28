@@ -11,7 +11,7 @@ from pathlib import Path
 from ..analysis.calibration import identity
 from ..common import evaluator_digest, fingerprint
 from .input_profiles import recipes, selection_policy
-from .operator_specs import spec_for
+from .specs import spec_for
 
 PROTOCOL = "kernelbench_pro_reference_input_calibration_v1"
 BUNDLE = "kernelbench_pro_input_calibration_bundle_v1"
@@ -99,8 +99,8 @@ def selected_attempt(record):
                 continue
             spec = record.get("oracle_spec", {})
             if spec.get("family") in {"composite", "model_block"}:
-                from .composite_specs import receipt_valid as composite_receipt
-                from .model_specs import receipt_valid as model_receipt
+                from .specs import validate_composite_receipt as composite_receipt
+                from .specs import validate_model_receipt as model_receipt
 
                 replay = model_receipt if spec["family"] == "model_block" else composite_receipt
                 if any(not isinstance(row.get("source_device"), str) or not replay(row.get("oracle_receipt"), spec,
@@ -210,7 +210,7 @@ def prepare_output(reference, inputs, *, scope="timing"):
 
     from ..evaluation.determinism import preserve_rng
     from ..evaluation.measurement import input_signature
-    from .reference_oracles import prepare
+    from .specs import prepare_oracle as prepare
 
     payload = state["payload"]
     spec = spec_for(payload["level"], payload["problem_id"], payload["ref_arch_src"])

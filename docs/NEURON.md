@@ -76,7 +76,7 @@ python -m kb_workflows.runtime.queue_worker --config configs/trainium2.toml \
 `kb_workflows.hardware.devices.DeviceAdapter`定义`caps/calibrate/flush/time/attribute`，工厂只注册CUDA与Neuron，实现导入时不加载SDK。可使用以下显式探针入口；本轮未运行：
 
 ```bash
-/path/to/neuron-venv/bin/python -m scripts.calibrate_device --backend neuron --device neuron:0 --output neuron_calibration.json
+/path/to/neuron-venv/bin/python -m scripts.calibrate device --execute --backend neuron --device neuron:0 --output neuron_calibration.json
 ```
 
 Neuron校准保留copy、FP32/FP16/BF16编译GEMM的原始样本和全部尺寸扫描，以及同步启动代理；缺少真实FP64能力不会生成FP64速率。计时是含dispatch/输出消费的同步墙钟，单独标明，不能冒充CUDA events。缓存拓扑未知时`flush()`要求显式scratch字节数，记录已写字节且不声称完全驱逐。

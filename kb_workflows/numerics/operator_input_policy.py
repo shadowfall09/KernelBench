@@ -9,7 +9,7 @@ from functools import wraps
 
 from ..common import fingerprint
 from .operator_cases import NONFINITE_TASKS, PROTOCOL, cases, labels
-from .operator_specs import spec_for
+from .specs import spec_for
 
 ACTIVE = ContextVar("kernelbench_operator_inputs", default=None)
 

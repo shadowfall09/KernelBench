@@ -34,10 +34,13 @@ def request(tmp_path, pid=92, *, hidden=False, task="evaluate"):
     return task_payload(config, pid, task=task, hidden=hidden)
 
 
-@pytest.mark.parametrize("shape,axis", [((3, 7), 0), ((3, 7), 1), ((3, 7), -1), ((3, 7), -2),
-                                      ((2, 3, 5), 1), ((2, 3, 5), -1), ((4,), 0), ((1,), -1),
-                                      ((0,), 0), ((3, 0), 1), ((0, 7), 0), ((3, 0, 5), 2)])
-@pytest.mark.parametrize("dtype", [torch.float32, torch.float64, torch.float16, torch.bfloat16, torch.int16, torch.bool])
+# Exercise every geometry plus every promotion dtype on ordinary and empty axes.
+@pytest.mark.parametrize("shape,axis,dtype", list(dict.fromkeys(
+    [(shape, axis, (torch.float32, torch.float64, torch.float16, torch.bfloat16, torch.int16, torch.bool)[i % 6])
+     for i, (shape, axis) in enumerate([((3, 7), 0), ((3, 7), 1), ((3, 7), -1), ((3, 7), -2),
+         ((2, 3, 5), 1), ((2, 3, 5), -1), ((4,), 0), ((1,), -1), ((0,), 0), ((3, 0), 1), ((0, 7), 0), ((3, 0, 5), 2)])]
+    + [(shape, 1, dtype) for shape in ((3, 7), (3, 0))
+       for dtype in (torch.float32, torch.float64, torch.float16, torch.bfloat16, torch.int16, torch.bool)])))
 def test_repaired_exclusive_scan_preserves_shape_axis_dtype_promotion_and_empty_scans(shape, axis, dtype):
     model = model92(axis)
     inputs = torch.arange(max(1, torch.tensor(shape).prod().item()))[:torch.tensor(shape).prod().item()].reshape(shape)

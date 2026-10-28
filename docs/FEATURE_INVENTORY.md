@@ -11,7 +11,7 @@
 | 生成 | one-shot / mini-swe-agent feedback、Harbor external、coding-agent skill interactive |
 | 默认反馈预算 | 每样本最多5次候选、2400秒，可配置；开发反馈与最终隐藏验证分开 |
 | 设备与后端 | TOML/CLI硬件配置；CUDA与原生Neuron/NKI分别适配，local / Docker / Modal / HTTP队列执行 |
-| 正确性 | 结构/dtype/离散值/非有限值比较、实际输入数值与状态审计、隐藏输入族、缓存和执行检查；[严格契约](STRICT_VALIDATION.md) |
+| 正确性 | 结构/dtype/离散值/非有限值比较、实际输入数值与状态审计、隐藏输入族、缓存和执行检查；[严格契约](RELIABILITY.md#strict-validation) |
 | 性能与评分 | 经过验证的基线组合、配对噪声、冷成本摊销、冻结复测、Headroom模型与固定分母；[评分说明](HEADROOM_SCORING.md) |
 | 来源与归因 | CUDA实际计分来源门、实际R/C/B活动并集及launch_only零分门；完整计数器/Neuron归因仍按剩余范围追踪 |
 | 预算与恢复 | token预留、受控开发worker租约、CUDA进程活动/保守上界配额、队列/Modal请求与工件绑定；[资源边界](RESOURCE_BUDGETS.md) |
@@ -98,7 +98,7 @@
 | V23-02 | 连续模式与累计状态检查 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
 | V23-03 | 零值参数与缓存失效探针 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
 | V23-05 | 状态快照与证据重算 | [state_contract.py](../kb_workflows/evaluation/state_contract.py) | [M2](MOTIVATION.md#m2) |
-| V24-01 | L1独立FP64算式与源码绑定 | [operator_specs.py](../kb_workflows/numerics/operator_specs.py) | [M2](MOTIVATION.md#m2) |
+| V24-01 | L1独立FP64算式与源码绑定 | [specs.py](../kb_workflows/numerics/specs.py) | [M2](MOTIVATION.md#m2) |
 | V24-02 | 卷积与池化窗口参考 | [operator_oracles.py](../kb_workflows/numerics/operator_oracles.py) | [M2](MOTIVATION.md#m2) |
 | V24-03 | 数值语义与低精度自资格反例 | [operator_oracles.py](../kb_workflows/numerics/operator_oracles.py) | [M2](MOTIVATION.md#m2) |
 | V24-05 | 参考结构与离散自资格修正 | [numerical.py](../kb_workflows/numerics/numerical.py) | [M2](MOTIVATION.md#m2) |
@@ -154,7 +154,7 @@
 | V37-02 | 按存储组生成值与极值修复 | [input_profiles.py](../kb_workflows/numerics/input_profiles.py) | [M2](MOTIVATION.md#m2) |
 | V37-03 | 固定前向RNG与输出变化审计 | [input_calibration.py](../kb_workflows/numerics/input_calibration.py) | [M2](MOTIVATION.md#m2) |
 | V37-04 | 全题参考专用校准器 | [input_calibration_task.py](../kb_workflows/numerics/input_calibration_task.py) | [M2](MOTIVATION.md#m2) |
-| V37-05 | 当前状态的调用前真值票据 | [reference_oracles.py](../kb_workflows/numerics/reference_oracles.py) | [M2](MOTIVATION.md#m2) |
+| V37-05 | 当前状态的调用前真值票据 | [specs.py](../kb_workflows/numerics/specs.py) | [M2](MOTIVATION.md#m2) |
 | V38-01 | 冻结参考资格与排除清单 | [reference_population.py](../kb_workflows/benchmarks/reference_population.py) | [M2](MOTIVATION.md#m2) |
 | V38-02 | 未解决失败不缩小题集 | [reference_population.py](../kb_workflows/benchmarks/reference_population.py) | [M2](MOTIVATION.md#m2) |
 | V39-01 | 不依赖值校准的逐次FP64门 | [timed_numerics.py](../kb_workflows/evaluation/timed_numerics.py) | [M2](MOTIVATION.md#m2) |
@@ -294,7 +294,7 @@
 | V1-08 | 持久化 HTTP 验证队列 | [queue_worker.py](../kb_workflows/runtime/queue_worker.py) | [M5](MOTIVATION.md#m5) |
 | V1-09 | 带内容指纹的断点恢复 | [common.py](../kb_workflows/common.py) | [M5](MOTIVATION.md#m5) |
 | V1-10 | 批量任务的超时与失败处理 | [transports.py](../kb_workflows/runtime/transports.py) | [M5](MOTIVATION.md#m5) |
-| V1-14 | 旧入口兼容与配置预览 | [legacy.py](../kb_workflows/legacy.py) | [M5](MOTIVATION.md#m5) |
+| V1-14 | 统一入口与配置预览 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
 | V4-05 | 扩大恢复指纹覆盖 | [common.py](../kb_workflows/common.py) | [M5](MOTIVATION.md#m5) |
 | V5-07 | 新协议参与恢复指纹 | [common.py](../kb_workflows/common.py) | [M5](MOTIVATION.md#m5) |
 | V6-01 | 论文与旧实验材料 | [NOTICE.md](../NOTICE.md) | [M5](MOTIVATION.md#m5) |
@@ -347,11 +347,11 @@
 | V25-07 | 修订任务跨入口回归 | [test_reference_revisions.py](../tests/benchmarks/test_reference_revisions.py) | [M5](MOTIVATION.md#m5) |
 | V26-05 | 多设备分布复用与实测身份 | [input_calibration.py](../kb_workflows/numerics/input_calibration.py) | [M5](MOTIVATION.md#m5) |
 | V26-06 | 校准文件贯穿冻结与任务桥接 | [generation.py](../kb_workflows/agents/generation.py) | [M5](MOTIVATION.md#m5) |
-| V26-07 | 轻量校准预览与准入回归 | [calibrate_inputs.py](../scripts/calibrate_inputs.py) | [M5](MOTIVATION.md#m5) |
+| V26-07 | 轻量校准预览与准入回归 | [calibrate.py](../scripts/calibrate.py) | [M5](MOTIVATION.md#m5) |
 | V27-05 | 原生隐藏执行与覆盖复核 | [operator_input_policy.py](../kb_workflows/numerics/operator_input_policy.py) | [M5](MOTIVATION.md#m5) |
 | V27-06 | 输入内存准入与全流程冻结 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
 | V27-08 | 全L1元数据与原生入口回归 | [test_operator_inputs.py](../tests/numerics/test_operator_inputs.py) | [M5](MOTIVATION.md#m5) |
-| V28-04 | 复合收据与缺项拒绝 | [composite_specs.py](../kb_workflows/numerics/composite_specs.py) | [M5](MOTIVATION.md#m5) |
+| V28-04 | 复合收据与缺项拒绝 | [specs.py](../kb_workflows/numerics/specs.py) | [M5](MOTIVATION.md#m5) |
 | V28-05 | meta状态副本与分配前准入 | [composite_oracles.py](../kb_workflows/numerics/composite_oracles.py) | [M5](MOTIVATION.md#m5) |
 | V28-06 | 独立数值入口扩至L1及L2 | [config.py](../kb_workflows/config.py) | [M5](MOTIVATION.md#m5) |
 | V28-08 | 全L2数学与名义形状回归 | [_composite_cases.py](../tests/support/_composite_cases.py) | [M5](MOTIVATION.md#m5) |
@@ -370,7 +370,7 @@
 | V34-07 | 数学格式与后端模拟回归 | [test_baseline_recipes.py](../tests/evaluation/test_baseline_recipes.py) | [M5](MOTIVATION.md#m5) |
 | V35-06 | 实际副本交付收据 | [operator_input_policy.py](../kb_workflows/numerics/operator_input_policy.py) | [M5](MOTIVATION.md#m5) |
 | V35-07 | 别名与低精度反例回归 | [test_input_layouts.py](../tests/evaluation/test_input_layouts.py) | [M5](MOTIVATION.md#m5) |
-| V36-06 | 模型证据与统一数值入口 | [model_specs.py](../kb_workflows/numerics/model_specs.py) | [M5](MOTIVATION.md#m5) |
+| V36-06 | 模型证据与统一数值入口 | [specs.py](../kb_workflows/numerics/specs.py) | [M5](MOTIVATION.md#m5) |
 | V36-07 | 小构造对照与参考缺陷保留 | [test_model_oracles.py](../tests/numerics/test_model_oracles.py) | [M5](MOTIVATION.md#m5) |
 | V37-06 | 原生与Neuron计时顺序统一 | [paired_task.py](../kb_workflows/evaluation/paired_task.py) | [M5](MOTIVATION.md#m5) |
 | V37-07 | 角色、退化与连续状态回归 | [test_model_input_profiles.py](../tests/numerics/test_model_input_profiles.py) | [M5](MOTIVATION.md#m5) |
@@ -381,7 +381,7 @@
 | V39-04 | 原生与Neuron数值路径一致 | [neuron_worker.py](../kb_workflows/hardware/neuron_worker.py) | [M5](MOTIVATION.md#m5) |
 | V39-06 | 验证失败时恢复真实调用后RNG | [measurement.py](../kb_workflows/evaluation/measurement.py) | [M5](MOTIVATION.md#m5) |
 | V39-07 | 无配方的模型与状态计时回归 | [test_timed_numerics.py](../tests/evaluation/test_timed_numerics.py) | [M5](MOTIVATION.md#m5) |
-| V40-04 | 阈值预览与单次配方应用 | [calibrate_precision.py](../scripts/calibrate_precision.py) | [M5](MOTIVATION.md#m5) |
+| V40-04 | 阈值预览与单次配方应用 | [calibrate.py](../scripts/calibrate.py) | [M5](MOTIVATION.md#m5) |
 | V40-05 | 校准与执行设备分离核对 | [precision_calibration.py](../kb_workflows/numerics/precision_calibration.py) | [M5](MOTIVATION.md#m5) |
 | V40-07 | 私有阈值贯通Agent与重评分 | [generation.py](../kb_workflows/agents/generation.py) | [M5](MOTIVATION.md#m5) |
 | V40-08 | 拟合反例与批量传递回归 | [test_precision_calibration.py](../tests/numerics/test_precision_calibration.py) | [M5](MOTIVATION.md#m5) |

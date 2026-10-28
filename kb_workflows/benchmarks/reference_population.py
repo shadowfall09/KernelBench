@@ -66,8 +66,8 @@ def _reasons(record):
                 raise ValueError("Inconsistent reference precision observations; population is unresolved")
             spec = record["oracle_spec"]
             if spec["family"] in {"composite", "model_block"}:
-                from ..numerics.composite_specs import receipt_valid as composite_receipt
-                from ..numerics.model_specs import receipt_valid as model_receipt
+                from ..numerics.specs import validate_composite_receipt as composite_receipt
+                from ..numerics.specs import validate_model_receipt as model_receipt
 
                 check = model_receipt if spec["family"] == "model_block" else composite_receipt
                 if not isinstance(row.get("source_device"), str) or not check(row.get("oracle_receipt"), spec,

@@ -8,7 +8,7 @@ from contextvars import ContextVar
 
 from ..common import fingerprint
 from ..evaluation.evidence import check
-from .operator_specs import spec_for
+from .specs import spec_for
 
 PROTOCOL = "kernelbench_pro_native_numerical_audit_v1"
 ACTIVE = ContextVar("kernelbench_numerical_auditor", default=None)
@@ -89,13 +89,13 @@ def verdicts(document, cases, payload):
                 "reference_signal": check("not_measured", reason="Numerical qualification failed")}
     informative = False
     if spec.get("family") == "composite":
-        from .composite_specs import receipt_valid
+        from .specs import validate_composite_receipt as receipt_valid
 
         if any(not isinstance(row.get("source_device"), str) or not receipt_valid(row.get("composite_receipt"), spec,
                 precision=settings["precision"], source_device=row["source_device"]) for row in rows):
             return missing("Composite arithmetic graph or native stochastic-mask replay evidence is incomplete")
     elif spec.get("family") == "model_block":
-        from .model_specs import receipt_valid
+        from .specs import validate_model_receipt as receipt_valid
 
         if any(not isinstance(row.get("source_device"), str) or not receipt_valid(row.get("model_receipt"), spec,
                 precision=settings["precision"], source_device=row["source_device"]) for row in rows):

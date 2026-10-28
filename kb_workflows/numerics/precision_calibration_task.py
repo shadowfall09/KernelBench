@@ -6,7 +6,6 @@ import copy
 import hashlib
 
 from ..common import evaluator_digest, fingerprint, json_safe
-from .operator_specs import spec_for
 from .precision_calibration import (
     CHECK_SEEDS,
     FIT,
@@ -18,6 +17,7 @@ from .precision_calibration import (
     fitted_policy,
     heldout_passed,
 )
+from .specs import spec_for
 
 
 def calibrate(payload, *, adapter=None, loader=None):
@@ -43,7 +43,7 @@ def calibrate(payload, *, adapter=None, loader=None):
     from .input_calibration_task import precision_environment, probe
     from .input_profiles import transform
     from .numerical import PrecisionContract, precision_gate, reference_utilization, signal_audit
-    from .reference_oracles import prepare
+    from .specs import prepare_oracle as prepare
 
     settings = payload["eval_config"]
     if "kernel_src" in payload or payload["level"] not in {1, 2, 3} or settings.get("precision_profile"):

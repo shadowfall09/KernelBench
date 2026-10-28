@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from ..common import evaluator_digest, fingerprint, json_safe
 from .input_calibration import PROTOCOL, SEEDS, precision_policy, selected_attempt
 from .input_profiles import recipes, selection_policy, transform
-from .operator_specs import spec_for
+from .specs import spec_for
 
 
 def probe(value):
@@ -69,7 +69,7 @@ def calibrate(payload, *, adapter=None, loader=None):
     from ..evaluation.measurement import input_signature
     from ..hardware.devices import adapter as device_adapter
     from .numerical import PrecisionContract, precision_gate, signal_audit
-    from .reference_oracles import prepare
+    from .specs import prepare_oracle as prepare
 
     if "kernel_src" in payload or payload["level"] not in {1, 2, 3} or payload["eval_config"].get("input_profile") or payload["eval_config"].get("precision_profile"):
         raise ValueError("Input calibration accepts original L1/L2/L3 references, with no candidate or existing profile")

@@ -16,7 +16,7 @@ KernelBench Pro 由 shadowfall09 维护，维护地址为 https://github.com/sha
 
 ## 示例与方法来源
 
-`src/prompts/` 中的部分示例参考 Christian Mills 的 GPU MODE 讲解和 Peter Kim 的
+历史版本 `src/prompts/` 中的部分示例参考 Christian Mills 的 GPU MODE 讲解和 Peter Kim 的
 Minimal Flash Attention；具体链接保留在该目录的说明中。
 
 正确性协议借鉴了 KernelBench-Hard、KernelBenchX、robust-kbench 的公开方法，
@@ -39,3 +39,5 @@ Minimal Flash Attention；具体链接保留在该目录的说明中。
 固定使用发布版 2.4.6 的 DefaultAgent；本仓库自行实现模型和评测环境适配器。
 诊断与正式基准分离参考 [MLC / TIRx Harness](https://mlc.ai/agentic-gpu-programming-for-mlsys/)，
 本次未迁入其编译器或检查器。相关方案核对及采用范围见 [Agent loops](docs/AGENT_LOOPS.md)。
+
+旧提示模板、模型 API 路由和 Archon 接口已从当前发行版移除；历史来源与许可说明继续保留。当前模型调用统一由 agent 适配器管理。

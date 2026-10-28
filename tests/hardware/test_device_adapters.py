@@ -577,7 +577,7 @@ def test_neuron_first_execution_cannot_mutate_environment_or_frozen_compiler_sou
 def test_neuron_auxiliary_oracles_can_run_on_cpu_without_downgrading_the_device_precision():
     from kb_workflows.evaluation.evidence import accepted
     from kb_workflows.evaluation.strict_validation import run_checks
-    from kb_workflows.numerics.contract_specs import contract_for
+    from kb_workflows.numerics.specs import contract_for
 
     source = select_problems(1, problem_ids=[2])[2].read_text()
     contract = contract_for(1, 2, source)
