@@ -1573,7 +1573,7 @@
         "kb_workflows/evaluation/tool_runner.py",
         "kb_workflows/common.py"
       ],
-      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。CUDA L2软件已按标准/隐藏/冻结/配对重放计数器与逐内核资源模型、原始独占驱动观察及安全/重复收据，旧分数随工件变化失效；独立诊断不单独授予等级。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key关联当前NEFF缓存快照，未证明实际加载身份。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、冻结regrade的L2采集接线及跨平台完整归因。模拟资料不授予资格，未运行设备或工具实验"
+      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。CUDA L2软件已按标准/隐藏/冻结/配对重放计数器与逐内核资源模型、原始独占驱动观察及安全/重复收据，旧分数随工件变化失效；独立诊断不单独授予等级。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key关联当前NEFF缓存快照，未证明实际加载身份。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、跨平台完整归因。模拟资料不授予资格，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -2440,9 +2440,12 @@
       "source": "current_integration",
       "evidence": [
         "kb_workflows/runtime/regrade.py",
-        "scripts/regrade_artifacts.py"
+        "scripts/regrade_artifacts.py",
+        "scripts/audit_kernel_origin.py",
+        "scripts/audit_work_counters.py",
+        "tests/provenance/test_kernel_origin.py"
       ],
-      "reason": "固定完整题目与样本槽位、候选/历史轨迹及当前验证输入；缺样本保留，新基线另存，仅调用当前验证阶段，旧运行不改动"
+      "reason": "原生重评分冻结全部声明槽位与候选，重新执行当前验证而不调用模型；来源/计数器CLI直接复用冻结manifest及当前实际结果，复查源码、配置、nonce和seed，不用普通请求替代冻结请求，默认预览不调度"
     },
     {
       "id": "V19-07",
@@ -2457,9 +2460,10 @@
       "evidence": [
         "kb_workflows/runtime/regrade.py",
         "kb_workflows/analysis/experiment.py",
-        "kb_workflows/common.py"
+        "kb_workflows/common.py",
+        "tests/runtime/test_regrade.py"
       ],
-      "reason": "单独标记artifact-regrade与零新模型调用，绑定原始测量和基线后再评分，保留失败阶段成本；历史费用不重新认证，模拟数据不能建立资格"
+      "reason": "冻结历史来源、标准/隐藏/final/paired原始结果和其实际引用的规范计数工件；不复制无人引用的旧诊断或worker日志。逐文件校验与只读副本贯穿计划验证；历史成本/测量不直接认证新等级，新评分仍绑定当前测量证明"
     },
     {
       "id": "V19-08",
@@ -5400,9 +5404,10 @@
         "kb_workflows/evaluation/evidence.py",
         "kb_workflows/evaluation/tool_runner.py",
         "kb_workflows/common.py",
-        "scripts/audit_kernel_origin.py"
+        "scripts/audit_kernel_origin.py",
+        "scripts/audit_work_counters.py"
       ],
-      "reason": "实际计分与同次ncu二进制/launch配置按完整输入/状态/输出、设备和数量关联；逐内核身份组计算资源需求、SOL、busy并集与E，不猜重复launch逐次对应。标准/隐藏/冻结/配对各用实际调用收据归档；CUDA L2评分及旧缓存重放所有必需工件、审核证书、worker/对照/ncu/基线的独占观察及四工具/重复收据。驱动XML要求直接worker归属，排除MPS/图形/其他进程，不修改模式或宣称OS隔离。未知不补零，非kernel校准与Neuron来源/计时仍待补；复用原模块和集中测试，无设备/工具/模型实验"
+      "reason": "实际计分与同次ncu二进制/launch配置按完整输入/状态/输出、设备和数量关联；逐内核身份组计算资源需求、SOL、busy并集与E，不猜重复launch逐次对应。标准/隐藏/冻结/配对各用实际调用收据归档；两采集CLI直接加载重评分冻结manifest并核对当前测量，统一map选择器拒绝跨槽位/阶段/repeat借用；CUDA L2评分及旧缓存重放所有必需工件、审核证书、worker/对照/ncu/基线的独占观察及四工具/重复收据。驱动XML要求直接worker归属，排除MPS/图形/其他进程，不修改模式或宣称OS隔离。未知不补零，非kernel校准与Neuron来源/计时仍待补；复用原模块和集中测试，无设备/工具/模型实验"
     },
     {
       "id": "V61-02",

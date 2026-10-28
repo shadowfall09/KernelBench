@@ -8,11 +8,11 @@ import json
 from pathlib import Path
 
 from kb_workflows.common import atomic_json, fingerprint, read_json
-from kb_workflows.config import parse_config
 from kb_workflows.engine import evaluate_tasks
 from kb_workflows.provenance.counter_task import MODEL, artifact_path, execution_models, native_contract
 from kb_workflows.provenance.origin_task import read_scored
 from kb_workflows.provenance.work_counters import recipe
+from scripts.audit_kernel_origin import configuration
 from scripts.audit_kernel_origin import prepare as prepare_origin
 
 
@@ -27,7 +27,9 @@ def prepare(config, pid, sid, policy, *, target="candidate", task="evaluate", hi
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--config", type=Path)
+    source.add_argument("--regrade-manifest", type=Path, help="Use the validated frozen verifier configuration")
     parser.add_argument("--recipe", required=True, type=Path)
     parser.add_argument("--problem", required=True, type=int)
     parser.add_argument("--sample", default=0, type=int)
@@ -36,13 +38,14 @@ def main(argv=None):
     parser.add_argument("--hidden", action="store_true", help="Trusted final hidden phase; never development feedback")
     parser.add_argument("--baseline-variant", help="Required for paired timing; the actual source-bound baseline")
     parser.add_argument("--scored-result", type=Path, help="Existing L1/L2 native result/map; bind counters to its actual call plan")
+    parser.add_argument("--result-key", help="Exact slot/repeat/phase key in the scored result map")
     parser.add_argument("--calibration", type=Path)
     parser.add_argument("--output", type=Path, help="Defaults to the scored receipt's canonical archive when --scored-result is supplied")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
     try:
-        config = parse_config(["--config", str(args.config), "--stage", "evaluate", "--generation", "local"])
-        scored = read_scored(args.scored_result, args.problem, args.sample, args.task)
+        config = configuration(args.config, args.regrade_manifest)
+        scored = read_scored(args.scored_result, args.problem, args.sample, args.task, result_key=args.result_key)
         payload, metrics = prepare(config, args.problem, args.sample, read_json(args.recipe), target=args.target,
                                    task=args.task, hidden=args.hidden, variant=args.baseline_variant, scored_result=scored)
         canonical = artifact_path(config.run_dir, scored) if scored is not None else None

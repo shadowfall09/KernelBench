@@ -17,12 +17,14 @@ from ..config import RunConfig
 PROTOCOL = "kernelbench_pro_artifact_regrade_v1"
 EXTERNAL = ("problem_specs", "device_calibration", "input_calibration", "precision_calibration", "reference_population", "task_dimensions", "determinism_policy_file")
 HISTORY = ("run_config.json", "reference_population.json", "precision_calibration_manifest.json", "paper_analysis.json", "generation_budget.json", "generation_attempts.json", "generation_summary.json",
-           "eval_results.json", "eval_results_hidden.json", "final_manifest.json", "regrade_manifest.json", "baseline_snapshot.json")
+           "eval_results.json", "eval_results_hidden.json", "final_manifest.json", "final_results.json", "paired_results.json",
+           "regrade_manifest.json", "baseline_snapshot.json")
 MAX_SOURCE_BYTES = 8 * 1024**2
 
 
 def history_name(name):
-    return name in HISTORY or bool(re.fullmatch(r"work/p[0-9]+_s[0-9]+/(trajectory|agent_result|development_history|interactive_state)\.json", name))
+    return name in HISTORY or bool(re.fullmatch(
+        r"work/p[0-9]+_s[0-9]+/(trajectory|agent_result|development_history|interactive_state)\.json|counter_artifacts/[0-9a-f]{64}\.json", name))
 
 
 def digest(path):
@@ -70,6 +72,19 @@ def prepare(source, verifier, *, output):
     if not isinstance(saved, dict) or type(saved.get("level")) is not int or saved["level"] not in {1, 2, 3, 5}:
         raise ValueError("Source run configuration is missing")
     history_paths = {name: source / name for name in HISTORY if (source / name).is_file()}
+    # Preserve archives referenced by original native results, not orphaned
+    # diagnostics or worker log trees. Historical bytes never qualify new scores.
+    for filename in ("eval_results.json", "eval_results_hidden.json", "final_results.json", "paired_results.json"):
+        records = read_json(source / filename, {})
+        for result in records.values() if isinstance(records, dict) else ():
+            metadata = result.get("metadata") if isinstance(result, dict) else None
+            receipt = metadata.get("native_call_receipt") if isinstance(metadata, dict) else None
+            checksum = receipt.get("receipt_sha256") if isinstance(receipt, dict) else None
+            if isinstance(checksum, str) and re.fullmatch(r"[0-9a-f]{64}", checksum):
+                name = "counter_artifacts/" + checksum + ".json"
+                path = source / name
+                if path.exists() or path.is_symlink():
+                    history_paths[name] = path
     for filename in ("trajectory.json", "agent_result.json", "development_history.json", "interactive_state.json"):
         for path in source.glob("work/p*_s*/" + filename):
             name = str(path.relative_to(source))

@@ -120,7 +120,26 @@ python -m scripts.audit_work_counters --config /path/to/device.toml \
   --scored-result /path/to/one-raw-result.json
 ```
 
-默认仍为预览。预览显示的规范路径是`RUN/counter_artifacts/<native-call-receipt-SHA>.json`；显式执行才写入。隐藏结果加`--hidden`，配对结果加`--task paired_timing --baseline-variant 实际变体`。冻结结果须从最终结果map选择单个原始结果，不能改写其收据。自选`--output`仍可用于诊断；正式组装读取规范路径，已有工件不会覆写。携带`regrade_manifest`的运行仍被来源采集CLI拒绝，冻结regrade的L2采集接线待补，不能用普通任务替代其冻结请求。
+默认仍为预览。预览显示的规范路径是`RUN/counter_artifacts/<native-call-receipt-SHA>.json`；显式执行才写入。`--scored-result`可直接读取结果map，`--result-key`指定其中的槽位、repeat和阶段，无需另存或改写原始结果：
+
+| 结果map | key示例 | 另需选项 |
+| --- | --- | --- |
+| `eval_results.json` | `2_0` | 无 |
+| `eval_results_hidden.json` | `2_0` | `--hidden` |
+| `final_results.json` | `2_0:1:standard`或`2_0:1:hidden` | 隐藏阶段加`--hidden` |
+| `paired_results.json` | `2_0:0`，或冻结repeat如`2_0:1` | `--task paired_timing --baseline-variant 实际变体` |
+
+两个采集CLI共用选择器，核对map标签与原生请求的task、repeat及阶段，错误标签不能借用另一份结果。单个原始结果文件仍可直接使用，不接受`--result-key`。自选`--output`仍可用于诊断；正式组装读取规范路径，已有工件不会覆写。
+
+冻结重评分使用`--regrade-manifest`替代`--config`，例如预览某个隐藏repeat：
+
+```bash
+python -m scripts.audit_work_counters --regrade-manifest RUN/regrade_manifest.json \
+  --recipe /path/to/reviewed-recipe.json --problem 2 --sample 0 \
+  --scored-result RUN/final_results.json --result-key 2_0:1:hidden --hidden
+```
+
+入口直接加载冻结配置，重新核对计划、源码、审核输入、参考及隐藏源码，不接受另外拼出的不同配置。必须已有对应的实际计分结果；它还须与重评分目录当前的对应测量记录完全一致。冻结repeat继续按当前final manifest复查nonce和seed。普通请求或历史测量不能代替冻结请求；默认预览不建目录、不调度任务，显式执行才采集，且不调用生成器或模型。
 
 评分在现有`measurement_checks()`中重放该slot所有必需阶段，而不是只读一个passed标记。每份工件最多256 MiB，并继续受内部CSV/二进制报告各64 MiB的包络约束。按二进制/符号/完整配置分组，报告原始action IDs、资源工作量、校准SOL、实际计分busy并集及效率E；相同身份的重复launch保留数量，不猜逐次对应关系。不同组可以重叠，不能把各组busy直接相加成整次时间。没有正需求的组保留未知，任何组模型不一致都不能取得完整计数资格。
 

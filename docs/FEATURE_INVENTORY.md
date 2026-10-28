@@ -221,7 +221,7 @@
 | V17-05 | Neuron校准与物理身份 | [neuron_device.py](../kb_workflows/hardware/neuron_device.py) | [M3](MOTIVATION.md#m3) |
 | V17-06 | 设备轨迹与每引擎诊断 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M3](MOTIVATION.md#m3) |
 | V18-05 | 诊断与性能采样分离 | [tool_runner.py](../kb_workflows/evaluation/tool_runner.py) | [M3](MOTIVATION.md#m3) |
-| V19-07 | 重评分来源与测量凭据 | [regrade.py](../kb_workflows/runtime/regrade.py) | [M3](MOTIVATION.md#m3) |
+| V19-07 | 重评分来源与测量凭据 | [原始结果与关联工件](ISOLATION_REGRADE.md#原生已有候选重评分) | [M3](MOTIVATION.md#m3) |
 | V20-03 | 来源时间并集与未知重放 | [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py) | [M3](MOTIVATION.md#m3) |
 | V21-03 | 原生内存操作与双轨道诊断 | [kernel_origin.py](../kb_workflows/provenance/kernel_origin.py) | [M3](MOTIVATION.md#m3) |
 | V25-06 | 诊断设置贯穿冻结与比较 | [tool_checks.py](../kb_workflows/evaluation/tool_checks.py) | [M3](MOTIVATION.md#m3) |
@@ -332,7 +332,7 @@
 | V19-02 | 实际权限与资源观察 | [isolation.py](../kb_workflows/runtime/isolation.py) | [M5](MOTIVATION.md#m5) |
 | V19-03 | 结果交接与容器清理 | [restricted_transport.py](../kb_workflows/runtime/restricted_transport.py) | [M5](MOTIVATION.md#m5) |
 | V19-05 | Harbor网络与只读验证器 | [harbor.py](../kb_workflows/runtime/harbor.py) | [M5](MOTIVATION.md#m5) |
-| V19-06 | 冻结候选的原生重评分 | [regrade.py](../kb_workflows/runtime/regrade.py) | [M5](MOTIVATION.md#m5) |
+| V19-06 | 冻结候选的原生重评分 | [冻结配置与采集入口](../scripts/audit_kernel_origin.py) | [M5](MOTIVATION.md#m5) |
 | V19-08 | Harbor产物重评分与默认预览 | [harbor_regrade.py](../kb_workflows/runtime/harbor_regrade.py) | [M5](MOTIVATION.md#m5) |
 | V20-01 | 冻结候选源码与JIT身份 | [submission_source.py](../kb_workflows/provenance/submission_source.py) | [M5](MOTIVATION.md#m5) |
 | V20-04 | 独立来源诊断与默认预览 | [origin_task.py](../kb_workflows/provenance/origin_task.py) | [M5](MOTIVATION.md#m5) |

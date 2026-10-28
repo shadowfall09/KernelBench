@@ -36,6 +36,16 @@ def tree_hashes(path):
 
 
 def test_regrade_freezes_all_declared_slots_preserves_missing_and_does_not_modify_source(source, tmp_path):
+    from scripts.audit_kernel_origin import configuration, prepare
+
+    checksum = "f" * 64
+    archive = "counter_artifacts/" + checksum + ".json"
+    atomic_json(source.run_dir / "eval_results.json", {"1_0": {"metadata": {"native_call_receipt": {"receipt_sha256": checksum}}}})
+    atomic_json(source.run_dir / archive, {"status": "Historical retention fixture, not hardware evidence"})
+    orphan = "counter_artifacts/" + "e" * 64 + ".json"
+    atomic_json(source.run_dir / orphan, {"status": "Unreferenced diagnostics"})
+    atomic_json(source.run_dir / "final_results.json", {})
+    atomic_json(source.run_dir / "paired_results.json", {})
     before = tree_hashes(source.run_dir)
     plan = regrade.prepare(source.run_dir, target(), output=tmp_path / "regraded")
     config = regrade.validate(plan)
@@ -52,6 +62,18 @@ def test_regrade_freezes_all_declared_slots_preserves_missing_and_does_not_modif
     assert not (config.run_dir / "generation_budget.json").exists()
     assert read_json(config.run_dir / "source_history/generation_budget.json")["totals"]["model_calls"] == 8
     assert read_json(config.run_dir / "source_history/work/p1_s0/trajectory.json")["messages"] == ["SIMULATED historical trajectory"]
+    assert configuration(manifest_path=config.regrade_manifest).to_dict() == config.to_dict()
+    with pytest.raises(ValueError, match="actual scored result"):
+        prepare(config, 1, 0)
+    assert tree_hashes(source.run_dir) == before
+    retained = config.run_dir / "source_history" / archive
+    assert read_json(retained) == read_json(source.run_dir / archive)
+    assert not (config.run_dir / "source_history" / orphan).exists()
+    assert {"final_results.json", "paired_results.json", archive} <= set(plan["history_files"])
+    retained.chmod(0o644)
+    retained.write_text("changed historical counter bytes")
+    with pytest.raises(ValueError, match="historical provenance"):
+        configuration(manifest_path=config.regrade_manifest)
 
 
 @pytest.mark.parametrize("damage", ["candidate", "frozen_candidate", "history", "reference", "evaluator", "population", "add_missing"])
@@ -83,6 +105,10 @@ def test_stale_or_changed_frozen_regrade_inputs_cannot_start(source, tmp_path, d
         atomic_json(root / "regrade_manifest.json", plan)
     with pytest.raises(ValueError):
         regrade.execute(plan)
+    from scripts.audit_kernel_origin import configuration
+
+    with pytest.raises(ValueError):
+        configuration(manifest_path=root / "regrade_manifest.json")
     assert not (root / "regrade_execution.json").exists()
 
 

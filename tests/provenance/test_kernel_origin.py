@@ -1129,6 +1129,79 @@ def test_scored_call_binding_rejects_wrappers_changed_results_and_claimed_qualif
     preview = json.loads(capsys.readouterr().out)
     assert preview["actual_scored_calls_requested"] and preview["timing_seed_count"] == len(frozen["_origin_timing_seeds"])
     assert not preview["experiments_started"] and not output.parent.exists()
+    assert command.main(["--config", str(config), "--problem", "2", "--scored-result", str(results),
+                         "--result-key", "2_0", "--output", str(output)]) == 0
+    assert json.loads(capsys.readouterr().out)["actual_scored_calls_requested"]
+    assert not output.parent.exists()
+    from kb_workflows.evaluation.final_verification import PROTOCOL as FINAL_PROTOCOL
+
+    request = copy.deepcopy(actual["metadata"]["native_call_receipt"]["native_request"])
+    request["eval_config"].update(final_protocol=FINAL_PROTOCOL, final_repeat=2, final_nonce="software-format-fixture",
+                                  evaluation_seed=42, hidden_seeds=[1, 2, 3])
+    final = native_origin_runner.scored(request)
+    validator(final, allow_simulated=True)
+    results.write_text(json.dumps({"2_0:2:standard": final, "2_0:1:standard": final, "2_0:2:hidden": final}))
+    assert origin_task.read_scored(results, 2, 0, result_key="2_0:2:standard") == final
+    for key in ("2_0:1:standard", "2_0:2:hidden", "1_0:2:standard", "2_1:2:standard"):
+        with pytest.raises(ValueError):
+            origin_task.read_scored(results, 2, 0, result_key=key)
+    with pytest.raises(ValueError, match="requires"):
+        origin_task.read_scored(None, 2, 0, result_key="2_0")
+    individual = tmp_path / "individual.json"
+    individual.write_text(json.dumps(final))
+    with pytest.raises(ValueError, match="individual"):
+        origin_task.read_scored(individual, 2, 0, result_key="2_0")
+    paired_map = tmp_path / "paired-map.json"
+    for repeat in (None, 2):
+        request = copy.deepcopy(actual["metadata"]["native_call_receipt"]["native_request"])
+        request["task"] = "paired_timing"
+        if repeat is not None:
+            request["eval_config"].update(final_protocol=FINAL_PROTOCOL, final_repeat=repeat,
+                final_nonce="software-paired-fixture", evaluation_seed=42, hidden_seeds=[1, 2, 3])
+        paired = native_origin_runner.scored(request)
+        validator(paired, allow_simulated=True)
+        key = f"2_0:{repeat or 0}"
+        paired_map.write_text(json.dumps({key: paired, "2_0:3": paired}))
+        assert origin_task.read_scored(paired_map, 2, 0, "paired_timing", result_key=key) == paired
+        if repeat is None:
+            assert origin_task.read_scored(paired_map, 2, 0, "paired_timing") == paired
+        with pytest.raises(ValueError):
+            origin_task.read_scored(paired_map, 2, 0, "paired_timing", result_key="2_0:3")
+    from kb_workflows.common import atomic_json, kernel_name
+    from kb_workflows.config import RunConfig
+    from kb_workflows.runtime import regrade
+    from scripts import audit_work_counters as counter_command
+    from tests.provenance.test_work_counters import policy
+
+    # Reuse the genuine CPU call receipt and simulated device validator above;
+    # the real regrade freezer/configuration/CLI paths still check every file.
+    original = RunConfig(run_name="original-for-regrade", runs_dir=str(tmp_path), start=2, end=2,
+                         generation="local", hardware="H100", gpu="H100", gpu_arch="Hopper", evidence_level="L1").validate()
+    atomic_json(original.run_dir / "run_config.json", original.to_dict())
+    atomic_json(original.run_dir / "paper_analysis.json", {"problem_ids": [2], "declared_samples": 1})
+    (original.run_dir / kernel_name(1, 2)).write_text(actual["metadata"]["native_call_receipt"]["native_request"]["kernel_src"])
+    plan = regrade.prepare(original.run_dir, original, output=tmp_path / "regraded-source")
+    manifest = Path(plan["output_directory"]) / "regrade_manifest.json"
+    atomic_json(manifest.parent / "eval_results.json", {"2_0": actual})
+    results.write_text(json.dumps({"2_0": actual}))
+    capsys.readouterr()
+    assert command.main(["--regrade-manifest", str(manifest), "--problem", "2", "--scored-result", str(results),
+                         "--result-key", "2_0", "--output", str(output)]) == 0
+    assert json.loads(capsys.readouterr().out)["actual_scored_calls_requested"]
+    recipe = tmp_path / "recipe.json"
+    atomic_json(recipe, policy(complete=False))
+    monkeypatch.setattr(counter_command, "evaluate_tasks", lambda *args: pytest.fail("Counter preview cannot dispatch experiments"))
+    assert counter_command.main(["--regrade-manifest", str(manifest), "--problem", "2", "--recipe", str(recipe),
+                                 "--scored-result", str(results), "--result-key", "2_0"]) == 0
+    selected = json.loads(capsys.readouterr().out)
+    assert selected["actual_scored_calls_requested"] and not selected["experiments_started"]
+    assert Path(selected["formal_archive_path"]).parent == manifest.parent / "counter_artifacts"
+    assert not Path(selected["formal_archive_path"]).exists() and not (manifest.parent / "regrade_execution.json").exists()
+    assert not output.parent.exists()
+    (manifest.parent / "eval_results.json").unlink()
+    assert command.main(["--regrade-manifest", str(manifest), "--problem", "2", "--scored-result", str(results),
+                         "--result-key", "2_0", "--output", str(output)]) == 2
+    assert "not the current frozen regrade measurement" in capsys.readouterr().out
 
 
 def test_native_state_binding_includes_parameters_aliases_and_entrypoints(native_origin_runner, monkeypatch, tmp_path):

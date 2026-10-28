@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 import time
@@ -701,9 +702,11 @@ def origin_check(result):
         return check("not_measured", reason=f"Actual scored origin unavailable: {exc}"[:500])
 
 
-def read_scored(path, problem, sample, task="evaluate"):
+def read_scored(path, problem, sample, task="evaluate", *, result_key=None):
     """Read one existing native artifact for both origin and counter previews."""
     if path is None:
+        if result_key is not None:
+            raise ValueError("--result-key requires a scored result map")
         return None
     path = Path(path)
     if not path.is_file() or path.is_symlink():
@@ -713,8 +716,36 @@ def read_scored(path, problem, sample, task="evaluate"):
     if len(data) > MAX_REPORT_BYTES:
         raise ValueError("Scored results exceed the report byte limit")
     result = json.loads(data)
-    if isinstance(result, dict) and "metadata" not in result:
-        result = result[f"{problem}_{sample}" + (":0" if task == "paired_timing" else "")]
+    if not isinstance(result, dict):
+        raise ValueError("Scored results must contain a native result or result map")
+    base, match = f"{problem}_{sample}", None
+    if "metadata" not in result:
+        key = result_key if result_key is not None else base + (":0" if task == "paired_timing" else "")
+        suffix = r":([0-9]+)" if task == "paired_timing" else r"(?::([0-9]+):(standard|hidden))?"
+        match = re.fullmatch(re.escape(base) + suffix, key) if isinstance(key, str) else None
+        if match is None or key not in result:
+            raise ValueError("Scored result key is missing or belongs to another slot/task")
+        result = result[key]
+    elif result_key is not None:
+        raise ValueError("--result-key requires a result map, not an individual result")
+    if not isinstance(result, dict) or not isinstance(result.get("metadata"), dict):
+        raise ValueError("Selected scored result lacks native metadata")
+    receipt = result["metadata"].get("native_call_receipt")
+    request = receipt.get("native_request") if isinstance(receipt, dict) else None
+    if not isinstance(request, dict) or not isinstance(request.get("eval_config"), dict):
+        raise ValueError("Selected scored result lacks its native request")
+    if match is not None:
+        if request.get("task", "evaluate") != task:
+            raise ValueError("Scored result task differs from its selected map key")
+        repeat = match.group(1)
+        settings = request.get("eval_config", {})
+        if repeat is not None and (task != "paired_timing" or int(repeat) != 0 or "final_protocol" in settings):
+            from ..evaluation.final_verification import PROTOCOL
+
+            if (settings.get("final_protocol") != PROTOCOL or type(settings.get("final_repeat")) is not int
+                    or settings["final_repeat"] != int(repeat)
+                    or task == "evaluate" and bool(settings.get("use_hidden_tests")) != (match.group(2) == "hidden")):
+                raise ValueError("Scored result phase/repeat differs from its selected map key")
     return result
 
 
