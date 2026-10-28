@@ -389,7 +389,7 @@
 | V42-06 | 计数器路由与精度校准队列修复 | [audit_work_counters.py](../scripts/audit_work_counters.py) | [M5](MOTIVATION.md#m5) |
 | V42-07 | 计数器反例与软件集成回归 | [test_work_counters.py](../tests/provenance/test_work_counters.py) | [M5](MOTIVATION.md#m5) |
 | V43-01 | Schema12分片完整读取与资源准入 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M5](MOTIVATION.md#m5) |
-| V43-04 | Neuron采集、编译与原生加载观察 | [运行时key与NEFF缓存快照](NEURON_WORK.md#运行时key与neff缓存快照) | [M5](MOTIVATION.md#m5) |
+| V43-04 | Neuron采集、编译与原生加载观察 | [编译依赖与原生加载观察](NEURON_WORK.md#编译前端与框架降低观察) | [M5](MOTIVATION.md#m5) |
 | V43-07 | Parquet与Neuron模拟回归 | [test_neuron_tables.py](../tests/hardware/test_neuron_tables.py) | [M5](MOTIVATION.md#m5) |
 | V44-06 | 离线模型命令与失败门 | [analyze_device_trace.py](../scripts/analyze_device_trace.py) | [M5](MOTIVATION.md#m5) |
 | V44-07 | 注释模型与篡改回归 | [test_neuron_work.py](../tests/hardware/test_neuron_work.py) | [M5](MOTIVATION.md#m5) |

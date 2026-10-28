@@ -16,6 +16,7 @@ from kb_workflows.common import fingerprint
 from kb_workflows.provenance.cpp_origin import Extensions, cuda_policy
 from kb_workflows.provenance.submission_source import SourceRegistry, execute, record_sources, sha256
 from kb_workflows.provenance.triton_origin import Frontend, LanguageSources
+from tests.hardware.test_device_adapters import payload as payload
 
 CUDA = '#include <cuda_runtime.h>\n__global__ void owned(float *x) { x[0] += 1; }\n'
 CUBIN = b'\x7fELF\x02\x01' + b'\x00' * 12 + (190).to_bytes(2, 'little') + b'\x00' * 44 + b'synthetic-device-object'
@@ -639,3 +640,187 @@ def test_compiler_cannot_replace_bad_dependency_phase_with_a_later_clean_one(rea
     current["receipt"]["receipt_sha256"] = "2" * 64
     assert frontend.compiled_frontend_for(kernel) == frozen
     assert frontend.compiled_for(kernel)["frontend_receipt_sha256"] == "1" * 64
+
+
+def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(payload, monkeypatch, tmp_path):
+    import copy
+    import importlib.util
+    import inspect
+    import os
+    import py_compile
+    import sys
+    from types import ModuleType
+
+    from kb_workflows import engine
+    from kb_workflows.hardware import neuron_worker
+    from kb_workflows.provenance.submission_source import SourceRegistry, record_sources
+    from tests.hardware.test_device_adapters import SimulatedNeuron
+
+    config, request = payload
+    value = neuron_worker.evaluate(request, adapter=SimulatedNeuron())
+    path = neuron_worker.ROOT / "cache/workflow" / fingerprint(request) / "candidate.py"
+    registry = SourceRegistry()
+    with record_sources(registry):
+        namespace = neuron_worker.load_source(request["kernel_src"], "inspection_test", filename=path)
+    assert "class ModelNew" in inspect.getsource(namespace["ModelNew"])
+    assert value["metadata"]["compiler_source_sha256"]["candidate.py"]
+    assert value["metadata"]["compiler_source_registration"] == "frozen_compile_code_objects"
+    assert registry.source_for(namespace["ModelNew"].forward)["source_sha256"] == value["metadata"]["compiler_source_sha256"]["candidate.py"]
+    copied = {"__name__": "recompiled_neuron_source"}
+    exec(compile(request["kernel_src"], str(path), "exec", dont_inherit=True), copied)
+    assert registry.source_for(copied["ModelNew"].forward) is None
+    original, stamp = path.read_bytes(), path.stat()
+    path.write_bytes(original.replace(b"ModelNew", b"XodelNew"))
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    py_compile.compile(str(path), doraise=True, invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP)
+    path.write_bytes(original)
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    spec = importlib.util.spec_from_file_location("stale_neuron_pyc_control", path)
+    control = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, control)
+    spec.loader.exec_module(control)
+    assert "XodelNew" in vars(control) and "ModelNew" not in vars(control)
+    refreshed = neuron_worker.load_source(request["kernel_src"], "trusted_compilation", filename=path)
+    assert "ModelNew" in refreshed and "XodelNew" not in refreshed
+    crlf = copy.deepcopy(request)
+    crlf["kernel_src"] = request["kernel_src"].replace("\n", "\r\n")
+    assert neuron_worker.evaluate(crlf, adapter=SimulatedNeuron())["correctness"]
+
+    from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
+    from kb_workflows.provenance.neuron_origin import CompilationObserver, validate_compilation
+
+    ir = tmp_path / "observed.bir"
+    ir.write_bytes(b"SIMULATED BIR; no NKI compiler or device executed")
+    module = object()
+    extra_dependencies = []
+
+    def frontend(kernel_fn):
+        kernel = NS(func=kernel_fn)
+        assert kernel.func is kernel_fn
+        return NS(module=module, dep_files=[kernel_fn.__code__.co_filename, *extra_dependencies])
+
+    def bir(module):
+        return NS(descriptor=NS(kernel_json_path=ir))
+
+    def pipeline(kernel_func, *, cached=False, mismatch=False):
+        if cached:
+            return NS(descriptor=NS(kernel_json_path=ir))
+        result = frontend(kernel_func)
+        return bir(object() if mismatch else result.module)
+
+    def build_config(self):
+        return NS(backend_config_b64=b"SIMULATED backend config",
+                               backend_config={"klir_binary": {"binary": str(ir)}})
+
+    def lower(dconfig, *, corrupt=False):
+        backend_config = dconfig.backend_config_b64.decode("ascii")
+        if corrupt:
+            ir.write_bytes(b"CHANGED BIR")
+        assert backend_config
+        return NS(stablehlo_bytes=b"SIMULATED StableHLO", cache_key="simulated-key")
+
+    functions = {"pipeline": pipeline, "frontend": frontend, "bir": bir, "config": build_config, "lower": lower}
+    with CompilationObserver(registry, functions=functions) as observer:
+        lower(build_config(pipeline(namespace["ModelNew"].forward)))
+    directory = tmp_path / "compiler-capture"
+    directory.mkdir()
+    observation = observer.export(directory)
+    files = file_manifest(directory, DEFAULT_LIMITS)
+    hashes, sizes = {k: r["sha256"] for k, r in files.items()}, {k: r["bytes"] for k, r in files.items()}
+    assert observation["status"] == "observed" and observation["simulated"]
+    assert observation["pipelines"][0]["root"]["source_sha256"] == value["metadata"]["compiler_source_sha256"]["candidate.py"]
+    assert observation["pipelines"][0]["cache_keys"] == ["simulated-key"]
+    assert not observation["formal_origin_qualified"] and not observation["loaded_binary_identity_proven"]
+    validate_compilation(observation, hashes, sizes, allow_simulated=True)
+    with pytest.raises(ValueError, match="receipt"):
+        validate_compilation(observation, hashes, sizes)
+    with pytest.raises(ValueError, match="BIR snapshot"):
+        validate_compilation(observation, {p: h for p, h in hashes.items() if not p.endswith(".bir")}, sizes, allow_simulated=True)
+    for options in ({"cached": True}, {"mismatch": True}):
+        with CompilationObserver(registry, functions=functions) as missing:
+            lower(build_config(pipeline(namespace["ModelNew"].forward, **options)))
+        assert missing.value["status"] == "partial"
+        assert not missing.value["pipelines"][0]["fresh_lowering_observed"]
+    with CompilationObserver(registry, functions=functions) as changed:
+        lower(build_config(pipeline(namespace["ModelNew"].forward)), corrupt=True)
+    assert changed.value["issues"] and not changed.value["pipelines"][0]["fresh_lowering_observed"]
+    with CompilationObserver(registry, functions=functions) as disrupted:
+        sys.setprofile(None)
+    assert disrupted.value["status"] == "partial" and disrupted.value["issues"]
+    assert sys.getprofile() is None
+    from types import FunctionType
+
+    recompiled = FunctionType(pipeline.__code__.replace(), pipeline.__globals__, closure=pipeline.__closure__)
+    with CompilationObserver(registry, functions=functions) as unregistered:
+        recompiled(namespace["ModelNew"].forward, cached=True, mismatch=False)
+    assert unregistered.value["pipelines"] == []
+    assert unregistered.value["status"] == "not_measured"
+    def previous(*args):
+        return None
+    sys.setprofile(previous)
+    try:
+        with CompilationObserver(registry, functions=functions) as occupied:
+            assert sys.getprofile() is previous
+        assert sys.getprofile() is previous and occupied.value["issues"]
+    finally:
+        sys.setprofile(None)
+    import base64
+    import hashlib
+
+    from kb_workflows.provenance.submission_source import WheelSources, compile_source
+
+    vendor = tmp_path / "vendor"
+    primitive_path = vendor / "nki/language/fixture.py"
+    primitive_path.parent.mkdir(parents=True)
+    primitive_source = "def primitive(x): return x\n"
+    primitive_path.write_text(primitive_source)
+    lookalike = primitive_path.with_name("fixture.py.other.py")
+    lookalike.write_text(primitive_source)
+    primitive_namespace = {}
+    exec(compile(primitive_source, str(primitive_path), "exec", dont_inherit=True), primitive_namespace)
+    digest = base64.urlsafe_b64encode(hashlib.sha256(primitive_source.encode()).digest()).decode().rstrip("=")
+    class Distribution:
+        version = "0.7.0"
+        def locate_file(self, name): return vendor / name
+        def read_text(self, name):
+            return (f"nki/language/fixture.py,sha256={digest},{len(primitive_source)}\n"
+                    f"nki/language/fixture.py.other.py,sha256={digest},{len(primitive_source)}\n")
+    language = WheelSources("nki", "0.7.0", ("nki/language/",), distribution=Distribution())
+    exact = WheelSources("nki", "0.7.0", ("nki/language/fixture.py",), distribution=Distribution())
+    assert set(exact.paths) == {str(primitive_path)}
+    sdk = ModuleType("reviewed_nki_fixture")
+    sdk.primitive = primitive_namespace["primitive"]
+    graph = "def helper(x): return x+1\ndef kernel(x): return sdk.primitive(helper(x))\n"
+    graph_namespace = {"sdk": sdk}
+    with record_sources(registry):
+        exec(compile_source(graph, tmp_path / "graph.py"), graph_namespace)
+    extra_dependencies[:] = [str(primitive_path)]
+    with CompilationObserver(registry, functions=functions, language=language) as dependencies:
+        lower(build_config(pipeline(graph_namespace["kernel"])))
+    observed = dependencies.value["pipelines"][0]["source_dependencies"]
+    assert observed["status"] == "observed" and observed["issues"] == []
+    assert {item["role"] for item in observed["files"]} == {"registered_source", "approved_wheel_source"}
+    assert [item["kind"] for item in observed["callables"]] == ["registered_code", "approved_primitive", "registered_code"]
+    dependency_dir = tmp_path / "dependencies"
+    dependency_dir.mkdir()
+    dependencies.export(dependency_dir)
+    artifacts = file_manifest(dependency_dir, DEFAULT_LIMITS)
+    digests, byte_sizes = {p: r["sha256"] for p, r in artifacts.items()}, {p: r["bytes"] for p, r in artifacts.items()}
+    validate_compilation(dependencies.value, digests, byte_sizes, allow_simulated=True)
+    with pytest.raises(ValueError, match="source artifact"):
+        validate_compilation(dependencies.value, {p: h for p, h in digests.items() if not p.startswith("compiler_sources/")},
+                             byte_sizes, allow_simulated=True)
+    # Equal filenames do not turn separately compiled helper code into ownership.
+    unowned = {}
+    exec(compile("def helper(x): return x+2", str(tmp_path / "graph.py"), "exec"), unowned)
+    graph_namespace["helper"] = unowned["helper"]
+    extra_dependencies.append(str(tmp_path / "unapproved-do-not-read.py"))
+    with CompilationObserver(registry, functions=functions, language=language) as unsupported:
+        lower(build_config(pipeline(graph_namespace["kernel"])))
+    incomplete = unsupported.value["pipelines"][0]["source_dependencies"]
+    assert incomplete["status"] == "partial"
+    assert "unregistered_or_opaque_callable" in incomplete["issues"]
+    assert any(issue.startswith("unapproved_gather_file:") for issue in incomplete["issues"])
+    path.write_text("# changed compiled source")
+    with pytest.raises(ValueError, match="compiler source file"):
+        neuron_worker.evaluate(engine.task_payload(config, 19), adapter=SimulatedNeuron())

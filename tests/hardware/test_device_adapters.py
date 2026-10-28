@@ -1,7 +1,6 @@
 """Device contract regressions only; SDK execution is replaced with explicit fakes."""
 
 import copy
-import inspect
 import json
 import shutil
 import subprocess
@@ -309,125 +308,6 @@ def test_neuron_library_baselines_preserve_production_semantics(pid, monkeypatch
     library = neuron_worker.prepare_variant(None, "neuron_library", level=5, pid=pid)
     from src.validation import compare_outputs
     assert compare_outputs(expected, library(*args), 1e-5) is None
-
-
-def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(payload, monkeypatch, tmp_path):
-    import importlib.util
-    import os
-    import py_compile
-
-    from kb_workflows.provenance.submission_source import SourceRegistry, record_sources
-
-    config, request = payload
-    value = neuron_worker.evaluate(request, adapter=SimulatedNeuron())
-    path = neuron_worker.ROOT / "cache/workflow" / fingerprint(request) / "candidate.py"
-    registry = SourceRegistry()
-    with record_sources(registry):
-        namespace = neuron_worker.load_source(request["kernel_src"], "inspection_test", filename=path)
-    assert "class ModelNew" in inspect.getsource(namespace["ModelNew"])
-    assert value["metadata"]["compiler_source_sha256"]["candidate.py"]
-    assert value["metadata"]["compiler_source_registration"] == "frozen_compile_code_objects"
-    assert registry.source_for(namespace["ModelNew"].forward)["source_sha256"] == value["metadata"]["compiler_source_sha256"]["candidate.py"]
-    copied = {"__name__": "recompiled_neuron_source"}
-    exec(compile(request["kernel_src"], str(path), "exec", dont_inherit=True), copied)
-    assert registry.source_for(copied["ModelNew"].forward) is None
-    original, stamp = path.read_bytes(), path.stat()
-    path.write_bytes(original.replace(b"ModelNew", b"XodelNew"))
-    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
-    py_compile.compile(str(path), doraise=True, invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP)
-    path.write_bytes(original)
-    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
-    spec = importlib.util.spec_from_file_location("stale_neuron_pyc_control", path)
-    control = importlib.util.module_from_spec(spec)
-    monkeypatch.setitem(sys.modules, spec.name, control)
-    spec.loader.exec_module(control)
-    assert "XodelNew" in vars(control) and "ModelNew" not in vars(control)
-    refreshed = neuron_worker.load_source(request["kernel_src"], "trusted_compilation", filename=path)
-    assert "ModelNew" in refreshed and "XodelNew" not in refreshed
-    crlf = copy.deepcopy(request)
-    crlf["kernel_src"] = request["kernel_src"].replace("\n", "\r\n")
-    assert neuron_worker.evaluate(crlf, adapter=SimulatedNeuron())["correctness"]
-
-    from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
-    from kb_workflows.provenance.neuron_origin import CompilationObserver, validate_compilation
-
-    ir = tmp_path / "observed.bir"
-    ir.write_bytes(b"SIMULATED BIR; no NKI compiler or device executed")
-    module = object()
-
-    def frontend(kernel_fn):
-        kernel = SimpleNamespace(func=kernel_fn)
-        assert kernel.func is kernel_fn
-        return SimpleNamespace(module=module)
-
-    def bir(module):
-        return SimpleNamespace(descriptor=SimpleNamespace(kernel_json_path=ir))
-
-    def pipeline(kernel_func, *, cached=False, mismatch=False):
-        if cached:
-            return SimpleNamespace(descriptor=SimpleNamespace(kernel_json_path=ir))
-        result = frontend(kernel_func)
-        return bir(object() if mismatch else result.module)
-
-    def build_config(self):
-        return SimpleNamespace(backend_config_b64=b"SIMULATED backend config",
-                               backend_config={"klir_binary": {"binary": str(ir)}})
-
-    def lower(dconfig, *, corrupt=False):
-        backend_config = dconfig.backend_config_b64.decode("ascii")
-        if corrupt:
-            ir.write_bytes(b"CHANGED BIR")
-        assert backend_config
-        return SimpleNamespace(stablehlo_bytes=b"SIMULATED StableHLO", cache_key="simulated-key")
-
-    functions = {"pipeline": pipeline, "frontend": frontend, "bir": bir, "config": build_config, "lower": lower}
-    with CompilationObserver(registry, functions=functions) as observer:
-        lower(build_config(pipeline(namespace["ModelNew"].forward)))
-    directory = tmp_path / "compiler-capture"
-    directory.mkdir()
-    observation = observer.export(directory)
-    files = file_manifest(directory, DEFAULT_LIMITS)
-    hashes, sizes = {k: r["sha256"] for k, r in files.items()}, {k: r["bytes"] for k, r in files.items()}
-    assert observation["status"] == "observed" and observation["simulated"]
-    assert observation["pipelines"][0]["root"]["source_sha256"] == value["metadata"]["compiler_source_sha256"]["candidate.py"]
-    assert observation["pipelines"][0]["cache_keys"] == ["simulated-key"]
-    assert not observation["formal_origin_qualified"] and not observation["loaded_binary_identity_proven"]
-    validate_compilation(observation, hashes, sizes, allow_simulated=True)
-    with pytest.raises(ValueError, match="receipt"):
-        validate_compilation(observation, hashes, sizes)
-    with pytest.raises(ValueError, match="BIR snapshot"):
-        validate_compilation(observation, {}, {}, allow_simulated=True)
-    for options in ({"cached": True}, {"mismatch": True}):
-        with CompilationObserver(registry, functions=functions) as missing:
-            lower(build_config(pipeline(namespace["ModelNew"].forward, **options)))
-        assert missing.value["status"] == "partial"
-        assert not missing.value["pipelines"][0]["fresh_lowering_observed"]
-    with CompilationObserver(registry, functions=functions) as changed:
-        lower(build_config(pipeline(namespace["ModelNew"].forward)), corrupt=True)
-    assert changed.value["issues"] and not changed.value["pipelines"][0]["fresh_lowering_observed"]
-    with CompilationObserver(registry, functions=functions) as disrupted:
-        sys.setprofile(None)
-    assert disrupted.value["status"] == "partial" and disrupted.value["issues"]
-    assert sys.getprofile() is None
-    from types import FunctionType
-
-    recompiled = FunctionType(pipeline.__code__.replace(), pipeline.__globals__, closure=pipeline.__closure__)
-    with CompilationObserver(registry, functions=functions) as unregistered:
-        recompiled(namespace["ModelNew"].forward, cached=True, mismatch=False)
-    assert unregistered.value["pipelines"] == []
-    assert unregistered.value["status"] == "not_measured"
-    def previous(*args):
-        return None
-    sys.setprofile(previous)
-    try:
-        with CompilationObserver(registry, functions=functions) as occupied:
-            assert sys.getprofile() is previous
-        assert sys.getprofile() is previous and occupied.value["issues"]
-    finally:
-        sys.setprofile(None)
-    path.write_text("# changed compiled source")
-    with pytest.raises(ValueError, match="compiler source file"):
-        neuron_worker.evaluate(engine.task_payload(config, 19), adapter=SimulatedNeuron())
 
 
 def test_neuron_public_development_never_accepts_fp8_storage_downgrade(tmp_path):

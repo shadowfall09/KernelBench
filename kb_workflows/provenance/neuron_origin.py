@@ -6,21 +6,27 @@ compiler dependency ownership and formal timing remain separate requirements.
 
 from __future__ import annotations
 
+import ast
+import builtins
 import hashlib
+import importlib.metadata
 import json
 import os
 import stat
 import sys
+import types
 from pathlib import Path
 
 from ..common import fingerprint
 from ..hardware.neuron_tables import integer
+from .submission_source import WheelSources
 from .work_counters import sha
 
 RUNTIME_NEFF = "kernelbench_pro_neuron_runtime_neff_v1"
 RUNTIME_NEFF_SCOPE = "privateuse1_driver_events_to_current_cache_snapshots; explicit_host_workers_excluded"
-COMPILATION = "kernelbench_pro_neuron_compilation_observation_v1"
-COMPILATION_SCOPE = "current_python_thread; observed_frontend_to_bir_to_framework_lowering; root_code_only"
+COMPILATION = "kernelbench_pro_neuron_compilation_observation_v2"
+COMPILATION_SCOPE = "current_python_thread; frontend_to_bir_to_framework_lowering; gather_files_and_static_callable_references"
+DEPENDENCY_SCOPE = "returned_gather_files_and_static_call_references; not_native_ast_callee_attestation"
 
 
 def _seal(value):
@@ -44,9 +50,13 @@ class CompilationObserver:
     The retained objects associate each handoff; names and cache keys do not.
     """
 
-    def __init__(self, registry, *, functions=None):
+    def __init__(self, registry, *, functions=None, language=None):
         self.registry, self.injected = registry, functions is not None
         self.functions = functions
+        self.language, self.kernel_types = language, ()
+        self.source_binaries = {}
+        self.builtins = {name: getattr(builtins, name) for name in
+                         ("range", "len", "int", "float", "bool", "tuple", "list", "min", "max", "enumerate", "zip")}
         self.rows, self.issues, self.frames, self.nirs, self.configs, self.binaries = [], [], {}, {}, {}, {}
         self.callback, self.previous = self._observe, None
         self.lower_count = 0
@@ -59,6 +69,17 @@ class CompilationObserver:
             if self.previous is not None:
                 raise ValueError("Existing Python profiler; compiler observation not installed")
             self.functions = self.functions if self.injected else _compiler_functions()
+            if not self.injected:
+                from nki.framework import Kernel
+                from packaging.version import Version
+
+                dist = importlib.metadata.distribution("nki")
+                if Version(dist.version).release != (0, 7, 0):
+                    raise ValueError("NKI dependency observation requires the reviewed 0.7.0 frontend")
+                self.language = WheelSources("nki", dist.version,
+                    ("nki/language/", "nki/isa/", "nki/experimental/", "nki/compiler/_builtins.py"), distribution=dist)
+                self.kernel_types = (Kernel, *Kernel.__subclasses__())
+                self.kernel_types += tuple(child for cls in self.kernel_types for child in cls.__subclasses__())
             self.codes = {id(fn.__code__): (fn.__code__, name) for name, fn in self.functions.items()}
             if {name for _, name in self.codes.values()} != {"pipeline", "frontend", "bir", "config", "lower"}:
                 raise ValueError("Unsupported NKI compiler observation contract")
@@ -76,6 +97,8 @@ class CompilationObserver:
             sys.setprofile(self.previous)
             if any(fn.__code__ is not self.original_codes[name] for name, fn in self.functions.items()):
                 self.issues.append("Observed SDK compiler code changed")
+        if self.language is not None and not self.language.intact():
+            self.issues.append("Approved NKI primitive sources changed")
         self.value = _seal({"protocol": COMPILATION, "scope": COMPILATION_SCOPE,
             "simulated": self.injected, "pipelines": self.rows, "issues": self.issues,
             "compiler_entrypoints": self.entrypoints,
@@ -86,19 +109,115 @@ class CompilationObserver:
         self.nirs.clear()
         self.configs.clear()
 
-    def _snapshot(self, path):
+    def _snapshot(self, path, *, source=False):
+        limit = (4 if source else 16) * 1024**2
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         with os.fdopen(fd, "rb") as stream:
             if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
                 raise ValueError("NKI BIR must be a regular file")
-            raw = stream.read(16 * 1024**2 + 1)
-        if not 0 < len(raw) <= 16 * 1024**2:
-            raise ValueError("NKI BIR exceeds the 16 MiB observation envelope")
+            raw = stream.read(limit + 1)
+        if not 0 < len(raw) <= limit:
+            raise ValueError("NKI compiler input exceeds its observation envelope")
         digest = hashlib.sha256(raw).hexdigest()
-        if digest not in self.binaries and sum(map(len, self.binaries.values())) + len(raw) > 64 * 1024**2:
-            raise ValueError("NKI BIR snapshots exceed the 64 MiB envelope")
-        self.binaries[digest] = raw
+        target = self.source_binaries if source else self.binaries
+        if digest not in target and sum(map(len, self.binaries.values())) + sum(map(len, self.source_binaries.values())) + len(raw) > 64 * 1024**2:
+            raise ValueError("NKI compiler snapshots exceed the 64 MiB envelope")
+        target[digest] = raw
         return digest
+
+    def references(self, function):
+        """Resolve a conservative static view; dynamic/opaque calls stay unknown."""
+        rows, unresolved, seen = [], [], set()
+        calls = 0
+
+        def visit(fn):
+            nonlocal calls
+            if type(fn) in self.kernel_types:
+                fn = fn.func
+            if id(fn) in seen:
+                return
+            seen.add(id(fn))
+            if len(seen) > 1024:
+                raise ValueError("NKI callable references exceed 1024 objects")
+            if any(fn is value for value in self.builtins.values()):
+                rows.append({"kind": "builtin", "name": fn.__name__})
+                return
+            owner = self.registry.source_for(fn) if type(fn) is types.FunctionType else None
+            if owner is None:
+                approved = self.language.python_sources(fn) if self.language is not None else None
+                if approved:
+                    rows.extend({"kind": "approved_primitive", **item} for item in approved)
+                else:
+                    unresolved.append("unregistered_or_opaque_callable")
+                return
+            rows.append(self.registry.callable_identity(fn))
+            text = self.registry.jit_text.get(id(fn.__code__))
+            if text is None:
+                unresolved.append("missing_frozen_function_text")
+                return
+            bindings = {**fn.__builtins__, **fn.__globals__}
+            bindings.update(zip(fn.__code__.co_freevars, (cell.cell_contents for cell in fn.__closure__ or ())))
+
+            def resolve(node):
+                if isinstance(node, ast.Name):
+                    return bindings.get(node.id)
+                if isinstance(node, ast.Attribute):
+                    base = resolve(node.value)
+                    return vars(base).get(node.attr) if type(base) is types.ModuleType else None
+                return None
+
+            for node in ast.walk(ast.parse(text)):
+                if isinstance(node, ast.Call):
+                    calls += 1
+                    if calls > 4096:
+                        raise ValueError("NKI static call references exceed 4096 sites")
+                    target = resolve(node.func)
+                    if target is None:
+                        unresolved.append("dynamic_or_unresolved_call:" + ast.unparse(node.func)[:160])
+                    else:
+                        visit(target)
+
+        visit(function)
+        return {"callables": rows, "unresolved": sorted(set(unresolved))}
+
+    def dependencies(self, result, function, before):
+        after = self.references(function)
+        issues = list(after["unresolved"])
+        if before != after:
+            issues.append("callable_references_changed_during_frontend")
+        paths, files = getattr(result, "dep_files", None), []
+        known = {str(Path(r["path"]).resolve()): ("registered_source", r["source_sha256"]) for r in self.registry.sources}
+        if self.language is not None:
+            known.update({p: ("approved_wheel_source", r["file_sha256"]) for p, r in self.language.paths.items()})
+        if not isinstance(paths, (list, tuple)) or not 0 < len(paths) <= 1024:
+            issues.append("missing_or_oversized_gather_file_set")
+        else:
+            names = set()
+            for name in paths:
+                if not isinstance(name, str) or not 0 < len(name) <= 4096:
+                    issues.append("invalid_gather_file")
+                    continue
+                name = str(Path(name).resolve())
+                if name in names:
+                    continue
+                names.add(name)
+                if name not in known:
+                    issues.append("unapproved_gather_file:" + name[:160])
+                    continue  # Do not read arbitrary files named by compiler metadata.
+                role, expected = known[name]
+                digest = self._snapshot(name, source=True)
+                if digest != expected:
+                    issues.append("changed_gather_file:" + name[:160])
+                files.append({"path": name, "role": role, "sha256": digest,
+                              "artifact": "compiler_sources/" + digest + ".py"})
+            root = self.registry.source_for(function)
+            if root is None or str(Path(root["path"]).resolve()) not in names:
+                issues.append("registered_root_missing_from_gather_files")
+            registered = {item["sha256"] for item in files if item["role"] == "registered_source"}
+            if any(item.get("kind") == "registered_code" and item["source_sha256"] not in registered for item in after["callables"]):
+                issues.append("registered_callable_file_missing_from_gather_files")
+        return {"scope": DEPENDENCY_SCOPE, "files": files, "callables": after["callables"],
+                "issues": sorted(set(issues)), "status": "observed" if not issues else "partial"}
 
     def _observe(self, frame, event, result):
         match = self.codes.get(id(frame.f_code))
@@ -120,8 +239,10 @@ class CompilationObserver:
                    "frontend_observed": False, "bir_lowering_observed": False,
                    "config_observed": False, "fresh_lowering_observed": False,
                    "bir_sha256": None, "cache_keys": [], "stablehlo_sha256": []}
+            function = getattr(kernel, "func", kernel)
+            row["source_dependencies"] = None
             self.rows.append(row)
-            self.frames[frame] = {"row": row}
+            self.frames[frame] = {"row": row, "references": self.references(function)}
         if event != "return":
             return
         parent = frame
@@ -134,6 +255,7 @@ class CompilationObserver:
             if source == active["row"]["root"]:
                 active["module"] = result.module
                 active["row"]["frontend_observed"] = True
+                active["row"]["source_dependencies"] = self.dependencies(result, kernel.func, active["references"])
         elif name == "bir" and active is not None and result is not None:
             if local["module"] is active.get("module") and active["row"]["frontend_observed"]:
                 active["bir"] = result
@@ -181,11 +303,13 @@ class CompilationObserver:
 
     def export(self, directory):
         """Preserve observed BIR bytes inside the existing profile artifact tree."""
-        if self.binaries:
-            root = Path(directory) / "compiler_ir"
+        for folder, binaries, extension in (("compiler_ir", self.binaries, ".bir"), ("compiler_sources", self.source_binaries, ".py")):
+            if not binaries:
+                continue
+            root = Path(directory) / folder
             root.mkdir(exist_ok=False)
-            for digest, raw in self.binaries.items():
-                with (root / (digest + ".bir")).open("xb") as stream:
+            for digest, raw in binaries.items():
+                with (root / (digest + extension)).open("xb") as stream:
                     stream.write(raw)
         return self.value
 
@@ -217,6 +341,41 @@ def validate_compilation(value, files, sizes, *, allow_simulated=False):
                 or row["fresh_lowering_observed"] and not row["config_observed"]):
             raise ValueError("Inconsistent Neuron compiler stages")
         digest = row.get("bir_sha256")
+        dependencies = row.get("source_dependencies")
+        if dependencies is not None:
+            if (not row["frontend_observed"] or not isinstance(dependencies, dict)
+                    or dependencies.get("scope") != DEPENDENCY_SCOPE
+                    or not isinstance(dependencies.get("files"), list) or len(dependencies["files"]) > 1024
+                    or not isinstance(dependencies.get("callables"), list) or len(dependencies["callables"]) > 20000
+                    or not isinstance(dependencies.get("issues"), list) or len(dependencies["issues"]) > 2048
+                    or any(not isinstance(issue, str) or len(issue) > 300 for issue in dependencies["issues"])
+                    or dependencies.get("status") != ("partial" if dependencies["issues"] else "observed")):
+                raise ValueError("Invalid Neuron dependency observation")
+            paths = set()
+            for item in dependencies["files"]:
+                if (not isinstance(item, dict) or not isinstance(item.get("path"), str) or item["path"] in paths
+                        or item.get("role") not in {"registered_source", "approved_wheel_source"}
+                        or not sha(item.get("sha256")) or item.get("artifact") != "compiler_sources/" + item["sha256"] + ".py"
+                        or files.get(item["artifact"]) != item["sha256"] or sizes is None
+                        or not 0 < sizes.get(item["artifact"], 0) <= 4 * 1024**2):
+                    raise ValueError("Neuron dependency source artifact missing or changed")
+                paths.add(item["path"])
+                artifacts.add(item["artifact"])
+            for item in dependencies["callables"]:
+                if (not isinstance(item, dict) or item.get("kind") not in {"registered_code", "approved_primitive", "builtin"}
+                        or item["kind"] == "registered_code" and (not sha(item.get("source_sha256")) or not integer(item.get("code_index")))
+                        or item["kind"] == "approved_primitive" and item.get("role") not in {"primitive", "builtin"}
+                        or item["kind"] == "approved_primitive" and item.get("role") == "primitive" and (
+                            not sha(item.get("code_sha256")) or not sha(item.get("file_sha256")) or not sha(item.get("record_sha256")))):
+                    raise ValueError("Invalid Neuron dependency callable observation")
+            if not dependencies["issues"]:
+                registered = {item["sha256"] for item in dependencies["files"] if item["role"] == "registered_source"}
+                if (row["root"].get("source_sha256") not in registered or not dependencies["callables"]
+                        or any(item.get("kind") == "registered_code" and item["source_sha256"] not in registered
+                               for item in dependencies["callables"])):
+                    raise ValueError("Neuron dependency files do not cover their registered callable references")
+        elif row["frontend_observed"]:
+            raise ValueError("Neuron frontend lacks its dependency observation")
         root = row["root"]
         if (root.get("kind") not in {"registered_code", "external_code_observation", "builtin_observation"}
                 or root["kind"] == "registered_code" and (not sha(root.get("source_sha256")) or not integer(root.get("code_index")))

@@ -7,9 +7,16 @@ matching registered object.
 
 from __future__ import annotations
 
+import base64
+import builtins
+import csv
+import functools
 import hashlib
+import importlib.metadata
 import inspect
+import io
 import marshal
+import math
 import os
 import re
 import sys
@@ -163,3 +170,103 @@ def execute(source, context, build_directory):
             sys.modules[context["__name__"]] = previous
         raise
     context.update(module.__dict__)
+
+
+class WheelSources:
+    def __init__(self, name, version, prefixes, *, distribution=None):
+        dist = distribution or importlib.metadata.distribution(name)
+        if dist.version != version:
+            raise RuntimeError("Frontend provenance requires " + name + " " + version)
+        record = dist.read_text("RECORD")
+        if not record:
+            raise RuntimeError(name + " source RECORD is unavailable")
+        self.records = []
+        self.codes = {}
+        self.texts = {}
+        self.paths = {}
+        record_sha = sha256(record.encode())
+        root = Path(dist.locate_file("")).resolve()
+        for row in csv.reader(io.StringIO(record)):
+            if len(row) != 3:
+                continue
+            relative, digest, _ = row
+            selected = any(relative.startswith(prefix) if prefix.endswith("/") else relative == prefix for prefix in prefixes)
+            if not (selected and relative.endswith(".py") and digest.startswith("sha256=")):
+                continue
+            path = Path(dist.locate_file(relative)).resolve()
+            if not path.is_relative_to(root) or path.stat().st_size > 4 * 1024**2:
+                raise ValueError("Invalid language primitive path/size")
+            content = path.read_bytes()
+            expected = base64.b64decode(digest.removeprefix("sha256=") + "=", altchars=b"-_", validate=True).hex()
+            if sha256(content) != expected:
+                raise ValueError("Installed language source does not match RECORD")
+            source = {"path": str(path), "relative_path": relative, "file_sha256": expected,
+                      "distribution": name, "version": dist.version, "record_sha256": record_sha}
+            self.records.append(source)
+            text = content.decode()
+            self.paths[str(path)] = source
+            self.texts[str(path)] = text
+            collected = []
+
+            def visit(code):
+                collected.append(code)
+                for child in code.co_consts:
+                    if isinstance(child, types.CodeType):
+                        visit(child)
+
+            visit(compile(text, str(path), "exec", dont_inherit=True))
+            self.codes[str(path)] = collected
+        self.builtins = {id(value): value for value in [getattr(builtins, name) for name in
+            ("bool", "float", "int", "len", "list", "max", "min", "print", "range", "tuple", "getattr", "isinstance", "enumerate", "zip")]
+            + [value for value in vars(math).values() if isinstance(value, types.BuiltinFunctionType)]}
+
+    def python_sources(self, fn, seen=None):
+        """Validate actual bytecode and callable closure cells, never __wrapped__."""
+        seen = set() if seen is None else seen
+        if id(fn) in seen:
+            return []
+        seen.add(id(fn))
+        if id(fn) in self.builtins and self.builtins[id(fn)] is fn:
+            return [{"role": "builtin", "module": fn.__module__, "function": fn.__qualname__}]
+        if isinstance(fn, functools.partial):
+            sources = self.python_sources(fn.func, seen)
+            if sources is None:
+                return None
+            for value in (*fn.args, *fn.keywords.values()):
+                if callable(value):
+                    child = self.python_sources(value, seen)
+                    if child is None:
+                        return None
+                    sources.extend(child)
+            return sources
+        if isinstance(fn, types.MethodType):
+            fn = fn.__func__
+        code = getattr(fn, "__code__", None)
+        if code is None:
+            return None
+        source = self.paths.get(code.co_filename)
+        if source is None or not any(code == known for known in self.codes[code.co_filename]):
+            return None
+        if not self.accepts(source, code):
+            return None
+        sources = [{**source, "role": "primitive", "function": fn.__qualname__, "code_sha256": sha256(marshal.dumps(code))}]
+        for cell in fn.__closure__ or ():
+            value = cell.cell_contents
+            if callable(value):
+                child = self.python_sources(value, seen)
+                if child is None:
+                    return None
+                sources.extend(child)
+        return sources
+
+    def python_function(self, fn):
+        return self.python_sources(fn) is not None
+
+    def accepts(self, source, code):
+        return True
+
+    def intact(self):
+        try:
+            return all(sha256(Path(row["path"]).read_bytes()) == row["file_sha256"] for row in self.records)
+        except OSError:
+            return False
