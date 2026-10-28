@@ -10,6 +10,7 @@ import ast
 import builtins
 import hashlib
 import importlib.metadata
+import inspect
 import json
 import os
 import stat
@@ -40,7 +41,7 @@ def _compiler_functions():
 
     return {"pipeline": driver.compile_to_bir, "frontend": frontend.NKIFrontend.compile,
             "bir": ncc_driver.compile_mlir_to_bir, "config": ncc_driver.NirResult.build_config,
-            "lower": _lower_custom_nki}
+            "lower": _lower_custom_nki, "parser": frontend.ParserFrontend._compile, "source": inspect.getsourcelines}
 
 
 class CompilationObserver:
@@ -50,11 +51,13 @@ class CompilationObserver:
     The retained objects associate each handoff; names and cache keys do not.
     """
 
-    def __init__(self, registry, *, functions=None, language=None):
+    def __init__(self, registry, *, functions=None, language=None, native_frontend=None):
         self.registry, self.injected = registry, functions is not None
         self.functions = functions
         self.language, self.kernel_types = language, ()
         self.source_binaries = {}
+        self.ast_binaries, self.native_frames = {}, {}
+        self.native_frontend, self.native_original, self.native_factory = native_frontend, None, None
         self.builtins = {name: getattr(builtins, name) for name in
                          ("range", "len", "int", "float", "bool", "tuple", "list", "min", "max", "enumerate", "zip")}
         self.rows, self.issues, self.frames, self.nirs, self.configs, self.binaries = [], [], {}, {}, {}, {}
@@ -77,14 +80,20 @@ class CompilationObserver:
                 if Version(dist.version).release != (0, 7, 0):
                     raise ValueError("NKI dependency observation requires the reviewed 0.7.0 frontend")
                 self.language = WheelSources("nki", dist.version,
-                    ("nki/language/", "nki/isa/", "nki/experimental/", "nki/compiler/_builtins.py"), distribution=dist)
+                    ("nki/language/", "nki/isa/", "nki/experimental/", "nki/utils/", "nki/_dependency.py", "nki/compiler/_builtins.py"), distribution=dist)
                 self.kernel_types = (Kernel, *Kernel.__subclasses__())
                 self.kernel_types += tuple(child for cls in self.kernel_types for child in cls.__subclasses__())
+                from nki.compiler import frontend
+
+                self.native_frontend = frontend
             self.codes = {id(fn.__code__): (fn.__code__, name) for name, fn in self.functions.items()}
-            if {name for _, name in self.codes.values()} != {"pipeline", "frontend", "bir", "config", "lower"}:
+            names = {name for _, name in self.codes.values()}
+            if not {"pipeline", "frontend", "bir", "config", "lower"} <= names or names - {"pipeline", "frontend", "bir", "config", "lower", "parser", "source"}:
                 raise ValueError("Unsupported NKI compiler observation contract")
             self.original_codes = {name: fn.__code__ for name, fn in self.functions.items()}
             self.entrypoints = {name: self.registry.callable_identity(fn) for name, fn in self.functions.items()}
+            if self.native_frontend is not None:
+                self._install_native()
             sys.setprofile(self.callback)
         except Exception as exc:
             self.issues.append(str(exc)[:300])
@@ -97,6 +106,10 @@ class CompilationObserver:
             sys.setprofile(self.previous)
             if any(fn.__code__ is not self.original_codes[name] for name, fn in self.functions.items()):
                 self.issues.append("Observed SDK compiler code changed")
+        if self.native_original is not None:
+            if self.native_frontend.Kernel is not self.native_factory:
+                self.issues.append("Native NKI constructor observation changed")
+            self.native_frontend.Kernel = self.native_original
         if self.language is not None and not self.language.intact():
             self.issues.append("Approved NKI primitive sources changed")
         self.value = _seal({"protocol": COMPILATION, "scope": COMPILATION_SCOPE,
@@ -108,6 +121,47 @@ class CompilationObserver:
         self.frames.clear()
         self.nirs.clear()
         self.configs.clear()
+        self.native_frames.clear()
+
+    def _install_native(self):
+        from .neuron_ast import Inputs, KernelProxy, bind
+
+        self.native_original = self.native_frontend.Kernel
+        self.native_inputs = Inputs(self.registry, self.language)
+        serialize, compile_method = self.native_original.serialize_python, self.native_original.compile
+
+        def factory(function):
+            state = self.native_frames.get(sys._getframe(1))
+            if state is not None:
+                state["constructor_frame"] = sys._getframe()
+            try:
+                native = self.native_original(function)
+            finally:
+                if state is not None:
+                    state.pop("constructor_frame", None)
+            if state is None:
+                return native
+
+            def before(instance):
+                try:
+                    raw = serialize(instance)
+                    frame = state["frame"]
+                    config = [frame.f_locals.get(key) for key in ("arch", "arch_sub_version", "lnc")]
+                    packet = bind(raw, state["reads"], config, simulated=self.injected)
+                    digest = packet["ast_sha256"]
+                    total = sum(len(v) for collection in (self.binaries, self.source_binaries, self.ast_binaries) for v in collection.values())
+                    if digest not in self.ast_binaries and total + len(raw) > 64 * 1024**2:
+                        raise ValueError("NKI compiler snapshots exceed the 64 MiB envelope")
+                    self.ast_binaries[digest] = raw
+                    state["packet"] = packet
+                except Exception as exc:
+                    if len(self.issues) < 64:
+                        self.issues.append("Native NKI inputs unavailable: " + type(exc).__name__ + ": " + str(exc)[:180])
+
+            return KernelProxy(native, compile_method, before)
+
+        self.native_factory = factory
+        self.native_frontend.Kernel = factory
 
     def _snapshot(self, path, *, source=False):
         limit = (4 if source else 16) * 1024**2
@@ -120,7 +174,7 @@ class CompilationObserver:
             raise ValueError("NKI compiler input exceeds its observation envelope")
         digest = hashlib.sha256(raw).hexdigest()
         target = self.source_binaries if source else self.binaries
-        if digest not in target and sum(map(len, self.binaries.values())) + sum(map(len, self.source_binaries.values())) + len(raw) > 64 * 1024**2:
+        if digest not in target and sum(map(len, self.binaries.values())) + sum(map(len, self.source_binaries.values())) + sum(map(len, self.ast_binaries.values())) + len(raw) > 64 * 1024**2:
             raise ValueError("NKI compiler snapshots exceed the 64 MiB envelope")
         target[digest] = raw
         return digest
@@ -241,14 +295,36 @@ class CompilationObserver:
                    "bir_sha256": None, "cache_keys": [], "stablehlo_sha256": []}
             function = getattr(kernel, "func", kernel)
             row["source_dependencies"] = None
+            row["native_ast"] = None
             self.rows.append(row)
             self.frames[frame] = {"row": row, "references": self.references(function)}
+        if name == "parser" and event == "call":
+            self.native_frames[frame] = {"frame": frame, "reads": [], "packet": None}
         if event != "return":
             return
         parent = frame
         while parent is not None and parent not in self.frames:
             parent = parent.f_back
         active = self.frames.get(parent)
+        if name == "source":
+            ancestor = frame.f_back
+            while ancestor is not None and ancestor not in self.native_frames:
+                ancestor = ancestor.f_back
+            state = self.native_frames.get(ancestor)
+            if state is not None and hasattr(self, "native_inputs"):
+                if len(state["reads"]) >= 4096:
+                    raise ValueError("Native NKI source reads exceed their envelope")
+                source = self.functions["source"]
+                direct = (frame.f_back is state["frame"] or frame.f_back is state.get("constructor_frame")) and frame.f_globals is source.__globals__ and frame.f_builtins is source.__builtins__
+                record = self.native_inputs.read(local.get("object"), result, direct=direct)
+                if record.get("status") == "observed" and self._snapshot(record["path"], source=True) != record["source_sha256"]:
+                    record = {"status": "unresolved", "reason": "native_source_changed_during_read"}
+                state["reads"].append(record)
+        elif name == "parser":
+            state = self.native_frames.pop(frame, None)
+            if active is not None and state and state["packet"] is not None:
+                active["row"]["native_ast"] = state["packet"]
+                active["native_module"] = getattr(result, "module", None)
         if name == "frontend" and active is not None and result is not None:
             kernel = local["kernel"]
             source = self.registry.callable_identity(kernel.func)
@@ -256,6 +332,9 @@ class CompilationObserver:
                 active["module"] = result.module
                 active["row"]["frontend_observed"] = True
                 active["row"]["source_dependencies"] = self.dependencies(result, kernel.func, active["references"])
+                if packet := active["row"]["native_ast"]:
+                    packet["module_handoff_observed"] = result.module is active.get("native_module")
+                    _seal(packet)
         elif name == "bir" and active is not None and result is not None:
             if local["module"] is active.get("module") and active["row"]["frontend_observed"]:
                 active["bir"] = result
@@ -303,7 +382,7 @@ class CompilationObserver:
 
     def export(self, directory):
         """Preserve observed BIR bytes inside the existing profile artifact tree."""
-        for folder, binaries, extension in (("compiler_ir", self.binaries, ".bir"), ("compiler_sources", self.source_binaries, ".py")):
+        for folder, binaries, extension in (("compiler_ir", self.binaries, ".bir"), ("compiler_sources", self.source_binaries, ".py"), ("compiler_ast", self.ast_binaries, ".msgpack")):
             if not binaries:
                 continue
             root = Path(directory) / folder
@@ -326,7 +405,8 @@ def validate_compilation(value, files, sizes, *, allow_simulated=False):
             or any(not isinstance(issue, str) or len(issue) > 300 for issue in issues)):
         raise ValueError("Invalid Neuron compiler observation envelope")
     entrypoints = value.get("compiler_entrypoints")
-    if (not isinstance(entrypoints, dict) or entrypoints and set(entrypoints) != {"pipeline", "frontend", "bir", "config", "lower"}
+    required = {"pipeline", "frontend", "bir", "config", "lower"}
+    if (not isinstance(entrypoints, dict) or entrypoints and (not required <= set(entrypoints) or set(entrypoints) - required - {"parser", "source"})
             or any(not isinstance(item, dict) or not sha(item.get("code_sha256")) for item in entrypoints.values())
             or rows and not entrypoints):
         raise ValueError("Invalid Neuron compiler entrypoint observations")
@@ -341,6 +421,13 @@ def validate_compilation(value, files, sizes, *, allow_simulated=False):
                 or row["fresh_lowering_observed"] and not row["config_observed"]):
             raise ValueError("Inconsistent Neuron compiler stages")
         digest = row.get("bir_sha256")
+        if row.get("native_ast") is not None:
+            from .neuron_ast import validate
+
+            packet = validate(row["native_ast"], files, sizes, allow_simulated=allow_simulated)
+            if not row["frontend_observed"] or not {"parser", "source"} <= set(entrypoints):
+                raise ValueError("Native NKI input witness lacks its actual frontend")
+            artifacts.add(packet["artifact"])
         dependencies = row.get("source_dependencies")
         if dependencies is not None:
             if (not row["frontend_observed"] or not isinstance(dependencies, dict)

@@ -40,7 +40,7 @@ DMA包的read/write/transfer字节另列。它们包含不同存储端点和host
 
 Neuron worker与CUDA共用源码冻结、字节核对和编译注册，`source_registration=frozen_compile_code_objects`记录本次实际执行的代码对象；相同文件名或重新编译的相同文本不能借用注册身份。源文件保持可检查，旧`.pyc`不能替代本次编译；原始换行字节也参与核对。候选前后状态观察复用同一个注册表。
 
-原生profile的`runtime_neff_bindings`从导出的Chrome trace选择`privateuse1_driver`完整事件，排除显式host worker及runtime提交事件。只使用原始`neff_cache_key`与`persistent_cache_key`，不靠kernel名称猜身份。每对key调用一次在候选导入前保存的`torch_neuronx._C.get_neff_info`，要求返回的persistent key精确相同，再保存NEFF字节、SHA-256与原始事件索引。接口和事件字段分别依据固定SDK源码的[缓存查询实现](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/NeuronBindings.cpp#L2259)与[设备事件导出实现](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/profiler/Session.cpp#L691)核对，没有运行SDK或设备实验。
+原生profile的`runtime_neff_bindings`从导出的Chrome trace选择`privateuse1_driver`完整事件，排除显式host worker及runtime提交事件。只使用原始`neff_cache_key`与`persistent_cache_key`，不靠kernel名称猜身份。每对key调用一次在候选导入前保存的`torch_neuronx._C.get_neff_info`，要求返回的persistent key精确相同，再保存NEFF字节、SHA-256与原始事件索引。接口和事件字段分别依据固定SDK源码的[缓存查询实现](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/NeuronBindings.cpp#L2259)与[设备事件导出实现](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/profiler/Session.cpp#L691)核对，未调用该运行时或运行设备实验。
 
 实时采集和离线处理复用已有完整工件清单检查：默认4096文件、单文件128 MiB、总计512 MiB。trace另限64 MiB及200,000事件。不重复保存已有同哈希`.neff`；缺少时才写入`runtime_neff/<SHA-256>.neff`。清单与收据同时核对哈希、字节数及事件覆盖。缺少SDK接口、字段不完整、查询失败或key不匹配均保留未解析事件；`observed/partial/not_measured`区分完整关联、部分关联和未测量。
 
@@ -48,7 +48,7 @@ Neuron worker与CUDA共用源码冻结、字节核对和编译注册，`source_r
 
 ## 编译前端与框架降低观察
 
-开发 profile 现在同时保留 `kernelbench_pro_neuron_compilation_observation_v2`。观察器在导入候选前固定 NKI 编译入口的代码对象，以当前 Python 线程的实际调用/返回事件关联 `compile_to_bir`、`NKIFrontend.compile`、`compile_mlir_to_bir`、`NirResult.build_config` 和框架 `_lower_custom_nki`。它不替换 SDK 函数，也不覆盖已有 Python profiler；已有 profiler、回调被替换或入口代码变化都会留下未完成原因。正式 evaluate、baseline、paired_timing 路径不启用这项开发插桩。
+开发 profile 现在同时保留 `kernelbench_pro_neuron_compilation_observation_v2`。观察器在导入候选前固定 NKI 编译入口的代码对象，以当前 Python 线程的实际调用/返回事件关联 `compile_to_bir`、`NKIFrontend.compile`、`compile_mlir_to_bir`、`NirResult.build_config` 和框架 `_lower_custom_nki`。原有入口通过函数帧观察；为保存原生 AST，开发 profile 会临时代理 Parser 的原生 Kernel 构造入口，并在原生降低前保存输入、结束后恢复。它不覆盖已有 Python profiler；已有 profiler、回调被替换或入口代码变化都会留下未完成原因。正式 evaluate、baseline、paired_timing 路径不启用这项开发插桩。
 
 只有实际前端返回的 MLIR 对象传给实际 BIR 降低、同一个 NirResult 返回框架配置、配置和 BIR 字节在框架降低时仍一致，才标记 `fresh_lowering_observed`。内存缓存、持久 trace 缓存跳过前端，或模块对象不对应时保留缺失阶段。源码身份来自本次冻结编译注册的代码对象；相同文件名和另行编译的相等代码对象不等于已注册对象。外部根函数单独记录为代码观察，不能据此认领自写内核。
 
@@ -56,11 +56,25 @@ NKI 0.7.0 的实际 `CompilationResult.dep_files` 另保留 Gather 文件清单�
 
 原语源码校验复用 [WheelSources](../kb_workflows/provenance/submission_source.py)，与 Triton 共用 RECORD、源码、字节码及可调用闭包检查；Triton 自己的版本、语言路径和 `__init__` 函数限制保持原政策。这里只核对 Gather 文件和静态引用视图，收据明确标记 `not_native_ast_callee_attestation`：它没有解码原生 Parser 的全部 AST，也不把动态依赖或静态引用当成实际编译调用证明。
 
-每次 BIR 快照最多16 MiB、每个依赖源码4 MiB，二者共用64 MiB总额。源码保存在既有采集工件树 `compiler_sources/<sha256>.py`，纳入同一文件/字节清单；不会复制 SDK 源码进仓库。每次 Gather 最多1024文件，静态引用最多1024对象、4096调用位置。流水线、配置对象和降低调用分别最多4096项。原始字节保存到既有 profile 工件树的 `compiler_ir/<sha256>.bir`，纳入统一哈希/字节清单。收据记录入口代码摘要、逐阶段观察、BIR 摘要及实际 StableHLO 摘要/cache key；验证器检查阶段依赖、原始工件和模拟标记。StableHLO 摘要不等于保留了完整 HLO 文件。
+每次 BIR 快照最多16 MiB、每个依赖源码和原生 AST 各4 MiB，三者共用64 MiB总额。源码保存在既有采集工件树 `compiler_sources/<sha256>.py`，纳入同一文件/字节清单；不会复制 SDK 源码进仓库。每次 Gather 最多1024文件，静态引用最多1024对象、4096调用位置。流水线、配置对象和降低调用分别最多4096项。原始字节保存到既有 profile 工件树的 `compiler_ir/<sha256>.bir`，纳入统一哈希/字节清单。收据记录入口代码摘要、逐阶段观察、BIR 摘要及实际 StableHLO 摘要/cache key；验证器检查阶段依赖、原始工件和模拟标记。StableHLO 摘要不等于保留了完整 HLO 文件。
 
-实现依据是 [NKI 0.7.0 官方 wheel](https://pip.repos.neuron.amazonaws.com/nki/nki-0.7.0%2B37713544100.gfede04bb-cp312-cp312-linux_x86_64.whl) 的编译驱动，以及固定提交的 [Torch Neuron NKI 降低](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/python_ops/neuron_nki_call_lowering.py)。这不是所有 SDK 版本的兼容保证：其他前端、线程、缓存或编译路径未观察到时保持未知。本次仅静态阅读 SDK，并用明确模拟的 CPU 流水线验证协议，没有导入或运行 Neuron SDK。
+实现依据是 [NKI 0.7.0 官方 wheel](https://pip.repos.neuron.amazonaws.com/nki/nki-0.7.0%2B37713544100.gfede04bb-cp312-cp312-linux_x86_64.whl) 的编译驱动，以及固定提交的 [Torch Neuron NKI 降低](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/python_ops/neuron_nki_call_lowering.py)。这不是所有 SDK 版本的兼容保证：其他前端、线程、缓存或编译路径未观察到时保持未知。本次另在隔离临时目录用真实 NKI 0.7.0 CPU Gather/序列化验证接口，禁止 Torch、Neuron runtime/后端工具、子进程与网络；未执行原生 Kernel.compile、BIR/NEFF 后端、设备或模型实验。模块交接与工厂恢复另由明确模拟的软件回归覆盖。
 
-这里观察编译交接、Gather 文件和静态辅助函数引用，不证明原生 AST 的全部辅助函数/动态依赖来源。因此编译观察和运行时缓存快照都保持 `formal_origin_qualified=false`、`loaded_binary_identity_proven=false`；下一节的可选原生观察器单独核对加载字节与提交序号，R-08/R-16 继续部分实现。旧的 root-only v1 编译收据不能改标签升级为 v2，须重新采集。来源观察统一放在 [neuron_origin.py](../kb_workflows/provenance/neuron_origin.py)；[neuron_work.py](../kb_workflows/hardware/neuron_work.py)只组合采集与资源需求模型。
+编译交接与静态引用不是原生 AST 证据的替代；原生定义输入另由下一节的独立收据核对。动态、外部及不支持的定义继续未知，正式连续计分和完整编译输出关联仍未完成。因此编译观察和运行时缓存快照都保持 `formal_origin_qualified=false`、`loaded_binary_identity_proven=false`；下一节的可选原生观察器单独核对加载字节与提交序号，R-08/R-16 继续部分实现。旧的 root-only v1 编译收据不能改标签升级为 v2，须重新采集。来源观察统一放在 [neuron_origin.py](../kb_workflows/provenance/neuron_origin.py)；[neuron_work.py](../kb_workflows/hardware/neuron_work.py)只组合采集与资源需求模型。
+
+## 原生 Parser 的实际源码输入
+
+[neuron_ast.py](../kb_workflows/provenance/neuron_ast.py)独立处理 NKI 0.7.0 的 MessagePack 输入和源码读取证据，避免把二进制格式解析继续堆进采集器。编译观察中的可选 `native_ast` 使用 `kernelbench_pro_neuron_native_ast_v1`。候选导入前固定 Parser、原始 `inspect.getsourcelines` 代码与 SDK Kernel 构造/编译/序列化方法；正常 Parser 入口临时返回透明代理，同一个原生对象在真正降低前先序列化，然后调用原有编译方法。前端返回的 module 对象继续核对是否传给上层前端。
+
+收集真实源码读取的返回值，要求调用直接来自原生 Parser/构造边界，使用原始 inspect 的 globals/builtins，并匹配注册代码或候选导入前通过 RECORD 核对的 SDK 函数/类。返回源码须逐字匹配提前冻结的文本（按 Python 源码语义规范换行）；代码对象、原始文件 SHA、实际返回块 SHA 和定义范围分别保留。普通 Python 包装器中转的读取不能取得真实原生输入身份。注册表额外缓存原始源码，不能用运行中的 linecache 替代冻结文本。
+
+解析原始 MessagePack 中的函数、类及类方法定义，把名称和完整源码范围逐项关联到实际读取记录及冻结源码 AST。重复读取只有来源与返回内容一致才可合并；缺失、含糊、未知外部定义、arch/sub-version/LNC 不同或不支持格式保留未完成。原始 blob 还保留参数及内联全局值，不能只靠 Gather 文件列表推断这些值的来源。`root_source_sha256`来自原生根定义的实际读取，而不是外层包装器的声明。
+
+原始 AST 放在 `compiler_ast/<sha256>.msgpack`，与 BIR/源码共用64 MiB总额；收据同时保留有界编码，供离线重新解析并核对原始工件、定义覆盖和源码清单。解码最多4 MiB、1,000,000值、128层，定义最多20,000项、源码读取4096次。`msgpack`依赖仅加入 Neuron worker 和离线 analysis extra，导入模块不会加载 SDK或解码器。
+
+只有全部定义都匹配直接读取、根定义存在、配置一致且非模拟时，`native_definition_sources_bound`为true；`module_handoff_observed`单独记录 Parser→上层前端的对象交接。它们证明的是受信 SDK 的源码输入关联，不证明输出因果/算法质量、完整 NEFF 编译链或正式墙钟等价，`formal_origin_qualified`保持false。格式/配额无法观察时记录原因并继续原有 SDK 编译，不能把诊断失败改成成功来源。构造入口被替换也会记录失格并恢复。
+
+CPU 软件核验使用已记录官方 wheel 的真实 `Kernel.specialize()`、`serialize_python()` 和 `inspect` 读取；一个包含 load/arange/辅助函数的输入关联了180个函数、类和方法定义，全部有冻结输入记录。没有调用原生 `Kernel.compile`、neuronx-cc、NRT、设备或真实模型。该核验只确认 Gather 证据与格式，不认证实际 SDK 部署、硬件正确性或性能；常规测试保留明确模拟标记，不能冒充设备来源。
 
 ## 可选原生加载与提交观察
 

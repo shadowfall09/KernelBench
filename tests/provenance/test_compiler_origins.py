@@ -810,6 +810,75 @@ def test_nki_compiler_can_inspect_frozen_source_and_changed_file_is_rejected(pay
     with pytest.raises(ValueError, match="source artifact"):
         validate_compilation(dependencies.value, {p: h for p, h in digests.items() if not p.startswith("compiler_sources/")},
                              byte_sizes, allow_simulated=True)
+    import msgpack
+
+    from kb_workflows.provenance import neuron_ast
+
+    facade = NS()
+    functions_used = [graph_namespace["kernel"], graph_namespace["helper"], sdk.primitive]
+    encoded_definitions = []
+    for fn in functions_used:
+        source_path = Path(fn.__code__.co_filename)
+        definition = next(n for n in ast.walk(ast.parse(source_path.read_text())) if isinstance(n, ast.FunctionDef) and n.name == fn.__name__)
+        location = [str(source_path), definition.lineno, definition.col_offset + 1, definition.end_lineno, definition.end_col_offset + 1]
+        encoded_definitions.append([str(fn.__module__) + "." + fn.__qualname__, [], [[], [], [], None, [], [], None], [], location])
+    blob = msgpack.packb([encoded_definitions[0][0], encoded_definitions, [], [], [], [], 3, 0, 1, []], use_bin_type=True)
+    class NativeKernel:
+        def __init__(self, fn): self.function = fn
+        def specialize(self):
+            for fn in functions_used:
+                inspect.getsourcelines(fn)
+        def serialize_python(self): return blob
+        def compile(self): return module
+    facade.Kernel = NativeKernel
+    def parser(kernel_fn):
+        arch, arch_sub_version, lnc = 3, 0, 1
+        assert arch + arch_sub_version + lnc == 4
+        native = facade.Kernel(kernel_fn)
+        native.specialize()
+        return NS(module=native.compile(), dep_files=[kernel_fn.__code__.co_filename, str(primitive_path)])
+    def parsed_frontend(kernel_fn):
+        kernel = NS(func=kernel_fn)
+        assert kernel.func is kernel_fn
+        return parser(kernel_fn)
+    def parsed_pipeline(kernel_func):
+        return bir(parsed_frontend(kernel_func).module)
+    native_functions = {**functions, "pipeline": parsed_pipeline, "frontend": parsed_frontend,
+                        "parser": parser, "source": inspect.getsourcelines}
+    with CompilationObserver(registry, functions=native_functions, language=language, native_frontend=facade) as native_capture:
+        lower(build_config(parsed_pipeline(graph_namespace["kernel"])))
+    assert facade.Kernel is NativeKernel
+    native_packet = native_capture.value["pipelines"][0]["native_ast"]
+    assert native_packet["all_definition_sources_matched"] and native_packet["module_handoff_observed"]
+    assert native_packet["simulated"] and not native_packet["native_definition_sources_bound"]
+    assert not native_packet["formal_origin_qualified"]
+    indirect = neuron_ast.bind(blob, native_packet["reads"], [3, 0, 1])
+    assert not indirect["native_definition_sources_bound"] and indirect["unresolved_definitions"]
+    native_dir = tmp_path / "native-ast"
+    native_dir.mkdir()
+    native_capture.export(native_dir)
+    native_files = file_manifest(native_dir, DEFAULT_LIMITS)
+    native_hashes = {p: r["sha256"] for p, r in native_files.items()}
+    native_sizes = {p: r["bytes"] for p, r in native_files.items()}
+    validate_compilation(native_capture.value, native_hashes, native_sizes, allow_simulated=True)
+    with pytest.raises(ValueError, match="packet"):
+        neuron_ast.validate(native_packet, native_hashes, native_sizes)
+    with pytest.raises(ValueError, match="artifact"):
+        neuron_ast.validate(native_packet, {p: h for p, h in native_hashes.items() if not p.endswith(".msgpack")}, native_sizes, allow_simulated=True)
+    missing = neuron_ast.bind(blob, native_packet["reads"][:1], [3, 0, 1], simulated=True)
+    assert not missing["all_definition_sources_matched"] and missing["unresolved_definitions"]
+    changed_config = neuron_ast.bind(blob, native_packet["reads"], [3, 0, 2], simulated=True)
+    assert not changed_config["all_definition_sources_matched"]
+    with pytest.raises(ValueError, match="MessagePack"):
+        neuron_ast.decode(blob + b"extra")
+    # A format failure must preserve the real compiler call and leave source evidence unknown.
+    original_serializer = NativeKernel.serialize_python
+    NativeKernel.serialize_python = lambda self: b"unsupported"
+    with CompilationObserver(registry, functions=native_functions, language=language, native_frontend=facade) as unknown_ast:
+        lower(build_config(parsed_pipeline(graph_namespace["kernel"])))
+    assert unknown_ast.value["issues"] and unknown_ast.value["pipelines"][0]["fresh_lowering_observed"]
+    assert unknown_ast.value["pipelines"][0]["native_ast"] is None
+    NativeKernel.serialize_python = original_serializer
     # Equal filenames do not turn separately compiled helper code into ownership.
     unowned = {}
     exec(compile("def helper(x): return x+2", str(tmp_path / "graph.py"), "exec"), unowned)

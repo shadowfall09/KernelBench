@@ -36,6 +36,7 @@ def sha256(value):
 class SourceRegistry:
     def __init__(self):
         self.sources = []
+        self.texts = {}
         self.codes = {}  # id -> retained object: code equality is insufficient.
         self.jit_text = {}
         self.literals = {}
@@ -44,6 +45,7 @@ class SourceRegistry:
     def register(self, source, path, code):
         item = {"source_sha256": sha256(source.encode()), "path": str(path)}
         self.sources.append(item)
+        self.texts[item["source_sha256"]] = source
         lines = source.splitlines(keepends=True)
         literals = self.literals.setdefault(item["source_sha256"], set())
         position = 0

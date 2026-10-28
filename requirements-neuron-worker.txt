@@ -7,3 +7,4 @@ nki>=0.6,<0.8
 neuronx-cc>=2,<3
 numpy
 packaging
+msgpack>=1.1.1,<2

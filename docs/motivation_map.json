@@ -1431,9 +1431,10 @@
         "kb_workflows/hardware/neuron_worker.py",
         "kb_workflows/provenance/neuron_origin.py",
         "kb_workflows/provenance/neuron_runtime.py",
-        "kb_workflows/provenance/neuron_runtime.cpp"
+        "kb_workflows/provenance/neuron_runtime.cpp",
+        "kb_workflows/provenance/neuron_ast.py"
       ],
-      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron已有本次编译代码对象注册、实际前端→MLIR/BIR→框架降低交接观察、BIR原始快照及运行时key/当前NEFF缓存快照；缓存跳过阶段保持未知，可选原生预加载按实际NEFF缓冲区、模型代次及异步序号关联开发driver事件；已核对实际Gather源码集与注册辅助代码/批准原语的静态引用，原生AST完整callee证明及正式评分连续调用关联仍未建立；未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
+      "reason": "已支持CUDA实际计分持续CUPTI、同模式基线、原始callable与完整公共/隐藏/预热/计时/配对/显存覆盖；源码→产物→函数→launch与前后状态/入口/别名绑定后，自写/库轨道门由实际trace推导，评分离线重算，政策进入配置/恢复/分组。独立诊断不能代替；Neuron已有本次编译代码对象注册、实际前端→MLIR/BIR→框架降低交接观察、BIR原始快照及运行时key/当前NEFF缓存快照；缓存跳过阶段保持未知，可选原生预加载按实际NEFF缓冲区、模型代次及异步序号关联开发driver事件；已核对实际Gather源码集与注册辅助代码/批准原语的静态引用，原生AST另按实际直接inspect读取与冻结函数/类源码逐定义绑定，保存原始MessagePack及根源码；受支持定义已有CPU真实Gather验证。完整NEFF编译输出链与正式评分连续调用关联仍未建立；未支持loader/compiler继续未知，完整等级与安全/输出因果证明不由来源门替代，按要求不运行实验"
     },
     {
       "id": "R-09",
@@ -1577,9 +1578,10 @@
         "kb_workflows/common.py",
         "kb_workflows/provenance/neuron_origin.py",
         "kb_workflows/provenance/neuron_runtime.py",
-        "kb_workflows/provenance/neuron_runtime.cpp"
+        "kb_workflows/provenance/neuron_runtime.cpp",
+        "kb_workflows/provenance/neuron_ast.py"
       ],
-      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。CUDA L2软件已按标准/隐藏/冻结/配对重放计数器与逐内核资源模型、原始独占驱动观察及安全/重复收据，旧分数随工件变化失效；独立诊断不单独授予等级。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key保留当前NEFF缓存快照；可选NRT观察器另按原始加载字节/模型代次/异步序号关联开发driver事件，未关联正式连续评分与原生时间。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、跨平台完整归因。模拟资料不授予资格，未运行设备或工具实验"
+      "reason": "CUDA实际计分及配对采集已关联原始wall、busy并集、完整调用输入/状态/输出/设备与来源，按独立repeat执行launch_only零分门；来源重放核对二进制/入口/grid/block/shared，ncu同次CSV核对原始launch配置，自身二进制报告的ELF cubin经进程/context/stream/符号/维度/数量关联并核对实际计分二进制；含糊或未支持格式保留未知。CUDA L2软件已按标准/隐藏/冻结/配对重放计数器与逐内核资源模型、原始独占驱动观察及安全/重复收据，旧分数随工件变化失效；独立诊断不单独授予等级。复制/清零/P2P字节、方向与逻辑设备读写已接入，缺失/截断/丢记录不补零，不冒充DRAM计数或执行SOL。Neuron已有原始表、DMA、审核工作量与同设备资源模型，并绑定完整输入/输出及候选前后状态；原生运行时key保留当前NEFF缓存快照；可选NRT观察器另按原始加载字节/模型代次/异步序号关联开发driver事件，原生AST定义另关联直接冻结源码输入，仍未关联完整NEFF输出链、正式连续评分与原生时间。剩余：ncu进程非kernel memory身份、非kernel传输校准/执行SOL、Neuron来源与原生时间关联、跨平台完整归因。模拟资料不授予资格，未运行设备或工具实验"
     },
     {
       "id": "R-17",
@@ -4774,7 +4776,7 @@
     },
     {
       "id": "V43-04",
-      "title": "Neuron采集、编译与原生加载观察",
+      "title": "Neuron编译输入与原生加载观察",
       "primary": "M5",
       "secondary": [
         "M2"
@@ -4790,9 +4792,10 @@
         "kb_workflows/provenance/neuron_runtime.py",
         "kb_workflows/provenance/neuron_runtime.cpp",
         "kb_workflows/provenance/submission_source.py",
-        "tests/provenance/test_compiler_origins.py"
+        "tests/provenance/test_compiler_origins.py",
+        "kb_workflows/provenance/neuron_ast.py"
       ],
-      "reason": "统一原生导出、冻结源码、前端/IR/配置交接及有界BIR工件；v2另核对实际Gather源码清单与注册辅助函数/RECORD批准原语的静态引用，保存共享总额内的原始源码，未知路径不读、动态/未注册/变化引用保留partial。源码/字节码/闭包校验抽到共享WheelSources，Triton政策不放宽；NKI编译回归归入provenance，无新运行文件/测试项。config可选NRT预加载按实际NEFF缓冲区、模型代次和异步提交关联开发driver事件，保留原始SO/清单/日志/NEFF。原生AST全部callee、正式来源/连续时间资格仍未完成；仅软件与模拟验证，无设备实验"
+      "reason": "统一原生导出、冻结源码、前端/IR/配置交接及共享限额的BIR/源码/原生AST工件。v2保留Gather与静态引用；原生Parser另按真实直接inspect返回、注册代码/RECORD冻结函数/类源码、完整定义范围与arch/LNC逐项关联，临时工厂在降低前固定同一对象AST并恢复，未知不授予来源且不阻断原有编译。独立MessagePack解析器离线重放原始数据/清单，普通中转读取、缺失/含糊/外部/模拟保留未知。CPU实际SDK Gather验证180定义；未调用后端编译或设备。可选NRT预加载继续按实际NEFF/模型代次/提交序号关联开发事件。正式来源/NEFF全链与连续时间资格仍未完成；扩展集中回归，无新增测试项"
     },
     {
       "id": "V43-05",
