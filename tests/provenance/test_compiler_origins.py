@@ -22,7 +22,7 @@ CUDA = '#include <cuda_runtime.h>\n__global__ void owned(float *x) { x[0] += 1; 
 CUBIN = b'\x7fELF\x02\x01' + b'\x00' * 12 + (190).to_bytes(2, 'little') + b'\x00' * 44 + b'synthetic-device-object'
 
 
-def test_neuron_preloaded_runtime_binds_model_generations_and_device_sequences(tmp_path, monkeypatch):
+def test_neuron_preloaded_runtime_binds_model_generations_and_device_sequences(tmp_path, monkeypatch, payload):
     """Compile CPU-only ABI stubs; never link or execute the vendor runtime."""
     from kb_workflows.provenance import neuron_runtime
 
@@ -113,9 +113,12 @@ script.write_text("raise RuntimeError('MUTATED compiler wrapper must never execu
 os.environ['PATH']='/not-a-compiler-path'
 handle=ctypes.CDLL({str(library)!r},mode=ctypes.RTLD_LOCAL)
 handle.exercise.argtypes=[ctypes.c_char_p]
-assert handle.exercise({str(work).encode()!r})==0
+native=os.environ.get('KB_TEST_NATIVE_SCOPES')=='1'
+from contextlib import nullcontext
+with observer.call(seed=7,signature=[],training=False) if native else nullcontext():
+ assert handle.exercise({str(work).encode()!r})==0
 script.write_bytes(original)
-result=observer.export({str(capture)!r})
+result=observer.export(os.environ.get('KB_TEST_CAPTURE',{str(capture)!r}),native_invocations=native)
 print(json.dumps(result))
 """
     child = subprocess.run([os.sys.executable, "-c", code], env={**os.environ,
@@ -124,6 +127,78 @@ print(json.dumps(result))
         "KB_NEURON_COMPILER_SCRIPT": build_info["compiler_script"], "KB_NEURON_COMPILER_PYTHON": os.sys.executable}, capture_output=True, text=True, timeout=30)
     assert child.returncode == 0, child.stderr
     result = json.loads(child.stdout)
+    scoped_root = tmp_path / "scoped-runtime"
+    scoped_root.mkdir()
+    scoped_manifest = scoped_root / "manifest.json"
+    scoped_manifest.write_bytes(manifest.read_bytes())
+    scoped_capture = tmp_path / "scoped-capture"
+    scoped_capture.mkdir()
+    scoped_child = subprocess.run([os.sys.executable, "-c", code], env={**os.environ,
+        "LD_PRELOAD": build_info["library"], neuron_runtime.ENV: str(scoped_manifest),
+        "KB_NEURON_RUNTIME_DIRECTORY": str(scoped_root), "KB_NEURON_COMPILER_SCRIPT": build_info["compiler_script"],
+        "KB_NEURON_COMPILER_PYTHON": os.sys.executable, "KB_TEST_NATIVE_SCOPES": "1", "KB_TEST_CAPTURE": str(scoped_capture)},
+        capture_output=True, text=True, timeout=30)
+    assert scoped_child.returncode == 0, scoped_child.stderr
+    scoped_result = json.loads(scoped_child.stdout)
+    assert scoped_result["event_source"] == "native_invocations" and scoped_result["status"] == "observed"
+    assert scoped_result["trace_sha256"] is None and not (scoped_capture / "framework_trace.json").exists()
+    assert [r["sequence"] for r in scoped_result["native_calls"][0]["executions"]] == [41, 42]
+    assert [e["call_id"] for e in scoped_result["device_events"]] == [1, 1]
+    bad_scopes = json.loads(json.dumps(scoped_result["journal"]))
+    next(r for r in bad_scopes if r["type"] == "execute")["call"] = 2
+    with pytest.raises(ValueError, match="active native invocation"):
+        neuron_runtime._journal(bad_scopes)
+    scored_request = json.loads(json.dumps(payload[1]))
+    scored_request["eval_config"].update(evidence_level="L1", neuron_runtime_origin=True)
+    scored_root = tmp_path / "scored-runtime"
+    scored_root.mkdir()
+    scored_manifest = scored_root / "manifest.json"
+    scored_manifest.write_text(json.dumps({**build_info, "request_sha256": fingerprint(scored_request)}, separators=(",", ":")) + "\n")
+    scored_code = f"""
+from pathlib import Path
+from kb_workflows.hardware import neuron_worker
+from kb_workflows.provenance import neuron_runtime
+from tests.hardware.test_device_adapters import SimulatedNeuron
+original=neuron_runtime.Observer
+neuron_runtime.Observer=lambda request: original(request,allow_simulated=True)
+neuron_worker.ROOT=Path({str(tmp_path / 'scored-worker')!r})
+request={scored_request!r}
+result=neuron_worker.evaluate(request,adapter=SimulatedNeuron())
+calls=result['metadata']['native_call_receipt']
+assert calls['status']=='captured',calls['issues']
+neuron_runtime.validate_invocations(calls,request,result,allow_simulated=True)
+from kb_workflows.provenance import origin_task
+assert origin_task.timing_observer(result,allow_simulated=True)==neuron_runtime.SCORED_MODE
+assert origin_task.validate_scored(result,request,allow_simulated=True)[1]==calls
+try:
+ origin_task.scored_origin(result,allow_simulated=True)
+except ValueError as exc:
+ assert 'device busy' in str(exc)
+else:
+ raise AssertionError('NRT submissions alone cannot qualify device-time origin')
+assert origin_task.origin_check(result)['status']=='not_measured'
+# Offline replay uses the retained bytes, even after the worker directory vanishes.
+import shutil,copy
+shutil.rmtree(result['metadata']['origin_capture']['artifact_directory'])
+origin_task.validate_scored(result,request,allow_simulated=True)
+altered=copy.deepcopy(result)
+data=altered['metadata']['origin_capture']['artifact_data']
+key=next(iter(data))
+data[key]='AAAA'
+try:
+ origin_task.validate_scored(altered,allow_simulated=True)
+except ValueError:
+ pass
+else:
+ raise AssertionError('Changed archived bytes must not replay')
+assert len(calls['windows'])==len(calls['calls'])>0
+assert not result['metadata']['origin_capture']['native_runtime']['loaded_binary_identity_proven']
+"""
+    scored_child = subprocess.run([os.sys.executable, "-c", scored_code], env={**os.environ,
+        "LD_PRELOAD": build_info["library"], neuron_runtime.ENV: str(scored_manifest),
+        "KB_NEURON_RUNTIME_DIRECTORY": str(scored_root), "KB_NEURON_COMPILER_SCRIPT": build_info["compiler_script"],
+        "KB_NEURON_COMPILER_PYTHON": os.sys.executable}, capture_output=True, text=True, timeout=30)
+    assert scored_child.returncode == 0, scored_child.stderr
     assert result["simulated"] and result["status"] == "partial"
     assert [b["generation"] for b in result["bindings"]] == [1, 2]
     assert result["bindings"][0]["neff_sha256"] == result["bindings"][1]["neff_sha256"]

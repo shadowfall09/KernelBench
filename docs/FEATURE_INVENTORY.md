@@ -13,7 +13,7 @@
 | 设备与后端 | TOML/CLI硬件配置；CUDA与原生Neuron/NKI分别适配，local / Docker / Modal / HTTP队列执行 |
 | 正确性 | 结构/dtype/离散值/非有限值比较、实际输入数值与状态审计、隐藏输入族、缓存和执行检查；[严格契约](RELIABILITY.md#strict-validation) |
 | 性能与评分 | 经过验证的基线组合、配对噪声、冷成本摊销、冻结复测、Headroom模型与固定分母；[评分说明](HEADROOM_SCORING.md) |
-| 来源与归因 | CUDA实际计分来源门、实际R/C/B活动并集及launch_only零分门；完整计数器/Neuron归因仍按剩余范围追踪 |
+| 来源与归因 | CUDA实际计分来源门、实际R/C/B活动并集及launch_only零分门；Neuron复用调用/计时收据和工件重放，设备busy与完整归因仍待补全 |
 | 预算与恢复 | token预留、受控开发worker租约、CUDA进程活动/保守上界配额、队列/Modal请求与工件绑定；[资源边界](RESOURCE_BUDGETS.md) |
 | 部署与复现 | Harbor独立verifier、只读任务导出、Slurm、结果/轨迹/收据、指纹恢复与已有产物重评分 |
 
@@ -389,7 +389,7 @@
 | V42-06 | 计数器路由与精度校准队列修复 | [audit_work_counters.py](../scripts/audit_work_counters.py) | [M5](MOTIVATION.md#m5) |
 | V42-07 | 计数器反例与软件集成回归 | [test_work_counters.py](../tests/provenance/test_work_counters.py) | [M5](MOTIVATION.md#m5) |
 | V43-01 | Schema12分片完整读取与资源准入 | [neuron_tables.py](../kb_workflows/hardware/neuron_tables.py) | [M5](MOTIVATION.md#m5) |
-| V43-04 | Neuron编译输入输出与原生加载观察 | [原始产物包、编译输出与加载观察](NEURON_WORK.md#本地编译输入输出与加载关联) | [M5](MOTIVATION.md#m5) |
+| V43-04 | Neuron编译输入输出与原生加载观察 | [原始产物包、实际调用与加载观察](NEURON_WORK.md#实际计分调用关联) | [M5](MOTIVATION.md#m5) |
 | V43-07 | Parquet与Neuron模拟回归 | [test_neuron_tables.py](../tests/hardware/test_neuron_tables.py) | [M5](MOTIVATION.md#m5) |
 | V44-06 | 离线模型命令与失败门 | [analyze_device_trace.py](../scripts/analyze_device_trace.py) | [M5](MOTIVATION.md#m5) |
 | V44-07 | 注释模型与篡改回归 | [test_neuron_work.py](../tests/hardware/test_neuron_work.py) | [M5](MOTIVATION.md#m5) |

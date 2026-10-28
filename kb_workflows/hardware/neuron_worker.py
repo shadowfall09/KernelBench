@@ -85,7 +85,9 @@ def prepare_variant(model, variant, *, level=None, pid=None):
 
 @contextmanager
 def profile_source_cache(payload):
-    if payload.get("task") != "profile":
+    settings = payload["eval_config"]
+    if payload.get("task") != "profile" and not (settings.get("neuron_runtime_origin")
+            and settings.get("evidence_level") in {"L1", "L2"} and payload.get("task") in {"evaluate", "baseline", "paired_timing"}):
         yield
         return
     directory = ROOT / "cache/workflow" / fingerprint(payload) / "neff_cache"
@@ -105,17 +107,36 @@ def evaluate(payload, *, adapter=None):
     import torch
 
     from ..provenance.neuron_origin import CompilationObserver
+    from ..provenance.neuron_runtime import invocation_receipt
+    from ..provenance.origin_task import native_calls
     from ..provenance.submission_source import SourceRegistry, record_sources
 
     registry = SourceRegistry()
+    scored = payload.get("task", "evaluate") in {"evaluate", "baseline", "paired_timing"} and payload["eval_config"].get("evidence_level") in {"L1", "L2"}
     runtime = None
-    if payload.get("task") == "profile" and payload["eval_config"].get("neuron_runtime_origin"):
+    if (payload.get("task") == "profile" or scored) and payload["eval_config"].get("neuron_runtime_origin"):
         from ..provenance.neuron_runtime import Observer
 
         runtime = Observer(payload)
-    observer = CompilationObserver(registry) if payload.get("task") == "profile" else nullcontext()
-    with torch.no_grad(), profile_source_cache(payload), record_sources(registry), observer:
+    observer = CompilationObserver(registry) if payload.get("task") == "profile" or runtime is not None else nullcontext()
+    with (torch.no_grad(), profile_source_cache(payload), record_sources(registry), observer,
+          native_calls(registry, runtime) if scored else nullcontext() as calls):
         result = _evaluate(payload, adapter=adapter, registry=registry)
+    if scored:
+        if runtime is not None:
+            from ..provenance.neuron_runtime import SCORED_MODE, capture_artifacts, compiler_links
+            from .neuron_processing import DEFAULT_LIMITS, file_manifest
+
+            directory = ROOT / "cache/workflow" / fingerprint(payload) / "native_invocations" / uuid.uuid4().hex
+            directory.mkdir(parents=True)
+            observer.export(directory)
+            observed = runtime.export(directory, native_invocations=True)
+            manifest = file_manifest(directory, DEFAULT_LIMITS)
+            result["metadata"]["origin_capture"] = {"mode": SCORED_MODE, "compiler_observations": observer.value, "native_runtime": observed,
+                "compiler_output_links": compiler_links(observer.value, observed), "artifact_directory": str(directory),
+                "artifact_files": manifest, "artifact_data": capture_artifacts(directory, manifest,
+                    payload["eval_config"].get("isolation_report_mb", 64) * 1024**2)}
+        result["metadata"]["native_call_receipt"] = invocation_receipt(payload, result, calls)
     if payload.get("task") == "profile":
         from .neuron_processing import DEFAULT_LIMITS, file_manifest
 
@@ -147,6 +168,14 @@ def evaluate(payload, *, adapter=None):
     if not registry.intact():
         raise ValueError("Registered Neuron compiler sources changed during execution")
     result["metadata"]["compiler_source_registration"] = "frozen_compile_code_objects"
+    if scored and payload.get("task") != "baseline":
+        from ..evaluation.evidence import from_result
+        from ..provenance.origin_task import origin_check
+
+        metadata = result["metadata"]
+        checks = {**metadata.get("evidence_receipt", {}).get("checks", {}), "kernel_origin": origin_check(result)}
+        metadata["evidence_receipt"] = from_result(result, payload["eval_config"],
+            scope="hidden" if payload["eval_config"].get("use_hidden_tests") else "standard", additional=checks)
     if payload.get("task") == "profile":
         from .neuron_work import capture_record
 
@@ -510,7 +539,8 @@ def _evaluate(payload, *, adapter=None, registry=None):
                     "output_consumed": True, "varied_inputs": True, "all_outputs_verified": True}
                 return {"compiled": True, "correctness": True, "runtime": paired["candidate_mean_ms"], "metadata": metadata}
             times = synchronized_times(model, move(args), device, num_trials=settings["num_perf_trials"],
-                                       input_factory=factory, verifier=verify, receipt=receipt)
+                                       input_factory=factory, verifier=verify, receipt=receipt,
+                                       origin_candidate=settings.get("evidence_level") in {"L1", "L2"})
             stats = timing_stats(times)
             metadata.update(timing_receipt=receipt, cold_start_ms=metadata["cold_start_ms"] + receipt.get("warmup_total_ms", 0))
             if phase == "baseline":

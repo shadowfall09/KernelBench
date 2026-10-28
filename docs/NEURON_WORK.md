@@ -48,7 +48,7 @@ Neuron worker与CUDA共用源码冻结、字节核对和编译注册，`source_r
 
 ## 编译前端与框架降低观察
 
-开发 profile 现在同时保留 `kernelbench_pro_neuron_compilation_observation_v2`。观察器在导入候选前固定 NKI 编译入口的代码对象，以当前 Python 线程的实际调用/返回事件关联 `compile_to_bir`、`NKIFrontend.compile`、`compile_mlir_to_bir`、`NirResult.build_config` 和框架 `_lower_custom_nki`。原有入口通过函数帧观察；为保存原生 AST，开发 profile 会临时代理 Parser 的原生 Kernel 构造入口，并在原生降低前保存输入、结束后恢复。它不覆盖已有 Python profiler；已有 profiler、回调被替换或入口代码变化都会留下未完成原因。正式 evaluate、baseline、paired_timing 路径不启用这项开发插桩。
+开发 profile 现在同时保留 `kernelbench_pro_neuron_compilation_observation_v2`。观察器在导入候选前固定 NKI 编译入口的代码对象，以当前 Python 线程的实际调用/返回事件关联 `compile_to_bir`、`NKIFrontend.compile`、`compile_mlir_to_bir`、`NirResult.build_config` 和框架 `_lower_custom_nki`。原有入口通过函数帧观察；为保存原生 AST，开发 profile 会临时代理 Parser 的原生 Kernel 构造入口，并在原生降低前保存输入、结束后恢复。它不覆盖已有 Python profiler；已有 profiler、回调被替换或入口代码变化都会留下未完成原因。L0不启用；L1/L2实际计分路径只有显式开启 `neuron_runtime_origin` 时才同时观察编译交接。
 
 只有实际前端返回的 MLIR 对象传给实际 BIR 降低、同一个 NirResult 返回框架配置、配置和 BIR 输入集在框架降低时仍一致，才标记 `fresh_lowering_observed`。内存缓存、持久 trace 缓存跳过前端，或模块对象不对应时保留缺失阶段。源码身份来自本次冻结编译注册的代码对象；相同文件名和另行编译的相等代码对象不等于已注册对象。外部根函数单独记录为代码观察，不能据此认领自写内核。
 
@@ -89,7 +89,7 @@ neuron_runtime_compiler = "c++"
 neuron_backend_compiler = "/opt/aws/neuron/bin/neuronx-cc"
 ```
 
-默认关闭，只用于公开开发 profile。SDK include 路径可配置；配置文件里的相对路径按配置目录解析。正式 evaluate、baseline 和 paired_timing 不启动观察器。启用时要求同一原生 worker 主机已安装 C++ 编译器及 NRT 头文件；缺失、编译失败或收集失败会明确失败，不退回一个声称已观察的结果。本轮没有安装或调用实际 NRT。
+默认关闭。除公开开发 profile 外，L1/L2的实际 evaluate、baseline 和 paired_timing 也可显式开启；L0和独立小规模诊断不启动。SDK include 路径可配置；配置文件里的相对路径按配置目录解析。启用时要求同一原生 worker 主机已安装 C++ 编译器及 NRT 头文件；缺失、编译失败或收集失败会明确失败，不退回一个声称已观察的结果。本轮没有安装或调用实际 NRT。
 
 轻量 worker 入口先编译仓库自己的 [C++ 观察器](../kb_workflows/provenance/neuron_runtime.cpp)，然后在导入 Torch/Neuron 和候选前，以 `LD_PRELOAD` 重启同一 worker。编译直接使用所配置 SDK 的 `nrt.h`、`nrt_async.h` 和 `nrt_experimental.h` 声明；不自行猜测 `nrta_seq_t` 布局。构建收据固定源码、编译器及这三个直接头文件的摘要，并在构建后复查，保留命令与 SO 摘要。它不认证工具链的全部传递依赖。
 
@@ -97,13 +97,21 @@ neuron_backend_compiler = "/opt/aws/neuron/bin/neuronx-cc"
 
 profile 同步完成后封口原生日志。`native_runtime/` 保存 SO、构建清单、原始 JSONL 和每次加载的 NEFF；它们仍受整个采集树的4096文件、每文件128 MiB、总计512 MiB限制，原生快照不额外增加磁盘额度。worker 复查加载观察器的工件，再按日志重放成功加载/卸载的代次，用原生异步序号关联框架 `privateuse1_driver` 事件。两种观察器共用事件选择与区间有效性政策，显式 host worker 不在该范围。序号缺失、重复含糊、没有本次活模型或文件不一致时拒绝相应关联；没有用事件名称或当前缓存字节认领加载身份。
 
-`kernelbench_pro_neuron_native_runtime_v1` 的 `loaded_binary_identity_proven` 仅在真实收据覆盖全部选中 driver 事件时为true。这里证明的是观察到的加载与异步提交关联；调度返回成功本身不证明设备完成、输出有用性或全部硬件活动覆盖。模拟收据始终不能取得真实加载身份，默认验证也拒绝模拟标记。`formal_origin_qualified` 仍为false：辅助函数编译归属、实际评分连续调用和原生时间的完整关联尚未完成，不能凭这项开发采集通过自写内核门或授予 L1/L2。
+`kernelbench_pro_neuron_native_runtime_v1` 的 `loaded_binary_identity_proven` 仅在真实收据覆盖全部选中 driver 事件时为true。这里证明的是观察到的加载与异步提交关联；调度返回成功本身不证明设备完成、输出有用性或全部硬件活动覆盖。模拟收据始终不能取得真实加载身份，默认验证也拒绝模拟标记。`formal_origin_qualified` 仍为false：完整设备活动与设备时间归属尚未完成，不能仅凭加载与提交观察通过自写内核门或授予 L1/L2。
 
 接口依据固定提交的 [NRT 调用封装](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/runtime/NRTUtils.cpp)及其正式头文件。当前验证只编译并运行仓库自写的 CPU 假 NRT，覆盖实际预加载、嵌套转发、卸载后同址复用、序号匹配/缺失、原始工件及启动参数；它不证明某一实际 SDK 安装的 ABI 或设备兼容性。其他加载/执行 API、不同进程、绕过预加载的路径不在支持范围。
 
+## 实际计分调用关联
+
+L1/L2的Neuron evaluate、隐藏验证、baseline和paired_timing现在复用CUDA的原始callable/输入/状态记录，不重新执行候选。`metadata.native_call_receipt`保留两种正确性顺序、预热、逐次计时及配对候选调用的输入内容/几何/别名、前后模型状态、输出、seed和原生墙钟；普通L0保持原路径。调用结构和原始计时验证复用 `origin_task.validate_call_rows` / `validate_call_timings`；正式样本、首调用及预热合计必须与逐次观察一致，配对样本还需核对seed与执行顺序。这里明确不包含严格辅助检查的单独调用归属。
+
+显式启用 `neuron_runtime_origin` 时，在SDK导入前预加载同一NRT观察器，并使用私有NEFF缓存。原生 `call_begin/call_end` 使用 `CLOCK_MONOTONIC`，以进程范围的串行调用ID覆盖框架工作线程的提交；`nrta_execute_schedule`记录实际活跃调用ID、模型代次和序号。缺失、重复、重叠、未关闭或错误归属的调用会拒绝关联。Python边界必须与原始日志逐项一致；不套用CUPTI时钟，不额外插入同步，也不替换被计时的callable。
+
+这条路径不运行Torch/NeuronProfiler，也不伪造框架trace。实际提交事件从原始调用日志重放，编译输出/加载关联复用现有验证器；收据绑定实际结果、调用/计时清单、编译和NRT工件。工件先写入worker的私有 `native_invocations` 目录，再按内容摘要去重，保存在结果的 `metadata.origin_capture.artifact_data` 中；完整传输受现有 `isolation_report_mb` 上限约束。评分与恢复通过共用的 `validate_scored` 接口重新核对原始字节、调用和样本，不依赖远端临时目录。未启用NRT时只记录实际Python调用，不能认领原生提交。`formal_origin_qualified`仍为false：这些是实际计分过程中的观察，完整来源门与原生设备busy/指令时间归因尚未完成；主机调用范围不能冒充设备busy时间。软件回归覆盖公开/隐藏/基线/配对路径与CPU假NRT的原生边界，未运行实际设备或供应商后端。
+
 ## 本地编译输入输出与加载关联
 
-启用 `neuron_runtime_origin` 的公开开发 profile 现在同时观察本地编译调用。`neuron_backend_compiler`选择实际编译工具，默认`neuronx-cc`；路径可在 config 配置，带路径分隔符的相对路径按配置目录解析。只在准备观察器时查找/冻结工具，不会因导入模块、预览或普通 evaluate 而启动它。本轮没有运行真实 neuronx-cc。
+启用 `neuron_runtime_origin` 的公开开发 profile 现在同时观察本地编译调用。`neuron_backend_compiler`选择实际编译工具，默认`neuronx-cc`；路径可在 config 配置，带路径分隔符的相对路径按配置目录解析。只在准备观察器时查找/冻结工具，不会因导入模块、预览或未启用观察的 evaluate 而启动它。本轮没有运行真实 neuronx-cc。
 
 依据固定 SDK 的 [ProcessExecutor 弱入口](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/utils/ProcessExecutor.cpp)接入原生编译进程。NRT preload 在候选执行前把验证器自有的纯 stdlib 编译观察脚本和环境保存到原生状态；实际入口只把本地`neuronx-cc compile`转到隔离模式的固定 Python 解释器，再调用配置的绝对编译工具。运行时不重新读取可能被候选改写的脚本，也不依赖候选当前 PATH。非编译调用或未配置该脚本时继续原有入口链。远程编译服务、旧 SDK 没有该入口、未观测调用的缓存结果，都没有本地编译输出证据。
 

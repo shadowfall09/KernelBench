@@ -169,10 +169,46 @@ def test_native_neuron_worker_runs_reference_contracts_and_varied_checks_on_simu
     assert len(result["runtime_stats"]["samples_ms"]) == config.num_perf_trials
     assert result["metadata"]["timing_receipt"]["timed_outputs_verified"]
     assert paper_analysis.measurement_evidence(result, candidate=True) == "simulated_device_execution_cannot_qualify"
+    from kb_workflows.provenance.neuron_runtime import validate_invocations
+
+    scored = copy.deepcopy(request)
+    scored["eval_config"]["evidence_level"] = "L1"
+    traced = neuron_worker.evaluate(scored, adapter=SimulatedNeuron())
+    calls = traced["metadata"]["native_call_receipt"]
+    validate_invocations(calls, scored, traced, allow_simulated=True)
+    from kb_workflows.provenance.origin_task import timing_observer, validate_scored
+
+    assert validate_scored(traced, scored, allow_simulated=True)[0]["eval_config"] == scored["eval_config"]
+    with pytest.raises(ValueError, match="observer"):
+        timing_observer(traced, allow_simulated=True)
+    assert len(calls["calls"]) == 2 * config.num_correct_trials + 3 + config.num_perf_trials
+    assert calls["status"] == "captured" and not calls["timed_callable_wrapped"] and not calls["formal_origin_qualified"]
+    with pytest.raises(ValueError, match="simulated"):
+        validate_invocations(calls, scored, traced)
+    modified = copy.deepcopy(calls)
+    modified["calls"].pop()
+    from kb_workflows.provenance.neuron_origin import _seal
+
+    with pytest.raises(ValueError, match="omit|change"):
+        validate_invocations(_seal(modified), scored, traced, allow_simulated=True)
     baseline = engine.task_payload(config, 19, task="baseline")
     baseline["eval_config"]["baseline_variant"] = "neuron_compile"
+    baseline["eval_config"]["evidence_level"] = "L1"
     value = neuron_worker.evaluate(baseline, adapter=SimulatedNeuron())
     assert value["baseline_correctness"] and value["baseline_variant"] == "neuron_compile"
+    validate_invocations(value["metadata"]["native_call_receipt"], baseline, value, allow_simulated=True)
+    from kb_workflows.provenance.neuron_runtime import validate_scored as validate_baseline
+
+    validate_baseline(value, baseline, baseline=True, allow_simulated=True)
+    changed = copy.deepcopy(traced)
+    changed["runtime_stats"]["samples_ms"][0] *= 2
+    receipt = changed["metadata"]["native_call_receipt"]
+    from kb_workflows.provenance.origin_task import _scored_timing
+
+    receipt["timing_sha256"] = fingerprint(_scored_timing(changed))
+    _seal(receipt)
+    with pytest.raises(ValueError, match="performance samples"):
+        validate_scored(changed, allow_simulated=True)
     unmarked = SimulatedNeuron()
     unmarked.simulated = False
     assert neuron_worker.evaluate(request, adapter=unmarked)["metadata"]["simulated_execution"]
@@ -182,8 +218,12 @@ def test_neuron_worker_uses_frozen_private_seeds_and_rejects_changed_hidden_sour
     config, _ = payload
     hidden = engine.task_payload(config, 19, hidden=True)
     hidden["eval_config"]["hidden_seeds"] = [991, 992]
+    hidden["eval_config"]["evidence_level"] = "L1"
     result = neuron_worker.evaluate(hidden, adapter=SimulatedNeuron())
     assert result["correctness"] and result["metadata"]["hidden_completed_checks"] == 6
+    from kb_workflows.provenance.neuron_runtime import validate_invocations
+
+    validate_invocations(result["metadata"]["native_call_receipt"], hidden, result, allow_simulated=True)
     labels = [row["label"] for row in result["metadata"]["correctness_cases"]]
     assert all(label.startswith(("hidden/991/", "hidden/992/")) for label in labels)
     assert any(row["input_signature"][0]["stride"][-1] == 2 for row in result["metadata"]["correctness_cases"])
@@ -209,11 +249,27 @@ def test_neuron_worker_paired_timing_reuses_native_balance_and_checks_every_outp
     config, _ = payload
     monkeypatch.setattr(torch, "compile", lambda model, **kwargs: model)
     request = engine.paired_payload(config, 19, 0, variant="neuron_compile")
+    request["eval_config"]["evidence_level"] = "L1"
     result = neuron_worker.evaluate(request, adapter=SimulatedNeuron())
     paired = result["metadata"]["paired_timing"]
     assert paired["all_outputs_verified"] and paired["num_pairs"] == 10
     assert paired["baseline_variant"] == "neuron_compile"
     assert all(sorted(row["order"]) == ["B", "C", "R"] for row in paired["pairs"])
+    from kb_workflows.provenance.neuron_runtime import validate_invocations
+
+    assert result["metadata"]["native_call_receipt"]["status"] == "captured", result["metadata"]["native_call_receipt"]["issues"]
+    validate_invocations(result["metadata"]["native_call_receipt"], request, result, allow_simulated=True)
+    from kb_workflows.provenance.neuron_origin import _seal
+    from kb_workflows.provenance.origin_task import _scored_timing, validate_scored
+
+    validate_scored(result, request, allow_simulated=True)
+    altered = copy.deepcopy(result)
+    altered["metadata"]["paired_timing"]["pairs"][0]["candidate_ms"] *= 2
+    record = altered["metadata"]["native_call_receipt"]
+    record["timing_sha256"] = fingerprint(_scored_timing(altered))
+    _seal(record)
+    with pytest.raises(ValueError, match="paired samples"):
+        validate_scored(altered, allow_simulated=True)
 
 
 def test_neuron_interpreter_is_local_only_and_device_changes_invalidate_evaluation(payload, tmp_path):

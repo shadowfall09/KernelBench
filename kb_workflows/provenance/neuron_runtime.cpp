@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <link.h>
 #include <spawn.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <cstdint>
@@ -38,7 +39,7 @@ struct State {
     std::string compiler_script, compiler_python;
     std::vector<std::string> environment;
     pid_t pid = getpid();
-    uint64_t next = 0, jobs = 0, records = 0, errors = 0, bytes = 0;
+    uint64_t next = 0, jobs = 0, records = 0, errors = 0, bytes = 0, call = 0, last_call = 0;
     bool finished = false;
     State() {
         const char* path = getenv("KB_NEURON_RUNTIME_DIRECTORY");
@@ -219,19 +220,20 @@ extern "C" NRT_STATUS nrta_execute_schedule(nrt_model_t* model, const nrt_tensor
     if (depth) return fn(model, input, output, queue, completion, sequence);
     Boundary boundary;
     auto& s = state();
-    uint64_t generation = 0;
+    uint64_t generation = 0, call = 0;
     {
         std::lock_guard<std::mutex> lock(s.mutex);
         auto it = s.models.find(key(model));
         if (it != s.models.end()) generation = it->second.generation;
+        call = s.call;
     }
     auto status = fn(model, input, output, queue, completion, sequence);
     std::lock_guard<std::mutex> lock(s.mutex);
     if (s.active()) {
         fprintf(s.journal, "{\"type\":\"execute\",\"model\":%llu,\"generation\":%llu,"
-                "\"sequence\":%llu,\"status\":%d}\n", (unsigned long long)key(model),
+                "\"sequence\":%llu,\"status\":%d,\"call\":%llu}\n", (unsigned long long)key(model),
                 (unsigned long long)generation,
-                (unsigned long long)(status == NRT_SUCCESS && sequence ? *sequence : 0), int(status));
+                (unsigned long long)(status == NRT_SUCCESS && sequence ? *sequence : 0), int(status), (unsigned long long)call);
         fflush(s.journal);
     }
     return status;
@@ -252,10 +254,30 @@ extern "C" NRT_STATUS nrt_unload(nrt_model_t* model) {
     if (status == NRT_SUCCESS) s.models.erase(key(model));
     return status;
 }
+// Serial verifier scopes enclose the original callable and its existing barrier.
+// A process-wide ID also covers submissions dispatched by framework worker threads.
+extern "C" uint64_t kb_neuron_runtime_call(uint64_t id, int entering) {
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mutex);
+    if (!s.active()) return 0;
+    if (!id || id > 200000 || (entering ? s.call || id != s.last_call + 1 : s.call != id)) {
+        ++s.errors; return 0;
+    }
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) { ++s.errors; return 0; }
+    uint64_t timestamp = uint64_t(now.tv_sec) * 1000000000 + now.tv_nsec;
+    s.call = entering ? id : 0;
+    if (entering) s.last_call = id;
+    fprintf(s.journal, "{\"type\":\"call_%s\",\"id\":%llu,\"timestamp_ns\":%llu}\n",
+            entering ? "begin" : "end", (unsigned long long)id, (unsigned long long)timestamp);
+    fflush(s.journal);
+    return timestamp;
+}
 extern "C" int kb_neuron_runtime_finish() {
     auto& s = state();
     std::lock_guard<std::mutex> lock(s.mutex);
     if (!s.journal || s.finished || getpid() != s.pid) return -1;
+    if (s.call) ++s.errors;
     fprintf(s.journal, "{\"type\":\"finish\",\"errors\":%llu}\n", (unsigned long long)s.errors);
     fflush(s.journal);
     int status = ferror(s.journal) || fsync(fileno(s.journal));

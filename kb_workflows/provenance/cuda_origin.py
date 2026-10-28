@@ -412,6 +412,9 @@ class Capture:
                 row["end_ns"] = int(self.cupti.get_timestamp())
                 self.active_calls.pop(tid, None)
 
+    def timestamp(self):
+        return int(self.cupti.get_timestamp())
+
     def stop(self):
         # Flush before disable; query every observed context/stream queue as well
         # as the global queue. Unknown drop accounting blocks attribution.

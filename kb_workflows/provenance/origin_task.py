@@ -166,6 +166,19 @@ def next_seed():
 
 
 @contextmanager
+def native_calls(registry, capture=None):
+    """Share original-call/input/state observations with native device backends."""
+    if _ACTIVE.get() is not None:
+        raise ValueError("Native invocation observations cannot be nested")
+    state = _Calls(capture, [], scored=True, registry=registry)
+    token = _ACTIVE.set(state)
+    try:
+        yield state
+    finally:
+        _ACTIVE.reset(token)
+
+
+@contextmanager
 def candidate_call(model, args, *, role="candidate", **scope):
     """Inactive calls retain the exact original callable, with no timed wrapper."""
     state = _ACTIVE.get()
@@ -201,12 +214,12 @@ def paired_device_call(role, trial, seed, order, args):
         raise ValueError("Excessive paired device windows")
     row = {"id": len(state.paired_windows) + 1, "role": role, "trial": trial, "seed": seed, "order": order,
            "device": 0, "input_signature_sha256": fingerprint({"signature": input_signature(args)}),
-           "output_verified": False, "start_ns": int(state.capture.cupti.get_timestamp()), "end_ns": None}
+           "output_verified": False, "start_ns": int(state.capture.timestamp()), "end_ns": None}
     state.paired_windows.append(row)
     try:
         yield row
     finally:
-        row["end_ns"] = int(state.capture.cupti.get_timestamp())
+        row["end_ns"] = int(state.capture.timestamp())
 
 
 def confirm_paired_device(row, elapsed, output, observed):
@@ -448,6 +461,49 @@ def _run_native(payload, invoke, *, observer=None):
     return document
 
 
+def validate_call_rows(rows, *, role="candidate"):
+    """Backend-independent original callable, contents and state observations."""
+    if (not isinstance(rows, list) or not rows or len(rows) > MAX_RECORDS
+            or any(not isinstance(row, dict) for row in rows)
+            or [row.get("id") for row in rows] != list(range(1, len(rows) + 1))
+            or any(row.get("role") != role
+                   or row["called"] is not True or row["verified"] is not True or row.get("no_grad") is not True
+                   or type(row.get("training")) is not bool or row.get("training_after") != row["training"]
+                   or any(not _sha(row.get(key)) for key in ("input_content_sha256", "input_signature_sha256",
+                                                             "input_layout_sha256", "output_content_sha256"))
+                   or any(not isinstance(row.get(key), dict) or row[key].get("status") != "observed"
+                          or not _sha(row[key].get("sha256")) or type(row[key].get("tensor_count")) is not int
+                          or row[key]["tensor_count"] < 0
+                          or row[key].get("scope") != "module_data_entrypoints_and_input_state_aliases; no_host_control_proof"
+                          for key in ("model_state_before", "model_state_after")) for row in rows)):
+        raise ValueError("Missing, changed, unverified or mode-unbound native candidate calls")
+    return rows
+
+
+def validate_call_timings(document, result, *, paired=False, baseline=False):
+    """Bind original timer observations to the samples consumed by scoring."""
+    timed = [row for row in document["calls"] if row["phase"] in {"warmup", "timing", "paired_warmup", "paired"}]
+    timings = document["native_timings"]
+    if (not isinstance(timings, list) or len(timings) != len(timed)
+            or any(item.get("id") != row["id"] or item.get("native_call_sha256") != fingerprint(row)
+                   or type(item.get("wall_ms")) not in (int, float) or not math.isfinite(item["wall_ms"]) or item["wall_ms"] <= 0
+                   for item, row in zip(timings, timed))):
+        raise ValueError("Native timer omitted or rebound a measured/warmup call")
+    measured = [item["wall_ms"] for item, row in zip(timings, timed) if row["phase"] in {"timing", "paired"}]
+    metadata = result["metadata"]
+    if paired:
+        key = "reference_ms" if document["binding"]["role"] == "reference" else "candidate_ms"
+        if [pair[key] for pair in metadata["paired_timing"]["pairs"]] != measured:
+            raise ValueError("Native paired samples differ from their observed candidate calls")
+    elif timings:
+        receipt = metadata["timing_receipt"]
+        stats = result if baseline else result.get("runtime_stats", {})
+        if (stats.get("samples_ms") != measured or receipt.get("first_timed_call_ms") != timings[0]["wall_ms"]
+                or not math.isclose(receipt.get("warmup_total_ms", -1), sum(item["wall_ms"] for item in timings[:3]), rel_tol=1e-12)):
+            raise ValueError("Native performance samples differ from their observed candidate calls")
+    return timings
+
+
 def _coverage(document, payload):
     """Replay actual native receipts, rather than trusting a claimed call count."""
     target, seeds, _ = _validate(payload)
@@ -498,35 +554,13 @@ def _coverage(document, payload):
         if (paired.get("num_pairs") != len(expected) - 3 or [(row["seed"], row["order"]) for row in paired["pairs"]]
                 != [(seed, order) for _, seed, _, order in expected[3:]]):
             raise ValueError("Paired native results do not match the captured seed/order schedule")
-    rows = document["calls"]
+    rows = validate_call_rows(document["calls"], role=payload.get("_origin_role", "candidate"))
     if ([(row["phase"], row["seed"], row["label"], row["order"]) for row in rows] != expected
             or [row["id"] for row in rows] != list(range(1, len(expected) + 1))
-            or document["seeds_consumed"] != len(seeds) or document["environment_changes"]
-            or any(row.get("role") != payload.get("_origin_role", "candidate")
-                   or row["called"] is not True or row["verified"] is not True or row.get("no_grad") is not True
-                   or type(row.get("training")) is not bool or row.get("training_after") != row["training"]
-                   or any(not _sha(row.get(key)) for key in ("input_content_sha256", "input_signature_sha256",
-                                                             "input_layout_sha256", "output_content_sha256"))
-                   or any(not isinstance(row.get(key), dict) or row[key].get("status") != "observed"
-                          or not _sha(row[key].get("sha256")) or type(row[key].get("tensor_count")) is not int
-                          or row[key]["tensor_count"] < 0
-                          or row[key].get("scope") != "module_data_entrypoints_and_input_state_aliases; no_host_control_proof"
-                          for key in ("model_state_before", "model_state_after")) for row in rows)):
+            or document["seeds_consumed"] != len(seeds) or document["environment_changes"]):
         raise ValueError("Missing, changed, unverified or mode-unbound native candidate calls")
-    timed = [row for row in rows if row["phase"] in {"warmup", "timing", "paired_warmup", "paired"}]
-    timings = document["native_timings"]
-    if (not isinstance(timings, list) or len(timings) != len(timed)
-            or any(item.get("id") != row["id"] or item.get("native_call_sha256") != fingerprint(row)
-                   or type(item.get("wall_ms")) not in (int, float) or not math.isfinite(item["wall_ms"]) or item["wall_ms"] <= 0
-                   for item, row in zip(timings, timed))):
-        raise ValueError("Native timer omitted or rebound a measured/warmup call")
-    measured = [item["wall_ms"] for item, row in zip(timings, timed) if row["phase"] in {"timing", "paired"}]
+    validate_call_timings(document, result, paired=target == "paired_timing")
     if target == "evaluate" and seeds:
-        receipt = metadata["timing_receipt"]
-        if (result.get("runtime_stats", {}).get("samples_ms") != measured
-                or receipt.get("first_timed_call_ms") != timings[0]["wall_ms"]
-                or not math.isclose(receipt.get("warmup_total_ms", -1), sum(item["wall_ms"] for item in timings[:3]), rel_tol=1e-12)):
-            raise ValueError("Native performance samples differ from their observed candidate calls")
         memory, row = metadata["memory_receipt"], rows[-1]
         peak = memory.get("peak_bytes")
         raw_peak, copy_bytes = memory.get("raw_peak_bytes"), memory.get("verification_input_bytes")
@@ -538,9 +572,6 @@ def _coverage(document, payload):
                 or any(result.get("memory_stats", {}).get(key) != memory[key]
                        for key in ("peak_bytes", "raw_peak_bytes", "verification_input_bytes"))):
             raise ValueError("Native memory probe omitted verification, inputs or peak measurement binding")
-    key = "reference_ms" if payload.get("_origin_role") == "reference" else "candidate_ms"
-    if target == "paired_timing" and [pair[key] for pair in metadata["paired_timing"]["pairs"]] != measured:
-        raise ValueError("Native paired samples differ from their observed candidate calls")
     return rows
 
 
@@ -578,6 +609,10 @@ def _scored_contract(payload):
 
 def validate_scored(result, payload=None, *, allow_simulated=False):
     """Replay actual timer observations without granting execution ownership."""
+    if result.get("metadata", {}).get("device_backend") == "neuron":
+        from .neuron_runtime import validate_scored as native
+
+        return native(result, payload, allow_simulated=allow_simulated)
     from ..evaluation.evaluate_task import validate_sources
 
     try:
@@ -625,6 +660,10 @@ def _observer_record(result, binding):
 
 def timing_observer(result, *, baseline=False, allow_simulated=False):
     """Verify the actual timing mode, without promoting source or work facts."""
+    if result.get("metadata", {}).get("device_backend") == "neuron":
+        from .neuron_runtime import timing_observer as native
+
+        return native(result, baseline=baseline, allow_simulated=allow_simulated)
     from ..evaluation.evaluate_task import validate_sources
 
     try:
@@ -672,6 +711,9 @@ def timing_observer(result, *, baseline=False, allow_simulated=False):
 
 def scored_origin(result, *, allow_simulated=False):
     """Replay source-to-launch facts from the actual timed execution itself."""
+    if result.get("metadata", {}).get("device_backend") == "neuron":
+        timing_observer(result, allow_simulated=allow_simulated)
+        raise ValueError("Neuron NRT submissions are bound; device busy intervals and complete origin coverage are not yet available")
     timing_observer(result, allow_simulated=allow_simulated)
     request, _ = validate_scored(result, allow_simulated=allow_simulated)
     summary = summarize(result["metadata"]["origin_capture"]["raw"],
@@ -692,7 +734,7 @@ def origin_check(result):
         if track not in {"custom", "library"}:
             raise ValueError("Unknown execution track")
         return check(summary["track_verdicts"][track], reason="Source-to-binary-to-launch attribution of actual timed execution",
-                     values={"track": track, "mode": SCORED_MODE, "raw_sha256": summary["raw_sha256"],
+                     values={"track": track, "mode": summary["native_timing_mode"], "raw_sha256": summary["raw_sha256"],
                              "native_call_receipt_sha256": record["receipt_sha256"],
                              "minimum_custom_fraction": summary["minimum_custom_fraction"],
                              "calls": [{**{key: row[key] for key in ("id", "unknown_activity_count",
