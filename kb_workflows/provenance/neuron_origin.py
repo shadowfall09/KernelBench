@@ -58,6 +58,7 @@ class CompilationObserver:
         self.source_binaries = {}
         self.ast_binaries, self.native_frames = {}, {}
         self.native_frontend, self.native_original, self.native_factory = native_frontend, None, None
+        self.compiler_index, self.compiler_inputs = None, {}
         self.builtins = {name: getattr(builtins, name) for name in
                          ("range", "len", "int", "float", "bool", "tuple", "list", "min", "max", "enumerate", "zip")}
         self.rows, self.issues, self.frames, self.nirs, self.configs, self.binaries = [], [], {}, {}, {}, {}
@@ -71,6 +72,11 @@ class CompilationObserver:
         try:
             if self.previous is not None:
                 raise ValueError("Existing Python profiler; compiler observation not installed")
+            manifest = os.environ.get("KB_NEURON_RUNTIME_MANIFEST")
+            if manifest:
+                data = json.loads(Path(manifest).read_text())
+                if data.get("compiler_script"):
+                    self.compiler_index = Path(manifest).parent / "compiler-inputs.json"
             self.functions = self.functions if self.injected else _compiler_functions()
             if not self.injected:
                 from nki.framework import Kernel
@@ -339,6 +345,7 @@ class CompilationObserver:
             if local["module"] is active.get("module") and active["row"]["frontend_observed"]:
                 active["bir"] = result
                 active["row"]["bir_sha256"] = self._snapshot(result.descriptor.kernel_json_path)
+                active["row"]["bir_path"] = str(Path(result.descriptor.kernel_json_path).resolve())
                 active["row"]["bir_lowering_observed"] = True
         elif name == "pipeline":
             active = self.frames.pop(frame)
@@ -371,6 +378,14 @@ class CompilationObserver:
                 if type(hlo) is not bytes or not 0 < len(hlo) <= 64 * 1024**2 or type(key) is not str or not 0 < len(key) <= 4096:
                     raise ValueError("Invalid NKI StableHLO/key observation")
                 digest = hashlib.sha256(hlo).hexdigest()
+                row["bir_path"] = str(Path(local["dconfig"].backend_config["klir_binary"]["binary"]).resolve())
+                if self.compiler_index is not None:
+                    from ..common import atomic_json
+
+                    self.compiler_inputs[digest] = [{"path": row["bir_path"], "sha256": row["bir_sha256"]}]
+                    if len(self.compiler_inputs) > 4096:
+                        raise ValueError("Compiler input index exceeds its envelope")
+                    atomic_json(self.compiler_index, self.compiler_inputs)
                 if key not in row["cache_keys"]:
                     if len(row["cache_keys"]) >= 4096:
                         raise ValueError("NKI lowering observations exceed 4096 keys")

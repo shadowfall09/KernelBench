@@ -47,13 +47,23 @@ NRT_STATUS nrta_execute_schedule(nrt_model_t*,const nrt_tensor_set_t*,nrt_tensor
         (include / name).write_text('#pragma once\n#include "nrt.h"\n')
     stub = tmp_path / "stub.cpp"
     stub.write_text("""#include <nrt/nrt.h>
+#include <spawn.h>
+#include <sys/wait.h>
+extern "C" int torch_neuronx_posix_spawn_with_stable_environ(pid_t*,const char*,const posix_spawn_file_actions_t*,const posix_spawnattr_t*,char* const[],const char*) __attribute__((weak));
 static nrt_model_t model;
 static nrta_seq_t next=40;
 extern "C" NRT_STATUS nrt_load(const void*,size_t,int32_t,int32_t,nrt_model_t** out) {*out=&model;return NRT_SUCCESS;}
 extern "C" NRT_STATUS nrt_load_collectives(const void* b,size_t n,int32_t s,int32_t c,uint32_t,uint32_t,nrt_model_t** o) {return nrt_load(b,n,s,c,o);}
 extern "C" NRT_STATUS nrt_unload(nrt_model_t*) {return NRT_SUCCESS;}
 extern "C" NRT_STATUS nrta_execute_schedule(nrt_model_t*,const nrt_tensor_set_t*,nrt_tensor_set_t*,int,NRT_STATUS*,nrta_seq_t* seq) {*seq=++next;return NRT_SUCCESS;}
-extern "C" void exercise() {
+extern "C" int exercise(const char* cwd) {
+ posix_spawn_file_actions_t actions;posix_spawn_file_actions_init(&actions);
+ posix_spawn_file_actions_addchdir_np(&actions,cwd);
+ char* argv[]={(char*)"neuronx-cc",(char*)"compile",(char*)"module.mlir",(char*)"--output",(char*)"module.neff",nullptr};
+ pid_t child;int status;
+ int error=torch_neuronx_posix_spawn_with_stable_environ(&child,argv[0],&actions,nullptr,argv,cwd);
+ posix_spawn_file_actions_destroy(&actions);
+ if(error || waitpid(child,&status,0)!=child || status!=0)return 1;
  nrt_model_t* ptr; NRT_STATUS completion; nrta_seq_t seq; char binary[]="SIMULATED NEFF";
  nrt_load(binary,sizeof(binary),0,1,&ptr);
  nrta_execute_schedule(ptr,nullptr,nullptr,0,&completion,&seq);
@@ -61,6 +71,7 @@ extern "C" void exercise() {
  nrt_load_collectives(binary,sizeof(binary),0,1,0,1,&ptr);
  nrta_execute_schedule(ptr,nullptr,nullptr,0,&completion,&seq);
  nrt_unload(ptr);
+ return 0;
 }
 """)
     library = tmp_path / "libnrt.so"
@@ -68,7 +79,18 @@ extern "C" void exercise() {
                    check=True, capture_output=True, timeout=30)
     request = {"task": "profile", "eval_config": {"device_backend": "neuron", "neuron_runtime_origin": True,
                "neuron_runtime_include": str(include.parent), "neuron_runtime_compiler": "c++"}}
-    manifest = neuron_runtime.build(tmp_path / "runtime", include.parent, "c++", fingerprint(request), simulated=True)
+    work = tmp_path / "compiler-work"
+    work.mkdir()
+    (work / "module.mlir").write_bytes(b"SIMULATED StableHLO")
+    bir_file = work / "input.bir"
+    bir_file.write_bytes(b"SIMULATED BIR")
+    fake_compiler = tmp_path / "fake-neuronx-cc"
+    fake_compiler.write_text("#!" + os.sys.executable + "\nfrom pathlib import Path\nPath('module.neff').write_bytes(b'SIMULATED NEFF\\x00')\n")
+    fake_compiler.chmod(0o755)
+    manifest = neuron_runtime.build(tmp_path / "runtime", include.parent, "c++", fingerprint(request), simulated=True,
+                                   backend_compiler=str(fake_compiler))
+    (manifest.parent / "compiler-inputs.json").write_text(json.dumps({sha256(b"SIMULATED StableHLO"): [
+        {"path": str(bir_file), "sha256": sha256(b"SIMULATED BIR")}]}))
     build_info = json.loads(manifest.read_text())
     capture = tmp_path / "profile"
     capture.mkdir()
@@ -79,13 +101,23 @@ extern "C" void exercise() {
 import ctypes,json
 from kb_workflows.provenance.neuron_runtime import Observer
 observer=Observer({request!r},allow_simulated=True)
-ctypes.CDLL({str(library)!r},mode=ctypes.RTLD_LOCAL).exercise()
+from pathlib import Path
+import os
+script=Path({build_info["compiler_script"]!r})
+original=script.read_bytes()
+script.write_text("raise RuntimeError('MUTATED compiler wrapper must never execute')")
+os.environ['PATH']='/not-a-compiler-path'
+handle=ctypes.CDLL({str(library)!r},mode=ctypes.RTLD_LOCAL)
+handle.exercise.argtypes=[ctypes.c_char_p]
+assert handle.exercise({str(work).encode()!r})==0
+script.write_bytes(original)
 result=observer.export({str(capture)!r})
 print(json.dumps(result))
 """
     child = subprocess.run([os.sys.executable, "-c", code], env={**os.environ,
         "LD_PRELOAD": build_info["library"], neuron_runtime.ENV: str(manifest),
-        "KB_NEURON_RUNTIME_DIRECTORY": str(manifest.parent)}, capture_output=True, text=True, timeout=30)
+        "KB_NEURON_RUNTIME_DIRECTORY": str(manifest.parent),
+        "KB_NEURON_COMPILER_SCRIPT": build_info["compiler_script"], "KB_NEURON_COMPILER_PYTHON": os.sys.executable}, capture_output=True, text=True, timeout=30)
     assert child.returncode == 0, child.stderr
     result = json.loads(child.stdout)
     assert result["simulated"] and result["status"] == "partial"
@@ -93,6 +125,18 @@ print(json.dumps(result))
     assert result["bindings"][0]["neff_sha256"] == result["bindings"][1]["neff_sha256"]
     assert result["unresolved_events"] == [2] and not result["loaded_binary_identity_proven"]
     assert not result["formal_origin_qualified"]
+    assert len(result["compiler_jobs"]) == 1 and not result["compiler_jobs"][0]["issues"]
+    compilation = {"simulated": True, "pipelines": [{"fresh_lowering_observed": True,
+        "native_ast": {"all_definition_sources_matched": True, "module_handoff_observed": True, "root_source_sha256": "a"*64},
+        "stablehlo_sha256": [sha256(b"SIMULATED StableHLO")], "bir_path": str(bir_file), "bir_sha256": sha256(b"SIMULATED BIR")} ]}
+    linked = neuron_runtime.compiler_links(compilation, result)
+    assert linked["status"] == "partial" and len(linked["links"]) == 2 and linked["simulated"]
+    assert linked["unresolved_events"] == [2]
+    assert not linked["formal_origin_qualified"]
+    assert neuron_runtime.compiler_links(compilation, {**result, "compiler_jobs": []})["status"] == "not_measured"
+    wrong_hlo = json.loads(json.dumps(compilation))
+    wrong_hlo["pipelines"][0]["stablehlo_sha256"] = ["b"*64]
+    assert neuron_runtime.compiler_links(wrong_hlo, result)["status"] == "not_measured"
     from kb_workflows.hardware.neuron_processing import DEFAULT_LIMITS, file_manifest
 
     files = file_manifest(capture, DEFAULT_LIMITS)
@@ -101,7 +145,7 @@ print(json.dumps(result))
     with pytest.raises(ValueError, match="receipt"):
         neuron_runtime.validate(result, hashes, sizes)
     changed = json.loads(json.dumps(result))
-    changed["journal"][3]["model"] += 1
+    next(r for r in changed["journal"] if r["type"] == "unload")["model"] += 1
     from kb_workflows.provenance.neuron_origin import _seal
 
     _seal(changed)
@@ -111,8 +155,8 @@ print(json.dumps(result))
         neuron_runtime.validate(result, {p: h for p, h in hashes.items() if not p.endswith(".neff")}, sizes, allow_simulated=True)
     journal = result["journal"]
     with pytest.raises(ValueError, match="live model"):
-        neuron_runtime._journal([journal[0], journal[2], journal[-1]])
-    duplicate = [*journal[:-1], journal[1], journal[2], journal[-1]]
+        neuron_runtime._journal([journal[0], next(r for r in journal if r["type"] == "execute"), journal[-1]])
+    duplicate = [*journal[:-1], next(r for r in journal if r["type"] == "load"), journal[-1]]
     with pytest.raises(ValueError, match="generation"):
         neuron_runtime._journal(duplicate)
     monkeypatch.delenv(neuron_runtime.ENV, raising=False)

@@ -84,6 +84,7 @@ CPU 软件核验使用已记录官方 wheel 的真实 `Kernel.specialize()`、`s
 neuron_runtime_origin = true
 neuron_runtime_include = "/opt/aws/neuron/include"
 neuron_runtime_compiler = "c++"
+neuron_backend_compiler = "/opt/aws/neuron/bin/neuronx-cc"
 ```
 
 默认关闭，只用于公开开发 profile。SDK include 路径可配置；配置文件里的相对路径按配置目录解析。正式 evaluate、baseline 和 paired_timing 不启动观察器。启用时要求同一原生 worker 主机已安装 C++ 编译器及 NRT 头文件；缺失、编译失败或收集失败会明确失败，不退回一个声称已观察的结果。本轮没有安装或调用实际 NRT。
@@ -97,6 +98,20 @@ profile 同步完成后封口原生日志。`native_runtime/` 保存 SO、构建
 `kernelbench_pro_neuron_native_runtime_v1` 的 `loaded_binary_identity_proven` 仅在真实收据覆盖全部选中 driver 事件时为true。这里证明的是观察到的加载与异步提交关联；调度返回成功本身不证明设备完成、输出有用性或全部硬件活动覆盖。模拟收据始终不能取得真实加载身份，默认验证也拒绝模拟标记。`formal_origin_qualified` 仍为false：辅助函数编译归属、实际评分连续调用和原生时间的完整关联尚未完成，不能凭这项开发采集通过自写内核门或授予 L1/L2。
 
 接口依据固定提交的 [NRT 调用封装](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/runtime/NRTUtils.cpp)及其正式头文件。当前验证只编译并运行仓库自写的 CPU 假 NRT，覆盖实际预加载、嵌套转发、卸载后同址复用、序号匹配/缺失、原始工件及启动参数；它不证明某一实际 SDK 安装的 ABI 或设备兼容性。其他加载/执行 API、不同进程、绕过预加载的路径不在支持范围。
+
+## 本地编译输入输出与加载关联
+
+启用 `neuron_runtime_origin` 的公开开发 profile 现在同时观察本地编译调用。`neuron_backend_compiler`选择实际编译工具，默认`neuronx-cc`；路径可在 config 配置，带路径分隔符的相对路径按配置目录解析。只在准备观察器时查找/冻结工具，不会因导入模块、预览或普通 evaluate 而启动它。本轮没有运行真实 neuronx-cc。
+
+依据固定 SDK 的 [ProcessExecutor 弱入口](https://github.com/aws-neuron/torch-neuronx/blob/50b14171affaa365f1df6aa015232427336f6a4d/torch_neuronx/csrc/core/utils/ProcessExecutor.cpp)接入原生编译进程。NRT preload 在候选执行前把验证器自有的纯 stdlib 编译观察脚本和环境保存到原生状态；实际入口只把本地`neuronx-cc compile`转到隔离模式的固定 Python 解释器，再调用配置的绝对编译工具。运行时不重新读取可能被候选改写的脚本，也不依赖候选当前 PATH。非编译调用或未配置该脚本时继续原有入口链。远程编译服务、旧 SDK 没有该入口、未观测调用的缓存结果，都没有本地编译输出证据。
+
+源码前端在实际 lowering 返回 HLO 时，按 HLO 摘要发布已观察的 BIR 路径/摘要索引。独立编译子进程保留实际命令、工具摘要、PID、原始 HLO/BIR 输入和 NEFF 输出；工具与输入在前后复查。命令不使用 shell，输出选项和输入形式仅接受已核对的 SDK 形式；未知形式保留原因，不能变成成功来源。仍沿用外层 worker 期限，内部超时不增加设备或 agent 预算。
+
+`native_runtime/compiler_jobs/<id>/`保留原始收据及文件，与既有工件共用总计512 MiB的清单限制。每次输入 HLO 最多64 MiB、每个 BIR 16 MiB、NEFF 128 MiB，最多16个已观察 BIR；每次收据1 MiB、最多4096次调用。实际原生 spawn 的 PID 必须对应收据子进程，收据/命令/输入/输出和观察脚本均与原始字节清单核对。普通缓存快照不能补出这些调用。
+
+`compiler_output_links`把实际前端原生 AST/module 交接、BIR、HLO、编译命令输出及 NRT 加载字节逐项关联。要求实际 HLO/BIR 快照与前端一致，编译输出与实际加载 NEFF 一致；漏掉的 runtime 事件继续保留未知，不因为已有两项匹配而把整个采集称为完整。不存在实际编译收据、工具/文件变化、输入不同、原生来源未核对或输出不一致时不关联。模拟记录保留模拟标记。
+
+这里建立的是受信工具和 SDK 下观测到的文件/输出对应关系，**尚未证明全部外部辅助输入闭包，也没有建立正式连续评分与时间关联**。跨进程任意文件/解释器篡改不由这份文件观察收据认证；`formal_origin_qualified`继续false。CPU假编译器与假NRT覆盖了真实进程入口、源码脚本/PATH被改后的冻结调用、原始收据重放、输入错配和缓存缺少调用等情况；没有编译或执行真实模型、没有运行供应商后端/设备/性能实验。
 
 ## 审核后的资源需求模型
 

@@ -44,6 +44,7 @@ def settings(config, hidden=False):
         "neuron_runtime_origin": config.neuron_runtime_origin,
         "neuron_runtime_include": config.neuron_runtime_include,
         "neuron_runtime_compiler": config.neuron_runtime_compiler,
+        "neuron_backend_compiler": config.neuron_backend_compiler,
         "evaluator_sha256": evaluator_digest(),
         **diagnostic_options(config),
         "isolation": options(config),

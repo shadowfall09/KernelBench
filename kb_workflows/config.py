@@ -35,6 +35,7 @@ class RunConfig:
     neuron_runtime_origin: bool = False
     neuron_runtime_include: str = "/opt/aws/neuron/include"
     neuron_runtime_compiler: str = "c++"
+    neuron_backend_compiler: str = "neuronx-cc"
     start: int = 1
     end: int | None = None
     run_name: str = ""
@@ -353,7 +354,7 @@ class RunConfig:
             raise ValueError("Unknown device backend")
         if type(self.neuron_runtime_origin) is not bool or self.neuron_runtime_origin and self.device_backend != "neuron":
             raise ValueError("Native NRT origin observation requires the Neuron backend")
-        if not self.neuron_runtime_include or not self.neuron_runtime_compiler:
+        if not self.neuron_runtime_include or not self.neuron_runtime_compiler or not self.neuron_backend_compiler:
             raise ValueError("Native NRT observation requires compiler and SDK include paths")
         self.neuron_runtime_include = str(Path(self.neuron_runtime_include).expanduser().resolve())
         if self.device_python:
@@ -507,6 +508,7 @@ def parser():
         "device_python",
         "neuron_runtime_include",
         "neuron_runtime_compiler",
+        "neuron_backend_compiler",
         "sanitizer_tools",
         "sanitizer_command",
         "determinism_policy_file",
@@ -588,6 +590,9 @@ def file_options(path, argument_parser):
             candidate = Path(value).expanduser()
             candidate = candidate if candidate.is_absolute() else path.parent / candidate
             value = os.path.abspath(candidate) if key == "device_python" else str(candidate.resolve())
+        if key == "neuron_backend_compiler" and "/" in value:
+            candidate = Path(value).expanduser()
+            value = str((candidate if candidate.is_absolute() else path.parent / candidate).resolve())
         options[key] = value
     if document.get("gpu") and document.get("device"):
         raise ValueError("Use either [gpu] or [device] for one device target")

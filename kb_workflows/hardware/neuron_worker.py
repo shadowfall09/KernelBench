@@ -124,6 +124,9 @@ def evaluate(payload, *, adapter=None):
             observer.export(directory)
             if runtime is not None:
                 result["native_runtime"] = runtime.export(directory)
+                from ..provenance.neuron_runtime import compiler_links
+
+                result["compiler_output_links"] = compiler_links(observer.value, result["native_runtime"])
             files = file_manifest(directory, DEFAULT_LIMITS)
             result["artifact_files"] = {name: row["sha256"] for name, row in files.items()}
             result["artifact_file_bytes"] = {name: row["bytes"] for name, row in files.items()}

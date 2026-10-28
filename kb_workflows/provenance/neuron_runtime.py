@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
+import inspect
 import json
 import os
 import shutil
@@ -21,9 +22,82 @@ PROTOCOL = "kernelbench_pro_neuron_native_runtime_v1"
 SCOPE = "outermost_preloaded_nrt_load_and_collectives; nrta_execute_schedule; current_process; development_only"
 SOURCE = Path(__file__).with_suffix(".cpp")
 ENV = "KB_NEURON_RUNTIME_MANIFEST"
+COMPILER = "kernelbench_pro_neuron_compiler_job_v1"
 
 
-def build(directory, include, compiler, payload_sha256, *, simulated=False):
+def _compile_job(plan, arguments):
+    """Self-contained stdlib child; frozen into the preload before candidate code."""
+    import hashlib
+    import json
+    import os
+    import subprocess
+    from pathlib import Path
+
+    directory, cwd = Path(arguments[0]), Path(arguments[1]).resolve()
+    original = arguments[2:]
+    command = [plan["path"], *original[1:]]
+    def digest(path):
+        path = Path(path)
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 128 * 1024**2:
+            raise ValueError("Compiler file exceeds its hash envelope")
+        with path.open("rb") as stream:
+            raw = stream.read(128 * 1024**2 + 1)
+        if len(raw) > 128 * 1024**2:
+            raise ValueError("Compiler file grew beyond its hash envelope")
+        return hashlib.sha256(raw).hexdigest()
+    def snapshot(path, name, maximum=128 * 1024**2):
+        path = Path(path)
+        if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= maximum:
+            raise ValueError("Invalid compiler input/output file envelope")
+        with path.open("rb") as stream:
+            raw = stream.read(maximum + 1)
+        if len(raw) > maximum:
+            raise ValueError("Compiler file grew beyond its envelope")
+        (directory / name).write_bytes(raw)
+        return {"path": str(path.resolve()), "artifact": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+    value = {"protocol": plan["protocol"], "simulated": plan["simulated"], "pid": os.getpid(), "command": command,
+             "cwd": str(cwd), "compiler": {"path": plan["path"], "sha256": plan["sha256"]},
+             "inputs": [], "output": None, "issues": [], "exit_code": None}
+    try:
+        directory.mkdir(parents=True, exist_ok=False)
+        if (len(original) < 4 or original[1] != "compile" or original[2] not in {"module.mlir", "sg00/bir.json"} or original.count("--output") != 1
+                or original[-2:] != ["--output", "module.neff"]):
+            raise ValueError("Unsupported compiler invocation")
+        value["inputs"].append(snapshot(cwd / original[2], "input.mlir", 64 * 1024**2))
+        index_path = Path(plan["index"])
+        if index_path.is_file() and not index_path.is_symlink() and index_path.stat().st_size <= 8 * 1024**2:
+            index = json.loads(index_path.read_bytes())
+            rows = index.get(value["inputs"][0]["sha256"], [])
+            if not isinstance(rows, list) or len(rows) > 16:
+                raise ValueError("Invalid observed BIR input set")
+            for n, row in enumerate(rows):
+                item = snapshot(row["path"], "bir-" + str(n) + ".bin", 16 * 1024**2)
+                if item["sha256"] != row["sha256"]:
+                    raise ValueError("Observed BIR changed before compiler invocation")
+                value["inputs"].append(item)
+    except Exception as exc:
+        value["issues"].append(type(exc).__name__ + ": " + str(exc)[:240])
+    if digest(plan["path"]) != plan["sha256"]:
+        return 126
+    environment = dict(os.environ)
+    for key in ("LD_PRELOAD", "KB_NEURON_RUNTIME_DIRECTORY", "KB_NEURON_RUNTIME_MANIFEST", "KB_NEURON_COMPILER_SCRIPT"):
+        environment.pop(key, None)
+    completed = subprocess.run(command, cwd=cwd, env=environment, check=False, timeout=plan["timeout"])
+    value["exit_code"] = completed.returncode
+    try:
+        if completed.returncode == 0:
+            value["output"] = snapshot(cwd / "module.neff", "compiler-" + directory.name + ".neff")
+        if digest(plan["path"]) != plan["sha256"] or any(digest(row["path"]) != row["sha256"] for row in value["inputs"]):
+            raise ValueError("Compiler tool or inputs changed during invocation")
+    except Exception as exc:
+        value["issues"].append(type(exc).__name__ + ": " + str(exc)[:240])
+    value["receipt_sha256"] = hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+    if directory.is_dir():
+        (directory / "receipt.json").write_text(json.dumps(value, separators=(",", ":")) + "\n")
+    return completed.returncode if completed.returncode >= 0 else 128 - completed.returncode
+
+
+def build(directory, include, compiler, payload_sha256, *, simulated=False, backend_compiler=None, timeout=300):
     """Compile only the observer, using actual SDK declarations, never a model."""
     root, include = Path(directory).resolve(), Path(include).resolve(strict=True)
     root.mkdir(parents=True, exist_ok=False)
@@ -46,6 +120,20 @@ def build(directory, include, compiler, payload_sha256, *, simulated=False):
     manifest = {"protocol": PROTOCOL, "request_sha256": payload_sha256, "simulated": simulated,
                 "source_sha256": frozen[str(SOURCE)], "compiler": str(binary), "inputs": frozen,
                 "command": command, "library": str(library), "library_sha256": file_digest(library)}
+    if backend_compiler:
+        tool = shutil.which(backend_compiler)
+        if not tool:
+            raise ValueError("NRT compiler observation requires the configured neuronx-cc executable")
+        tool = str(Path(tool).resolve(strict=True))
+        plan = {"protocol": COMPILER, "path": tool, "sha256": file_digest(tool), "simulated": simulated,
+                "index": str(root / "compiler-inputs.json"), "timeout": timeout}
+        script = "import sys\nPLAN=" + repr(plan) + "\n" + inspect.getsource(_compile_job) + "\nraise SystemExit(_compile_job(PLAN,sys.argv[1:]))\n"
+        script_path = root / "compiler-observer.py"
+        script_path.write_text(script)
+        manifest["backend_compiler"] = plan
+        manifest["compiler_script"] = str(script_path)
+        manifest["compiler_script_sha256"] = file_digest(script_path)
+        manifest["observer_python"] = sys.executable
     path = root / "manifest.json"
     path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n")
     return path
@@ -62,10 +150,13 @@ def bootstrap(payload):
     if "torch_neuronx" in sys.modules:
         raise ValueError("NRT observer must be preloaded before importing the device SDK")
     directory = ROOT / "cache/workflow" / fingerprint(payload) / "neuron_runtime" / uuid.uuid4().hex
-    path = build(directory, settings["neuron_runtime_include"], settings["neuron_runtime_compiler"], fingerprint(payload))
+    path = build(directory, settings["neuron_runtime_include"], settings["neuron_runtime_compiler"], fingerprint(payload),
+                 backend_compiler=settings.get("neuron_backend_compiler", "neuronx-cc"), timeout=settings.get("timeout", 300))
     manifest = json.loads(path.read_text())
     environment = {**os.environ, ENV: str(path), "KB_NEURON_RUNTIME_DIRECTORY": str(path.parent),
                    "LD_PRELOAD": manifest["library"] + (" " + os.environ["LD_PRELOAD"] if os.environ.get("LD_PRELOAD") else "")}
+    if "compiler_script" in manifest:
+        environment.update(KB_NEURON_COMPILER_SCRIPT=manifest["compiler_script"], KB_NEURON_COMPILER_PYTHON=manifest["observer_python"])
     os.execve(sys.executable, [sys.executable, "-m", "kb_workflows.evaluation.evaluate_task", *sys.argv[1:]], environment)
 
 
@@ -76,8 +167,15 @@ def _journal(rows):
             or not integer(rows[0].get("pid"), minimum=1)
             or rows[-1] != {"type": "finish", "errors": 0}):
         raise ValueError("NRT journal is incomplete, unsupported or reports collection errors")
-    models, loads, executions, load_ids = {}, {}, {}, set()
+    models, loads, executions, load_ids, compiler_ids = {}, {}, {}, set(), set()
     for row in rows[1:-1]:
+        if row.get("type") == "compiler_spawn":
+            if (not integer(row.get("id"), minimum=1) or row["id"] > 4096 or not integer(row.get("child"))
+                    or type(row.get("status")) is not int or row["id"] in compiler_ids
+                    or row["status"] == 0 and not row["child"]):
+                raise ValueError("Invalid native compiler spawn")
+            compiler_ids.add(row["id"])
+            continue
         if not integer(row.get("model")) or type(row.get("status")) is not int or not -(2**31) <= row["status"] < 2**31:
             raise ValueError("Invalid NRT journal model/status")
         if row.get("type") == "load":
@@ -129,6 +227,68 @@ def _bindings(rows, events, files, sizes):
     return result, unresolved
 
 
+def validate_compiler_job(job, prefix, spawn, plan, files, sizes, *, allow_simulated=False):
+    if (not isinstance(job, dict) or job.get("protocol") != COMPILER
+            or job.get("simulated") is not False and not allow_simulated
+            or job.get("receipt_sha256") != fingerprint({k: v for k, v in job.items() if k != "receipt_sha256"})
+            or job.get("pid") != spawn.get("child") or spawn.get("status") != 0
+            or job.get("compiler") != {"path": plan["path"], "sha256": plan["sha256"]}
+            or job.get("simulated") is not plan.get("simulated")):
+        raise ValueError("Invalid observed Neuron compiler job")
+    raw = (json.dumps(job, separators=(",", ":")) + "\n").encode()
+    if len(raw) > 1024**2 or files.get(prefix + "/receipt.json") != hashlib.sha256(raw).hexdigest():
+        raise ValueError("Neuron compiler job differs from its original receipt")
+    command, inputs, output = job.get("command"), job.get("inputs"), job.get("output")
+    if (not isinstance(command, list) or not 4 <= len(command) <= 256
+            or any(not isinstance(s, str) or len(s) > 4096 for s in command)
+            or command[0] != plan["path"] or command[1] != "compile"
+            or not isinstance(inputs, list) or len(inputs) > 17
+            or not isinstance(job.get("issues"), list) or len(job["issues"]) > 32):
+        raise ValueError("Invalid Neuron compiler command/input envelope")
+    for row in [*inputs, *([output] if output is not None else [])]:
+        if (not isinstance(row, dict) or not isinstance(row.get("path"), str) or not isinstance(row.get("artifact"), str)
+                or Path(row["artifact"]).name != row["artifact"] or row["artifact"] in {"", ".", ".."}
+                or not sha(row.get("sha256")) or not integer(row.get("bytes"), minimum=1) or row["bytes"] > 128 * 1024**2
+                or files.get(prefix + "/" + row["artifact"]) != row["sha256"]
+                or sizes.get(prefix + "/" + row["artifact"]) != row["bytes"]):
+            raise ValueError("Neuron compiler input/output snapshot missing or changed")
+    return job
+
+
+def compiler_links(compilation, runtime):
+    """Match observed files/tool outputs, without asserting auxiliary-input closure."""
+    compilation = compilation if isinstance(compilation, dict) else {}
+    runtime = runtime if isinstance(runtime, dict) else {}
+    jobs = runtime.get("compiler_jobs", [])
+    rows = compilation.get("pipelines", [])
+    links, unresolved = [], list(runtime.get("unresolved_events", []))
+    for binding in runtime.get("bindings", []) if isinstance(runtime, dict) else []:
+        matches = []
+        for job in jobs:
+            if job.get("exit_code") != 0 or job.get("issues") or not job.get("inputs") or not job.get("output"):
+                continue
+            if job["output"]["sha256"] != binding["neff_sha256"]:
+                continue
+            for index, row in enumerate(rows):
+                native = row.get("native_ast") or {}
+                if (row.get("fresh_lowering_observed") and native.get("all_definition_sources_matched")
+                        and (compilation.get("simulated") is True or native.get("native_definition_sources_bound") is True)
+                        and native.get("module_handoff_observed") and job["inputs"][0]["sha256"] in row.get("stablehlo_sha256", [])
+                        and any(item["path"] == row.get("bir_path") and item["sha256"] == row.get("bir_sha256") for item in job["inputs"][1:])):
+                    matches.append({"pipeline": index, "job_receipt_sha256": job["receipt_sha256"],
+                                    "root_source_sha256": native.get("root_source_sha256"), "bir_sha256": row["bir_sha256"],
+                                    "hlo_sha256": job["inputs"][0]["sha256"], "neff_sha256": binding["neff_sha256"]})
+        if matches:
+            links.append({"event_index": binding["event_index"], "matches": matches})
+        else:
+            unresolved.append(binding["event_index"])
+    unresolved = sorted(set(unresolved))
+    return _seal({"protocol": "kernelbench_pro_neuron_compiler_links_v1", "links": links, "unresolved_events": unresolved,
+                  "simulated": bool(runtime.get("simulated")) or bool(compilation.get("simulated")),
+                  "scope": "observed BIR/HLO files, compiler command/output and loaded NEFF; auxiliary input closure not proven",
+                  "formal_origin_qualified": False, "status": "observed" if links and not unresolved else "partial" if links else "not_measured"})
+
+
 def validate(value, files, sizes, *, allow_simulated=False):
     if (not isinstance(value, dict) or value.get("protocol") != PROTOCOL or value.get("scope") != SCOPE
             or value.get("formal_origin_qualified") is not False
@@ -159,6 +319,21 @@ def validate(value, files, sizes, *, allow_simulated=False):
             or value.get("loaded_binary_identity_proven") is not proven
             or value.get("status") != ("observed" if events and not unresolved else "partial" if result else "not_measured")):
         raise ValueError("NRT observations differ from replayed native loads and schedules")
+    jobs = value.get("compiler_jobs", [])
+    spawns = {row["id"]: row for row in rows if row.get("type") == "compiler_spawn"}
+    plan = build_info.get("backend_compiler")
+    if not isinstance(jobs, list) or len(jobs) > 4096 or jobs and not isinstance(plan, dict):
+        raise ValueError("Invalid NRT compiler job list")
+    if plan is not None and (not isinstance(plan, dict) or plan.get("protocol") != COMPILER
+            or not sha(plan.get("sha256")) or not sha(build_info.get("compiler_script_sha256"))
+            or files.get("native_runtime/compiler-observer.py") != build_info["compiler_script_sha256"]):
+        raise ValueError("Native compiler observer script/plan changed")
+    for job in jobs:
+        ident = job.get("job_id")
+        if ident not in spawns:
+            raise ValueError("NRT compiler receipt lacks its actual spawn")
+        validate_compiler_job({k: v for k, v in job.items() if k != "job_id"}, "native_runtime/compiler_jobs/" + str(ident),
+                              spawns[ident], plan, files, sizes, allow_simulated=allow_simulated)
     return value
 
 
@@ -174,6 +349,9 @@ class Observer:
             raise ValueError("NRT bootstrap does not match this worker request/source")
         self.directory, self.manifest = path.parent, path
         self.frozen = {str(path): file_digest(path), self.build["library"]: self.build["library_sha256"]}
+        if self.build.get("compiler_script"):
+            self.frozen.update({self.build["compiler_script"]: self.build["compiler_script_sha256"],
+                                self.build["backend_compiler"]["path"]: self.build["backend_compiler"]["sha256"]})
         self.handle = ctypes.CDLL(None)
         self.finish = self.handle.kb_neuron_runtime_finish
         self.finish.restype, self.finish.argtypes = ctypes.c_int, []
@@ -202,6 +380,25 @@ class Observer:
             shutil.copyfile(source, target / source.name)
             if file_digest(source) != file_digest(target / source.name):
                 raise ValueError("NRT observer artifact changed during copying")
+        jobs = []
+        if self.build.get("compiler_script"):
+            source = Path(self.build["compiler_script"])
+            shutil.copyfile(source, target / source.name)
+        job_root = self.directory / "compiler_jobs"
+        if job_root.exists():
+            inventory = file_manifest(job_root, DEFAULT_LIMITS)
+            for name, info in inventory.items():
+                destination = target / "compiler_jobs" / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(job_root / name, destination)
+                if file_digest(destination) != info["sha256"]:
+                    raise ValueError("Native compiler artifacts changed during copying")
+                if Path(name).name == "receipt.json":
+                    if info["bytes"] > 1024**2:
+                        raise ValueError("Native compiler receipt exceeds its envelope")
+                    job = json.loads(destination.read_text())
+                    job["job_id"] = int(Path(name).parent.name)
+                    jobs.append(job)
         manifest = file_manifest(directory, DEFAULT_LIMITS)
         trace = Path(directory) / "framework_trace.json"
         if trace.stat().st_size > 64 * 1024**2:
@@ -220,6 +417,7 @@ class Observer:
                        "simulated": self.build["simulated"], "formal_origin_qualified": False,
                        "trace_sha256": files["framework_trace.json"], "journal": rows, "device_events": events,
                        "bindings": bindings, "unresolved_events": unresolved,
+                       "compiler_jobs": jobs,
                        "loaded_binary_identity_proven": bool(events) and not unresolved and self.build["simulated"] is False,
                        "status": "observed" if events and not unresolved else "partial" if bindings else "not_measured"})
         return validate(result, files, sizes, allow_simulated=self.build["simulated"] is True)

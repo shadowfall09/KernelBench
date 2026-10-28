@@ -5,12 +5,15 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <link.h>
+#include <spawn.h>
 #include <unistd.h>
 
 #include <cstdint>
+#include <cerrno>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -18,6 +21,7 @@
 #include <type_traits>
 #include <vector>
 
+extern "C" char** environ;
 static_assert(std::is_integral<nrta_seq_t>::value && sizeof(nrta_seq_t) <= 8,
               "Unsupported native NRT sequence ABI");
 
@@ -31,13 +35,27 @@ struct State {
     std::map<uintptr_t, Model> models;
     FILE* journal = nullptr;
     std::string directory;
+    std::string compiler_script, compiler_python;
+    std::vector<std::string> environment;
     pid_t pid = getpid();
-    uint64_t next = 0, records = 0, errors = 0, bytes = 0;
+    uint64_t next = 0, jobs = 0, records = 0, errors = 0, bytes = 0;
     bool finished = false;
     State() {
         const char* path = getenv("KB_NEURON_RUNTIME_DIRECTORY");
         if (!path) return;
         directory = path;
+        const char* script = getenv("KB_NEURON_COMPILER_SCRIPT");
+        const char* python = getenv("KB_NEURON_COMPILER_PYTHON");
+        if (script && python) {
+            std::ifstream stream(script, std::ios::binary);
+            compiler_script.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+            if (compiler_script.size() > 65536) compiler_script.clear();
+            compiler_python = python;
+            for (char** e = environ; e && *e; ++e) {
+                if (!strncmp(*e, "LD_PRELOAD=", 11) || !strncmp(*e, "KB_NEURON_", 10)) continue;
+                environment.emplace_back(*e);
+            }
+        }
         int fd = open((directory + "/journal.jsonl").c_str(),
                       O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (fd < 0) return;
@@ -132,6 +150,45 @@ void loaded(const Snapshot& value, NRT_STATUS status, nrt_model_t* model) {
 }
 
 __attribute__((constructor)) static void initialize() { state(); }
+
+// Reviewed TorchNeuron ProcessExecutor weak hook. The observer script and
+// environment are captured before Python/candidate execution, not read at spawn.
+extern "C" int torch_neuronx_posix_spawn_with_stable_environ(
+        pid_t* pid, const char* file, const posix_spawn_file_actions_t* actions,
+        const posix_spawnattr_t* attributes, char* const argv[], const char* cwd) {
+    auto& s = state();
+    if (s.compiler_script.empty() || !file || strcmp(file, "neuronx-cc") || !argv || !argv[1] || strcmp(argv[1], "compile")) {
+        auto chain = reinterpret_cast<decltype(&torch_neuronx_posix_spawn_with_stable_environ)>(
+            dlsym(RTLD_NEXT, "torch_neuronx_posix_spawn_with_stable_environ"));
+        if (chain) return chain(pid, file, actions, attributes, argv, cwd);
+        return posix_spawnp(pid, file, actions, attributes, argv, environ);
+    }
+    uint64_t id;
+    {
+        std::lock_guard<std::mutex> lock(s.mutex);
+        id = ++s.jobs;
+        if (id > 4096 || s.finished || getpid() != s.pid) return EINVAL;
+    }
+    std::vector<std::string> arguments = {s.compiler_python, "-I", "-B", "-c", s.compiler_script,
+        s.directory + "/compiler_jobs/" + std::to_string(id), cwd ? cwd : ""};
+    for (size_t n = 0; argv[n]; ++n) {
+        if (n >= 256 || strlen(argv[n]) > 4096) return E2BIG;
+        arguments.emplace_back(argv[n]);
+    }
+    std::vector<char*> command, environment;
+    for (auto& arg : arguments) command.push_back(const_cast<char*>(arg.c_str()));
+    command.push_back(nullptr);
+    for (auto& arg : s.environment) environment.push_back(const_cast<char*>(arg.c_str()));
+    environment.push_back(nullptr);
+    int status = posix_spawn(pid, s.compiler_python.c_str(), actions, attributes, command.data(), environment.data());
+    std::lock_guard<std::mutex> lock(s.mutex);
+    if (s.active()) {
+        fprintf(s.journal, "{\"type\":\"compiler_spawn\",\"id\":%llu,\"child\":%llu,\"status\":%d}\n",
+            (unsigned long long)id, (unsigned long long)(status == 0 && pid ? *pid : 0), status);
+        fflush(s.journal);
+    }
+    return status;
+}
 
 extern "C" NRT_STATUS nrt_load(const void* bytes, size_t size, int32_t start,
                                int32_t count, nrt_model_t** model) {

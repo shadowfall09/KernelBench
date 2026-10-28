@@ -74,6 +74,7 @@ def capture_record(payload, result):
                 "runtime_neff_bindings": result.get("runtime_neff_bindings"),
                 "compiler_observations": result.get("compiler_observations"),
                 "native_runtime": result.get("native_runtime"),
+                "compiler_output_links": result.get("compiler_output_links"),
                 "artifact_files": result.get("artifact_files", {}),
                 "artifact_file_bytes": result.get("artifact_file_bytes"),
                 "output_verified": result.get("output_verified") is True,
@@ -180,6 +181,11 @@ def validate_capture(value, *, allow_simulated=False):
         from ..provenance.neuron_runtime import validate
 
         validate(value["native_runtime"], files, sizes, allow_simulated=allow_simulated)
+    if value.get("compiler_output_links") is not None:
+        from ..provenance.neuron_runtime import compiler_links
+
+        if value["compiler_output_links"] != compiler_links(value.get("compiler_observations") or {}, value.get("native_runtime") or {}):
+            raise ValueError("Neuron compiler output links differ from observed source/runtime evidence")
     return value
 
 
